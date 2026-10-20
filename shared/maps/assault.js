@@ -57,7 +57,7 @@ const DOORS = BSP.DOORS.map((d, id) => {
   return { id, axis, dir: 1, len, h: y2 - y1 - 0.02, hinge: [d.origin[0], y1, d.origin[2]], tex: 'door1' };
 });
 
-for (const l of BSP.LIGHTS) m.add({ type: 'light', p: l.p, color: '#ffe2c8', intensity: 18, distance: 12 });
+for (const l of BSP.LIGHTS) m.add({ type: 'light', p: l.p, color: '#ffe2c8', intensity: 28, distance: 14 });
 m.add({ type: 'skyline', seed: 21 });
 
 const place = s => {
@@ -88,11 +88,11 @@ export default {
   ladders: m.ladders,
   water: [],
   doors: DOORS,
-  rooms: BSP.ROOMS.map(r => ({ group: 'covered', amb: 0.55, ...r })),
+  rooms: BSP.ROOMS.map(r => ({ group: 'covered', amb: 0.85, ...r })),
   theme: {
     skyTop: '#2c3c6a', skyHorizon: '#c49a8a', fog: ['#9a8a8e', 90, 280],
-    sun: { color: '#ffd6b0', intensity: 2.2, dir: [-50, 45, 40] },
-    hemi: { sky: '#c8c8e8', ground: '#6a5e58', intensity: 1.6 },
-    exposure: 1.1, clouds: 0.4, cloudColor: '#e8c8c0',
+    sun: { color: '#ffdcbc', intensity: 3.0, dir: [-50, 45, 40] },
+    hemi: { sky: '#d4d4f0', ground: '#8a7e76', intensity: 2.3 },
+    exposure: 1.35, clouds: 0.4, cloudColor: '#e8c8c0',
   },
 };
