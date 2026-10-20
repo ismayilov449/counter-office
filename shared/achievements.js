@@ -1,0 +1,31 @@
+// Achievements: lifetime goals on the stats counters (stat + goal), and moments the server unlocks directly.
+export const ACHIEVEMENTS = [
+  { id: 'first_kill', title: 'First Blood', desc: 'Get your first kill', stat: 'kills', goal: 1 },
+  { id: 'kills_100', title: 'Centurion', desc: 'Get 100 kills', stat: 'kills', goal: 100 },
+  { id: 'kills_500', title: 'Office Legend', desc: 'Get 500 kills', stat: 'kills', goal: 500 },
+  { id: 'hs_50', title: 'Headhunter', desc: 'Get 50 headshot kills', stat: 'headshots', goal: 50 },
+  { id: 'hs_250', title: 'Brain Surgeon', desc: 'Get 250 headshot kills', stat: 'headshots', goal: 250 },
+  { id: 'knife_1', title: 'Stabby', desc: 'Kill someone with the knife', stat: 'knifeKills', goal: 1 },
+  { id: 'knife_10', title: 'Butcher', desc: 'Get 10 knife kills', stat: 'knifeKills', goal: 10 },
+  { id: 'nade_10', title: 'Grenadier', desc: 'Get 10 HE grenade kills', stat: 'nadeKills', goal: 10 },
+  { id: 'molotov_5', title: 'Pyromaniac', desc: 'Get 5 Molotov kills', stat: 'molotovKills', goal: 5 },
+  { id: 'rpg_10', title: 'Rocket Man', desc: 'Get 10 RPG-7 kills', stat: 'rpgKills', goal: 10 },
+  { id: 'pkt_10', title: 'Tail Gunner', desc: 'Get 10 kills with the pickup\'s PKT', stat: 'pktKills', goal: 10 },
+  { id: 'mvp_10', title: 'Most Valuable', desc: 'Be the round MVP 10 times', stat: 'mvps', goal: 10 },
+  { id: 'win_10', title: 'Champion', desc: 'Win 10 matches', stat: 'matchWins', goal: 10 },
+  { id: 'plant_10', title: 'Demolition Expert', desc: 'Plant the bomb 10 times', stat: 'plants', goal: 10 },
+  { id: 'defuse_5', title: 'Wire Cutter', desc: 'Defuse the bomb 5 times', stat: 'defuses', goal: 5 },
+  { id: 'rescue_10', title: 'Hostage Hero', desc: 'Rescue 10 hostages', stat: 'rescues', goal: 10 },
+  { id: 'gg_win', title: 'Gun Master', desc: 'Win a Gun Game', stat: 'ggWins', goal: 1 },
+  { id: 'infect_25', title: 'Patient Zero', desc: 'Infect 25 humans as a zombie', stat: 'infections', goal: 25 },
+  { id: 'zkill_50', title: 'Zombie Slayer', desc: 'Kill 50 zombies', stat: 'zombieKills', goal: 50 },
+  { id: 'emote_10', title: 'Dance Floor', desc: 'Use 10 emotes', stat: 'emotes', goal: 10 },
+  { id: 'ace', title: 'Ace', desc: 'Kill the whole enemy team (3+) in one round' },
+  { id: 'clutch', title: 'Clutch', desc: 'Win a round as the last one alive against 2 or more' },
+  { id: 'rpg_double', title: 'Two Birds, One Rocket', desc: 'Kill 2 enemies with one rocket' },
+  { id: 'barbecue', title: 'Barbecue', desc: 'Burn 2 enemies with one Molotov' },
+  { id: 'road_rage', title: 'Road Rage', desc: 'Run someone over with a car' },
+  { id: 'survivor', title: 'Last One Standing', desc: 'Be the last human alive when the humans win a zombie round' },
+];
+
+export const ACHIEVEMENT = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));

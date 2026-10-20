@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Counter-Office Admin</title>
+<style>
+  :root {
+    --hud: #ffc440; --hud-dim: rgba(255, 196, 64, 0.5); --t: #e8b45a; --ct: #7fb2ff;
+    --bg: #141511; --panel: #1d1f1a; --line: rgba(255, 255, 255, 0.12); --text: #e8e4d8; --muted: #a8a294; --danger: #ff6a5d; --ok: #7fd08a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 Verdana, Tahoma, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: 2px; color: var(--hud); }
+  header h1 span { color: var(--text); }
+  main { max-width: 1000px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; min-width: 0; }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: normal; color: var(--hud); letter-spacing: 1px; text-transform: uppercase; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  button, select, input {
+    font: inherit; color: var(--text); background: #262822; border: 1px solid var(--line); border-radius: 3px; padding: 7px 10px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--hud-dim); background: rgba(255, 196, 64, 0.14); }
+  button.primary { background: rgba(255, 196, 64, 0.22); border-color: var(--hud-dim); }
+  button.danger:hover { border-color: var(--danger); background: rgba(255, 90, 80, 0.15); }
+  input[type=number] { width: 90px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px 18px; }
+  .field { display: grid; gap: 4px; }
+  .check { display: flex; gap: 8px; align-items: center; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--muted); font-weight: normal; border-bottom: 1px solid var(--line); padding: 6px; }
+  td { padding: 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); white-space: nowrap; }
+  .n { text-align: right; }
+  .T { color: var(--t); } .CT { color: var(--ct); } .SPEC { color: var(--muted); }
+  #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 9px 16px; border-radius: 4px; background: #262822;
+    border: 1px solid var(--line); opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: calc(100% - 32px); }
+  #toast.show { opacity: 1; }
+  #toast.err { border-color: var(--danger); color: var(--danger); }
+  #login { max-width: 380px; margin: 12vh auto; }
+  .hidden { display: none !important; }
+  .mode-pill { padding: 2px 8px; border-radius: 10px; background: rgba(255, 196, 64, 0.16); color: var(--hud); }
+</style>
+</head>
+<body>
+<header>
+  <h1>COUNTER-<span>OFFICE</span> ADMIN</h1>
+  <span id="status" class="muted"></span>
+</header>
+
+<section id="login">
+  <h2>Admin login</h2>
+  <form id="login-form" class="field">
+    <label class="field">Password <input id="password" type="password" autocomplete="current-password" required></label>
+    <span class="muted small">Shown in the server window when it starts (also in data/admin.json on the host).</span>
+    <div class="row"><button class="primary" type="submit">Log in</button></div>
+  </form>
+</section>
+
+<main id="app" class="hidden">
+  <section>
+    <h2>Match</h2>
+    <div class="row">
+      <button id="restart" class="primary" type="button">Restart match</button>
+      <select id="map-select" aria-label="Map"></select>
+      <button id="change-map" type="button">Change map now</button>
+    </div>
+    <form id="say-form" class="row" style="margin-top:10px">
+      <input id="say" placeholder="Message to everyone" maxlength="140" style="flex:1;min-width:180px">
+      <button type="submit">Send</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Players</h2>
+    <div class="table-wrap"><table id="players"></table></div>
+  </section>
+
+  <section>
+    <h2>Settings</h2>
+    <form id="settings-form">
+      <div class="grid">
+        <label class="field">Game mode
+          <select id="s-gameMode"><option value="classic">Classic (bomb / hostages)</option><option value="gungame">Gun Game</option><option value="zombie">Zombie mode</option><option value="deathmatch">Deathmatch (free for all)</option><option value="hns">Hide and Seek</option></select>
+        </label>
+        <label class="field">Start money <select id="s-startMoney"></select></label>
+        <label class="field">Rounds to win <input id="s-roundsToWin" type="number" min="1" max="30"></label>
+        <label class="field">Round time (s) <input id="s-roundTime" type="number" min="30" max="900"></label>
+        <label class="field">Freeze time (s) <input id="s-freezeTime" type="number" min="0" max="20"></label>
+        <label class="field">Buy time (s) <input id="s-buyTime" type="number" min="5" max="300"></label>
+        <label class="field">C4 timer (s) <input id="s-bombTime" type="number" min="15" max="120"></label>
+        <label class="field">Deathmatch kills to win <input id="s-dmFrags" type="number" min="5" max="150"></label>
+        <label class="field">Deathmatch time (min) <input id="s-dmMinutes" type="number" min="2" max="60"></label>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <label class="check"><input id="s-autoBalance" type="checkbox"> Auto team balance</label>
+        <label class="check"><input id="s-halftime" type="checkbox"> Switch sides at halftime</label>
+        <label class="check"><input id="s-friendlyFire" type="checkbox"> Friendly fire</label>
+        <label class="check"><input id="s-rotateMaps" type="checkbox"> Rotate maps when nobody votes</label>
+      </div>
+      <h2 style="margin-top:16px">Bots</h2>
+      <div class="grid">
+        <label class="field">Fill each team up to
+          <select id="b-perTeam">
+            <option value="0">no bots</option><option value="1">1 vs 1</option><option value="2">2 vs 2</option><option value="3">3 vs 3</option>
+            <option value="4">4 vs 4</option><option value="5">5 vs 5</option><option value="6">6 vs 6</option><option value="7">7 vs 7</option>
+            <option value="8">8 vs 8</option><option value="9">9 vs 9</option><option value="10">10 vs 10</option>
+          </select>
+        </label>
+        <label class="field">Bot level
+          <select id="b-difficulty"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
+        </label>
+      </div>
+      <p class="muted small">Bots fill the places nobody is playing (8 vs 8 with 6 people = 10 bots) and leave as people join. When every person is dead, the round ends right away — nobody has to watch the bots play.</p>
+      <h2 style="margin-top:16px">Party modes</h2>
+      <div class="grid">
+        <label class="check"><input id="p-lowGravity" type="checkbox"> Low gravity (jump way higher)</label>
+        <label class="check"><input id="p-headshotsOnly" type="checkbox"> Headshots only</label>
+        <label class="check"><input id="p-bigHeads" type="checkbox"> Big heads (bigger head hitbox too)</label>
+        <label class="field">Everyone gets only
+          <select id="p-weapon">
+            <option value="">— normal buying —</option><option value="awp">AWP</option><option value="deagle">Desert Eagle</option>
+            <option value="scout">Scout</option><option value="ak47">AK-47</option><option value="knife">Knife</option><option value="rpg">RPG-7</option>
+          </select>
+        </label>
+      </div>
+      <p class="muted small">Party modes apply right away (the weapon from the next spawn; classic mode only).</p>
+      <p class="muted small">Round times apply from the next round, start money from the next match. Changing the game mode restarts the match.</p>
+      <div class="row"><button class="primary" type="submit">Save settings</button><button id="reset-form" type="button">Undo changes</button></div>
+    </form>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const NUMS = ['roundsToWin', 'roundTime', 'freezeTime', 'buyTime', 'bombTime', 'dmFrags', 'dmMinutes'];
+const BOOLS = ['autoBalance', 'halftime', 'friendlyFire', 'rotateMaps'];
+const PARTY = ['lowGravity', 'headshotsOnly', 'bigHeads'];
+const MODES = { classic: 'Classic', gungame: 'Gun Game', zombie: 'Zombie mode', deathmatch: 'Deathmatch', hns: 'Hide and Seek' };
+let password = '';
+try { password = sessionStorage.getItem('adminPassword') || ''; } catch {}
+let state = null, formDirty = false;
+
+function toast(text, err = false) {
+  const t = $('toast');
+  t.textContent = text;
+  t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (t.className = ''), 2600);
+}
+
+async function api(action, extra = {}) {
+  const r = await fetch('/api/admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, action, ...extra }) });
+  const body = await r.json().catch(() => ({ error: 'Bad reply from the server' }));
+  if (r.status === 403 || r.status === 429) { logout(body.error); throw new Error(body.error); }
+  if (body.state) render(body.state);
+  if (body.error) { toast(body.error, true); throw new Error(body.error); }
+  return body;
+}
+
+function logout(msg) {
+  password = '';
+  try { sessionStorage.removeItem('adminPassword'); } catch {}
+  $('app').classList.add('hidden');
+  $('login').classList.remove('hidden');
+  if (msg) toast(msg, true);
+}
+
+const PHASE = { warmup: 'warmup', freeze: 'buy time', live: 'live', end: 'round over' };
+function render(s) {
+  const first = !state;
+  state = s;
+  const map = s.maps.find(m => m.id === s.map)?.title || s.map;
+  const mode = MODES[s.settings.gameMode] || 'Classic';
+  $('status').innerHTML = `<span class="mode-pill">${mode}</span> ${esc(map)} · ${PHASE[s.phase] || s.phase}` +
+    (s.settings.gameMode === 'gungame' || s.settings.gameMode === 'deathmatch' ? '' : ` · round ${s.round} · <span class="T">T ${s.score.T}</span> : <span class="CT">${s.score.CT} CT</span>`) +
+    ` · ${s.players.filter(p => !p.bot).length} player${s.players.filter(p => !p.bot).length === 1 ? '' : 's'}` +
+    (s.players.some(p => p.bot) ? ` + ${s.players.filter(p => p.bot).length} bots (${s.settings.bots.difficulty})` : '');
+
+  const sel = $('map-select');
+  if (sel.options.length !== s.maps.length) sel.innerHTML = s.maps.map(m => `<option value="${m.id}">${esc(m.title)}</option>`).join('');
+  if (document.activeElement !== sel) sel.value = s.map;
+
+  const gg = s.settings.gameMode === 'gungame';
+  const order = { T: 0, CT: 1, SPEC: 2 };
+  const rows = s.players.slice().sort((a, b) => order[a.team] - order[b.team] || b.k - a.k).map(p => `<tr>
+      <td class="${p.team}">${esc(p.name)}${p.alive ? '' : ' <span class="muted small">dead</span>'}</td>
+      <td class="${p.team}">${p.team}</td>${gg ? `<td class="n">${p.level ?? ''}</td>` : ''}
+      <td class="n">${p.k}</td><td class="n">${p.d}</td><td class="n">${p.bot ? 'BOT' : p.ping}</td>
+      <td>${p.bot ? '<span class="muted small">bot — set the number of bots below</span>' : ''}<div class="row"${p.bot ? ' hidden' : ''}>${['T', 'CT', 'SPEC'].filter(t => t !== p.team).map(t => `<button type="button" data-move="${p.id}" data-team="${t}">→ ${t}</button>`).join('')}
+        <button type="button" class="danger" data-kick="${p.id}" data-name="${esc(p.name)}">Kick</button></div></td></tr>`).join('');
+  $('players').innerHTML = `<tr><th>Name</th><th>Team</th>${gg ? '<th class="n">Level</th>' : ''}<th class="n">K</th><th class="n">D</th><th class="n">Ping</th><th>Actions</th></tr>` +
+    (rows || `<tr><td colspan="7" class="muted">Nobody is playing right now.</td></tr>`);
+
+  const money = $('s-startMoney');
+  if (money.options.length !== s.startMoneyChoices.length) money.innerHTML = s.startMoneyChoices.map(v => `<option value="${v}">$${v}</option>`).join('');
+  if (first || !formDirty) fillForm(s.settings);
+}
+
+function fillForm(set) {
+  $('s-gameMode').value = set.gameMode;
+  $('s-startMoney').value = String(set.startMoney);
+  for (const k of NUMS) $('s-' + k).value = set[k];
+  for (const k of BOOLS) $('s-' + k).checked = !!set[k];
+  for (const k of PARTY) $('p-' + k).checked = !!set.party?.[k];
+  $('p-weapon').value = set.party?.weapon || '';
+  $('b-perTeam').value = String(set.bots?.perTeam ?? 8);
+  $('b-difficulty').value = set.bots?.difficulty || 'hard';
+  formDirty = false;
+}
+
+function readForm() {
+  const out = { gameMode: $('s-gameMode').value, startMoney: +$('s-startMoney').value };
+  for (const k of NUMS) out[k] = Math.round(+$('s-' + k).value);
+  for (const k of BOOLS) out[k] = $('s-' + k).checked;
+  out.party = { weapon: $('p-weapon').value };
+  for (const k of PARTY) out.party[k] = $('p-' + k).checked;
+  out.bots = { perTeam: +$('b-perTeam').value, difficulty: $('b-difficulty').value };
+  return out;
+}
+
+async function start() {
+  try {
+    await api('state');
+    $('login').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    clearInterval(start.poll);
+    start.poll = setInterval(() => password && api('state').catch(() => {}), 2000);
+  } catch { /* logout() already showed why */ }
+}
+
+$('login-form').addEventListener('submit', e => {
+  e.preventDefault();
+  password = $('password').value;
+  try { sessionStorage.setItem('adminPassword', password); } catch {}
+  start();
+});
+$('settings-form').addEventListener('input', () => (formDirty = true));
+$('reset-form').addEventListener('click', () => state && fillForm(state.settings));
+$('settings-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const settings = readForm();
+  if (settings.gameMode !== state.settings.gameMode &&
+      !confirm(`Switch to ${MODES[settings.gameMode]}? The match restarts now.`)) return;
+  formDirty = false;
+  const r = await api('settings', { settings }).catch(() => null);
+  if (r) toast(r.changed?.length ? 'Settings saved' : 'Nothing changed');
+});
+$('restart').addEventListener('click', async () => {
+  if (!confirm('Restart the match for everyone?')) return;
+  await api('restart').then(() => toast('Match restarted')).catch(() => {});
+});
+$('change-map').addEventListener('click', async () => {
+  const id = $('map-select').value;
+  if (!confirm(`Change the map to ${state.maps.find(m => m.id === id)?.title}? The match restarts.`)) return;
+  await api('map', { map: id }).then(() => toast('Map changed')).catch(() => {});
+});
+$('say-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = $('say').value.trim();
+  if (!text) return;
+  await api('say', { text }).then(() => { $('say').value = ''; toast('Message sent'); }).catch(() => {});
+});
+$('players').addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.kick) {
+    if (!confirm(`Kick ${b.dataset.name}?`)) return;
+    await api('kick', { id: +b.dataset.kick }).then(() => toast('Player kicked')).catch(() => {});
+  } else if (b.dataset.move) {
+    await api('move', { id: +b.dataset.move, team: b.dataset.team }).then(() => toast('Player moved')).catch(() => {});
+  }
+});
+
+if (password) start();
+</script>
+</body>
+</html>

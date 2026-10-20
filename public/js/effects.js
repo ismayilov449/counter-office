@@ -1,0 +1,564 @@
+// Visual effects: tracers, bullet holes, particles, shell casings, grenades, explosions, smoke, Molotov fire, sprays.
+import * as THREE from 'three';
+import { simulateNade } from '/shared/physics.js';
+import { WEAPONS, FIRE } from '/shared/weapons.js';
+import { flashTexture } from './models.js';
+
+const MAX_PARTICLES = 1000;
+
+// A tongue of flame: bright round base narrowing to a soft tip.
+function flameTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 128;
+  const g = c.getContext('2d');
+  g.filter = 'blur(5px)';
+  const grad = g.createLinearGradient(0, 128, 0, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.45, 'rgba(255,255,255,0.75)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(32, 6);
+  g.bezierCurveTo(44, 40, 58, 70, 54, 98);
+  g.bezierCurveTo(50, 122, 14, 122, 10, 98);
+  g.bezierCurveTo(6, 70, 20, 40, 32, 6);
+  g.fill();
+  return new THREE.CanvasTexture(c);
+}
+const MAX_DECALS = 160;
+const MAX_TRACERS = 24;
+const MAX_CASINGS = 48;
+
+function softTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.6, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+export class Effects {
+  constructor(scene, getWorld) {
+    this.scene = scene;
+    this.getWorld = getWorld;
+    this.group = new THREE.Group();
+    scene.add(this.group);
+
+    // Particles (sparks, blood, debris)
+    const geo = new THREE.BufferGeometry();
+    this.pPos = new Float32Array(MAX_PARTICLES * 3).fill(-1000);
+    this.pCol = new Float32Array(MAX_PARTICLES * 3);
+    this.pVel = new Float32Array(MAX_PARTICLES * 3);
+    this.pLife = new Float32Array(MAX_PARTICLES);
+    this.pGrav = new Float32Array(MAX_PARTICLES);
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pPos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.pCol, 3));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.06, vertexColors: true, depthWrite: false }));
+    this.points.frustumCulled = false;
+    scene.add(this.points);
+    this.pi = 0;
+    this.pActive = 0;
+
+    // Bullet holes
+    this.decalGeo = new THREE.PlaneGeometry(0.1, 0.1);
+    this.decalMat = new THREE.MeshBasicMaterial({ color: 0x1a140e, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+    this.decals = [];
+    this.di = 0;
+
+    // Pooled tracers
+    this.tracers = [];
+    for (let i = 0; i < MAX_TRACERS; i++) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xffeaa0, transparent: true, opacity: 0 }));
+      line.frustumCulled = false;
+      line.visible = false;
+      scene.add(line);
+      this.tracers.push({ line, life: 0 });
+    }
+    this.ti = 0;
+
+    // Shell casings (instanced)
+    this.casings = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.035, 6), new THREE.MeshLambertMaterial({ color: 0xc8a040 }), MAX_CASINGS);
+    this.casings.frustumCulled = false;
+    this.casingData = Array.from({ length: MAX_CASINGS }, () => ({ p: new THREE.Vector3(0, -1000, 0), v: new THREE.Vector3(), r: new THREE.Euler(), spin: 0, life: 0, rest: false }));
+    this.ci = 0;
+    this._m = new THREE.Matrix4();
+    this._q = new THREE.Quaternion();
+    this._s = new THREE.Vector3(1, 1, 1);
+    for (let i = 0; i < MAX_CASINGS; i++) this.casings.setMatrixAt(i, this._m.makeTranslation(0, -1000, 0));
+    scene.add(this.casings);
+
+    this.light = new THREE.PointLight(0xffb060, 0, 14, 2);
+    scene.add(this.light);
+    this.lightLife = 0;
+    this.lightMax = 1;
+    this.lightPeak = 0;
+
+    this.softTex = softTexture();
+    this.flameTex = flameTexture();
+    this.sprites = [];
+    this.smokes = [];
+    this.nades = [];
+    this.rockets = [];
+    this.fires = [];
+    this.nadeGeo = new THREE.SphereGeometry(0.07, 8, 6);
+    this.nadeMats = {
+      he: new THREE.MeshLambertMaterial({ color: 0x3f5a2a }),
+      flash: new THREE.MeshLambertMaterial({ color: 0xaaaaaa }),
+      smoke: new THREE.MeshLambertMaterial({ color: 0x4a4a52 }),
+      molotov: new THREE.MeshLambertMaterial({ color: 0x4a6a24 }),
+    };
+    this.thirdFlashes = [];
+    this.sprayMeshes = new Map();
+  }
+
+  emit(p, v, color, life, gravity = 9) {
+    const i = this.pi++ % MAX_PARTICLES;
+    this.pPos.set(p, i * 3);
+    this.pVel.set(v, i * 3);
+    this.pCol.set(color, i * 3);
+    this.pLife[i] = life;
+    this.pGrav[i] = gravity;
+    this.pActive = Math.min(MAX_PARTICLES, this.pActive + 1);
+  }
+
+  puff(p, color, size, life, rise = 0.3) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.softTex, color, transparent: true, opacity: 0.6, depthWrite: false }));
+    s.position.set(p[0], p[1], p[2]);
+    s.scale.set(size * 0.3, size * 0.3, 1);
+    this.group.add(s);
+    this.sprites.push({ s, life, max: life, grow: size, rise, base: 0.6 });
+  }
+
+  sparks(p, n) {
+    for (let i = 0; i < 6; i++) {
+      const v = [n[0] * 2 + (Math.random() - 0.5) * 3, n[1] * 2 + Math.random() * 2, n[2] * 2 + (Math.random() - 0.5) * 3];
+      this.emit(p, v, [1, 0.8 + Math.random() * 0.2, 0.4], 0.25 + Math.random() * 0.2);
+    }
+    for (let i = 0; i < 5; i++) {
+      const v = [n[0] + (Math.random() - 0.5), n[1] + Math.random() * 0.8, n[2] + (Math.random() - 0.5)];
+      this.emit(p, v, [0.7, 0.62, 0.48], 0.5 + Math.random() * 0.3, 2);
+    }
+    this.puff([p[0] + n[0] * 0.1, p[1] + n[1] * 0.1, p[2] + n[2] * 0.1], 0xb8a888, 0.6, 0.6, 0.2);
+  }
+
+  blood(p) {
+    for (let i = 0; i < 12; i++) {
+      const v = [(Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3];
+      this.emit(p, v, [0.55 + Math.random() * 0.2, 0, 0], 0.4 + Math.random() * 0.3);
+    }
+    this.puff(p, 0x8a1010, 0.5, 0.35, 0);
+  }
+
+  decal(p, n) {
+    let m = this.decals[this.di % MAX_DECALS];
+    if (!m) {
+      m = new THREE.Mesh(this.decalGeo, this.decalMat);
+      this.decals.push(m);
+      this.group.add(m);
+    }
+    this.di++;
+    m.position.set(p[0] + n[0] * 0.01, p[1] + n[1] * 0.01, p[2] + n[2] * 0.01);
+    m.lookAt(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
+    m.rotateZ(Math.random() * Math.PI);
+  }
+
+  clearDecals() {
+    for (const d of this.decals) this.group.remove(d);
+    this.decals = [];
+    this.di = 0;
+  }
+
+  tracer(a, b) {
+    const tr = this.tracers[this.ti++ % MAX_TRACERS];
+    const pos = tr.line.geometry.attributes.position;
+    pos.setXYZ(0, a[0], a[1], a[2]);
+    pos.setXYZ(1, b[0], b[1], b[2]);
+    pos.needsUpdate = true;
+    tr.line.visible = true;
+    tr.life = 0.07;
+  }
+
+  // Brass flying out to the right of the gun.
+  casing(origin, right, up) {
+    const c = this.casingData[this.ci++ % MAX_CASINGS];
+    c.p.set(...origin);
+    c.v.set(right[0] * 2.2 + up[0] * 1.5, right[1] * 2.2 + 1.8 + Math.random(), right[2] * 2.2 + up[2] * 1.5);
+    c.r.set(Math.random() * 3, Math.random() * 3, 0);
+    c.spin = 15 + Math.random() * 10;
+    c.life = 6;
+    c.rest = false;
+  }
+
+  flashLight(p, intensity, dur, color = 0xffb060) {
+    this.light.position.set(p[0], p[1], p[2]);
+    this.light.color.setHex(color);
+    this.lightPeak = intensity;
+    this.lightMax = this.lightLife = dur;
+  }
+
+  thirdPersonFlash(object) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    s.scale.set(0.35, 0.35, 1);
+    object.add(s);
+    this.thirdFlashes.push({ s, parent: object, life: 0.05 });
+  }
+
+  explosion(p, big) {
+    const scale = big ? 3 : 1;
+    this.flashLight([p[0], p[1] + 1, p[2]], big ? 4000 : 800, big ? 0.8 : 0.4, 0xffa040);
+    const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    fire.position.set(p[0], p[1] + 0.6 * scale, p[2]);
+    this.group.add(fire);
+    this.sprites.push({ s: fire, life: 0.45, max: 0.45, grow: 7 * scale, base: 1 });
+    for (let i = 0; i < (big ? 14 : 6); i++) {
+      this.puff([p[0] + (Math.random() - 0.5) * 2 * scale, p[1] + 0.5 + Math.random() * 1.5 * scale, p[2] + (Math.random() - 0.5) * 2 * scale],
+        0x6a645a, 2 * scale + 1.5, 1.5 + Math.random() * 1.5, 0.6);
+    }
+    for (let i = 0; i < (big ? 120 : 50); i++) {
+      const a = Math.random() * Math.PI * 2, sp = (3 + Math.random() * 8) * (big ? 1.5 : 1);
+      this.emit([p[0], p[1] + 0.3, p[2]], [Math.cos(a) * sp, 2 + Math.random() * 7, Math.sin(a) * sp], [1, 0.5 + Math.random() * 0.4, 0.1], 0.5 + Math.random() * 0.6);
+    }
+  }
+
+  // Window pane bursting into shards.
+  glassShatter(center, size) {
+    for (let i = 0; i < 70; i++) {
+      const p = [center[0] + (Math.random() - 0.5) * size[0], center[1] + (Math.random() - 0.5) * size[1], center[2] + (Math.random() - 0.5) * size[2]];
+      const v = [(Math.random() - 0.5) * 4, Math.random() * 2, (Math.random() - 0.5) * 4];
+      const tint = 0.75 + Math.random() * 0.25;
+      this.emit(p, v, [0.7 * tint, 0.85 * tint, 0.95 * tint], 0.6 + Math.random() * 0.8, 12);
+    }
+  }
+
+  flashPop(p) {
+    this.flashLight([p[0], p[1] + 0.3, p[2]], 1500, 0.25, 0xffffff);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    s.position.set(p[0], p[1] + 0.2, p[2]);
+    this.group.add(s);
+    this.sprites.push({ s, life: 0.25, max: 0.25, grow: 4, base: 1 });
+  }
+
+  // A smoke grenade cloud that lingers ~18 s.
+  smoke(p) {
+    const parts = [];
+    for (let i = 0; i < 26; i++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.softTex, color: 0xb8b8b8, transparent: true, opacity: 0, depthWrite: false }));
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 3.2;
+      s.userData.target = new THREE.Vector3(p[0] + Math.cos(a) * r, p[1] + 0.6 + Math.random() * 2.6, p[2] + Math.sin(a) * r);
+      s.position.set(p[0], p[1] + 0.3, p[2]);
+      s.userData.size = 3 + Math.random() * 2;
+      s.userData.phase = Math.random() * 10;
+      this.group.add(s);
+      parts.push(s);
+    }
+    this.smokes.push({ parts, t: 0, life: 18 });
+  }
+
+  // An RPG rocket flying straight from o along d for dist metres, trailing smoke and a flame.
+  rocket(o, d, dist, speed) {
+    const mesh = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 8).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x4a5236 }));
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 8).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a4028 }));
+    head.position.z = -0.38;
+    const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), color: 0xffb050, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    flame.scale.set(0.6, 0.6, 1);
+    flame.position.z = 0.32;
+    mesh.add(body, head, flame);
+    mesh.position.set(...o);
+    mesh.lookAt(o[0] + d[0], o[1] + d[1], o[2] + d[2]);
+    mesh.rotateY(Math.PI);
+    this.group.add(mesh);
+    this.rockets.push({ mesh, o, d, dist, speed, t: 0, puffAt: 0 });
+  }
+
+  nade(kind, o, v, fuse, onBounce) {
+    const path = [];
+    const impact = !!WEAPONS[kind]?.impact;
+    simulateNade(this.getWorld().nade(), o, v, fuse, path, impact);
+    if (impact) fuse = path.length / 60;
+    const m = new THREE.Mesh(this.nadeGeo, this.nadeMats[kind] || this.nadeMats.he);
+    m.castShadow = true;
+    m.position.set(...o);
+    this.group.add(m);
+    this.nades.push({ mesh: m, path, t: 0, fuse, lastVy: v[1], onBounce, lit: kind === 'molotov' });
+  }
+
+  // A Molotov fire: flames over a patch of floor that walls cut off, burning for `life` seconds.
+  fire(id, p, life, r = FIRE.radius) {
+    this.fireOut(id, true);
+    const world = this.getWorld();
+    const flames = [];
+    const n = 34;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      let d = r * Math.sqrt(Math.random()) * 0.95;
+      // Flames stop at walls.
+      const o = [p[0], p[1] + 0.35, p[2]], dir = [Math.cos(a), 0, Math.sin(a)];
+      const hit = world.raycast(o, dir, d + 0.3);
+      if (hit) d = Math.max(0, hit.t - 0.35);
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: this.flameTex, color: i % 3 ? 0xff6a14 : 0xffb030, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+      }));
+      s.center.set(0.5, 0.04);
+      s.position.set(p[0] + dir[0] * d, p[1] + 0.02, p[2] + dir[2] * d);
+      s.userData = { w: 0.45 + Math.random() * 0.35, h: 0.8 + Math.random() * 0.9, ph: Math.random() * 10, sp: 7 + Math.random() * 6 };
+      this.group.add(s);
+      flames.push(s);
+    }
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(r, 24), new THREE.MeshBasicMaterial({
+      map: this.softTex, color: 0xff6a10, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.set(p[0], p[1] + 0.03, p[2]);
+    this.group.add(glow);
+    this.fires.push({ id, p: p.slice(), r, t: 0, life, flames, glow, nextEmber: 0, nextSmoke: 0 });
+  }
+
+  fireOut(id, now = false) {
+    const f = this.fires.find(x => x.id === id);
+    if (!f) return;
+    if (now) f.life = f.t;
+    else f.life = Math.min(f.life, f.t + 0.6);
+  }
+
+  clearFires() {
+    for (const f of this.fires) this.removeFire(f);
+    this.fires = [];
+  }
+
+  removeFire(f) {
+    for (const s of f.flames) { this.group.remove(s); s.material.dispose(); }
+    this.group.remove(f.glow);
+    f.glow.geometry.dispose();
+    f.glow.material.dispose();
+  }
+
+  // The fire someone standing at pos (feet) is caught in, if any. Same rule as the server.
+  fireAt(pos) {
+    for (const f of this.fires) {
+      if (f.t >= f.life - 0.3) continue;
+      if (Math.hypot(pos[0] - f.p[0], pos[2] - f.p[2]) > f.r) continue;
+      if (pos[1] < f.p[1] - 1 || pos[1] > f.p[1] + 1.4) continue;
+      const o = [f.p[0], f.p[1] + 0.35, f.p[2]], d = [pos[0] - f.p[0], 0, pos[2] - f.p[2]];
+      const len = Math.hypot(d[0], d[2]);
+      if (len > 0.2) {
+        const hit = this.getWorld().raycast(o, [d[0] / len, 0, d[2] / len], len);
+        if (hit && hit.t < len - 0.2) continue;
+      }
+      return f;
+    }
+    return null;
+  }
+
+  // Flames licking up a burning player's body.
+  burn(p) {
+    const a = Math.random() * Math.PI * 2;
+    this.emit([p[0] + Math.cos(a) * 0.25, p[1] + 0.2 + Math.random() * 1.3, p[2] + Math.sin(a) * 0.25],
+      [(Math.random() - 0.5) * 0.4, 1.2 + Math.random(), (Math.random() - 0.5) * 0.4], [1, 0.45 + Math.random() * 0.35, 0.08], 0.35 + Math.random() * 0.25, -1);
+  }
+
+  // Player graffiti: one per player, replaced when they spray again.
+  spray(id, texture, p, n, yaw) {
+    const old = this.sprayMeshes.get(id);
+    if (old) { this.group.remove(old); old.material.dispose(); }
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshLambertMaterial({
+      map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, alphaTest: 0.02,
+    }));
+    m.position.set(p[0] + n[0] * 0.02, p[1] + n[1] * 0.02, p[2] + n[2] * 0.02);
+    if (Math.abs(n[1]) > 0.7) m.up.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    m.lookAt(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
+    m.receiveShadow = true;
+    this.group.add(m);
+    this.sprayMeshes.set(id, m);
+  }
+
+  removeSpray(id) {
+    const m = this.sprayMeshes.get(id);
+    if (m) { this.group.remove(m); m.material.dispose(); this.sprayMeshes.delete(id); }
+  }
+
+  // Remove everything that belongs to a map (on map change).
+  reset() {
+    this.clearDecals();
+    for (const id of [...this.sprayMeshes.keys()]) this.removeSpray(id);
+    for (const s of this.smokes) for (const p of s.parts) this.group.remove(p);
+    this.smokes = [];
+    for (const n of this.nades) this.group.remove(n.mesh);
+    this.nades = [];
+    for (const r of this.rockets) this.group.remove(r.mesh);
+    this.rockets = [];
+    this.clearFires();
+    for (const c of this.casingData) { c.life = 0; c.p.y = -1000; }
+  }
+
+  update(dt, camera) {
+    for (let i = this.rockets.length - 1; i >= 0; i--) {
+      const r = this.rockets[i];
+      r.t += dt;
+      const s = Math.min(r.dist, r.t * r.speed);
+      const p = [r.o[0] + r.d[0] * s, r.o[1] + r.d[1] * s, r.o[2] + r.d[2] * s];
+      r.mesh.position.set(...p);
+      if (r.t >= r.puffAt) { r.puffAt = r.t + 0.025; this.puff([p[0] - r.d[0] * 0.4, p[1] - r.d[1] * 0.4, p[2] - r.d[2] * 0.4], 0xc8c4bc, 0.9, 1.4, 0.15); }
+      if (s >= r.dist) { this.group.remove(r.mesh); this.rockets.splice(i, 1); }
+    }
+    if (this.pActive > 0) {
+      let alive = 0;
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        if (this.pLife[i] <= 0) continue;
+        this.pLife[i] -= dt;
+        const k = i * 3;
+        if (this.pLife[i] <= 0) { this.pPos[k + 1] = -1000; continue; }
+        alive++;
+        this.pVel[k + 1] -= this.pGrav[i] * dt;
+        this.pPos[k] += this.pVel[k] * dt;
+        this.pPos[k + 1] += this.pVel[k + 1] * dt;
+        this.pPos[k + 2] += this.pVel[k + 2] * dt;
+      }
+      this.pActive = alive;
+      this.points.geometry.attributes.position.needsUpdate = true;
+      this.points.geometry.attributes.color.needsUpdate = true;
+    }
+
+    for (const tr of this.tracers) {
+      if (tr.life <= 0) continue;
+      tr.life -= dt;
+      tr.line.material.opacity = Math.max(0, tr.life / 0.07) * 0.7;
+      if (tr.life <= 0) tr.line.visible = false;
+    }
+
+    // Casings
+    const world = this.getWorld();
+    let dirty = false;
+    this.casingData.forEach((c, i) => {
+      if (c.life <= 0) return;
+      c.life -= dt;
+      dirty = true;
+      if (!c.rest) {
+        c.v.y -= 15 * dt;
+        const next = c.p.clone().addScaledVector(c.v, dt);
+        if (c.v.y < 0) {
+          const hit = world.raycast([c.p.x, c.p.y, c.p.z], [0, -1, 0], -c.v.y * dt + 0.02, 'solid');
+          if (hit) {
+            next.y = c.p.y - hit.t + 0.008;
+            c.v.y *= -0.35; c.v.x *= 0.5; c.v.z *= 0.5;
+            if (Math.abs(c.v.y) < 0.4) { c.rest = true; c.r.x = Math.PI / 2; }
+          }
+        }
+        c.p.copy(next);
+        c.r.x += c.spin * dt;
+        c.r.y += c.spin * 0.5 * dt;
+      }
+      const y = c.life <= 0 ? -1000 : c.p.y;
+      this._q.setFromEuler(c.r);
+      this._m.compose(new THREE.Vector3(c.p.x, y, c.p.z), this._q, this._s);
+      this.casings.setMatrixAt(i, this._m);
+    });
+    if (dirty) this.casings.instanceMatrix.needsUpdate = true;
+
+    if (this.lightLife > 0) {
+      this.lightLife -= dt;
+      this.light.intensity = this.lightPeak * Math.max(0, this.lightLife / this.lightMax);
+    } else {
+      this.light.intensity = 0;
+    }
+
+    for (let i = this.sprites.length - 1; i >= 0; i--) {
+      const sp = this.sprites[i];
+      sp.life -= dt;
+      const f = 1 - sp.life / sp.max;
+      const size = 0.3 + sp.grow * Math.sqrt(f);
+      sp.s.scale.set(size, size, 1);
+      if (sp.rise) sp.s.position.y += sp.rise * dt;
+      sp.s.material.opacity = Math.max(0, 1 - f) * (sp.base ?? 0.8);
+      if (sp.life <= 0) {
+        this.group.remove(sp.s);
+        sp.s.material.dispose();
+        this.sprites.splice(i, 1);
+      }
+    }
+
+    for (let i = this.smokes.length - 1; i >= 0; i--) {
+      const sm = this.smokes[i];
+      sm.t += dt;
+      const fadeIn = Math.min(1, sm.t / 1.5), fadeOut = Math.min(1, (sm.life - sm.t) / 3);
+      for (const s of sm.parts) {
+        s.position.lerp(s.userData.target, Math.min(1, dt * 1.2));
+        const size = s.userData.size * (0.4 + 0.6 * fadeIn);
+        s.scale.set(size, size, 1);
+        s.material.opacity = 0.92 * Math.max(0, Math.min(fadeIn, fadeOut));
+        s.material.rotation = Math.sin(sm.t * 0.2 + s.userData.phase) * 0.5;
+      }
+      if (sm.t >= sm.life) {
+        for (const s of sm.parts) { this.group.remove(s); s.material.dispose(); }
+        this.smokes.splice(i, 1);
+      }
+    }
+
+    for (let i = this.fires.length - 1; i >= 0; i--) {
+      const f = this.fires[i];
+      f.t += dt;
+      const k = Math.max(0, Math.min(1, f.t / 0.35, (f.life - f.t) / 0.8));
+      for (const s of f.flames) {
+        const u = s.userData;
+        const flick = 0.75 + 0.25 * Math.sin(f.t * u.sp + u.ph) + 0.1 * Math.sin(f.t * u.sp * 2.3 + u.ph * 3);
+        s.scale.set(u.w * (0.6 + 0.4 * k), u.h * flick * k, 1);
+        s.material.opacity = 0.8 * k;
+        s.material.rotation = 0.12 * Math.sin(f.t * u.sp * 0.7 + u.ph);
+      }
+      f.glow.material.opacity = 0.55 * k * (0.85 + 0.15 * Math.sin(f.t * 9));
+      if (f.t >= f.nextEmber) {
+        f.nextEmber = f.t + 0.03;
+        const a = Math.random() * Math.PI * 2;
+        const fl = f.flames[Math.floor(Math.random() * f.flames.length)].position;
+        this.emit([fl.x + Math.cos(a) * 0.2, fl.y + 0.3, fl.z + Math.sin(a) * 0.2], [(Math.random() - 0.5) * 0.6, 1.6 + Math.random() * 1.5, (Math.random() - 0.5) * 0.6],
+          [1, 0.5 + Math.random() * 0.4, 0.1], 0.5 + Math.random() * 0.5, -0.5);
+      }
+      if (f.t >= f.nextSmoke && k > 0.3) {
+        f.nextSmoke = f.t + 0.22;
+        const fl = f.flames[Math.floor(Math.random() * f.flames.length)].position;
+        this.puff([fl.x, fl.y + 1.4, fl.z], 0x2a2622, 2.2, 2.2, 1.1);
+      }
+      if (f.t >= f.life) {
+        this.removeFire(f);
+        this.fires.splice(i, 1);
+      }
+    }
+
+    for (let i = this.thirdFlashes.length - 1; i >= 0; i--) {
+      const f = this.thirdFlashes[i];
+      f.life -= dt;
+      if (f.life <= 0) {
+        f.parent.remove(f.s);
+        f.s.material.dispose();
+        this.thirdFlashes.splice(i, 1);
+      }
+    }
+
+    for (let i = this.nades.length - 1; i >= 0; i--) {
+      const n = this.nades[i];
+      n.t += dt;
+      const idx = Math.min(n.path.length - 1, Math.floor(n.t * 60));
+      const p = n.path[idx];
+      const prev = n.path[Math.max(0, idx - 1)];
+      const vy = p[1] - prev[1];
+      if (n.lastVy < -0.01 && vy >= 0) n.onBounce?.(p);
+      n.lastVy = vy;
+      n.mesh.position.set(p[0], p[1], p[2]);
+      n.mesh.rotation.x += dt * 8;
+      if (n.lit) this.emit(p, [(Math.random() - 0.5) * 0.3, 0.6, (Math.random() - 0.5) * 0.3], [1, 0.55, 0.1], 0.25, -1);
+      if (n.t >= n.fuse) {
+        this.group.remove(n.mesh);
+        this.nades.splice(i, 1);
+      }
+    }
+  }
+}
+
+export const nadeFuse = k => WEAPONS[k]?.fuse ?? 1.6;

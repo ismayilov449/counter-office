@@ -1,0 +1,573 @@
+// Effects are synthesized with WebAudio; the CS 1.6 voice lines (round start, bomb, win, "Fire in the hole") are mp3s in /sounds.
+import { WEAPONS } from '/shared/weapons.js';
+
+let ctx = null, master = null, noise = null, reverb = null;
+
+const VOICES = ['bombdef', 'bombpl', 'com_go', 'ctwin', 'terwin', 'ct_fireinhole', 'go', 'letsgo', 'locknload', 'moveout'];
+const voiceBuf = new Map();
+let voiceSrc = null;
+const listenerPos = { x: 0, y: 0, z: 0 };
+
+// Gunshots are layered: a sharp supersonic crack, a distorted mid "body", a low boom, the action cycling
+// and an echo tail. crack/body/boom are frequencies (Hz), dur the body length (s), tail the echo amount.
+const GUN = {
+  glock: { crack: 5200, body: 1500, boom: 150, dur: 0.11, gain: 0.7, tail: 0.25 },
+  usp: { suppressed: true, body: 1250, gain: 0.55 },
+  p228: { crack: 4800, body: 1350, boom: 140, dur: 0.12, gain: 0.75, tail: 0.28 },
+  deagle: { crack: 3600, body: 900, boom: 85, dur: 0.24, gain: 1.15, tail: 0.6 },
+  fiveseven: { crack: 6000, body: 1700, boom: 160, dur: 0.1, gain: 0.65, tail: 0.25 },
+  elite: { crack: 5000, body: 1450, boom: 145, dur: 0.11, gain: 0.72, tail: 0.27 },
+  m3: { crack: 2600, body: 650, boom: 70, dur: 0.3, gain: 1.3, tail: 0.65, after: 'pump' },
+  xm1014: { crack: 2800, body: 700, boom: 75, dur: 0.26, gain: 1.2, tail: 0.55 },
+  mac10: { crack: 5200, body: 1600, boom: 160, dur: 0.07, gain: 0.6, tail: 0.2 },
+  tmp: { suppressed: true, body: 1500, gain: 0.45 },
+  mp5: { crack: 5400, body: 1500, boom: 155, dur: 0.08, gain: 0.6, tail: 0.22 },
+  ump45: { crack: 4400, body: 1150, boom: 120, dur: 0.1, gain: 0.7, tail: 0.3 },
+  p90: { crack: 6200, body: 1800, boom: 170, dur: 0.07, gain: 0.55, tail: 0.2 },
+  galil: { crack: 4000, body: 1100, boom: 105, dur: 0.14, gain: 0.9, tail: 0.42 },
+  famas: { crack: 4300, body: 1200, boom: 115, dur: 0.12, gain: 0.85, tail: 0.4 },
+  ak47: { crack: 3400, body: 950, boom: 95, dur: 0.16, gain: 1.0, tail: 0.5 },
+  m4a1: { crack: 4100, body: 1150, boom: 110, dur: 0.13, gain: 0.88, tail: 0.42 },
+  m4a1s: { suppressed: true, body: 1050, gain: 0.5 },
+  sg552: { crack: 3800, body: 1050, boom: 100, dur: 0.14, gain: 0.92, tail: 0.45 },
+  aug: { crack: 4000, body: 1100, boom: 105, dur: 0.13, gain: 0.9, tail: 0.44 },
+  scout: { crack: 3000, body: 800, boom: 80, dur: 0.28, gain: 1.15, tail: 0.75, after: 'bolt' },
+  g3sg1: { crack: 3000, body: 850, boom: 82, dur: 0.22, gain: 1.12, tail: 0.65 },
+  sg550: { crack: 3400, body: 950, boom: 92, dur: 0.18, gain: 1.02, tail: 0.55 },
+  pkt: { crack: 3200, body: 900, boom: 88, dur: 0.15, gain: 1.0, tail: 0.5 },
+  rpg: { launcher: true },
+  awp: { crack: 2400, body: 600, boom: 58, dur: 0.42, gain: 1.45, tail: 1.0, after: 'bolt' },
+  m249: { crack: 3600, body: 1000, boom: 95, dur: 0.14, gain: 0.95, tail: 0.45 },
+};
+
+// A soft-clipping curve that gives gunshots their punch.
+let driveCurve = null;
+function drive() {
+  if (!driveCurve) {
+    driveCurve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; driveCurve[i] = Math.tanh(x * 4) * 0.9; }
+  }
+  const w = ctx.createWaveShaper();
+  w.curve = driveCurve;
+  return w;
+}
+
+// Outdoor echo: decaying noise as a convolution impulse.
+function makeReverb() {
+  const len = Math.floor(ctx.sampleRate * 1.6);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      const t = i / ctx.sampleRate;
+      // a couple of discrete slap-backs off walls, then a diffuse tail
+      const slap = (Math.abs(t - 0.09 - ch * 0.013) < 0.004 ? 0.5 : 0) + (Math.abs(t - 0.23 - ch * 0.02) < 0.005 ? 0.3 : 0);
+      d[i] = ((Math.random() * 2 - 1) * Math.exp(-t * 3.2) * 0.5 + slap * (Math.random() * 2 - 1)) * (t < 0.02 ? t / 0.02 : 1);
+    }
+  }
+  const conv = ctx.createConvolver();
+  conv.buffer = buf;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 2400;
+  conv.connect(lp).connect(master);
+  return conv;
+}
+
+function gunshot(out, t, s, dist) {
+  // Distant shots lose their highs and keep more echo.
+  const bus = ctx.createGain();
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = Math.max(1200, 16000 / (1 + dist / 18));
+  bus.connect(lp).connect(out);
+  if (reverb) {
+    const send = ctx.createGain();
+    send.gain.value = (s.tail ?? 0.15) * 0.7 / (1 + dist / 25);
+    bus.connect(send).connect(reverb);
+  }
+  const g = s.gain;
+  if (s.suppressed) {
+    burst(bus, t, { dur: 0.08, type: 'bandpass', freq: s.body, freqEnd: s.body * 0.6, q: 1.4, gain: g * 1.1 });
+    burst(bus, t, { dur: 0.025, type: 'highpass', freq: 4500, gain: g * 0.6 });
+    tone(bus, t, { freq: 210, freqEnd: 70, dur: 0.07, gain: g * 0.5 });
+    tone(bus, t + 0.025, { freq: 2900, dur: 0.012, type: 'square', gain: 0.05 });
+    return;
+  }
+  burst(bus, t, { dur: 0.018, type: 'highpass', freq: s.crack, gain: g * 1.8 });
+  const sh = drive();
+  sh.connect(bus);
+  burst(sh, t, { dur: s.dur, type: 'bandpass', freq: s.body, freqEnd: s.body * 0.45, q: 0.8, gain: g * 1.5 });
+  burst(bus, t + 0.004, { dur: s.dur * 1.8, freq: s.body * 1.4, freqEnd: 220, gain: g * 0.55 });
+  tone(bus, t, { freq: s.boom, freqEnd: 32, dur: s.dur * 1.5, gain: g * 0.95 });
+  tone(bus, t, { freq: s.boom * 2.1, freqEnd: 60, dur: s.dur * 0.6, type: 'triangle', gain: g * 0.3 });
+  // action cycling
+  tone(bus, t + 0.028, { freq: 3100 + Math.random() * 400, dur: 0.012, type: 'square', gain: 0.045 });
+}
+
+// ---- reload foley, built from small mechanical events
+const fol = {
+  magOut(o, t) { tone(o, t, { freq: 2300, dur: 0.015, type: 'square', gain: 0.09 }); burst(o, t + 0.02, { dur: 0.13, type: 'bandpass', freq: 2600, freqEnd: 1400, q: 1.5, gain: 0.28 }); },
+  magIn(o, t) { burst(o, t, { dur: 0.07, freq: 800, gain: 0.55 }); tone(o, t + 0.035, { freq: 1700, dur: 0.02, type: 'square', gain: 0.12 }); tone(o, t, { freq: 160, freqEnd: 90, dur: 0.06, gain: 0.25 }); },
+  boltBack(o, t) { burst(o, t, { dur: 0.09, type: 'bandpass', freq: 3200, freqEnd: 1600, q: 2, gain: 0.35 }); tone(o, t + 0.08, { freq: 2100, dur: 0.015, type: 'square', gain: 0.1 }); },
+  boltFwd(o, t) { burst(o, t, { dur: 0.04, type: 'highpass', freq: 2200, gain: 0.65 }); tone(o, t, { freq: 950, freqEnd: 600, dur: 0.06, type: 'triangle', gain: 0.25 }); },
+  slide(o, t) { burst(o, t, { dur: 0.05, type: 'bandpass', freq: 3000, q: 2, gain: 0.35 }); burst(o, t + 0.06, { dur: 0.035, type: 'highpass', freq: 2500, gain: 0.6 }); tone(o, t + 0.06, { freq: 1200, freqEnd: 800, dur: 0.05, type: 'triangle', gain: 0.2 }); },
+  shell(o, t) { tone(o, t, { freq: 1500, dur: 0.02, type: 'square', gain: 0.08 }); burst(o, t + 0.02, { dur: 0.06, freq: 1100, gain: 0.35 }); },
+  pump(o, t) { burst(o, t, { dur: 0.09, type: 'bandpass', freq: 1700, freqEnd: 1100, q: 1.2, gain: 0.5 }); burst(o, t + 0.16, { dur: 0.08, type: 'bandpass', freq: 1300, freqEnd: 2000, q: 1.2, gain: 0.55 }); tone(o, t + 0.24, { freq: 700, dur: 0.04, type: 'triangle', gain: 0.25 }); },
+  rattle(o, t) { for (let i = 0; i < 6; i++) tone(o, t + i * 0.035, { freq: 2600 + Math.random() * 1200, dur: 0.015, type: 'square', gain: 0.05 }); },
+  clank(o, t) { burst(o, t, { dur: 0.06, freq: 1400, gain: 0.45 }); tone(o, t, { freq: 620, freqEnd: 480, dur: 0.12, type: 'triangle', gain: 0.18 }); },
+};
+
+function reloadFoley(o, t, id) {
+  const def = WEAPONS[id] || { reload: 2.5, cls: 'rifle' };
+  const d = def.reload, at = f => t + d * f;
+  switch (def.autoSniper ? 'rifle' : def.cls) {
+    case 'pistol':
+      if (id === 'elite') { fol.magOut(o, at(0.1)); fol.magOut(o, at(0.18)); fol.magIn(o, at(0.48)); fol.magIn(o, at(0.62)); fol.slide(o, at(0.82)); fol.slide(o, at(0.9)); }
+      else { fol.magOut(o, at(0.15)); fol.magIn(o, at(0.55)); fol.slide(o, at(0.8)); }
+      break;
+    case 'shotgun': {
+      const n = 4;
+      for (let i = 0; i < n; i++) fol.shell(o, at(0.12 + (i * 0.6) / n));
+      fol.pump(o, at(0.8));
+      break;
+    }
+    case 'sniper':
+      fol.boltBack(o, at(0.08)); fol.magOut(o, at(0.3)); fol.magIn(o, at(0.6)); fol.boltFwd(o, at(0.85));
+      break;
+    case 'mg':
+      fol.clank(o, at(0.12)); fol.magOut(o, at(0.28)); fol.magIn(o, at(0.52)); fol.rattle(o, at(0.66)); fol.clank(o, at(0.84));
+      break;
+    default:
+      fol.magOut(o, at(0.18)); fol.magIn(o, at(0.55)); fol.boltBack(o, at(0.74)); fol.boltFwd(o, at(0.82));
+  }
+}
+
+let voice = null;
+function pickVoice() {
+  const voices = window.speechSynthesis?.getVoices() || [];
+  voice = voices.find(v => /en[-_](US|GB)/i.test(v.lang) && /male|david|mark|george|daniel/i.test(v.name)) ||
+    voices.find(v => /^en/i.test(v.lang)) || null;
+}
+if (window.speechSynthesis) {
+  pickVoice();
+  window.speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+function burst(dest, t0, { dur, type = 'lowpass', freq = 2000, freqEnd, q = 0.7, gain = 1 }) {
+  const src = ctx.createBufferSource();
+  src.buffer = noise;
+  src.playbackRate.value = 0.85 + Math.random() * 0.3;
+  const f = ctx.createBiquadFilter();
+  f.type = type;
+  f.Q.value = q;
+  f.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(gain, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  src.connect(f).connect(g).connect(dest);
+  src.start(t0, Math.random() * 0.5);
+  src.stop(t0 + dur + 0.05);
+}
+
+function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
+  const o = ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(gain, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g).connect(dest);
+  o.start(t0);
+  o.stop(t0 + dur + 0.05);
+}
+
+// A footstep on each kind of floor; heavy > 1 for landing from a jump.
+function footstep(out, t, surface, heavy) {
+  const r = Math.random();
+  const g = heavy;
+  switch (surface) {
+    case 'sand': // gritty crunch
+      burst(out, t, { dur: 0.13 * g, type: 'bandpass', freq: 1700 + r * 700, q: 0.8, gain: 0.32 * g });
+      for (let i = 0; i < 3; i++) burst(out, t + Math.random() * 0.08, { dur: 0.015, type: 'highpass', freq: 3500, gain: 0.12 * g });
+      break;
+    case 'grass': // soft swish
+      burst(out, t, { dur: 0.16 * g, type: 'bandpass', freq: 2600 + r * 900, q: 0.5, gain: 0.16 * g });
+      burst(out, t, { dur: 0.06, freq: 300, gain: 0.15 * g });
+      break;
+    case 'wood': // hollow knock
+      burst(out, t, { dur: 0.05, type: 'bandpass', freq: 900 + r * 200, q: 1.2, gain: 0.32 * g });
+      tone(out, t, { freq: 190 + r * 30, freqEnd: 140, dur: 0.12 * g, type: 'triangle', gain: 0.22 * g });
+      break;
+    case 'metal': // ringing clank
+      burst(out, t, { dur: 0.04, type: 'highpass', freq: 2500, gain: 0.3 * g });
+      tone(out, t, { freq: 620 + r * 90, dur: 0.22 * g, type: 'triangle', gain: 0.08 * g });
+      tone(out, t, { freq: 1490 + r * 160, dur: 0.16 * g, type: 'sine', gain: 0.05 * g });
+      tone(out, t, { freq: 140, freqEnd: 90, dur: 0.1, gain: 0.18 * g });
+      break;
+    case 'tile': // hard heel click
+      burst(out, t, { dur: 0.03, type: 'highpass', freq: 3000 + r * 1500, gain: 0.3 * g });
+      burst(out, t, { dur: 0.06, freq: 700, gain: 0.2 * g });
+      break;
+    case 'carpet': // muffled thump
+      burst(out, t, { dur: 0.09 * g, freq: 260 + r * 60, gain: 0.25 * g });
+      break;
+    default: // concrete / stone
+      burst(out, t, { dur: 0.07 * g, freq: 450 + r * 150, gain: 0.35 * g });
+      burst(out, t, { dur: 0.02, type: 'bandpass', freq: 2200 + r * 600, q: 1.5, gain: 0.1 * g });
+  }
+}
+
+export const audio = {
+  volume: 0.6,
+
+  init() {
+    if (ctx) { ctx.resume(); return; }
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = this.volume;
+    master.connect(ctx.destination);
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    reverb = makeReverb();
+    for (const n of VOICES) {
+      fetch(`/sounds/${n}.mp3`).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b))
+        .then(buf => voiceBuf.set(n, buf)).catch(() => {});
+    }
+  },
+
+  // Plays a CS 1.6 voice line. A new line cuts off the previous one, like the game's radio.
+  voice(name, gain = 1) {
+    const buf = voiceBuf.get(name);
+    if (!ctx || ctx.state !== 'running' || !buf) return false;
+    if (voiceSrc) { try { voiceSrc.stop(); } catch {} }
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    g.gain.value = gain;
+    src.connect(g).connect(master);
+    src.start();
+    voiceSrc = src;
+    src.onended = () => { if (voiceSrc === src) voiceSrc = null; };
+    return true;
+  },
+
+  setVolume(v) {
+    this.volume = v;
+    if (master) master.gain.value = v;
+  },
+
+  listener(pos, fwd) {
+    listenerPos.x = pos.x; listenerPos.y = pos.y; listenerPos.z = pos.z;
+    if (!ctx) return;
+    const L = ctx.listener;
+    if (L.positionX) {
+      L.positionX.value = pos.x; L.positionY.value = pos.y; L.positionZ.value = pos.z;
+      L.forwardX.value = fwd.x; L.forwardY.value = fwd.y; L.forwardZ.value = fwd.z;
+      L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+    } else {
+      L.setPosition(pos.x, pos.y, pos.z);
+      L.setOrientation(fwd.x, fwd.y, fwd.z, 0, 1, 0);
+    }
+  },
+
+  // A destination node: positional when `pos` ([x, y, z]) is given.
+  out(pos) {
+    if (!pos) return master;
+    const p = ctx.createPanner();
+    p.panningModel = 'equalpower';
+    p.distanceModel = 'inverse';
+    p.refDistance = 3;
+    p.maxDistance = 200;
+    p.rolloffFactor = 1.1;
+    if (p.positionX) { p.positionX.value = pos[0]; p.positionY.value = pos[1]; p.positionZ.value = pos[2]; }
+    else p.setPosition(pos[0], pos[1], pos[2]);
+    p.connect(master);
+    return p;
+  },
+
+  play(name, pos = null, arg = null) {
+    if (!ctx || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const out = this.out(pos);
+    switch (name) {
+      case 'shot': {
+        const s = GUN[arg] || GUN.glock;
+        const dist = pos ? Math.hypot(pos[0] - listenerPos.x, pos[1] - listenerPos.y, pos[2] - listenerPos.z) : 0;
+        if (s.launcher) {
+          // rocket launch: a hard pop and a long whoosh
+          burst(out, t, { dur: 0.25, freq: 900, freqEnd: 200, gain: 1.3 });
+          tone(out, t, { freq: 70, freqEnd: 30, dur: 0.35, gain: 0.9 });
+          burst(out, t + 0.05, { dur: 1.2, type: 'bandpass', freq: 600, freqEnd: 2600, q: 0.7, gain: 0.45 });
+          break;
+        }
+        gunshot(out, t, s, dist);
+        // bolt-action and pump guns work the action after every shot (only heard up close)
+        if (s.after && dist < 25) (s.after === 'pump' ? fol.pump : (o, t0) => { fol.boltBack(o, t0); fol.boltFwd(o, t0 + 0.22); })(out, t + (s.after === 'pump' ? 0.32 : 0.45));
+        break;
+      }
+      case 'knife':
+        burst(out, t, { dur: 0.16, type: 'bandpass', freq: 1800, freqEnd: 6000, q: 2, gain: 0.35 });
+        tone(out, t + 0.02, { freq: 5200, freqEnd: 7000, dur: 0.1, type: 'triangle', gain: 0.03 });
+        break;
+      case 'step':
+        footstep(out, t, arg, 1);
+        break;
+      case 'land':
+        footstep(out, t, arg, 1.7);
+        break;
+      case 'ggup':
+        tone(out, t, { freq: 660, dur: 0.08, type: 'square', gain: 0.08 });
+        tone(out, t + 0.08, { freq: 880, dur: 0.08, type: 'square', gain: 0.08 });
+        tone(out, t + 0.16, { freq: 1320, dur: 0.14, type: 'square', gain: 0.08 });
+        break;
+      case 'reload':
+        reloadFoley(out, t, arg);
+        break;
+      case 'draw':
+        burst(out, t, { dur: 0.07, type: 'bandpass', freq: 2800, freqEnd: 1800, q: 1.6, gain: 0.2 });
+        tone(out, t + 0.07, { freq: 1900, dur: 0.015, type: 'square', gain: 0.07 });
+        break;
+      case 'empty':
+        tone(out, t, { freq: 2600, dur: 0.012, type: 'square', gain: 0.12 });
+        burst(out, t, { dur: 0.02, type: 'highpass', freq: 3000, gain: 0.25 });
+        break;
+      case 'pin':
+        tone(out, t, { freq: 3400, dur: 0.02, type: 'square', gain: 0.06 });
+        burst(out, t + 0.03, { dur: 0.05, type: 'bandpass', freq: 4200, q: 3, gain: 0.25 });
+        tone(out, t + 0.09, { freq: 2600, freqEnd: 3800, dur: 0.06, type: 'triangle', gain: 0.05 });
+        break;
+      case 'throw':
+        burst(out, t, { dur: 0.18, type: 'bandpass', freq: 700, freqEnd: 2400, q: 0.9, gain: 0.3 });
+        break;
+      case 'dooropen':
+        // latch, then the hinge creaks
+        tone(out, t, { freq: 1500, dur: 0.02, type: 'square', gain: 0.1 });
+        burst(out, t, { dur: 0.03, type: 'highpass', freq: 2500, gain: 0.35 });
+        tone(out, t + 0.06, { freq: 170, freqEnd: 290, dur: 0.6, type: 'sawtooth', gain: 0.05 });
+        tone(out, t + 0.1, { freq: 350, freqEnd: 520, dur: 0.45, type: 'sawtooth', gain: 0.025 });
+        burst(out, t + 0.06, { dur: 0.5, type: 'bandpass', freq: 900, q: 6, gain: 0.08 });
+        break;
+      case 'doorclose':
+        tone(out, t, { freq: 230, freqEnd: 170, dur: 0.35, type: 'sawtooth', gain: 0.03 });
+        burst(out, t + 0.3, { dur: 0.18, freq: 380, gain: 1.0 });
+        tone(out, t + 0.3, { freq: 95, freqEnd: 50, dur: 0.2, gain: 0.6 });
+        tone(out, t + 0.34, { freq: 1500, dur: 0.02, type: 'square', gain: 0.1 });
+        break;
+      case 'carboom':
+        burst(out, t, { dur: 2.6, freq: 1100, freqEnd: 70, gain: 2.0 });
+        tone(out, t, { freq: 70, freqEnd: 22, dur: 1.6, gain: 1.3 });
+        for (let i = 0; i < 9; i++) tone(out, t + 0.15 + Math.random() * 1.6, { freq: 500 + Math.random() * 1500, freqEnd: 300, dur: 0.12, type: 'triangle', gain: 0.12 });
+        burst(out, t + 0.4, { dur: 2.2, type: 'bandpass', freq: 600, q: 0.5, gain: 0.3 });
+        break;
+      case 'hit':
+        tone(out, t, { freq: 1700, dur: 0.05, gain: 0.25 });
+        break;
+      case 'hs':
+        tone(out, t, { freq: 2600, dur: 0.09, gain: 0.3 });
+        tone(out, t + 0.03, { freq: 1300, dur: 0.12, gain: 0.2 });
+        break;
+      case 'hurt':
+        burst(out, t, { dur: 0.15, freq: 700, gain: 0.6 });
+        break;
+      case 'death':
+        tone(out, t, { freq: 220, freqEnd: 60, dur: 0.6, type: 'sawtooth', gain: 0.15 });
+        break;
+      case 'beep':
+        tone(out, t, { freq: 1950, dur: 0.1, gain: 0.35 });
+        break;
+      case 'boom':
+        burst(out, t, { dur: 1.1, freq: 1200, freqEnd: 120, gain: 1.6 });
+        tone(out, t, { freq: 80, freqEnd: 25, dur: 0.9, gain: 1.0 });
+        break;
+      case 'bigboom':
+        burst(out, t, { dur: 2.2, freq: 900, freqEnd: 60, gain: 2.0 });
+        tone(out, t, { freq: 60, freqEnd: 20, dur: 1.8, gain: 1.4 });
+        break;
+      case 'bounce':
+        tone(out, t, { freq: 500 + Math.random() * 300, dur: 0.04, type: 'triangle', gain: 0.2 });
+        break;
+      case 'buy':
+      case 'pickup':
+        tone(out, t, { freq: 900, freqEnd: 1500, dur: 0.08, gain: 0.15 });
+        break;
+      case 'plant':
+        for (let i = 0; i < 7; i++) tone(out, t + i * 0.4, { freq: 1400 + (i % 3) * 200, dur: 0.06, type: 'square', gain: 0.08 });
+        break;
+      case 'win':
+        tone(out, t, { freq: 523, dur: 0.25, gain: 0.2 });
+        tone(out, t + 0.18, { freq: 784, dur: 0.4, gain: 0.2 });
+        break;
+      case 'lose':
+        tone(out, t, { freq: 392, dur: 0.25, gain: 0.2 });
+        tone(out, t + 0.18, { freq: 262, dur: 0.45, gain: 0.2 });
+        break;
+      case 'go':
+        tone(out, t, { freq: 660, dur: 0.12, type: 'triangle', gain: 0.2 });
+        tone(out, t + 0.12, { freq: 990, dur: 0.18, type: 'triangle', gain: 0.2 });
+        break;
+      case 'chat':
+        tone(out, t, { freq: 1200, dur: 0.05, gain: 0.08 });
+        break;
+      case 'radio':
+        burst(out, t, { dur: 0.12, type: 'bandpass', freq: 2500, q: 3, gain: 0.25 });
+        tone(out, t + 0.02, { freq: 1500, dur: 0.06, type: 'square', gain: 0.05 });
+        break;
+      case 'ammo':
+        tone(out, t, { freq: 700, dur: 0.05, type: 'square', gain: 0.1 });
+        tone(out, t + 0.08, { freq: 900, dur: 0.05, type: 'square', gain: 0.1 });
+        break;
+      case 'flashpop':
+        burst(out, t, { dur: 0.25, type: 'highpass', freq: 2000, gain: 1.4 });
+        tone(out, t, { freq: 140, freqEnd: 50, dur: 0.3, gain: 0.6 });
+        break;
+      case 'ring':
+        tone(out, t, { freq: 3200, dur: arg || 2, gain: 0.12 });
+        break;
+      case 'smoke':
+        burst(out, t, { dur: 2.5, freq: 1800, freqEnd: 400, gain: 0.5 });
+        break;
+      case 'spray':
+        burst(out, t, { dur: 0.45, type: 'highpass', freq: 3500, gain: 0.35 });
+        break;
+      case 'click':
+        tone(out, t, { freq: 2200, dur: 0.02, type: 'square', gain: 0.08 });
+        break;
+      case 'nvg':
+        tone(out, t, { freq: 400, freqEnd: 4000, dur: 0.35, gain: 0.08 });
+        break;
+      case 'deny':
+        tone(out, t, { freq: 220, dur: 0.12, type: 'square', gain: 0.08 });
+        break;
+      case 'glass':
+        burst(out, t, { dur: 0.5, type: 'highpass', freq: 4000, gain: 0.9 });
+        for (let i = 0; i < 6; i++) tone(out, t + Math.random() * 0.25, { freq: 2500 + Math.random() * 3000, dur: 0.08, type: 'triangle', gain: 0.12 });
+        break;
+      case 'molotov':
+        // the bottle smashes and the petrol catches with a deep whoomp
+        burst(out, t, { dur: 0.45, type: 'highpass', freq: 3500, gain: 0.8 });
+        for (let i = 0; i < 5; i++) tone(out, t + Math.random() * 0.2, { freq: 2200 + Math.random() * 2800, dur: 0.07, type: 'triangle', gain: 0.1 });
+        burst(out, t + 0.05, { dur: 0.9, type: 'lowpass', freq: 300, freqEnd: 1400, gain: 1.1 });
+        tone(out, t + 0.05, { freq: 90, freqEnd: 45, dur: 0.5, gain: 0.5 });
+        break;
+      case 'fire':
+        // one crackle of a burning fire, played over and over while it burns
+        burst(out, t, { dur: 0.35, type: 'bandpass', freq: 500 + Math.random() * 300, q: 0.6, gain: 0.35 });
+        for (let i = 0; i < 3; i++) burst(out, t + Math.random() * 0.3, { dur: 0.025, type: 'highpass', freq: 2500 + Math.random() * 2500, gain: 0.35 });
+        break;
+      case 'infect':
+        // a choked scream sliding into a snarl
+        tone(out, t, { freq: 780, freqEnd: 260, dur: 0.7, type: 'sawtooth', gain: 0.16 });
+        tone(out, t + 0.02, { freq: 1180, freqEnd: 390, dur: 0.6, type: 'square', gain: 0.05 });
+        burst(out, t, { dur: 0.8, type: 'bandpass', freq: 1400, freqEnd: 500, q: 1.2, gain: 0.35 });
+        tone(out, t + 0.6, { freq: 110, freqEnd: 70, dur: 0.6, type: 'sawtooth', gain: 0.18 });
+        break;
+      case 'zgrowl': {
+        // a low wobbling growl
+        const f0 = 70 + Math.random() * 40;
+        tone(out, t, { freq: f0, freqEnd: f0 * 0.75, dur: 0.9, type: 'sawtooth', gain: 0.16 });
+        tone(out, t, { freq: f0 * 1.5, freqEnd: f0 * 1.1, dur: 0.8, type: 'square', gain: 0.04 });
+        burst(out, t, { dur: 0.9, type: 'bandpass', freq: 380, q: 1.5, gain: 0.3 });
+        break;
+      }
+      case 'achieve':
+        for (const [i, f] of [523, 659, 784, 1047].entries()) tone(out, t + i * 0.09, { freq: f, dur: 0.22, type: 'triangle', gain: 0.14 });
+        tone(out, t + 0.36, { freq: 1568, dur: 0.5, type: 'sine', gain: 0.08 });
+        break;
+      case 'rankup':
+        for (const [i, f] of [392, 523, 659, 784, 1047, 1319].entries()) tone(out, t + i * 0.08, { freq: f, dur: 0.3, type: 'square', gain: 0.07 });
+        burst(out, t + 0.45, { dur: 0.6, type: 'highpass', freq: 5000, gain: 0.15 });
+        break;
+      case 'switch':
+        tone(out, t, { freq: 1800, dur: 0.025, type: 'square', gain: 0.15 });
+        burst(out, t, { dur: 0.04, type: 'bandpass', freq: 3000, gain: 0.3 });
+        break;
+      case 'horn':
+        tone(out, t, { freq: 410, dur: 0.45, type: 'sawtooth', gain: 0.25 });
+        tone(out, t, { freq: 520, dur: 0.45, type: 'sawtooth', gain: 0.2 });
+        break;
+      case 'crash':
+        burst(out, t, { dur: 0.45, freq: 1500, freqEnd: 200, gain: 1.3 });
+        tone(out, t, { freq: 90, freqEnd: 40, dur: 0.3, gain: 0.7 });
+        break;
+      case 'rescue':
+        tone(out, t, { freq: 660, dur: 0.15, gain: 0.25 });
+        tone(out, t + 0.12, { freq: 880, dur: 0.15, gain: 0.25 });
+        tone(out, t + 0.24, { freq: 1320, dur: 0.3, gain: 0.25 });
+        break;
+      case 'hostage':
+        tone(out, t, { freq: 300, freqEnd: 420, dur: 0.18, type: 'triangle', gain: 0.2 });
+        break;
+      case 'announce':
+        tone(out, t, { freq: 220, dur: 0.5, type: 'sawtooth', gain: 0.12 });
+        tone(out, t, { freq: 330, dur: 0.5, type: 'sawtooth', gain: 0.1 });
+        burst(out, t, { dur: 0.6, freq: 600, freqEnd: 3000, gain: 0.25 });
+        break;
+      case 'mvp':
+        for (let i = 0; i < 4; i++) tone(out, t + i * 0.09, { freq: 784 * Math.pow(1.26, i), dur: 0.2, gain: 0.16 });
+        break;
+      case 'killcam':
+        burst(out, t, { dur: 0.6, type: 'bandpass', freq: 400, freqEnd: 2000, q: 1.5, gain: 0.35 });
+        break;
+      case 'ladder':
+        tone(out, t, { freq: 320 + Math.random() * 80, dur: 0.06, type: 'triangle', gain: 0.25 });
+        burst(out, t, { dur: 0.05, type: 'bandpass', freq: 1200, q: 2, gain: 0.25 });
+        break;
+      case 'splash':
+        burst(out, t, { dur: 0.25, type: 'bandpass', freq: 900 + Math.random() * 400, freqEnd: 2500, q: 0.8, gain: 0.5 });
+        break;
+      case 'door':
+        tone(out, t, { freq: 160, freqEnd: 90, dur: 0.15, type: 'square', gain: 0.15 });
+        break;
+    }
+  },
+
+  // Continuous engine sound per car: pitch follows speed, silent when nobody drives.
+  engines: new Map(),
+  engine(id, pos, speed, running) {
+    if (!ctx || ctx.state !== 'running') return;
+    let e = this.engines.get(id);
+    if (!e) {
+      const out = this.out(pos);
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 600;
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+      o1.type = 'sawtooth';
+      o2.type = 'square';
+      o1.connect(f); o2.connect(f);
+      f.connect(g).connect(out);
+      o1.start(); o2.start();
+      e = { out, g, o1, o2, f };
+      this.engines.set(id, e);
+    }
+    const t = ctx.currentTime, rpm = Math.min(1, Math.abs(speed) / 17);
+    if (pos && e.out.positionX) { e.out.positionX.value = pos[0]; e.out.positionY.value = pos[1]; e.out.positionZ.value = pos[2]; }
+    e.o1.frequency.setTargetAtTime(38 + rpm * 85, t, 0.08);
+    e.o2.frequency.setTargetAtTime(19 + rpm * 42, t, 0.08);
+    e.f.frequency.setTargetAtTime(400 + rpm * 900, t, 0.1);
+    e.g.gain.setTargetAtTime(running ? 0.07 + rpm * 0.09 : 0, t, 0.15);
+  },
+  stopEngines() {
+    for (const e of this.engines.values()) { e.o1.stop(); e.o2.stop(); e.g.disconnect(); }
+    this.engines.clear();
+  },
+
+  // Radio commands are read out loud, like the CS radio voice.
+  // `announcer` uses a slower, deeper delivery for callouts like "Double kill".
+  speak(text, announcer = false) {
+    const s = window.speechSynthesis;
+    if (!s || !this.volume) return;
+    const u = new SpeechSynthesisUtterance(text);
+    if (voice) u.voice = voice;
+    u.rate = announcer ? 0.9 : 1.15;
+    u.pitch = announcer ? 0.4 : 0.8;
+    u.volume = Math.min(1, this.volume * 1.4);
+    s.cancel();
+    s.speak(u);
+  },
+};

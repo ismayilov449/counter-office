@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Counter-Office</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="nvg" class="hidden"></div>
+  <div id="flashbang"></div>
+  <div id="burn"></div>
+  <div id="hns-blind" class="hidden"></div>
+
+  <div id="hud" class="hidden">
+    <canvas id="radar" width="200" height="200"></canvas>
+    <div id="map-name"></div>
+    <div id="top">
+      <span id="scoreT" class="score t">0</span>
+      <span id="timer">--:--</span>
+      <span id="scoreCT" class="score ct">0</span>
+    </div>
+    <div id="phase"></div>
+    <div id="killfeed"></div>
+    <div id="center-msg"></div>
+    <div id="announcer"></div>
+    <div id="mvp" class="hidden"></div>
+    <div id="killcam" class="hidden"></div>
+    <div id="small-msg"></div>
+    <div id="hint"></div>
+    <div id="target-name"></div>
+    <div id="progress" class="hidden">
+      <div id="progress-label"></div>
+      <div id="progress-bar"><div id="progress-fill"></div></div>
+    </div>
+    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
+    <div id="hitmarker"></div>
+    <div id="scope" class="hidden"><div class="lens"></div><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
+    <div id="damage"><i class="up"></i><i class="down"></i><i class="left"></i><i class="right"></i></div>
+    <div id="flash"></div>
+    <div id="menu" class="hidden"></div>
+    <div id="bottom-left">
+      <div class="stat"><span class="label">HP</span><span id="hp">100</span></div>
+      <div class="stat"><span class="label">AP</span><span id="armor">0</span></div>
+      <div id="bomb-icon" class="badge hidden">C4</div>
+      <div id="kit-icon" class="badge kit hidden">KIT</div>
+      <div id="nvg-icon" class="badge nvgb hidden">NVG</div>
+    </div>
+    <div id="bottom-right">
+      <div id="money">$0</div>
+      <div id="weapon-name"></div>
+      <div id="ammo"></div>
+    </div>
+    <div id="slots"></div>
+    <div id="spec" class="hidden"></div>
+    <div id="chat">
+      <div id="chat-log"></div>
+      <div id="chat-line" class="hidden"><span id="chat-mode">Say:</span><input id="chat-input" maxlength="120" autocomplete="off" spellcheck="false"></div>
+    </div>
+  </div>
+
+  <div id="scoreboard" class="panel hidden"></div>
+
+  <div id="join" class="modal">
+    <div class="panel join-panel">
+      <h1>COUNTER<span>-</span>OFFICE</h1>
+      <p class="muted">A CS 1.6-style multiplayer for the office LAN</p>
+      <label>Your name <input id="name" maxlength="16" autocomplete="off" spellcheck="false"></label>
+      <div class="team-buttons">
+        <button data-team="T" class="team-btn t">Terrorists</button>
+        <button data-team="CT" class="team-btn ct">Counter-Terrorists</button>
+        <button data-team="auto" class="team-btn">Auto-select</button>
+        <button data-team="SPEC" class="team-btn spec">Spectate</button>
+      </div>
+      <button id="draw-spray" class="ghost">Draw your graffiti spray</button>
+      <details class="lb" open><summary>Office leaderboard</summary><div id="leaderboard" class="lb-table"></div></details>
+      <div id="online" class="muted"></div>
+      <div id="conn-status" class="muted">Connecting...</div>
+    </div>
+  </div>
+
+  <div id="paused" class="modal hidden">
+    <div class="panel pause-panel">
+      <div class="pause-head">
+        <h2>Paused</h2>
+        <button id="resume" class="primary">Resume game</button>
+      </div>
+      <div class="pause-cols">
+        <div class="settings">
+          <label>Mouse sensitivity <input id="sens" type="range" min="0.2" max="4" step="0.05"><output id="sens-val"></output></label>
+          <label>Volume <input id="vol" type="range" min="0" max="1" step="0.05"><output id="vol-val"></output></label>
+          <label>Graphics
+            <select id="quality">
+              <option value="low">Low (fastest)</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <div id="quality-note" class="muted small hidden">Reload the page to apply the new graphics quality.</div>
+          <label class="check"><input id="fullscreen" type="checkbox"> Fullscreen &amp; block browser shortcuts</label>
+          <label class="check"><input id="rawinput" type="checkbox"> Raw mouse input</label>
+          <label class="check"><input id="radiovoice" type="checkbox"> Speak radio commands</label>
+          <label class="check"><input id="announcer-setting" type="checkbox"> Announcer voice (Double kill, Ace...)</label>
+          <label class="check"><input id="killcam-setting" type="checkbox"> Kill cam after death</label>
+          <div id="shortcut-note" class="muted small"></div>
+          <div class="row">
+            <button id="change-team">Change team</button>
+            <button id="draw-spray-2">Draw graffiti</button>
+          </div>
+          <h3>Crosshair</h3>
+          <label>Gap (radius) <input id="ch-gap" type="range" min="0" max="20" step="1"><output id="ch-gap-val"></output></label>
+          <label>Length <input id="ch-len" type="range" min="2" max="24" step="1"><output id="ch-len-val"></output></label>
+          <label>Thickness <input id="ch-thick" type="range" min="1" max="6" step="1"><output id="ch-thick-val"></output></label>
+          <label>Color <input id="ch-color" type="color"></label>
+          <div class="ch-preview"><div id="crosshair-preview"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div></div>
+          <div class="muted small">Changes apply instantly (no save button) and also color the sniper scope. They are kept in this browser for this server address only.</div>
+          <label>Start money (for everyone, from the next match)
+            <select id="start-money"></select>
+          </label>
+          <h3>Vote for the next map</h3>
+          <div id="map-votes" class="row"></div>
+          <div class="row"><button id="open-admin" type="button">Admin panel</button><span class="muted small">game mode, settings, kick, map, restart (password)</span></div>
+          <h3>Your rank &amp; achievements</h3>
+          <div id="achievements" class="ach-box"></div>
+          <h3>Office leaderboard</h3>
+          <div id="leaderboard-2" class="lb-table"></div>
+        </div>
+        <div class="controls">
+          <h3>CS 1.6 controls</h3>
+          <div><kbd>W A S D</kbd> move</div><div><kbd>Space</kbd> jump</div>
+          <div><kbd>Ctrl</kbd> duck</div><div><kbd>Shift</kbd> walk (silent)</div>
+          <div><kbd>Mouse 1</kbd> fire</div><div><kbd>Mouse 2</kbd> zoom / knife stab</div>
+          <div><kbd>R</kbd> reload</div><div><kbd>E</kbd> use: plant, defuse, pick up</div>
+          <div><kbd>1 2 3</kbd> weapons</div><div><kbd>4</kbd> grenades (repeat)</div>
+          <div><kbd>5</kbd> C4</div><div><kbd>Q</kbd> last weapon</div>
+          <div><kbd>G</kbd> drop weapon</div><div><kbd>Wheel</kbd> switch weapon</div>
+          <div><kbd>B</kbd> buy menu</div><div><kbd>O</kbd> buy equipment</div>
+          <div><kbd>,</kbd> <kbd>.</kbd> primary / secondary ammo</div><div><kbd>F1</kbd> autobuy <kbd>F2</kbd> rebuy</div>
+          <div><kbd>Z X C</kbd> radio menus</div><div><kbd>T</kbd> spray graffiti</div>
+          <div><kbd>F</kbd> flashlight</div><div><kbd>N</kbd> nightvision</div>
+          <div><kbd>J</kbd> emotes (dance, laugh, wave...)</div>
+          <div><kbd>Y</kbd> chat <kbd>U</kbd> team chat</div><div><kbd>Tab</kbd> scores</div>
+          <div><kbd>M</kbd> choose team</div><div><kbd>F5</kbd> screenshot</div>
+          <div><kbd>0-9</kbd> pick in menus</div><div><kbd>Esc</kbd> this menu</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="match-summary" class="modal hidden"><div class="panel summary-panel"></div></div>
+
+  <div id="spray-editor" class="modal hidden">
+    <div class="panel spray-panel">
+      <h2>Draw your graffiti</h2>
+      <div class="spray-body">
+        <canvas width="256" height="256"></canvas>
+        <div class="spray-tools">
+          <div class="row">
+            <button data-tool="brush">Brush</button>
+            <button data-tool="spray">Spray can</button>
+            <button data-tool="eraser">Eraser</button>
+          </div>
+          <label>Size <input class="brush-size" type="range" min="2" max="40" value="10"></label>
+          <div class="palette"></div>
+          <div class="row"><input class="stamp-text" maxlength="10" placeholder="Text"><button class="stamp">Stamp text</button></div>
+          <div class="presets row"></div>
+          <div class="row">
+            <button class="undo">Undo</button>
+            <button class="clear">Clear</button>
+            <label class="file-btn">Import image<input class="import" type="file" accept="image/*"></label>
+          </div>
+          <div class="row end">
+            <button class="cancel">Cancel</button>
+            <button class="save primary">Save spray</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="disconnected" class="modal hidden">
+    <div class="panel"><h2>Disconnected</h2><p id="disconnect-reason">Lost connection to the server.</p><button onclick="location.reload()" class="primary">Reconnect</button></div>
+  </div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

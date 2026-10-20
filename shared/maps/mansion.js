@@ -1,0 +1,159 @@
+// cs_mansion — built from the original CS 1.6 map (cs_mansion.bsp, converted into cs_mansion_bsp.js):
+// the same walled estate, fountain plaza, hedges, shed, street and two-storey mansion with its rooms,
+// stairs, furniture, light switches, ladder and the water tunnel under the north lawn.
+// Hostage rescue: the Terrorists start upstairs in the mansion with the hostages; the CTs start on the
+// street east of the estate and lead the hostages back there. Only the front and left (south) doors lead
+// into the house; the right (north) wall has a ladder up to the first-floor window.
+import { createBuilder } from './builder.js';
+import * as BSP from './cs_mansion_bsp.js';
+
+const m = createBuilder();
+
+// ---- collision: the original level's solid volumes
+for (const b of BSP.SOLIDS) m.box(b[0], b[2], b[3], b[5], b[4] - b[1], 'none', b[1], { hidden: true });
+
+// GoldSrc texture -> painted material (null: drawn some other way)
+const FACE_MATS = {
+  '-0out_grss1': 'grassdirt', c2a4_flr1: 'paving', out_cac2: 'hedge', c1a3wall05: 'greybrick', out_grnd2: 'asphalt',
+  crete3_wall02: 'stone', crete3_wall01b: 'stone', tnnl_flr4c: 'pooltile', out_w5: 'sewer', silo2_wet4d: 'sewer',
+  '!c2a54': null, '!waterblue': null, c1a4_silo2b: 'brick', '-0fift_wall13': 'mplaster', out_wall4a: 'mblock',
+  out_roof4: 'slate', fifties_flr02: 'checker', fifties_wall14: 'mwall', fifties_wall14a: 'mplaster', c1a1w1d: 'mplaster',
+  c1a2_flr1: 'mfloor', fifties_ceil5: 'ceiltile', picture8: 'picture', babtech_dr1c: 'trim', babtech_dr4c: 'trim',
+  black: 'black', fifties_dr1: 'door1', generic105: 'books', generic105a: 'books', generic105b: 'wood', generic105c: 'wood',
+  pfab_bks1a: 'books', pfab_bks2b: 'books', drkmtlt_bord11: 'metal', generic028: 'metal', pfab_trsh1a: 'metal',
+  pfab_trsh1b: 'metal', pfab_trsh1c: 'metal', pfab_trsh1d: 'metal', lab1_stair2b: 'metal', fiftsfile1: 'cabinet',
+  fiftsfile2b: 'cabinet', fifties_cch1: 'fabric', fifties_cch2: 'fabric', fifties_cch3: 'fabric', fifties_cch4: 'fabric',
+  fifties_dsk5a: 'wood', pfab_dskdrwr: 'wood', bcrate02: 'crate', cardbox1: 'cardboard', cardbox4: 'cardboard',
+  cardboxbot1: 'cardboard', cardboxtop1: 'cardboard', cardboxtop2: 'cardboard', generic039: 'brick', prefab_pot1: 'grassdirt',
+  c1a0_flipsign8: 'metal',
+};
+
+// The street texture is also on the wall behind the CT spawn: give that wall the estate's stone instead.
+const FACES = { ...BSP.FACES, out_grnd2: [], out_grnd2_wall: [] };
+for (const f of BSP.FACES.out_grnd2) {
+  const ys = f.filter((_, i) => i % 5 === 1);
+  (Math.max(...ys) - Math.min(...ys) > 0.3 ? FACES.out_grnd2_wall : FACES.out_grnd2).push(f);
+}
+FACE_MATS.out_grnd2_wall = 'greybrick';
+
+// ---- rooms (light groups named after the original lamps). Ground floor 0.81-4.06, first floor 4.27-6.71.
+const G = [0.75, 4.1], U = [4.2, 6.75];
+const room = (group, x1, x2, z1, z2, [y1, y2]) => ({ group, min: [x1, y1, z1], max: [x2, y2, z2] });
+const ROOMS = [
+  room('lampa6', -23.3, -13.31, -14.05, -10.16, G), room('lampa6', -23.3, -13.31, -10.16, -5.49, G),
+  room('lampa4', -13.31, -6.78, -14.05, -10.16, G),
+  room('lampa5', -12.9, -6.78, -10.16, 6.5, [0.75, 6.75]),
+  room('lampa7', -23.3, -13.31, -5.49, 2.03, G), room('lampa7', -23.3, -13.31, 2.03, 4.88, G),
+  room('lampa8', -23.3, -16.56, 4.88, 11.0, G),
+  room('lampa2', -16.56, -12.9, 4.88, 11.0, G), room('lampa2', -12.9, -6.78, 6.5, 11.0, G),
+  room('lampa9', -23.3, -12.9, -14.05, -7.32, U),
+  room('lampa3', -12.9, -6.78, -14.05, -10.16, U),
+  room('lampa10', -23.3, -16.15, -7.32, 4.47, U), room('lampa10', -16.15, -12.9, -7.32, 7.92, U),
+  room('lampa11', -23.3, -16.15, 4.47, 11.0, U), room('lampa11', -16.15, -12.9, 7.92, 11.0, U),
+  room('lampa1', -12.9, -6.78, 6.5, 11.0, U),
+];
+const roomAt = p => ROOMS.find(r => [0, 1, 2].every(k => p[k] > r.min[k] && p[k] < r.max[k]));
+
+// ---- windows: breakable glass in every window opening of the house, lit by the room behind it
+for (const w of BSP.WINDOWS) {
+  const c = (w.at[0] + w.at[1]) / 2, g = 0.03;
+  const mid = (w.from + w.to) / 2, y = (w.bottom + w.top) / 2;
+  const inward = w.axis === 'z' ? [c + (c < -15 ? 0.6 : -0.6), y, mid] : [mid, y, c + (c < 0 ? 0.6 : -0.6)];
+  const extra = { glass: true, id: m.boxes.filter(b => b.glass).length, group: roomAt(inward)?.group || null, depth: w.at[1] - w.at[0] };
+  if (w.axis === 'z') m.box(c - g, w.from, c + g, w.to, w.top - w.bottom, 'glass', w.bottom, extra);
+  else m.box(w.from, c - g, w.to, c + g, w.top - w.bottom, 'glass', w.bottom, extra);
+}
+
+// ---- ladders: up the north wall to the first-floor window, and down the two manholes into the tunnel
+const north = BSP.LADDERS.find(l => l[4] > 3);
+m.ladder((north[0] + north[3]) / 2, -14.43, [0, -1], 0, 5.25, 0.85);
+m.ladder(-24.0, -18.7, [1, 0], -4.06, 0.35, 0.8);
+m.ladder(25.95, -18.7, [-1, 0], -4.06, 0.35, 0.8);
+
+// ---- doors: the front door and the left (south) door swing open with E
+const DOORS = BSP.DOORS.map((d, id) => {
+  const [x1, y1, z1, x2, y2, z2] = d.box;
+  const axis = x2 - x1 > z2 - z1 ? 'x' : 'z';
+  const len = axis === 'x' ? x2 - x1 : z2 - z1;
+  return { id, axis, dir: 1, len, h: y2 - y1 - 0.02, hinge: [d.origin[0], y1, d.origin[2]], tex: 'door1' };
+});
+
+// ---- lights: one lamp per original light (the two lampa10 bulbs share one), switched by the wall buttons
+const seen = new Set();
+for (const l of BSP.LIGHTS) {
+  if (!l.name || seen.has(l.name)) continue;
+  seen.add(l.name);
+  const bulbs = BSP.LIGHTS.filter(o => o.name === l.name);
+  const p = [0, 1, 2].map(k => bulbs.reduce((s, o) => s + o.p[k], 0) / bulbs.length);
+  const ceil = p[1] < 5 ? 4.06 : 6.71;
+  m.add({ type: 'ceilinglamp', p: [p[0], ceil, p[2]], group: l.name });
+  m.add({ type: 'light', p: [p[0], ceil - 0.5, p[2]], color: '#ffe8b8', intensity: l.l[3] >= 200 ? 30 : 24, distance: 13, group: l.name });
+}
+const SWITCHES = BSP.BUTTONS.filter(b => /^lampa/.test(b.target)).map(b => {
+  const c = [(b.box[0] + b.box[3]) / 2, (b.box[1] + b.box[4]) / 2, (b.box[2] + b.box[5]) / 2];
+  const thinX = b.box[3] - b.box[0] < b.box[5] - b.box[2];
+  const free = n => !BSP.SOLIDS.some(s => {
+    const q = thinX ? [c[0] + n * 0.15, c[1], c[2]] : [c[0], c[1], c[2] + n * 0.15];
+    return q[0] > s[0] && q[0] < s[3] && q[1] > s[1] && q[1] < s[4] && q[2] > s[2] && q[2] < s[5];
+  });
+  const n = free(1) ? 1 : -1;
+  return { group: b.target, p: c, rot: thinX ? Math.atan2(n, 0) : Math.atan2(0, n) };
+});
+
+// ---- water: the fountain and the tunnel
+for (const w of BSP.WATER) m.add({ type: 'water', min: [w[0], w[2]], max: [w[3], w[5]], y: w[4], color: w[4] > 0 ? '#3a7a90' : '#2e4a3a', murky: w[4] < 0 });
+for (const x of [-16, -4, 8, 20]) m.add({ type: 'tunnel-lamp', p: [x, -2.2, -18.7] });
+
+// Lawns beyond the estate walls (so the city skyline stands on the ground), then the skyline itself
+for (const [x1, z1, x2, z2] of [[-400, -400, 400, -22.9], [-400, 22.9, 400, 400], [-400, -22.9, -29.3, 22.9], [29.3, -22.9, 400, 22.9]]) {
+  m.add({ type: 'plane', mat: 'grassdirt', min: [x1, z1], max: [x2, z2], y: -0.05 });
+}
+m.add({ type: 'skyline', seed: 7 });
+
+const yawOf = a => Math.atan2(-Math.cos((a * Math.PI) / 180), Math.sin((a * Math.PI) / 180));
+const spawn = s => ({ p: [s.p[0], s.p[1] < 2 ? 0 : 4.27, s.p[2]], yaw: yawOf(s.angle) });
+
+export default {
+  id: 'cs_mansion',
+  title: 'Mansion',
+  mode: 'hostage',
+  hostages: [
+    ...BSP.HOSTAGES.map(h => ({ p: [h.p[0], h.p[1] < 2 ? 0.81 : 4.27, h.p[2]], yaw: yawOf(h.angle) })),
+    { p: [-20.5, 0.81, 8.4], yaw: 0 },
+  ],
+  boxes: m.boxes,
+  decor: m.decor,
+  faces: FACES,
+  faceTex: { ...BSP.TEXTURES, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
+  faceMats: FACE_MATS,
+  bounds: { min: -29.2, max: 29.2 },
+  zones: {
+    rescue: { min: [24.1, -22.8], max: [29.2, 22.8] },
+    buyCT: { min: [24.1, -22.8], max: [29.2, 22.8] },
+    buyT: { min: [-23.7, -14.5], max: [-3.4, 11.4] },
+  },
+  spawns: {
+    CT: BSP.SPAWNSCT.map(spawn),
+    T: [...BSP.SPAWNST.map(spawn), { p: [-14.6, 4.27, -2.5], yaw: 0 }],
+  },
+  ladders: m.ladders,
+  water: BSP.WATER.map(w => ({ min: [w[0], w[1], w[2]], max: [w[3], w[4], w[5]] })),
+  doors: DOORS,
+  rooms: [
+    ...ROOMS,
+    { group: 'tunnel', amb: 0.55, min: [-24.4, -4.2, -21.2], max: [26.3, -1.95, -17.8] },
+    { group: 'shed', min: [13.1, 0, 14.6], max: [18.0, 2.5, 17.9] },
+  ],
+  switches: SWITCHES,
+  // One pickup truck with a PKT machine gun in the back, on the lawn by the left (south) door.
+  vehicles: [
+    { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },
+  ],
+  labels: {},
+  theme: {
+    skyTop: '#3f7fc4', skyHorizon: '#cfe0ec', fog: ['#d8e2e8', 90, 300],
+    sun: { color: '#fff4e2', intensity: 2.8, dir: [35, 75, 25] },
+    hemi: { sky: '#e4eefa', ground: '#8e8a70', intensity: 1.9 },
+    exposure: 1.15, clouds: 0.5, cloudColor: '#ffffff', particles: 'dust',
+  },
+};

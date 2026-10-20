@@ -1,0 +1,11 @@
+# Dependencies (start-server.bat runs npm install)
+node_modules/
+
+# Local server state: admin password, settings, player stats
+data/
+
+# Self-signed HTTPS certificate and private key (generated on first start)
+certs/
+
+# Temporary files
+*.ztmp
