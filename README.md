@@ -340,6 +340,8 @@ Grenade and radio voices follow the *Speak radio commands* setting.
 ## Crosshair
 
 Esc → Crosshair: gap (radius), length, thickness and color, with a live preview. Saved in your own browser.
+Standing still, the gap is exactly what you set, with every weapon. With **Dynamic** on (the default) it opens up
+while you move, jump or spray, like CS 1.6, and closes again when you stop; turn it off for a fixed crosshair.
 
 ## Graphics
 

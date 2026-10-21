@@ -31,7 +31,7 @@ const angleDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 // ---------------------------------------------------------------- settings
 
 const SETTINGS_KEY = 'counter-office-settings';
-const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50' };
+const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50', chDynamic: true };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch { /* storage unavailable */ }
 if (!QUALITY[settings.quality]) settings.quality = 'medium';
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ } };
@@ -227,6 +227,13 @@ function computeSpread(def) {
   else if (me.crouch) s *= 0.7;
   s += Math.min(me.shotsFired, 10) * (def.spreadInc || 0) * 0.55;
   return s;
+}
+
+// The spread of a weapon held still on the ground: the crosshair's gap is the player's own setting there, and only
+// what moving, jumping and spraying add on top opens it up (when the crosshair is dynamic).
+function restSpread(def) {
+  const s = def.sniper && !me.scope ? def.unscoped : def.spread ?? 0;
+  return me.onGround && me.crouch ? s * 0.7 : s;
 }
 
 function applySpread(d, s) {
@@ -1750,6 +1757,9 @@ for (const [key, el] of Object.entries(chInputs)) {
   el.addEventListener('input', () => { settings[key] = key === 'chColor' ? el.value : +el.value; applyCrosshair(); saveSettings(); });
 }
 applyCrosshair();
+const chDynamic = $('ch-dynamic');
+chDynamic.checked = settings.chDynamic !== false;
+chDynamic.addEventListener('change', () => { settings.chDynamic = chDynamic.checked; saveSettings(); });
 // Start money is a server setting: changing it tells the server, which tells everyone.
 const startMoney = $('start-money');
 function renderStartMoney() {
@@ -2599,7 +2609,8 @@ function updateHud(now) {
 
   const pxPerRad = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const sniperScoped = me.alive && me.scope > 0 && def.sniper;
-  hud.crosshair(settings.chGap + computeSpread(def) * pxPerRad, me.alive && !def.sniper);
+  const opening = settings.chDynamic !== false ? Math.max(0, computeSpread(def) - restSpread(def)) * pxPerRad : 0;
+  hud.crosshair(settings.chGap + opening, me.alive && !def.sniper);
   hud.scope(sniperScoped);
 
   let hint = '';
