@@ -135,6 +135,7 @@ export class Effects {
     this.sprayMeshes = new Map();
     this.gibs = [];
     this.gibSets = [];
+    this.shells = [];
   }
 
   emit(p, v, color, life, gravity = 9) {
@@ -426,6 +427,21 @@ export class Effects {
     this.rockets.push({ mesh, o, d, dist, speed, t: 0, puffAt: 0 });
   }
 
+  // A mortar shell: a high arc from the tube (o) to where it lands (at) in flight ms, nose along its path.
+  shell(o, at, flight) {
+    const mesh = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6).scale(1, 1, 2.6), new THREE.MeshLambertMaterial({ color: 0x3e4630 }));
+    const fins = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.14, 6).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x2a2e22 }));
+    fins.position.z = 0.17;
+    mesh.add(body, fins);
+    mesh.position.set(...o);
+    this.group.add(mesh);
+    const dist = Math.hypot(at[0] - o[0], at[2] - o[2]);
+    this.shells.push({ mesh, o, at, flight: flight / 1000, h: 25 + dist * 0.3, t: 0 });
+    this.puff([o[0], o[1] + 1, o[2]], 0xc8c4bc, 2.2, 1.6, 0.4);
+    this.flashLight([o[0], o[1] + 1.2, o[2]], 80, 0.1);
+  }
+
   nade(kind, o, v, fuse, onBounce) {
     const path = [];
     const impact = !!WEAPONS[kind]?.impact;
@@ -543,11 +559,23 @@ export class Effects {
     this.nades = [];
     for (const r of this.rockets) this.group.remove(r.mesh);
     this.rockets = [];
+    for (const s of this.shells) this.group.remove(s.mesh);
+    this.shells = [];
     this.clearFires();
     for (const c of this.casingData) { c.life = 0; c.p.y = -1000; }
   }
 
   update(dt, camera) {
+    for (let i = this.shells.length - 1; i >= 0; i--) {
+      const s = this.shells[i];
+      s.t += dt;
+      const k = Math.min(1, s.t / s.flight);
+      const at = k2 => [s.o[0] + (s.at[0] - s.o[0]) * k2, s.o[1] + (s.at[1] - s.o[1]) * k2 + 4 * s.h * k2 * (1 - k2), s.o[2] + (s.at[2] - s.o[2]) * k2];
+      const p = at(k), ahead = at(Math.min(1, k + 0.01));
+      s.mesh.position.set(...p);
+      s.mesh.lookAt(2 * p[0] - ahead[0], 2 * p[1] - ahead[1], 2 * p[2] - ahead[2]);
+      if (k >= 1) { this.group.remove(s.mesh); this.shells.splice(i, 1); }
+    }
     if (this.gibs.length) this.updateGibs(dt);
     for (let i = this.rockets.length - 1; i >= 0; i--) {
       const r = this.rockets[i];

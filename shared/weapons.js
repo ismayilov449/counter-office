@@ -40,6 +40,9 @@ export const WEAPONS = {
 
   // Rocket launcher: CTs buy it, anyone can pick it up. The rocket flies, then explodes (see server explodeRocket).
   rpg: primary('launcher', { name: 'RPG-7', team: 'CT', auto: false, price: 6000, damage: 500, rocket: true, blast: 9, rocketSpeed: 38, rate: 1.0, mag: 1, reserve: 3, reload: 3.0, spread: 0.002, moveSpread: 0.03, spreadInc: 0, recoil: 0.07, rangeMod: 1, pen: 0.95, speed: 5.0, killReward: 300, ammoPrice: 600 }),
+  // 82-BM-37 mortar: set it up on open ground (setup seconds), pick a spot on the map view within range (metres), and the
+  // shell drops there flight seconds later with some spread (see server onMortar). One per team; heavy to carry.
+  mortar: primary('mortar', { name: '82-BM-37', auto: false, price: 6000, damage: 300, mortar: true, blast: 10, rate: 2.5, mag: 6, reserve: 0, reload: 0, spread: 0, moveSpread: 0, spreadInc: 0, recoil: 0, rangeMod: 1, pen: 1, speed: 4.2, killReward: 300, range: [15, 80], setup: 2 }),
   // Mounted on the pickup truck: only the gunner uses it, and it never runs out.
   pkt: { name: 'PKT', slot: 0, cls: 'mg', mounted: true, auto: true, damage: 38, rate: 0.085, spread: 0.006, moveSpread: 0, spreadInc: 0.0012, recoil: 0.007, rangeMod: 0.97, pen: 0.8, speed: 0 },
 
@@ -73,7 +76,7 @@ export const BUY_MENU = [
   { title: 'Shotguns', items: ['m3', 'xm1014'] },
   { title: 'SMGs', items: ['mac10', 'tmp', 'mp5', 'ump45', 'p90'] },
   { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'scout', 'sg552', 'aug', 'sg550', 'g3sg1', 'awp'] },
-  { title: 'Heavy', items: ['m249', 'rpg'] },
+  { title: 'Heavy', items: ['m249', 'rpg', 'mortar'] },
   { title: 'Primary ammo', action: 'ammo1' },
   { title: 'Secondary ammo', action: 'ammo2' },
   { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg'] },
@@ -82,6 +85,9 @@ export const BUY_MENU = [
 // Gun Game: one kill with each weapon moves you to the next; a knife kill on the last level wins.
 export const GUNGAME = ['glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite', 'm3', 'xm1014', 'mac10', 'tmp', 'mp5', 'ump45', 'p90',
   'galil', 'famas', 'ak47', 'm4a1', 'sg552', 'aug', 'scout', 'awp', 'm249', 'rpg', 'he', 'knife'];
+
+// Mortar shell flight time (ms) for a horizontal distance: a high arc, 3.4 s at 15 m to 5 s at 80 m.
+export const shellFlight = dist => 3000 + dist * 25;
 
 export const defaultPistol = team => (team === 'CT' ? 'usp' : 'glock');
 export const itemInfo = id => WEAPONS[id] || ITEMS[id];

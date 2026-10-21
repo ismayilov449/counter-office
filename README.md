@@ -162,11 +162,19 @@ a match anyone can also vote from the Esc menu: more than half the players votin
   "game commencing" after 3 s and 3 s freeze time per round.
 - **Weapons:** Glock, USP, P228, Desert Eagle, Five-SeveN, Dual Berettas, M3, XM1014, MAC-10, TMP,
   MP5, UMP45, P90, Galil, FAMAS, AK-47, M4A1, Scout, SG 552, AUG, AWP, the semi-automatic snipers
-  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 (CT only, $6000); HE, flashbang and smoke
+  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 (CT only, $6000), 82-BM-37 mortar ($6000); HE, flashbang and smoke
   grenades, Molotov; Kevlar, helmet, defuse kit, nightvision.
 - **RPG-7** (buy menu → Heavy, CTs only, $6000; a Terrorist can pick it up from a dead CT): the rocket flies to
   the first wall, car or person and explodes for up to 500 damage within 9 m — but only to people who can see the
   explosion. A wall between you and the blast protects you. Rockets also smash windows and blow up cars.
+- **82-BM-37 mortar** (buy menu → Heavy, both teams, $6000, 6 shells; one per team — in Deathmatch one on the map;
+  not in Zombie mode, and bots don't use it). It's heavy: you walk slowly with it. **Mouse1** sets it up (2 seconds,
+  on open ground: not under a roof); you stay crouched and can't move. The view goes up over the map: move the
+  **mouse** to aim (15–80 m; the red ring is where the shells can land, the orange one the blast), **Mouse1** fires,
+  **E** or switching weapons packs it up. The shell flies a high arc for 3½–5 seconds and everyone near the target
+  hears it whistle in for the last two — run! It lands up to 4% of the distance off target and blows up like an
+  RPG rocket (up to 300 damage within 10 m, not through walls, bodies burst apart). A roof stops it, so it can't
+  reach indoors.
 - **Molotov** (buy menu → Equipment → 6, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor

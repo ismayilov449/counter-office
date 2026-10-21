@@ -462,6 +462,53 @@ function rpg7(gun, P) {
   return [0, 0.06, -0.62];
 }
 
+// A round rod from point a to point b (for the mortar's tube and bipod legs).
+const _up = new THREE.Vector3(0, 1, 0), _dir = new THREE.Vector3(), _rq = new THREE.Quaternion();
+function rod(P, a, b, r, mat, seg = 10, rEnd = r) {
+  _dir.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  const len = _dir.length();
+  _e.setFromQuaternion(_rq.setFromUnitVectors(_up, _dir.normalize()));
+  return P.cyl(r, len, mat, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, _e.x, _e.y, _e.z, seg, rEnd);
+}
+
+// 82-BM-37 mortar, carried over the shoulder: the smooth tube with its muzzle ring and breech cap, and the bipod
+// folded along it. (The baseplate shows on the set-up mortar, see buildMortarSetup.)
+function mortar(gun, P) {
+  const m = X();
+  P.cyl(0.042, 1.2, m.olive, 0, 0.07, -0.25, Math.PI / 2, 0, 0, 14);                          // tube
+  P.cyl(0.05, 0.05, m.dark, 0, 0.07, -0.84, Math.PI / 2, 0, 0, 14);                            // muzzle ring
+  P.cyl(0.055, 0.1, m.dark, 0, 0.07, 0.38, Math.PI / 2, 0, 0, 14, 0.045);                     // breech cap
+  P.box(0.03, 0.03, 0.03, m.dark, 0, 0.07, 0.45);
+  for (const x of [-0.05, 0.05]) P.box(0.014, 0.014, 0.7, m.dark, x, 0.02, -0.2);             // folded bipod legs
+  P.box(0.12, 0.04, 0.06, m.metal, 0, 0.03, -0.45);                                            // bipod clamp
+  P.box(0.03, 0.1, 0.04, m.grip, 0, -0.03, 0.02, -0.2);                                        // carrying grip
+  P.box(0.03, 0.05, 0.05, m.dark, -0.06, 0.12, -0.1);                                          // sight
+  return [0, 0.07, -0.87];
+}
+
+// The mortar set up on the ground: square baseplate, the tube raised at 60 degrees towards -z on a bipod with its
+// elevation screw, and the sight on the side. Feet at y = 0.
+export function buildMortarSetup() {
+  const g = new THREE.Group(), P = new Parts(), m = X();
+  P.box(0.5, 0.05, 0.5, m.dark, 0, 0.025, 0.15);                                               // baseplate
+  P.box(0.36, 0.03, 0.06, m.metal, 0, 0.06, 0.15);
+  const base = [0, 0.09, 0.15], axis = [0, Math.sin(Math.PI / 3), -Math.cos(Math.PI / 3)];
+  const along = s => base.map((v, k) => v + axis[k] * s);
+  rod(P, base, along(1.2), 0.042, m.olive, 14);                                                // tube
+  rod(P, along(1.17), along(1.21), 0.05, m.dark, 14);                                          // muzzle ring
+  P.cyl(0.06, 0.08, m.dark, ...base, 0, 0, 0, 12);                                             // breech on the plate
+  const knee = along(0.78);
+  for (const x of [-0.3, 0.3]) {
+    rod(P, knee, [x, 0.02, -0.62], 0.014, m.dark, 8);                                          // bipod legs
+    P.box(0.07, 0.02, 0.07, m.dark, x, 0.01, -0.62);
+  }
+  rod(P, [-0.3, 0.2, -0.56], [0.3, 0.2, -0.56], 0.01, m.metal, 6);                             // traverse bar
+  rod(P, [0, 0.2, -0.56], knee, 0.018, m.metal, 8);                                            // elevation screw
+  P.box(0.05, 0.08, 0.06, m.dark, -0.07, ...along(0.72).slice(1));                             // sight
+  P.build(g);
+  return g;
+}
+
 // PKT: long heavy barrel, box receiver, ammo can on the side, spade grips at the back.
 function pkt(gun, P) {
   const m = X();
@@ -511,6 +558,7 @@ const BUILD = {
   awp: (g, P) => sniper(g, P, { awp: true }),
   g3sg1: (g, P) => autoSniper(g, P, { g3: true }),
   rpg: (g, P) => rpg7(g, P),
+  mortar: (g, P) => mortar(g, P),
   pkt: (g, P) => pkt(g, P),
   sg550: (g, P) => autoSniper(g, P, {}),
   m249: (g, P) => mg(g, P),

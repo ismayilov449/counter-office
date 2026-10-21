@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -18,6 +18,7 @@ const ZOMBIE = { hp: 1000, motherHp: 2000, countdown: 12, respawn: 4 };
 const PARTY_WEAPONS = ['', 'awp', 'deagle', 'scout', 'ak47', 'knife', 'rpg'];
 import { CAR, carBoxes, seatPos, exitSpots } from './shared/vehicles.js';
 import { CollisionWorld } from './shared/collision.js';
+import { skyOf } from './shared/maps/sky.js';
 import { doorBox, doorCenter, openingSide } from './shared/doors.js';
 import { Stats, rating } from './lib/stats.js';
 import { rankIndex } from './shared/ranks.js';
@@ -942,6 +943,8 @@ function checkRankUps() {
 function dmLoadout(p) {
   p.inv = freshInv(p.team);
   if (p.dmSecondary) p.inv.secondary = makeItem(p.dmSecondary);
+  // (The mortar again only if nobody else took it meanwhile: one on the map.)
+  if (p.dmPrimary === 'mortar' && [...players.values()].some(q => q !== p && q.inv.primary?.id === 'mortar')) p.dmPrimary = null;
   if (p.dmPrimary) p.inv.primary = makeItem(p.dmPrimary);
   p.inv.he = 1;
   p.armor = 100;
@@ -1327,11 +1330,11 @@ function openMatchEnd(winner, extra = {}) {
   }, SUMMARY_DELAY);
 }
 
-// Heavy kills burst the body apart on the clients: explosions (RPG, HE, C4, a car) blow it to pieces, an AWP or M249
+// Heavy kills burst the body apart on the clients: explosions (RPG, mortar, HE, C4, a car) blow it to pieces, an AWP or M249
 // tears off the part it hit, a Scout or Desert Eagle does it with a headshot.
 function gibOf(weapon, hs, how) {
   if (!how) return null;
-  if (how.part === 'he' && ['rpg', 'he', 'c4', 'car'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
+  if (how.part === 'he' && ['rpg', 'mortar', 'he', 'c4', 'car'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
   if (['awp', 'm249'].includes(weapon) || (hs && ['scout', 'deagle'].includes(weapon))) return { k: 'shot', part: how.part, from: how.from.map(r2) };
   return null;
 }
@@ -1628,7 +1631,7 @@ function onShoot(p, m) {
   if (!p.alive || game.phase === 'freeze') return;
   p.protectUntil = 0;
   const w = m.w, def = WEAPONS[w];
-  if (!def || def.grenade || w === 'c4') return;
+  if (!def || def.grenade || def.mortar || w === 'c4') return; // (the mortar fires with a 'mortar' message)
   // Zombies only have claws, and only zombies have claws.
   if (!!p.zombie !== (w === 'claws')) return;
   let o = vec3(m.o);
@@ -1744,11 +1747,12 @@ function launchRocket(p, o, d, def) {
   setTimeout(() => { if (game.round === round) explodeRocket(at, p, def); }, flight);
 }
 
-function explodeRocket(at, owner, def) {
+// (Also the mortar's shell landing: weapon 'mortar'.)
+function explodeRocket(at, owner, def, weapon = 'rpg') {
   const R = def.blast;
   const killsBefore = owner.kills;
-  setTimeout(() => { if (owner.kills - killsBefore >= 2) unlockAch(owner, 'rpg_double'); }, 0);
-  broadcast({ t: 'boom', p: at, k: 'rpg' });
+  if (weapon === 'rpg') setTimeout(() => { if (owner.kills - killsBefore >= 2) unlockAch(owner, 'rpg_double'); }, 0);
+  broadcast({ t: 'boom', p: at, k: weapon });
   breakGlass(world.intactGlass.filter(g => dist3(at, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < R * 0.7).map(g => g.id));
   for (const q of players.values()) {
     if (!q.alive) continue;
@@ -1756,18 +1760,46 @@ function explodeRocket(at, owner, def) {
     const chest = [q.p[0], q.p[1] + 1.1, q.p[2]];
     const d = dist3(at, chest);
     if (d > R || !lineOfSight(at, chest)) continue;
-    applyDamage(q, owner, def.damage * (1 - d / R), 'he', 'rpg', def.pen, null, at);
+    applyDamage(q, owner, def.damage * (1 - d / R), 'he', weapon, def.pen, null, at);
   }
   for (const h of game.hostages) {
     if (h.state === 'dead' || h.state === 'rescued') continue;
     const chest = [h.p[0], h.p[1] + 1.1, h.p[2]];
     const d = dist3(at, chest);
-    if (d < R && lineOfSight(at, chest)) hurtHostage(h, owner, def.damage * (1 - d / R), 'rpg');
+    if (d < R && lineOfSight(at, chest)) hurtHostage(h, owner, def.damage * (1 - d / R), weapon);
   }
   for (const c of world.cars) {
     const d = dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
     if (d < R) damageCar(c, 900 * (1 - d / R), owner);
   }
+}
+
+// ---- 82-BM-37 mortar: the client sets it up and picks a spot (at: [x, z]); the shell flies a high arc and lands
+// there a few seconds later, give or take 4% of the distance. It needs open sky over the mortar, and a roof over the
+// target catches the shell (so it can't reach indoors; see shared/maps/sky.js).
+function onMortar(p, m) {
+  const t = now(), def = WEAPONS.mortar;
+  if (!p.alive || game.phase === 'freeze' || p.w !== 'mortar') return;
+  const item = ownItem(p, 'mortar');
+  if (!item || item.mag <= 0 || t - p.lastShot < def.rate * 1000 * 0.9) return;
+  if (!Array.isArray(m.at) || !isNum(m.at[0]) || !isNum(m.at[1])) return;
+  const o = [p.p[0], p.p[1] + 0.9, p.p[2]];
+  const sky = skyOf(MAP, world);
+  if (!sky.open(p.p)) return;
+  const dist = Math.hypot(m.at[0] - o[0], m.at[1] - o[2]);
+  if (dist < def.range[0] - 1 || dist > def.range[1] + 1) return;
+  p.lastShot = t;
+  p.protectUntil = 0;
+  item.mag--;
+  sendMe(p);
+  bots.heard(p, o);
+  const a = Math.random() * Math.PI * 2, off = dist * 0.04 * Math.sqrt(Math.random());
+  const x = m.at[0] + Math.cos(a) * off, z = m.at[1] + Math.sin(a) * off;
+  const at = [x, sky.ground(x, z, p.p[1]) + 0.1, z];
+  const flight = shellFlight(dist);
+  broadcast({ t: 'shell', o: o.map(r2), at: at.map(r2), flight, owner: p.id });
+  const round = game.round;
+  setTimeout(() => { if (game.round === round) explodeRocket(at, p, def, 'mortar'); }, flight);
 }
 
 function onNade(p, m) {
@@ -2004,6 +2036,12 @@ function onBuy(p, id) {
   const def = wdef || idef;
   if (!def || def.price == null) return;
   if (def.team && def.team !== p.team) return fail('Your team cannot buy that.');
+  if (id === 'mortar') {
+    // One mortar per team (in Deathmatch, one on the whole map); not against zombies.
+    if (isZM()) return fail('There are no mortars in Zombie mode.');
+    const holder = [...players.values()].find(q => q !== p && (isDM() || q.team === p.team) && q.inv.primary?.id === 'mortar');
+    if (holder) return fail(isDM() ? `${holder.name} already has the mortar.` : `Your team already has a mortar (${holder.name}).`);
+  }
   let price = def.price;
 
   if (wdef && wdef.grenade) {
@@ -2232,6 +2270,7 @@ function handle(p, m) {
       p.pitch = m.pitch;
       p.c = m.c ? 1 : 0;
       p.fl = m.fl ? 1 : 0;
+      p.mo = m.mo && p.w === 'mortar' ? 1 : 0;
       if (typeof m.w === 'string' && WEAPONS[m.w]) {
         if (p.reloadUntil && m.w !== p.reloadWeapon) p.reloadUntil = 0;
         p.w = m.w;
@@ -2251,6 +2290,9 @@ function handle(p, m) {
       p.reloadWeapon = m.w;
       break;
     }
+    case 'mortar':
+      onMortar(p, m);
+      break;
     case 'nade':
       onNade(p, m);
       break;
@@ -2454,7 +2496,7 @@ function tick() {
   const pl = [];
   for (const p of players.values()) {
     if (!inTeam(p)) continue;
-    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0]);
+    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo ? 1 : 0]);
   }
   const b = game.bomb;
   const base = {

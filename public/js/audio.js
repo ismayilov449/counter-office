@@ -375,6 +375,19 @@ export const audio = {
       case 'death':
         tone(out, t, { freq: 220, freqEnd: 60, dur: 0.6, type: 'sawtooth', gain: 0.15 });
         break;
+      case 'mortarfire':
+        // the shell dropped down the tube: a hollow metal clink, then a deep thoomp
+        tone(out, t, { freq: 1900, freqEnd: 1500, dur: 0.12, type: 'triangle', gain: 0.12 });
+        burst(out, t + 0.08, { dur: 0.6, type: 'lowpass', freq: 700, freqEnd: 90, gain: 1.7 });
+        tone(out, t + 0.08, { freq: 95, freqEnd: 32, dur: 0.55, gain: 1.2 });
+        burst(out, t + 0.1, { dur: 1.2, type: 'bandpass', freq: 300, q: 0.6, gain: 0.3 });
+        break;
+      case 'whistle':
+        // an incoming shell, falling in pitch as it comes down
+        tone(out, t, { freq: 1500, freqEnd: 520, dur: 1.8, gain: 0.16 });
+        tone(out, t, { freq: 1530, freqEnd: 540, dur: 1.8, gain: 0.08 });
+        burst(out, t + 0.6, { dur: 1.2, type: 'bandpass', freq: 1800, freqEnd: 700, q: 3, gain: 0.25 });
+        break;
       case 'gib':
         // a body bursting: a wet crunch, a thump and a spatter of drips
         burst(out, t, { dur: 0.4, type: 'lowpass', freq: 1800, freqEnd: 250, gain: 1.3 });

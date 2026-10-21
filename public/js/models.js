@@ -256,7 +256,7 @@ export function createViewModel(id, team) {
   const gun = buildGun(id);
   root.add(gun);
   const glove = bare ? C.head : 0x1e1e1e;
-  const twoHanded = ['rifle', 'sniper', 'shotgun', 'mg', 'smg', 'launcher'].includes(cls);
+  const twoHanded = ['rifle', 'sniper', 'shotgun', 'mg', 'smg', 'launcher', 'mortar'].includes(cls);
 
   const ra = new THREE.Group();
   ra.position.set(0.02, -0.08, 0.03);
