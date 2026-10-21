@@ -537,7 +537,7 @@ function explodeCar(c, attacker) {
     const chest = [q.p[0], q.p[1] + 1.1, q.p[2]];
     const d = dist3(center, chest);
     if (d > R || !lineOfSight(center, chest)) continue;
-    applyDamage(q, attacker, 130 * (1 - d / R), 'he', 'car', 1);
+    applyDamage(q, attacker, 130 * (1 - d / R), 'he', 'car', 1, null, center);
   }
   for (const h of game.hostages) {
     if (h.state === 'dead' || h.state === 'rescued') continue;
@@ -1327,7 +1327,16 @@ function openMatchEnd(winner, extra = {}) {
   }, SUMMARY_DELAY);
 }
 
-function killPlayer(v, killer, weapon, hs, silent = false) {
+// Heavy kills burst the body apart on the clients: explosions (RPG, HE, C4, a car) blow it to pieces, an AWP or M249
+// tears off the part it hit, a Scout or Desert Eagle does it with a headshot.
+function gibOf(weapon, hs, how) {
+  if (!how) return null;
+  if (how.part === 'he' && ['rpg', 'he', 'c4', 'car'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
+  if (['awp', 'm249'].includes(weapon) || (hs && ['scout', 'deagle'].includes(weapon))) return { k: 'shot', part: how.part, from: how.from.map(r2) };
+  return null;
+}
+
+function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
   if (!v.alive) return;
   v.alive = false;
   v.hp = 0;
@@ -1377,7 +1386,8 @@ function killPlayer(v, killer, weapon, hs, silent = false) {
     sendMe(killer);
   }
   if (!silent) record(v, 'deaths');
-  if (!silent) broadcast({ t: 'kill', k: killer ? killer.id : null, v: v.id, w: weapon, hs: !!hs, streak, first, ace });
+  const gib = gibOf(weapon, hs, how);
+  if (!silent) broadcast({ t: 'kill', k: killer ? killer.id : null, v: v.id, w: weapon, hs: !!hs, streak, first, ace, gib: gib && { ...gib, p: v.p.map(r2), c: v.c, yaw: r2(v.yaw) } });
   if (!silent && isGG() && game.phase === 'live') ggOnKill(killer, v, weapon);
   if (!silent && isDM() && game.phase === 'live' && killer && killer !== v && killer.kills >= CFG.dmFrags) dmWin(killer);
   // Clutch: the last one alive on a team facing two or more.
@@ -1392,7 +1402,8 @@ function killPlayer(v, killer, weapon, hs, silent = false) {
 }
 
 // Returns the damage dealt; `hitInfo` collects headshot/kill flags for a single hit message.
-function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo) {
+// from: where the shot or blast came from (for the body bursting apart on a heavy kill, see gibOf).
+function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo, from = null) {
   if (!v.alive) return 0;
   if (attacker && attacker !== v && v.protectUntil && now() < v.protectUntil) return 0; // Gun Game spawn protection
   const mult = { head: 4, chest: 1, stomach: 1.25, legs: 0.75 }[part] ?? 1;
@@ -1419,7 +1430,7 @@ function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo) {
     if (hitInfo) { hitInfo.any = true; hitInfo.hs ||= part === 'head'; hitInfo.kill ||= killed; }
     else send(attacker, { t: 'hit', hs: part === 'head', kill: killed });
   }
-  if (killed) killPlayer(v, attacker, weapon, part === 'head');
+  if (killed) killPlayer(v, attacker, weapon, part === 'head', false, from && { part, from });
   return d;
 }
 
@@ -1518,7 +1529,7 @@ function explodeBomb() {
   for (const q of players.values()) {
     if (!q.alive) continue;
     const dmg = 500 * (1 - dist3(q.p, pos) / 22);
-    if (dmg > 0) applyDamage(q, null, dmg, 'he', 'c4', 1);
+    if (dmg > 0) applyDamage(q, null, dmg, 'he', 'c4', 1, null, pos);
   }
 }
 
@@ -1694,7 +1705,7 @@ function onShoot(p, m) {
     else if (def.melee) applyDamage(h.q, p, alt ? def.altDamage : def.damage, 'chest', w, def.pen, info);
     else if (CFG.party.headshotsOnly && h.part !== 'head') continue;
     else {
-      const dealt = applyDamage(h.q, p, def.damage * Math.pow(def.rangeMod, h.t / 12.7), h.part, w, def.pen, info);
+      const dealt = applyDamage(h.q, p, def.damage * Math.pow(def.rangeMod, h.t / 12.7), h.part, w, def.pen, info, eyeOf(p));
       // Bullets push zombies back.
       if (h.q.zombie && dealt) {
         const k = Math.min(7, dealt / 9);
@@ -1745,7 +1756,7 @@ function explodeRocket(at, owner, def) {
     const chest = [q.p[0], q.p[1] + 1.1, q.p[2]];
     const d = dist3(at, chest);
     if (d > R || !lineOfSight(at, chest)) continue;
-    applyDamage(q, owner, def.damage * (1 - d / R), 'he', 'rpg', def.pen);
+    applyDamage(q, owner, def.damage * (1 - d / R), 'he', 'rpg', def.pen, null, at);
   }
   for (const h of game.hostages) {
     if (h.state === 'dead' || h.state === 'rescued') continue;
@@ -1836,7 +1847,7 @@ function explodeNade(n) {
     const chest = [q.p[0], q.p[1] + 1.1, q.p[2]];
     const d = dist3(o, chest);
     if (d > 9 || !lineOfSight(o, chest)) continue;
-    applyDamage(q, owner, 100 * (1 - d / 9), 'he', 'he', WEAPONS.he.pen);
+    applyDamage(q, owner, 100 * (1 - d / 9), 'he', 'he', WEAPONS.he.pen, null, o);
   }
   if (n.k === 'he') {
     for (const c of world.cars) {

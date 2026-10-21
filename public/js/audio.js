@@ -375,6 +375,17 @@ export const audio = {
       case 'death':
         tone(out, t, { freq: 220, freqEnd: 60, dur: 0.6, type: 'sawtooth', gain: 0.15 });
         break;
+      case 'gib':
+        // a body bursting: a wet crunch, a thump and a spatter of drips
+        burst(out, t, { dur: 0.4, type: 'lowpass', freq: 1800, freqEnd: 250, gain: 1.3 });
+        tone(out, t, { freq: 140, freqEnd: 45, dur: 0.35, gain: 0.7 });
+        burst(out, t + 0.02, { dur: 0.12, type: 'bandpass', freq: 2600, q: 0.8, gain: 0.5 });
+        for (let i = 0; i < 7; i++) burst(out, t + 0.05 + Math.random() * 0.5, { dur: 0.05, type: 'bandpass', freq: 500 + Math.random() * 900, q: 2, gain: 0.35 });
+        break;
+      case 'splat':
+        // a piece landing
+        burst(out, t, { dur: 0.09, type: 'lowpass', freq: 900 + Math.random() * 500, gain: 0.45 });
+        break;
       case 'beep':
         tone(out, t, { freq: 1950, dur: 0.1, gain: 0.35 });
         break;

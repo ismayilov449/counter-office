@@ -10,7 +10,7 @@ import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, patchTree, ambientAt } from './roomlight.js';
-import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb } from './models.js';
+import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel } from './models.js';
 import { EMOTES, EMOTE } from '/shared/emotes.js';
 import { RANKS } from '/shared/ranks.js';
 import { ACHIEVEMENT } from '/shared/achievements.js';
@@ -703,6 +703,7 @@ function updateRemotes(dt) {
     r.model.position.set(...s.p);
     r.model.rotation.y = s.yaw;
     if (alive) {
+      if (r.model.userData.torn) { mendModel(r.model); r.model.userData.gibAll = false; }
       r.walk += moved * 3.2;
       r.model.rotation.x = 0;
       r.deadT = 0;
@@ -721,7 +722,7 @@ function updateRemotes(dt) {
     r.model.userData.light.visible = alive && !!r.fl;
     r.model.userData.headG.scale.setScalar(bigHeads());
     if (r.tag) r.tag.visible = alive;
-    r.model.visible = !(!me.alive && me.specId === r.id && specActive) && !(killcam && killcam.killer === r.id);
+    r.model.visible = !(!me.alive && me.specId === r.id && specActive) && !(killcam && killcam.killer === r.id) && !(!alive && r.model.userData.gibAll);
   }
 }
 
@@ -1066,6 +1067,34 @@ function nearestHostage() {
   return best;
 }
 
+// ---------------------------------------------------------------- heavy kills: the body bursts apart
+
+// m: a kill message with gib { k: 'blast' | 'shot', part, from, p, c, yaw } (see gibOf in server.js);
+// body: the model left lying there (pieces torn off it, or hidden for a blast); look: its team colors.
+function gibBody(m, body, look) {
+  const { k, part, from, p, c, yaw } = m.gib;
+  const blast = k === 'blast';
+  const parts = blast ? ['head', 'torso', 'rArm', 'lArm', 'lLeg', 'rLeg']
+    : part === 'head' ? ['head']
+    : part === 'legs' ? [Math.random() < 0.5 ? 'lLeg' : 'rLeg']
+    : [Math.random() < 0.5 ? 'rArm' : 'lArm'];
+  const pieces = createGibPieces(look, parts, blast ? 14 : 5);
+  if (c) for (const pc of pieces) pc.at[1] *= 0.55;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  // A blast throws everything away from its center, harder the closer it was; a bullet carries on along its path.
+  const dir = (a, b) => { const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l = Math.hypot(...d) || 1; return [d[0] / l, d[1] / l, d[2] / l, l]; };
+  const push = blast
+    ? q => { const [x, y, z, l] = dir(from, q), s = clamp(10 - l, 3, 8) * rnd(0.6, 1.1); return [x * s + rnd(-1.2, 1.2), Math.max(y, 0) * s + rnd(2.5, 5.5), z * s + rnd(-1.2, 1.2)]; }
+    : q => { const [x, y, z] = dir(from, [p[0], q[1], p[2]]), s = rnd(4, 7.5); return [x * s + rnd(-1, 1), y * s + rnd(2, 3.5), z * s + rnd(-1, 1)]; };
+  fx.gib(pieces, p, yaw, push, blast);
+  audio.play('gib', [p[0], p[1] + 1, p[2]]);
+  if (body) {
+    if (blast) { body.userData.gibAll = true; if (body === killcam?.ghost) body.visible = false; } else tearOff(body, parts);
+    body.userData.torn = true;
+  }
+}
+fx.onSplat = p => audio.play('splat', p);
+
 // ---------------------------------------------------------------- kill cam
 
 let killcam = null;
@@ -1093,6 +1122,7 @@ function startKillcam(killerId, weapon, hs) {
 
 function stopKillcam() {
   if (!killcam) return;
+  if (killcam.gib) gibBody(killcam.gib, null, me.zombie ? 'Z' : me.team);
   scene.remove(killcam.ghost);
   killcam = null;
   hud.killcam(null);
@@ -1106,6 +1136,7 @@ function updateKillcam(dt) {
   if (killcam.t >= killcam.end || !remotes.get(killcam.killer)) { stopKillcam(); return; }
   // Our own body at the replay time
   const g = killcam.ghost;
+  if (killcam.gib && killcam.t >= killcam.death) { gibBody(killcam.gib, g, me.zombie ? 'Z' : me.team); killcam.gib = null; }
   if (selfHistory.length) {
     const s = sampleRemote({ buf: selfHistory }, Math.min(killcam.t, killcam.death));
     const moved = killcam.lastP ? Math.hypot(s.p[0] - killcam.lastP[0], s.p[2] - killcam.lastP[2]) : 0;
@@ -1825,6 +1856,11 @@ const net = new Net({
     announceKill(m, killer);
     const r = remotes.get(m.v);
     if (r && r.alive) { r.alive = false; r.deadT = 0; }
+    if (m.gib) {
+      // Our own death in the kill cam: the body bursts when the replay gets there.
+      if (m.v === me.id && killcam) killcam.gib = m;
+      else gibBody(m, r?.model, r?.look || teamOf(m.v));
+    }
   },
   rocket(m) {
     fx.rocket(m.o, m.d, m.dist, m.speed);
@@ -1871,6 +1907,7 @@ const net = new Net({
   },
   round(m) {
     fx.clearDecals();
+    fx.clearGibs();
     fx.clearFires();
     if (me.roundBuys.length) me.lastBuys = me.roundBuys;
     me.roundBuys = [];

@@ -150,6 +150,11 @@ a match anyone can also vote from the Esc menu: more than half the players votin
   around). Moving or shooting stops it.
 - **Kill cam** — when you die, a short replay from your killer's eyes, slowed down at the moment of the
   kill. Click or press Space to skip; can be turned off in the Esc menu.
+- **Gore** — a heavy kill bursts the body apart: an **RPG**, **HE grenade**, **C4** or exploding car blows it to
+  pieces (head, torso, arms, legs and scraps fly off, bounce and bleed), an **AWP** or **M249** tears off the part it
+  hit (a headshot takes the head off), and a **Scout** or **Desert Eagle** does it with a headshot. Blood sprays,
+  pools under the body and splashes nearby walls. It all stays until the next round starts (in Deathmatch and Gun
+  Game the oldest dozen go first). In the kill cam you see your own body burst at the moment of the kill.
 
 ## Gameplay
 

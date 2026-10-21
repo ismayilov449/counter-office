@@ -28,6 +28,23 @@ function flameTexture() {
 const MAX_DECALS = 160;
 const MAX_TRACERS = 24;
 const MAX_CASINGS = 48;
+const MAX_GIB_SETS = 12;
+
+// An irregular blood splat: a dark pool with blobs and droplets around it (alpha in the texture).
+function splatTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const blob = (x, y, r, a) => { g.fillStyle = `rgba(${90 + Math.floor(Math.random() * 40)},0,0,${a})`; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+  for (let i = 0; i < 9; i++) blob(64 + (Math.random() - 0.5) * 40, 64 + (Math.random() - 0.5) * 40, 10 + Math.random() * 18, 0.85);
+  for (let i = 0; i < 26; i++) {
+    const a = Math.random() * Math.PI * 2, d = 28 + Math.random() * 30;
+    blob(64 + Math.cos(a) * d, 64 + Math.sin(a) * d, 1.5 + Math.random() * 5, 0.8);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 function softTexture() {
   const c = document.createElement('canvas');
@@ -116,6 +133,8 @@ export class Effects {
     };
     this.thirdFlashes = [];
     this.sprayMeshes = new Map();
+    this.gibs = [];
+    this.gibSets = [];
   }
 
   emit(p, v, color, life, gravity = 9) {
@@ -234,6 +253,135 @@ export class Effects {
       const v = [(Math.random() - 0.5) * 4, Math.random() * 2, (Math.random() - 0.5) * 4];
       const tint = 0.75 + Math.random() * 0.25;
       this.emit(p, v, [0.7 * tint, 0.85 * tint, 0.95 * tint], 0.6 + Math.random() * 0.8, 12);
+    }
+  }
+
+  // ---- heavy kills: the body bursts into pieces that fly, bounce and bleed, and blood splats around.
+  // Everything stays until the next round (clearGibs); with no rounds (Deathmatch, Gun Game) the oldest go first.
+  // pieces: from createGibPieces; at: the victim's feet; yaw: its facing; push(p): how a piece at p is thrown.
+  gib(pieces, at, yaw, push, blast) {
+    const set = { meshes: [], splats: [] };
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    for (const pc of pieces) {
+      const [lx, ly, lz] = pc.at;
+      const p = new THREE.Vector3(at[0] + lx * cy + lz * sy, at[1] + ly, at[2] - lx * sy + lz * cy);
+      pc.mesh.position.copy(p);
+      pc.mesh.rotation.set(0, yaw, 0);
+      this.group.add(pc.mesh);
+      const v = new THREE.Vector3(...push([p.x, p.y, p.z]));
+      const spin = v.length() * 1.6 + 3;
+      this.gibs.push({
+        mesh: pc.mesh, v, r: pc.r, rest: false, landed: false, bleed: 1.2 + Math.random() * 2, dripAt: 0,
+        w: new THREE.Vector3((Math.random() - 0.5) * spin, (Math.random() - 0.5) * spin, (Math.random() - 0.5) * spin), set,
+      });
+      set.meshes.push(pc.mesh);
+    }
+    // a burst of blood and a red mist
+    const chest = [at[0], at[1] + 1.1, at[2]];
+    for (let i = 0; i < (blast ? 140 : 70); i++) {
+      const v = push(chest).map((c, k) => c * (0.3 + Math.random() * 0.6) + (Math.random() - 0.5) * (blast ? 7 : 4) + (k === 1 ? Math.random() * 2 : 0));
+      this.emit([chest[0] + (Math.random() - 0.5) * 0.4, chest[1] + (Math.random() - 0.5) * 0.8, chest[2] + (Math.random() - 0.5) * 0.4], v, [0.45 + Math.random() * 0.3, 0, 0], 0.6 + Math.random() * 0.8, 12);
+    }
+    for (let i = 0; i < (blast ? 5 : 3); i++) this.puff([chest[0] + (Math.random() - 0.5) * 0.6, chest[1] + (Math.random() - 0.5) * 0.6, chest[2] + (Math.random() - 0.5) * 0.6], 0x7a0808, blast ? 2.6 : 1.6, 0.9 + Math.random() * 0.6, 0.05);
+    // pools and splashes: under the body, and on what's nearby in the direction everything flew
+    const world = this.getWorld();
+    const splashAt = (o, d, len, size) => {
+      const hit = world.raycast(o, d, len, 'solid');
+      if (hit) this.splat([o[0] + d[0] * hit.t, o[1] + d[1] * hit.t, o[2] + d[2] * hit.t], hit.n, size, set);
+    };
+    splashAt([at[0], at[1] + 0.5, at[2]], [0, -1, 0], 3, blast ? 2.4 : 1.6);
+    for (let i = 0; i < (blast ? 9 : 4); i++) {
+      const v = push(chest), l = Math.hypot(...v) || 1;
+      const d = [v[0] / l + (Math.random() - 0.5) * 0.9, v[1] / l * 0.3 - Math.random() * 0.5, v[2] / l + (Math.random() - 0.5) * 0.9];
+      const dl = Math.hypot(...d);
+      splashAt(chest, d.map(c => c / dl), blast ? 4 : 3, 0.6 + Math.random() * 0.8);
+    }
+    this.gibSets.push(set);
+    while (this.gibSets.length > MAX_GIB_SETS) this.dropGibSet(this.gibSets[0]);
+  }
+
+  // A blood splat flat on a surface (n: its normal).
+  splat(p, n, size, set) {
+    if (!this.splatMats) {
+      this.splatMats = Array.from({ length: 4 }, () => new THREE.MeshLambertMaterial({
+        map: splatTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
+      }));
+      this.splatGeo = new THREE.PlaneGeometry(1, 1);
+    }
+    const m = new THREE.Mesh(this.splatGeo, this.splatMats[Math.floor(Math.random() * this.splatMats.length)]);
+    m.position.set(p[0] + n[0] * 0.012, p[1] + n[1] * 0.012, p[2] + n[2] * 0.012);
+    m.lookAt(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
+    m.rotateZ(Math.random() * Math.PI * 2);
+    m.scale.set(size, size, 1);
+    this.group.add(m);
+    set.splats.push(m);
+  }
+
+  dropGibSet(set) {
+    for (const m of [...set.meshes, ...set.splats]) this.group.remove(m);
+    this.gibs = this.gibs.filter(g => g.set !== set);
+    this.gibSets = this.gibSets.filter(s => s !== set);
+  }
+
+  clearGibs() {
+    for (const set of [...this.gibSets]) this.dropGibSet(set);
+  }
+
+  updateGibs(dt) {
+    const world = this.getWorld();
+    for (let i = this.gibs.length - 1; i >= 0; i--) {
+      const g = this.gibs[i];
+      if (g.rest) continue;
+      const m = g.mesh, p = m.position;
+      g.v.y -= 15 * dt;
+      // walls: bounce off
+      const hs = Math.hypot(g.v.x, g.v.z);
+      if (hs > 0.01) {
+        const d = [g.v.x / hs, 0, g.v.z / hs];
+        const hit = world.raycast([p.x, p.y, p.z], d, hs * dt + g.r, 'solid');
+        if (hit) {
+          if (hit.n[0]) g.v.x *= -0.35; else g.v.z *= -0.35;
+          if (!g.wallSplat && hs > 3) { g.wallSplat = true; this.splat([p.x + d[0] * hit.t, p.y, p.z + d[2] * hit.t], hit.n, 0.3 + g.r * 1.5, g.set); }
+        }
+      }
+      p.x += g.v.x * dt;
+      p.z += g.v.z * dt;
+      // floor: land, bounce a little, slide to a stop
+      if (g.v.y <= 0) {
+        const hit = world.raycast([p.x, p.y + 0.05, p.z], [0, -1, 0], -g.v.y * dt + g.r + 0.05, 'solid');
+        if (hit) {
+          const floor = p.y + 0.05 - hit.t;
+          p.y = floor + g.r * 0.6;
+          if (!g.landed) {
+            g.landed = true;
+            this.splat([p.x, floor, p.z], [0, 1, 0], 0.35 + g.r * 2.2, g.set);
+            if (g.r > 0.12) this.onSplat?.([p.x, floor, p.z]);
+          }
+          g.v.y *= -0.25; g.v.x *= 0.55; g.v.z *= 0.55; g.w.multiplyScalar(0.5);
+          if (Math.abs(g.v.y) < 0.6 && Math.hypot(g.v.x, g.v.z) < 0.5) {
+            // settle lying flat on the floor
+            g.rest = true;
+            m.rotation.x = Math.round(m.rotation.x / (Math.PI / 2)) * (Math.PI / 2);
+            m.rotation.z = Math.round(m.rotation.z / (Math.PI / 2)) * (Math.PI / 2);
+            m.updateMatrixWorld(true);
+            p.y += floor - new THREE.Box3().setFromObject(m).min.y + 0.002;
+            continue;
+          }
+        } else p.y += g.v.y * dt;
+      } else p.y += g.v.y * dt;
+      if (p.y < -60) { g.rest = true; m.visible = false; continue; }
+      m.rotation.x += g.w.x * dt;
+      m.rotation.y += g.w.y * dt;
+      m.rotation.z += g.w.z * dt;
+      // a trail of drips while it bleeds
+      if (g.bleed > 0) {
+        g.bleed -= dt;
+        g.dripAt -= dt;
+        if (g.dripAt <= 0) {
+          g.dripAt = 0.025;
+          this.emit([p.x, p.y, p.z], [g.v.x * 0.2 + (Math.random() - 0.5) * 0.6, g.v.y * 0.2, g.v.z * 0.2 + (Math.random() - 0.5) * 0.6], [0.5 + Math.random() * 0.2, 0, 0], 0.5, 12);
+        }
+      }
     }
   }
 
@@ -387,6 +535,7 @@ export class Effects {
   // Remove everything that belongs to a map (on map change).
   reset() {
     this.clearDecals();
+    this.clearGibs();
     for (const id of [...this.sprayMeshes.keys()]) this.removeSpray(id);
     for (const s of this.smokes) for (const p of s.parts) this.group.remove(p);
     this.smokes = [];
@@ -399,6 +548,7 @@ export class Effects {
   }
 
   update(dt, camera) {
+    if (this.gibs.length) this.updateGibs(dt);
     for (let i = this.rockets.length - 1; i >= 0; i--) {
       const r = this.rockets[i];
       r.t += dt;

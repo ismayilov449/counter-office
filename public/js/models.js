@@ -162,6 +162,50 @@ export function setPlayerWeapon(model, id) {
   u.gunId = id;
 }
 
+// ---- body pieces for a heavy kill (see Effects.gib): head, torso, arms and legs with bloody stumps, and scraps.
+const FLESH = 0x7a0c0c, MEAT = [0x6a0808, 0x8e1414, 0x5a0606], BONE = 0xd8cfc0;
+const PIECE = {
+  head: (g, C) => { bx(g, 0.28, 0.3, 0.28, C.head); bx(g, 0.32, 0.1, 0.32, C.hat, 0, 0.18, 0); bx(g, 0.15, 0.06, 0.15, FLESH, 0, -0.17, 0); return 1.62; },
+  torso: (g, C) => { bx(g, 0.48, 0.62, 0.28, C.shirt); bx(g, 0.52, 0.42, 0.32, C.vest, 0, 0.05, 0); bx(g, 0.18, 0.05, 0.18, FLESH, 0, 0.33, 0); bx(g, 0.4, 0.05, 0.22, FLESH, 0, -0.32, 0); return 1.16; },
+  rArm: (g, C) => { bx(g, 0.1, 0.42, 0.1, C.sleeve); bx(g, 0.08, 0.05, 0.08, FLESH, 0, 0.22, 0); bx(g, 0.03, 0.06, 0.03, BONE, 0, 0.26, 0); return 1.25; },
+  lArm: (g, C) => { bx(g, 0.1, 0.42, 0.1, C.sleeve); bx(g, 0.08, 0.05, 0.08, FLESH, 0, 0.22, 0); bx(g, 0.03, 0.06, 0.03, BONE, 0, 0.26, 0); return 1.25; },
+  lLeg: (g, C) => { bx(g, 0.18, 0.7, 0.2, C.pants); bx(g, 0.2, 0.1, 0.28, 0x1c1c1c, 0, -0.38, -0.03); bx(g, 0.15, 0.05, 0.17, FLESH, 0, 0.36, 0); bx(g, 0.05, 0.07, 0.05, BONE, 0, 0.4, 0); return 0.45; },
+  rLeg: (g, C) => { bx(g, 0.18, 0.7, 0.2, C.pants); bx(g, 0.2, 0.1, 0.28, 0x1c1c1c, 0, -0.38, -0.03); bx(g, 0.15, 0.05, 0.17, FLESH, 0, 0.36, 0); bx(g, 0.05, 0.07, 0.05, BONE, 0, 0.4, 0); return 0.45; },
+};
+const PIECE_X = { head: 0, torso: 0, rArm: 0.27, lArm: -0.27, lLeg: -0.12, rLeg: 0.12 };
+
+// The pieces as meshes, each with where it sat on the body (local, feet at 0, facing -z) and its rough size.
+export function createGibPieces(look, parts, scraps) {
+  const C = TEAM[look] || TEAM.T;
+  const out = [];
+  for (const part of parts) {
+    const g = new THREE.Group();
+    const y = PIECE[part](g, C);
+    out.push({ mesh: g, at: [PIECE_X[part], y, 0], r: part === 'torso' ? 0.3 : part.endsWith('Leg') ? 0.25 : 0.16 });
+  }
+  for (let i = 0; i < scraps; i++) {
+    const g = new THREE.Group(), s = 0.05 + Math.random() * 0.09;
+    bx(g, s, s * (0.6 + Math.random() * 0.6), s * (0.7 + Math.random() * 0.6), Math.random() < 0.15 ? BONE : MEAT[i % MEAT.length]);
+    out.push({ mesh: g, at: [(Math.random() - 0.5) * 0.4, 0.5 + Math.random() * 1.1, (Math.random() - 0.5) * 0.3], r: s / 2 });
+  }
+  for (const p of out) p.mesh.traverse(o => { o.castShadow = true; });
+  return out;
+}
+
+// Hide the parts that were torn off a body (all: the whole body); mendModel puts them back when it respawns.
+export function tearOff(model, parts) {
+  const u = model.userData;
+  const node = { head: u.headG, rArm: u.rArm, lArm: u.lArm, lLeg: u.legs[0], rLeg: u.legs[1] };
+  for (const part of parts) if (node[part]) node[part].visible = false;
+  u.torn = true;
+}
+export function mendModel(model) {
+  const u = model.userData;
+  if (!u.torn) return;
+  for (const n of [u.headG, u.rArm, u.lArm, ...u.legs]) n.visible = true;
+  u.torn = false;
+}
+
 // Pose the model: crouch, look pitch, walk cycle.
 export function posePlayer(model, crouch, pitch, walkPhase, walkAmount) {
   const u = model.userData;
