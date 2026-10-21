@@ -168,13 +168,21 @@ a match anyone can also vote from the Esc menu: more than half the players votin
   the first wall, car or person and explodes for up to 500 damage within 9 m — but only to people who can see the
   explosion. A wall between you and the blast protects you. Rockets also smash windows and blow up cars.
 - **82-BM-37 mortar** (buy menu → Heavy, both teams, $6000, 6 shells; one per team — in Deathmatch one on the map;
-  not in Zombie mode, and bots don't use it). It's heavy: you walk slowly with it. **Mouse1** sets it up (2 seconds,
-  on open ground: not under a roof); you stay crouched and can't move. The view goes up over the map: move the
-  **mouse** to aim (15–80 m; the red ring is where the shells can land, the orange one the blast), **Mouse1** fires,
-  **E** or switching weapons packs it up. The shell flies a high arc for 3½–5 seconds and everyone near the target
-  hears it whistle in for the last two — run! It lands up to 4% of the distance off target and blows up like an
-  RPG rocket (up to 300 damage within 10 m, not through walls, bodies burst apart). A roof stops it, so it can't
-  reach indoors.
+  not in Zombie mode, and bots don't use it). It's heavy: you walk slowly with it. It's aimed like a real one, in
+  Soviet mils (60-00 to the full circle; bearings go clockwise from north, the top of the radar):
+  - **Mouse1** sets it up (2 seconds, on open ground: not under a roof); you stay crouched and can't move.
+  - You look out along the tube. The **mouse** (or **A D**) turns it — the panel shows the **bearing**, e.g. 31-50 —
+    and raises or lowers it (or **W S**): the **elevation**, from 7-50 (45°, the furthest: 80 m) to 14-15 (85°, 14 m).
+    The **firing table** on the panel says how far each elevation throws. You don't see where it will land.
+  - **V** calls in a target — anyone on the team (or you, before setting up): the spot you're looking at. The
+    gunner's panel shows its bearing and distance from the mortar and how far to turn, and it's marked on the radar.
+  - **Mouse1** fires. The shell flies a high arc for 3½–5 seconds; everyone near where it comes down hears it whistle
+    in for the last two — run! It lands a little off (1 m + 3% of the distance) and blows up like an RPG rocket (up to
+    300 damage within 10 m, not through walls, bodies burst apart). A roof stops it, so it can't reach indoors.
+  - After each shell the panel says where it landed: exactly, with the correction ("6 m short, 0-40 left of the
+    target"), if someone on the team saw it go off; only roughly ("not observed") if nobody did. It's on the radar
+    too. Walk the shells onto the target, like a real crew.
+  - **E** or switching weapons packs it up.
 - **Molotov** (buy menu → Equipment → 6, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor

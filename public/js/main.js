@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_MENU, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_MENU, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -18,7 +18,7 @@ import { RANKS } from '/shared/ranks.js';
 import { ACHIEVEMENT } from '/shared/achievements.js';
 import { Effects, nadeFuse } from './effects.js';
 import { audio } from './audio.js';
-import { Hud, TEAM_NAME, TEAM_COLOR } from './hud.js';
+import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
@@ -402,12 +402,16 @@ function tryFire(now) {
 }
 
 // ---------------------------------------------------------------- 82-BM-37 mortar
-// Mouse1 sets it up (on open ground: a couple of seconds, crouched, not moving); then the view goes up over the map,
-// the mouse moves the aim point, Mouse1 fires and E (or switching weapons) packs it up. The server checks and fires
-// the shell (onMortar in server.js); everyone sees and hears it fly in through the 'shell' message.
+// Aimed like a real one. Mouse1 sets it up (on open ground: a couple of seconds, then you stay crouched and still).
+// You look along the tube: the mouse turns it (the bearing) and raises or lowers it (the elevation, both in Soviet
+// mils); the firing table on the panel says how far each elevation throws. Mouse1 fires, E (or switching weapons)
+// packs it up. Teammates (or you) press V on a spot to call in a target: its bearing and distance from the mortar
+// show on the panel and the radar. After each shell the panel says where it landed: exactly, with a correction, if
+// someone on the team saw it go off; roughly if nobody did. The server fires the shell (onMortar in server.js).
 const MORTAR = WEAPONS.mortar;
 const skyOpen = p => skyOf(map, coll).open(p);
-const groundAt = (x, z, fallback) => skyOf(map, coll).ground(x, z, fallback);
+const elevDeg = mils => (mils * 360) / MILS;
+const mortarInfo = { target: null, impact: null };
 
 function mortarFire(now) {
   const m = me.mortar;
@@ -415,7 +419,7 @@ function mortarFire(now) {
     if (!me.onGround || inWater(map.water, me.p)) return;
     if (!skyOpen(me.p)) { hud.small('The mortar needs open sky above it', 2); audio.play('deny'); return; }
     stopEmote();
-    me.mortar = { phase: 'setup', start: now, until: now + MORTAR.setup * 1000, yaw: me.yaw, at: [me.p[0] - Math.sin(me.yaw) * 35, me.p[2] - Math.cos(me.yaw) * 35] };
+    me.mortar = { phase: 'setup', start: now, until: now + MORTAR.setup * 1000, elev: 1000 };
     me.scope = 0;
     audio.play('draw');
     return;
@@ -423,10 +427,13 @@ function mortarFire(now) {
   if (m.phase !== 'aim') return;
   const item = currentItem();
   if (!item || item.mag <= 0) { audio.play('empty'); me.nextShot = now + 400; return; }
-  net.send({ t: 'mortar', at: m.at.map(v => Math.round(v * 100) / 100) });
+  net.send({ t: 'mortar', b: Math.round(mortarBearing()), e: Math.round(m.elev) });
   item.mag--;
   me.nextShot = now + MORTAR.rate * 1000;
 }
+
+// The way the tube points: our facing, as a bearing in mils.
+const mortarBearing = () => bearingOf(-Math.sin(me.yaw), -Math.cos(me.yaw));
 
 // Per frame: finish setting up; pack up when the mortar is put away, dropped, or you die.
 function updateMortar(now) {
@@ -435,75 +442,100 @@ function updateMortar(now) {
   if (!me.alive || current() !== 'mortar' || me.driving != null || me.riding || game.phase === 'end') { me.mortar = null; return; }
   if (m.phase === 'setup' && now >= m.until) {
     m.phase = 'aim';
+    me.pitch = 0.06; // look out along the bearing, just over the horizon
     audio.play('pickup');
   }
 }
 
-// The mouse moves the aim point (screen up = the way the mortar faces), kept within range.
-function aimMortar(dx, dy) {
-  const m = me.mortar, k = 0.05 * settings.sens;
-  const s = Math.sin(m.yaw), c = Math.cos(m.yaw);
-  m.at[0] += (c * dx + s * dy) * k;
-  m.at[1] += (-s * dx + c * dy) * k;
-  const ox = m.at[0] - me.p[0], oz = m.at[1] - me.p[2], d = Math.hypot(ox, oz) || 1;
-  const want = clamp(d, MORTAR.range[0], MORTAR.range[1]);
-  m.at = [me.p[0] + (ox / d) * want, me.p[2] + (oz / d) * want];
-}
-
-// The map view: looking down over the mortar and the aim point, the mortar's facing up the screen.
-function mortarCamera() {
-  const m = me.mortar, b = me.p;
-  const mid = [(b[0] + m.at[0]) / 2, (b[2] + m.at[1]) / 2];
-  const H = 22 + Math.hypot(m.at[0] - b[0], m.at[1] - b[2]) * 0.75;
-  const f = [-Math.sin(m.yaw), -Math.cos(m.yaw)];
-  camera.position.set(mid[0] - f[0] * H * 0.25, b[1] + H, mid[1] - f[1] * H * 0.25);
-  camera.up.set(f[0], 0, f[1]);
-  camera.lookAt(mid[0], b[1], mid[1]);
-  camera.up.set(0, 1, 0);
-}
-
-// Markers on the map view (drawn over everything): the aim point with the shells' spread, the blast radius, and
-// rings at the shortest and longest range around the mortar.
-let mortarMarks = null;
-function ring(r, w, color, opacity) {
-  const m = new THREE.Mesh(new THREE.RingGeometry(r - w, r, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthTest: false, depthWrite: false }));
-  m.renderOrder = 999;
-  return m;
-}
-function updateMortarMarks() {
+// Turning and tilting the tube: slow and fine with the mouse, or 0-05 / 0-10 a step with A D / W S.
+function aimMortar(dBearing, dElev) {
   const m = me.mortar;
-  const show = !!m && m.phase === 'aim' && me.alive;
-  if (!show) { if (mortarMarks) mortarMarks.visible = false; return; }
-  if (!mortarMarks) {
-    mortarMarks = new THREE.Group();
-    mortarMarks.userData = {
-      spread: ring(1, 0.12, 0xff3030, 0.95), dot: ring(0.25, 0.25, 0xff3030, 0.95), blast: ring(MORTAR.blast, 0.15, 0xffa040, 0.45),
-      min: ring(MORTAR.range[0], 0.2, 0xffffff, 0.35), max: ring(MORTAR.range[1], 0.3, 0xffffff, 0.35),
-    };
-    for (const o of Object.values(mortarMarks.userData)) mortarMarks.add(o);
-    scene.add(mortarMarks);
-  }
-  const u = mortarMarks.userData;
-  mortarMarks.visible = true;
-  const dist = Math.hypot(m.at[0] - me.p[0], m.at[1] - me.p[2]);
-  const y = groundAt(m.at[0], m.at[1], me.p[1]) + 0.05;
-  for (const o of [u.spread, u.dot, u.blast]) o.position.set(m.at[0], y, m.at[1]);
-  u.spread.scale.setScalar(Math.max(0.8, dist * 0.04));
-  for (const o of [u.min, u.max]) o.position.set(me.p[0], me.p[1] + 0.05, me.p[2]);
+  me.yaw -= (dBearing / MILS) * Math.PI * 2;
+  me.yaw = Math.atan2(Math.sin(me.yaw), Math.cos(me.yaw));
+  m.elev = clamp(m.elev + dElev, MORTAR.elev[0], MORTAR.elev[1]);
 }
 
-// Set-up mortars on the ground: ours (seen from the map view) and other players'.
-let ownMortar = null;
-function placeMortarModel(model, p, yaw) {
-  model.position.set(p[0] - Math.sin(yaw) * 0.55, p[1], p[2] - Math.cos(yaw) * 0.55);
-  model.rotation.set(0, yaw, 0);
+// Calling in a target (V): the spot you're looking at, for the team's mortar.
+function spotTarget() {
+  const o = eyePos(), d = aimDir(me.yaw, me.pitch);
+  const hit = coll.raycast(o, d, 250, 'bullet');
+  if (!hit) { hud.small('Look at a spot on the ground to call in a target', 2); return; }
+  net.send({ t: 'spot', p: [o[0] + d[0] * hit.t, o[1] + d[1] * hit.t, o[2] + d[2] * hit.t] });
 }
+
+// Bearing (mils) and distance from the mortar to a point.
+const fromMortar = p => ({ b: bearingOf(p[0] - me.p[0], p[2] - me.p[2]), d: Math.hypot(p[0] - me.p[0], p[2] - me.p[2]) });
+const turnText = mils => (Math.abs(mils) < 5 ? 'on line' : `${milsText(Math.abs(mils))} ${mils > 0 ? 'right' : 'left'}`);
+
+// Where the last shell landed, compared to the called-in target (or just where, without one).
+function impactText() {
+  const i = mortarInfo.impact;
+  if (!i) return '';
+  const at = fromMortar(i.p), t = mortarInfo.target;
+  if (!i.seen) return `Last shell: not observed — roughly ${milsText(at.b)}, ${Math.round(at.d)} m`;
+  if (!t) return `Last shell: ${milsText(at.b)}, ${Math.round(at.d)} m (seen by ${esc(i.seen)})`;
+  const tt = fromMortar(t.p);
+  const dd = at.d - tt.d, db = ((at.b - tt.b + MILS * 1.5) % MILS) - MILS / 2;
+  const range = Math.abs(dd) < 1.5 ? 'on range' : `${Math.round(Math.abs(dd))} m ${dd > 0 ? 'over' : 'short'}`;
+  return `Last shell: ${range}, ${turnText(db)} of the target (seen by ${esc(i.seen)})`;
+}
+
+// The gunner's panel: bearing, elevation and its range, the firing table, the target and the last shell.
+const TABLE = [750, 800, 900, 1000, 1100, 1200, 1300, 1400];
+function updateMortarHud() {
+  const m = me.mortar;
+  if (!m || m.phase !== 'aim' || !me.alive) { hud.mortarPanel(null); return; }
+  const item = currentItem(), range = mortarRange(m.elev);
+  const near = TABLE.reduce((a, b) => (Math.abs(b - m.elev) < Math.abs(a - m.elev) ? b : a));
+  const rows = TABLE.map(e => `<span class="${e === near ? 'on' : ''}">${milsText(e)} <b>${Math.round(mortarRange(e))} m</b></span>`).join('');
+  const t = mortarInfo.target;
+  let target = '<div class="mp-dim">No target — teammates press V on a spot to call one in</div>';
+  if (t) {
+    const tt = fromMortar(t.p);
+    const off = ((tt.b - mortarBearing() + MILS * 1.5) % MILS) - MILS / 2;
+    target = `<div class="mp-target">Target from ${esc(t.name)}: <b>${milsText(tt.b)}</b>, <b>${Math.round(tt.d)} m</b>` +
+      `${tt.d < mortarRange(MORTAR.elev[1]) || tt.d > MORTAR.maxRange ? ' (out of range)' : ` · turn ${turnText(off)}`}</div>`;
+  }
+  hud.mortarPanel(`<div class="mp-head">82-BM-37 <span>${item?.mag ?? 0} shells</span></div>` +
+    `<div class="mp-row">Bearing <b>${milsText(mortarBearing())}</b></div>` +
+    `<div class="mp-row">Elevation <b>${milsText(m.elev)}</b> (${Math.round(elevDeg(m.elev))}°) → <b>${Math.round(range)} m</b></div>` +
+    `<div class="mp-table">${rows}</div>${target}` +
+    (mortarInfo.impact ? `<div class="mp-impact">${impactText()}</div>` : '') +
+    '<div class="mp-dim">Mouse or A D: turn · Mouse or W S: elevation · Mouse1: fire · E: pack up</div>');
+}
+
+// Radar marks: the called-in target, and where the last shell landed (a dashed ring when nobody saw it).
+function mortarRadarMarks(now) {
+  const marks = [];
+  if (mortarInfo.target && now - mortarInfo.target.at < 60000) marks.push({ kind: 'target', p: mortarInfo.target.p });
+  if (mortarInfo.impact && now - mortarInfo.impact.at < 15000) marks.push({ kind: 'impact', p: mortarInfo.impact.p, rough: !mortarInfo.impact.seen });
+  return marks;
+}
+
+// Set-up mortars on the ground: ours (in front of us while aiming) and other players'. The tube shows the elevation;
+// one model per degree is kept and copied.
+const mortarModels = new Map();
+function mortarModel(holder, deg) {
+  deg = Math.round(deg);
+  if (holder.userData.deg === deg) return;
+  if (!mortarModels.has(deg)) mortarModels.set(deg, buildMortarSetup(deg));
+  holder.clear();
+  holder.add(mortarModels.get(deg).clone());
+  holder.userData.deg = deg;
+}
+function placeMortarModel(holder, p, yaw, elev) {
+  mortarModel(holder, elevDeg(elev));
+  // in front and a little to the right: the gunner sits beside the tube
+  holder.position.set(p[0] - Math.sin(yaw) * 0.55 + Math.cos(yaw) * 0.4, p[1], p[2] - Math.cos(yaw) * 0.55 - Math.sin(yaw) * 0.4);
+  holder.rotation.set(0, yaw, 0);
+}
+let ownMortar = null;
 function updateOwnMortarModel() {
   const m = me.mortar;
-  if (m && !ownMortar) { ownMortar = buildMortarSetup(); scene.add(ownMortar); }
+  if (m && !ownMortar) { ownMortar = new THREE.Group(); scene.add(ownMortar); }
   if (!ownMortar) return;
   ownMortar.visible = !!m && m.phase === 'aim';
-  if (ownMortar.visible) placeMortarModel(ownMortar, me.p, m.yaw);
+  if (ownMortar.visible) placeMortarModel(ownMortar, me.p, me.yaw, m.elev);
 }
 
 function startReload() {
@@ -830,8 +862,8 @@ function updateRemotes(dt) {
     }
     r.model.userData.light.visible = alive && !!r.fl;
     const deployed = alive && !!r.mo && !killcam;
-    if (deployed && !r.mortarSet) { r.mortarSet = buildMortarSetup(); scene.add(r.mortarSet); }
-    if (r.mortarSet) { r.mortarSet.visible = deployed; if (deployed) placeMortarModel(r.mortarSet, s.p, s.yaw); }
+    if (deployed && !r.mortarSet) { r.mortarSet = new THREE.Group(); scene.add(r.mortarSet); }
+    if (r.mortarSet) { r.mortarSet.visible = deployed; if (deployed) placeMortarModel(r.mortarSet, s.p, s.yaw, r.mo); }
     if (r.model.userData.gun) r.model.userData.gun.visible = !deployed;
     r.model.userData.headG.scale.setScalar(bigHeads());
     if (r.tag) r.tag.visible = alive;
@@ -1402,7 +1434,7 @@ document.addEventListener('mousemove', e => {
     me.camIdle = 0;
     return;
   }
-  if (me.mortar?.phase === 'aim') { aimMortar(e.movementX, e.movementY); return; }
+  if (me.mortar?.phase === 'aim') { aimMortar(e.movementX * 0.6 * settings.sens, -e.movementY * 0.6 * settings.sens); return; }
   me.yaw -= e.movementX * k;
   me.yaw = Math.atan2(Math.sin(me.yaw), Math.cos(me.yaw));
   me.pitch = clamp(me.pitch - e.movementY * k, -1.55, 1.55);
@@ -1482,6 +1514,10 @@ document.addEventListener('keydown', e => {
   if (menu.isOpen && digit) { if (!e.repeat) menu.key(+digit[2]); return; }
 
   keys.add(e.code);
+  if (me.mortar?.phase === 'aim') {
+    const step = { KeyW: [0, 10], KeyS: [0, -10], KeyA: [-5, 0], KeyD: [5, 0] }[e.code];
+    if (step) { aimMortar(...step); return; }
+  }
   if (e.repeat) return;
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
@@ -1503,6 +1539,7 @@ document.addEventListener('keydown', e => {
     case 'KeyJ': if (me.alive && me.team !== 'SPEC') toggleMenu(emoteMenu); break;
     case 'KeyV':
       if (me.driving != null) me.carCam = me.carCam === 'chase' ? 'seat' : 'chase';
+      else if (me.alive && inTeamName(me.team)) spotTarget();
       break;
     case 'KeyF':
       if (me.alive) { me.flashlight = !me.flashlight; audio.play('click'); }
@@ -1977,6 +2014,16 @@ const net = new Net({
       else gibBody(m, r?.model, r?.look || teamOf(m.v));
     }
   },
+  spot(m) {
+    mortarInfo.target = { p: m.p, name: m.name, at: performance.now() };
+    audio.play('radio');
+    hud.chat(m.name, me.team, `Target! ${current() === 'mortar' ? (() => { const t = fromMortar(m.p); return `${milsText(t.b)}, ${Math.round(t.d)} m`; })() : 'Marked on the radar'}`, { teamOnly: true, radio: true });
+  },
+  impact(m) {
+    // Nobody saw it: only a rough idea where (a few metres off).
+    const p = m.seen ? m.p : [m.p[0] + (Math.random() - 0.5) * 8, m.p[1], m.p[2] + (Math.random() - 0.5) * 8];
+    mortarInfo.impact = { p, seen: m.seen, at: performance.now() };
+  },
   shell(m) {
     fx.shell(m.o, m.at, m.flight);
     audio.play('mortarfire', m.o);
@@ -2027,6 +2074,7 @@ const net = new Net({
     fx.fireOut(m.id);
   },
   round(m) {
+    mortarInfo.target = mortarInfo.impact = null;
     fx.clearDecals();
     fx.clearGibs();
     fx.clearFires();
@@ -2282,9 +2330,7 @@ function updateCamera(dt, now) {
   } else if (me.alive && me.emote) {
     emoteCamera(now);
     hud.spectating(null);
-  } else if (me.alive && me.mortar?.phase === 'aim') {
-    mortarCamera();
-    hud.spectating(null);
+
   } else if (me.alive) {
     camera.position.set(me.p[0], (me.driving == null && !me.riding && Number.isFinite(me.viewY) ? me.viewY : me.p[1]) + me.eyeH, me.p[2]);
     camera.rotation.set(me.pitch + me.punchP, me.yaw + me.punchY, 0);
@@ -2444,7 +2490,7 @@ function updateHud(now) {
 
   const pxPerRad = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const sniperScoped = me.alive && me.scope > 0 && def.sniper;
-  hud.crosshair(settings.chGap + computeSpread(def) * pxPerRad, me.alive && !def.sniper && me.mortar?.phase !== 'aim');
+  hud.crosshair(settings.chGap + computeSpread(def) * pxPerRad, me.alive && !def.sniper);
   hud.scope(sniperScoped);
 
   let hint = '';
@@ -2454,8 +2500,7 @@ function updateHud(now) {
     const hostage = me.team === 'CT' ? nearestHostage() : null;
     if (me.driving != null) hint = '';
     else if (me.mortar?.phase === 'aim') {
-      const item = currentItem(), dist = Math.hypot(me.mortar.at[0] - me.p[0], me.mortar.at[1] - me.p[2]);
-      hint = `82-BM-37 — ${Math.round(dist)} m, ${item?.mag ?? 0} shells left · Mouse: aim · Mouse1: fire · E: pack up`;
+      hint = ''; // (the controls are on the mortar panel)
     } else if (me.mortar) hint = '';
     else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : 'The mortar needs open sky above it';
     else if (me.riding) hint = 'Press E to get out of the car';
@@ -2498,7 +2543,7 @@ function updateHud(now) {
     bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
   }
   const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
-  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots);
+  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()));
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
 
@@ -2509,7 +2554,7 @@ function sendState(now) {
   const r3 = v => Math.round(v * 1000) / 1000;
   const yaw = me.car ? me.car.yaw + me.camYaw : me.yaw;
   if (me.riding) me.crouch = !me.riding.gunner;
-  net.send({ t: 'state', sq: me.spawnSeq, p: me.p.map(r3), yaw: r3(yaw), pitch: r3(me.car ? 0 : me.pitch), c: me.crouch ? 1 : 0, w: current(), fl: me.flashlight ? 1 : 0, mo: me.mortar ? 1 : 0 });
+  net.send({ t: 'state', sq: me.spawnSeq, p: me.p.map(r3), yaw: r3(yaw), pitch: r3(me.car ? 0 : me.pitch), c: me.crouch ? 1 : 0, w: current(), fl: me.flashlight ? 1 : 0, mo: me.mortar ? Math.round(me.mortar.elev) : 0 });
 }
 
 function saveScreenshot() {
@@ -2692,7 +2737,7 @@ function frame() {
   updateBomb(now);
   if (now - lastPatch > 1000) { lastPatch = now; patchTree(scene); }
   updateCamera(dt, now);
-  updateMortarMarks();
+  updateMortarHud();
   updateOwnMortarModel();
   updateFires(dt, now);
   updateZombieGrowls(now);

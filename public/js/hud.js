@@ -3,7 +3,7 @@ import { WEAPONS, GRENADES } from '/shared/weapons.js';
 import { RANKS, RANK_SHORT, rankIndex, rankColor } from '/shared/ranks.js';
 
 const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+export const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const TEAM_NAME = { T: 'Terrorists', CT: 'Counter-Terrorists' };
 
 // Small coloured rank badge (S1 ... GE); "--" while unranked.
@@ -19,7 +19,7 @@ export class Hud {
     for (const id of ['hud', 'hp', 'armor', 'money', 'ammo', 'weapon-name', 'timer', 'phase', 'scoreT', 'scoreCT', 'killfeed',
       'center-msg', 'small-msg', 'hint', 'progress', 'progress-label', 'progress-fill', 'crosshair', 'hitmarker', 'scope',
       'damage', 'flash', 'flashbang', 'nvg', 'bomb-icon', 'kit-icon', 'nvg-icon', 'slots', 'spec', 'chat', 'chat-log', 'chat-line',
-      'chat-mode', 'chat-input', 'scoreboard', 'radar', 'target-name', 'map-name']) this.el[id] = $(id);
+      'chat-mode', 'chat-input', 'scoreboard', 'radar', 'target-name', 'map-name', 'mortar-panel']) this.el[id] = $(id);
     this.radarCtx = this.el.radar.getContext('2d');
     this.radarBg = null;
     this.map = null;
@@ -95,6 +95,12 @@ export class Hud {
     this.el['small-msg'].textContent = text;
     clearTimeout(this.smallTimer);
     this.smallTimer = setTimeout(() => { this.el['small-msg'].textContent = ''; }, secs * 1000);
+  }
+
+  // The mortar gunner's panel (html from main.js), or null to hide it.
+  mortarPanel(html) {
+    this.show('mortar-panel', !!html);
+    if (html) this.set('mortar-panel', html);
   }
 
   hint(text) {
@@ -442,7 +448,9 @@ export class Hud {
     return { s, toR: (x, z) => [(x - min) * s, (z - min) * s] };
   }
 
-  radar(self, mates, bomb, hostages = []) {
+  // marks: the mortar's called-in target (a red cross) and where its last shell landed (an orange ring, dashed when
+  // nobody saw it).
+  radar(self, mates, bomb, hostages = [], marks = []) {
     if (!this.radarBg) return;
     const g = this.radarCtx;
     const { toR } = this.radarXform();
@@ -459,6 +467,20 @@ export class Hud {
       const [x, z] = toR(h.p[0], h.p[2]);
       g.fillStyle = h.follow ? '#9fff9f' : '#ffffff';
       g.fillRect(x - 2.5, z - 2.5, 5, 5);
+    }
+    for (const mk of marks) {
+      const [x, z] = toR(mk.p[0], mk.p[2]);
+      g.lineWidth = 2;
+      if (mk.kind === 'target') {
+        g.strokeStyle = '#ff3a2a';
+        g.beginPath(); g.moveTo(x - 5, z - 5); g.lineTo(x + 5, z + 5); g.moveTo(x + 5, z - 5); g.lineTo(x - 5, z + 5); g.stroke();
+      } else {
+        g.strokeStyle = '#ffa040';
+        g.setLineDash(mk.rough ? [3, 3] : []);
+        g.beginPath(); g.arc(x, z, mk.rough ? 7 : 4, 0, Math.PI * 2); g.stroke();
+        g.setLineDash([]);
+      }
+      g.lineWidth = 1;
     }
     for (const m of mates) {
       const [x, z] = toR(m.p[0], m.p[2]);

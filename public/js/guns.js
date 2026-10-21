@@ -486,13 +486,13 @@ function mortar(gun, P) {
   return [0, 0.07, -0.87];
 }
 
-// The mortar set up on the ground: square baseplate, the tube raised at 60 degrees towards -z on a bipod with its
+// The mortar set up on the ground: square baseplate, the tube raised at deg degrees towards -z on a bipod with its
 // elevation screw, and the sight on the side. Feet at y = 0.
-export function buildMortarSetup() {
+export function buildMortarSetup(deg = 60) {
   const g = new THREE.Group(), P = new Parts(), m = X();
   P.box(0.5, 0.05, 0.5, m.dark, 0, 0.025, 0.15);                                               // baseplate
   P.box(0.36, 0.03, 0.06, m.metal, 0, 0.06, 0.15);
-  const base = [0, 0.09, 0.15], axis = [0, Math.sin(Math.PI / 3), -Math.cos(Math.PI / 3)];
+  const a = (deg * Math.PI) / 180, base = [0, 0.09, 0.15], axis = [0, Math.sin(a), -Math.cos(a)];
   const along = s => base.map((v, k) => v + axis[k] * s);
   rod(P, base, along(1.2), 0.042, m.olive, 14);                                                // tube
   rod(P, along(1.17), along(1.21), 0.05, m.dark, 14);                                          // muzzle ring

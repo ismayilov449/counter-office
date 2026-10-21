@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -1774,32 +1774,51 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
   }
 }
 
-// ---- 82-BM-37 mortar: the client sets it up and picks a spot (at: [x, z]); the shell flies a high arc and lands
-// there a few seconds later, give or take 4% of the distance. It needs open sky over the mortar, and a roof over the
+// ---- 82-BM-37 mortar, aimed like a real one: the gunner sets a bearing (b) and an elevation (e), both in mils; the
+// firing table (mortarRange) turns the elevation into a distance. The shell flies a high arc and lands there a few
+// seconds later, a little off (1 m plus 3% of the distance). It needs open sky over the mortar, and a roof over the
 // target catches the shell (so it can't reach indoors; see shared/maps/sky.js).
 function onMortar(p, m) {
   const t = now(), def = WEAPONS.mortar;
   if (!p.alive || game.phase === 'freeze' || p.w !== 'mortar') return;
   const item = ownItem(p, 'mortar');
   if (!item || item.mag <= 0 || t - p.lastShot < def.rate * 1000 * 0.9) return;
-  if (!Array.isArray(m.at) || !isNum(m.at[0]) || !isNum(m.at[1])) return;
+  if (!isNum(m.b) || !isNum(m.e) || m.e < def.elev[0] - 1 || m.e > def.elev[1] + 1) return;
   const o = [p.p[0], p.p[1] + 0.9, p.p[2]];
   const sky = skyOf(MAP, world);
   if (!sky.open(p.p)) return;
-  const dist = Math.hypot(m.at[0] - o[0], m.at[1] - o[2]);
-  if (dist < def.range[0] - 1 || dist > def.range[1] + 1) return;
   p.lastShot = t;
   p.protectUntil = 0;
   item.mag--;
   sendMe(p);
   bots.heard(p, o);
-  const a = Math.random() * Math.PI * 2, off = dist * 0.04 * Math.sqrt(Math.random());
-  const x = m.at[0] + Math.cos(a) * off, z = m.at[1] + Math.sin(a) * off;
+  const dist = mortarRange(m.e), bearing = (m.b / MILS) * Math.PI * 2;
+  const a = Math.random() * Math.PI * 2, off = (1 + dist * 0.03) * Math.sqrt(Math.random());
+  const x = p.p[0] + Math.sin(bearing) * dist + Math.cos(a) * off, z = p.p[2] - Math.cos(bearing) * dist + Math.sin(a) * off;
   const at = [x, sky.ground(x, z, p.p[1]) + 0.1, z];
   const flight = shellFlight(dist);
   broadcast({ t: 'shell', o: o.map(r2), at: at.map(r2), flight, owner: p.id });
   const round = game.round;
-  setTimeout(() => { if (game.round === round) explodeRocket(at, p, def, 'mortar'); }, flight);
+  setTimeout(() => {
+    if (game.round !== round) return;
+    explodeRocket(at, p, def, 'mortar');
+    // Where it landed, for the gunner's team: exact if one of them saw it go off, rough if nobody did.
+    const team = [...players.values()].filter(q => q === p || mates(q, p));
+    const seen = team.find(q => q.alive && dist3(eyeOf(q), at) < 150 && lineOfSight(eyeOf(q), [at[0], at[1] + 0.6, at[2]]));
+    for (const q of team) send(q, { t: 'impact', p: at.map(r2), by: p.id, seen: seen ? seen.name : null });
+  }, flight);
+}
+
+// A forward observer calls in a target for the team's mortar: the spot they're looking at (it must be in sight).
+function onSpot(p, m) {
+  const t = now(), pos = vec3(m.p);
+  if (!p.alive || !pos || !inTeam(p) || t - (p.spotAt || 0) < 2000) return;
+  const eye = eyeOf(p);
+  if (dist3(eye, pos) > 250 || !lineOfSight(eye, [pos[0], pos[1] + 0.3, pos[2]])) return;
+  const team = [...players.values()].filter(q => q === p || mates(q, p));
+  if (!team.some(q => q.inv.primary?.id === 'mortar')) return send(p, { t: 'msg', text: 'Nobody on your team has a mortar.' });
+  p.spotAt = t;
+  for (const q of team) send(q, { t: 'spot', p: pos.map(r2), by: p.id, name: p.name });
 }
 
 function onNade(p, m) {
@@ -2270,7 +2289,7 @@ function handle(p, m) {
       p.pitch = m.pitch;
       p.c = m.c ? 1 : 0;
       p.fl = m.fl ? 1 : 0;
-      p.mo = m.mo && p.w === 'mortar' ? 1 : 0;
+      p.mo = isNum(m.mo) && m.mo > 0 && p.w === 'mortar' ? Math.round(Math.min(1500, m.mo)) : 0;
       if (typeof m.w === 'string' && WEAPONS[m.w]) {
         if (p.reloadUntil && m.w !== p.reloadWeapon) p.reloadUntil = 0;
         p.w = m.w;
@@ -2292,6 +2311,9 @@ function handle(p, m) {
     }
     case 'mortar':
       onMortar(p, m);
+      break;
+    case 'spot':
+      onSpot(p, m);
       break;
     case 'nade':
       onNade(p, m);
@@ -2496,7 +2518,7 @@ function tick() {
   const pl = [];
   for (const p of players.values()) {
     if (!inTeam(p)) continue;
-    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo ? 1 : 0]);
+    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo || 0]);
   }
   const b = game.bomb;
   const base = {

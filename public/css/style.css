@@ -70,6 +70,19 @@ kbd { background: #2a2a24; border: 1px solid #444; border-radius: 3px; padding: 
 #center-msg small { display: block; font-size: 16px; color: var(--muted); margin-top: 4px; }
 #small-msg { position: absolute; top: 76px; left: 50%; transform: translateX(-50%); font-size: 14px; color: #fff; text-align: center; }
 #hint { position: absolute; top: 62%; left: 50%; transform: translateX(-50%); color: var(--hud); font-size: 15px; }
+/* the mortar gunner's sight panel */
+#mortar-panel { position: absolute; left: 14px; top: 250px; width: 400px; padding: 10px 14px; background: rgba(12, 14, 10, 0.78); border: 1px solid var(--hud-dim); color: var(--text); font-size: 13px; line-height: 1.55; font-family: Consolas, monospace; }
+#mortar-panel b { color: var(--hud); }
+#mortar-panel .mp-head { color: var(--hud); font-weight: bold; letter-spacing: 1px; display: flex; justify-content: space-between; margin-bottom: 2px; }
+#mortar-panel .mp-head span { color: var(--text); font-weight: normal; }
+#mortar-panel .mp-row { font-size: 15px; }
+#mortar-panel .mp-table { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 10px; margin: 6px 0; padding: 4px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+#mortar-panel .mp-table .on { color: var(--text); background: rgba(255, 196, 64, 0.15); }
+#mortar-panel .mp-table b { color: inherit; font-weight: normal; }
+#mortar-panel .mp-dim { color: var(--muted); }
+#mortar-panel .mp-target { color: #ff8a7a; }
+#mortar-panel .mp-impact { color: #ffc070; }
+@media (max-width: 640px) { #mortar-panel { width: calc(100% - 32px); } }
 #target-name { position: absolute; top: calc(50% + 24px); left: 50%; transform: translateX(-50%); font-size: 13px; }
 #progress { position: absolute; top: 66%; left: 50%; transform: translateX(-50%); width: 320px; text-align: center; }
 #progress-bar { height: 10px; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--hud-dim); margin-top: 4px; }
