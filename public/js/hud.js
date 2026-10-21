@@ -1,5 +1,5 @@
 // HUD, scoreboard, radar, chat and screen overlays (plain DOM).
-import { WEAPONS, GRENADES } from '/shared/weapons.js';
+import { WEAPONS, GRENADES, MINES } from '/shared/weapons.js';
 import { RANKS, RANK_SHORT, rankIndex, rankColor } from '/shared/ranks.js';
 
 const $ = id => document.getElementById(id);
@@ -58,7 +58,7 @@ export class Hud {
     const def = WEAPONS[weaponId];
     this.set('weapon-name', def ? def.name : '');
     let ammo = '';
-    if (def?.grenade) ammo = String(me.inv[weaponId]);
+    if (def?.grenade || def?.mine) ammo = String(me.inv[weaponId]);
     else if (def?.mounted) ammo = '∞';
     else if (def && def.mag) {
       const item = me.inv.primary?.id === weaponId ? me.inv.primary : me.inv.secondary;
@@ -69,10 +69,11 @@ export class Hud {
     const slots = [
       ['1', me.inv.primary?.id], ['2', me.inv.secondary?.id], ['3', me.zombie ? 'claws' : 'knife'],
       ...GRENADES.filter(g => me.inv[g] > 0).map(g => ['4', g]),
+      ...MINES.filter(g => me.inv[g] > 0).map(g => ['6', g]),
       ['5', me.inv.c4 ? 'c4' : null],
     ];
     this.set('slots', slots.filter(s => s[1]).map(([k, id]) =>
-      `<div class="${id === weaponId ? 'active' : ''}">${k} ${esc(WEAPONS[id].name)}${WEAPONS[id].grenade && me.inv[id] > 1 ? ` x${me.inv[id]}` : ''}</div>`).join(''));
+      `<div class="${id === weaponId ? 'active' : ''}">${k} ${esc(WEAPONS[id].name)}${(WEAPONS[id].grenade || WEAPONS[id].mine) && me.inv[id] > 1 ? ` x${me.inv[id]}` : ''}</div>`).join(''));
   }
 
   timer(text, bomb) {

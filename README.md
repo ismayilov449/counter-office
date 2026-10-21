@@ -184,6 +184,20 @@ a match anyone can also vote from the Esc menu: more than half the players votin
     target"), if someone on the team saw it go off; only roughly ("not observed") if nobody did. It's on the radar
     too. Walk the shells onto the target, like a real crew.
   - **E** or switching weapons packs it up.
+- **Anti-personnel mines** (buy menu → 9 Mines & camo, both teams, carry up to 2 of each; classic and Deathmatch only).
+  Press **6** to take one out (again to switch type) and **Mouse1** to lay it on the ground a step in front of you;
+  it arms 1.5 seconds later. Your team always sees its own mines (with a green ring) and never sets them off;
+  enemies only notice a mine within 3 m. Hold **E** next to an enemy mine to defuse it (3 s, 1.5 s with a defuse
+  kit, +$100). An explosion nearby sets mines off. They're cleared every round; you can have 4 down at once.
+  - **PMN** ($500): a Soviet pressure mine, flat on the ground. An enemy who steps on it loses a leg — and usually
+    their life — and anyone close by is hurt too.
+  - **MON-50** ($600): a Soviet directional mine on little legs, with a tripwire stretched across its front 3 m out.
+    An enemy walking into the wire sets it off: a fan of fragments up to 25 m ahead (60° wide), a small blast behind.
+- **Ghillie camo** (buy menu → 9, $1000): crouch, keep still and don't shoot for 1.5 seconds, and enemies see only a
+  faint shimmer of you (bots can't make you out beyond 4 m). Moving or shooting ends it. Lost when you die.
+- **Uniforms**: Terrorists wear Soviet camouflage (Flora's wavy bands; KLMK's leafy patches on woodland maps),
+  Counter-Terrorists Western patterns (M81 woodland blotches; DCU desert), in each map's colors — desert on Dust,
+  Dust II and Inferno, urban on Assault and aim_map, woodland on Mansion. Vests and helmets keep the team colors.
 - **Molotov** (buy menu → Equipment → 6, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor
@@ -300,14 +314,14 @@ The HUD shows the active party modes under the timer.
 | Ctrl | duck | Shift | walk (silent) |
 | Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
-| E | use: plant, defuse, pick up, door, light switch, enter/exit car | G | drop weapon |
-| 1 2 3 5 | primary, pistol, knife, C4 | 4 | grenades (press again to cycle) |
+| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car | G | drop weapon |
+| 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |
 | Q | last weapon | Wheel | switch weapon |
 | B | buy menu | O | buy equipment |
 | , / . | buy primary / secondary ammo | F1 / F2 | autobuy / rebuy |
 | Z X C | radio menus | T | spray graffiti |
 | F | flashlight | N | nightvision |
-| J | emotes | | |
+| J | emotes | V | call in a mortar target |
 | Y / U | chat / team chat | Tab | scores |
 | M | choose team | F5 | screenshot |
 | Esc | menu (settings, map vote) | 0–9 | pick in menus |

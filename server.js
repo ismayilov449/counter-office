@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -227,6 +227,8 @@ const game = {
   drops: [],
   nades: [],
   fires: [],
+  mines: [],
+  nextMineId: 1,
   endVote: null,
   sprays: new Map(),
   nextDropId: 1,
@@ -254,7 +256,7 @@ function broadcast(msg, filter) {
 const notify = (text, big = false, filter) => broadcast({ t: 'msg', text, big }, filter);
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
-const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, c4: false });
+const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, c4: false });
 const ownItem = (p, w) => (p.inv.primary?.id === w ? p.inv.primary : p.inv.secondary?.id === w ? p.inv.secondary : null);
 
 function addMoney(p, amount) {
@@ -264,7 +266,7 @@ function addMoney(p, amount) {
 function sendMe(p) {
   send(p, {
     t: 'me', team: p.team, alive: p.alive, hp: Math.max(0, Math.round(p.hp)), armor: Math.round(p.armor),
-    helmet: p.helmet, kit: p.kit, nvg: p.nvg, money: p.money, inv: p.inv, zombie: !!p.zombie,
+    helmet: p.helmet, kit: p.kit, nvg: p.nvg, camo: !!p.camo, money: p.money, inv: p.inv, zombie: !!p.zombie,
   });
 }
 
@@ -283,6 +285,7 @@ function resetLoadout(p) {
   p.helmet = false;
   p.kit = false;
   p.nvg = false;
+  p.camo = false;
 }
 
 // ---------------------------------------------------------------- spawning, teams, maps
@@ -441,6 +444,7 @@ function resetWorld() {
   world.cars = (MAP.vehicles || []).map((v, id) => freshCar(v, id));
   world.setDoors([]);
   game.hostages = isHostageMap() && CFG.gameMode === 'classic' ? createHostages(MAP) : [];
+  clearMines();
   broadcast({ t: 'world', glass: [], lights: game.lights, doors: world.doorStates });
 }
 
@@ -797,6 +801,7 @@ function startRound() {
   game.nades = [];
   game.fires = [];
   game.smokes = [];
+  clearMines();
   game.bomb = { state: 'none', carrier: null, p: null, explodeAt: 0 };
   game.plantedThisRound = false;
   game.firstBlood = false;
@@ -963,6 +968,7 @@ function startDeathmatch() {
   game.nades = [];
   game.fires = [];
   game.smokes = [];
+  clearMines();
   game.bomb = { state: 'none', carrier: null, p: null, explodeAt: 0 };
   game.firstBlood = false;
   game.teamSize = { T: teamCount('T'), CT: teamCount('CT') };
@@ -1334,7 +1340,8 @@ function openMatchEnd(winner, extra = {}) {
 // tears off the part it hit, a Scout or Desert Eagle does it with a headshot.
 function gibOf(weapon, hs, how) {
   if (!how) return null;
-  if (how.part === 'he' && ['rpg', 'mortar', 'he', 'c4', 'car'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
+  if (how.part === 'he' && ['rpg', 'mortar', 'he', 'c4', 'car', 'mon50'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
+  if (weapon === 'pmn' && how.part === 'legs') return { k: 'shot', part: 'legs', from: how.from.map(r2) };
   if (['awp', 'm249'].includes(weapon) || (hs && ['scout', 'deagle'].includes(weapon))) return { k: 'shot', part: how.part, from: how.from.map(r2) };
   return null;
 }
@@ -1534,13 +1541,28 @@ function explodeBomb() {
     const dmg = 500 * (1 - dist3(q.p, pos) / 22);
     if (dmg > 0) applyDamage(q, null, dmg, 'he', 'c4', 1, null, pos);
   }
+  chainMines(pos, 15);
 }
 
 function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
-    if (!p.alive || game.phase !== 'live' || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
+    if (!p.alive || (game.phase !== 'live' && !(a.type === 'mine' && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
+    if (a.type === 'mine') {
+      const mine = game.mines.find(x => x.id === a.mine);
+      if (!mine) { p.act = null; continue; }
+      if (t - a.start >= a.dur) {
+        p.act = null;
+        game.mines.splice(game.mines.indexOf(mine), 1);
+        sendMines();
+        addMoney(p, 100);
+        sendMe(p);
+        send(p, { t: 'msg', text: `${WEAPONS[mine.k].name} defused.` });
+        send(p, { t: 'sfx', s: 'defused' });
+      }
+      continue;
+    }
     if (a.type === 'plant') {
       if (!p.inv.c4 || !siteAt(MAP, p.p)) { p.act = null; continue; }
       if (t - a.start >= a.dur) plantBomb(p, t);
@@ -1592,6 +1614,11 @@ function onUse(p, m, t) {
   if (game.phase === 'live' && p.team === 'CT' && game.bomb.state === 'planted' && dist3(p.p, game.bomb.p) < 1.8) {
     p.act = { type: 'defuse', start: t, pos: p.p.slice(), dur: (p.kit ? CFG.kitDefuseTime : CFG.defuseTime) * 1000 };
     broadcast({ t: 'sfx', s: 'defusing' }, q => q.team === 'CT');
+    return;
+  }
+  const mine = game.mines.filter(x => !mineFriend(x, p) && dist3(p.p, x.p) < 1.4).sort((x, y) => dist3(p.p, x.p) - dist3(p.p, y.p))[0];
+  if (mine) {
+    p.act = { type: 'mine', mine: mine.id, start: t, pos: p.p.slice(), dur: (p.kit ? MINE.kitDefuse : MINE.defuse) * 1000 };
     return;
   }
   const sw = nearestSwitch(p), door = nearestDoor(p);
@@ -1772,6 +1799,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
     const d = dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
     if (d < R) damageCar(c, 900 * (1 - d / R), owner);
   }
+  chainMines(at, MINE.chain);
 }
 
 // ---- 82-BM-37 mortar, aimed like a real one: the gunner sets a bearing (b) and an elevation (e), both in mils; the
@@ -1819,6 +1847,115 @@ function onSpot(p, m) {
   if (!team.some(q => q.inv.primary?.id === 'mortar')) return send(p, { t: 'msg', text: 'Nobody on your team has a mortar.' });
   p.spotAt = t;
   for (const q of team) send(q, { t: 'spot', p: pos.map(r2), by: p.id, name: p.name });
+}
+
+// ---- Anti-personnel mines (see MINE in shared/weapons.js). A mine belongs to its owner's team (in Deathmatch only
+// to its owner): those never set it off and always see it; enemies see it only up close (the clients do that).
+const mineFriend = (mine, q) => (isDM() ? q.id === mine.owner : q.team === mine.team);
+
+function sendMines(to = null) {
+  const list = game.mines.map(m => [m.id, m.k, m.team === 'T' ? 1 : 2, ...m.p.map(r2), r2(m.yaw), m.owner, m.armAt <= now() ? 1 : 0]);
+  if (to) send(to, { t: 'mines', list });
+  else broadcast({ t: 'mines', list });
+}
+
+function clearMines() {
+  if (!game.mines?.length) return;
+  game.mines = [];
+  sendMines();
+}
+
+// Laying a mine: on the floor within reach in front of you, not on top of another one.
+function onMine(p, m) {
+  const t = now(), k = MINES.includes(m.k) ? m.k : null, pos = vec3(m.p);
+  if (!k || !pos || !isNum(m.yaw) || !p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || game.phase === 'end') return;
+  if (Math.hypot(pos[0] - p.p[0], pos[2] - p.p[2]) > 2.5 || Math.abs(pos[1] - p.p[1]) > 1.5) return;
+  const floor = world.raycast([pos[0], pos[1] + 0.4, pos[2]], [0, -1, 0], 1, 'solid');
+  if (!floor || floor.t < 0.01) return send(p, { t: 'msg', text: 'Lay the mine on the ground.' }); // (t = 0: inside something)
+  pos[1] = pos[1] + 0.4 - floor.t;
+  if (game.mines.some(x => dist3(x.p, pos) < 0.8)) return send(p, { t: 'msg', text: 'There is a mine there already.' });
+  p.inv[k]--;
+  p.protectUntil = 0;
+  const own = game.mines.filter(x => x.owner === p.id);
+  if (own.length >= MINE.perPlayer) game.mines.splice(game.mines.indexOf(own[0]), 1);
+  game.mines.push({ id: game.nextMineId++, k, team: p.team, owner: p.id, p: pos, yaw: m.yaw, armAt: t + MINE.arm * 1000 });
+  setTimeout(sendMines, MINE.arm * 1000 + 50);
+  sendMe(p);
+  sendMines();
+}
+
+// Each tick: an enemy stepping on a PMN, or walking into a MON-50's tripwire, sets it off.
+function updateMines(t) {
+  for (const mine of [...game.mines]) {
+    if (mine.armAt > t || !game.mines.includes(mine)) continue;
+    for (const q of players.values()) {
+      if (!q.alive || !inTeam(q) || mineFriend(mine, q)) continue;
+      const dy = q.p[1] - mine.p[1];
+      if (mine.k === 'pmn') {
+        if (dy > -0.3 && dy < 0.5 && Math.hypot(q.p[0] - mine.p[0], q.p[2] - mine.p[2]) < MINE.pmn.trigger) { detonateMine(mine, q); break; }
+      } else {
+        const W = MINE.mon50, fx = -Math.sin(mine.yaw), fz = -Math.cos(mine.yaw);
+        const cx = mine.p[0] + fx * W.wire, cz = mine.p[2] + fz * W.wire;
+        // distance from the feet to the wire (a segment across the mine's front)
+        const s = Math.max(-W.wireHalf, Math.min(W.wireHalf, (q.p[0] - cx) * -fz + (q.p[2] - cz) * fx));
+        const wx = cx - fz * s, wz = cz + fx * s;
+        if (dy > -0.4 && dy < 0.6 && Math.hypot(q.p[0] - wx, q.p[2] - wz) < 0.35) { detonateMine(mine, q); break; }
+      }
+    }
+  }
+}
+
+function detonateMine(mine, stepper = null) {
+  const i = game.mines.indexOf(mine);
+  if (i < 0) return;
+  game.mines.splice(i, 1);
+  sendMines();
+  const owner = players.get(mine.owner) || null;
+  const at = [mine.p[0], mine.p[1] + 0.15, mine.p[2]];
+  const fwd = [-Math.sin(mine.yaw), 0, -Math.cos(mine.yaw)];
+  broadcast({ t: 'boom', p: at.map(r2), k: mine.k, d: [r2(fwd[0]), r2(fwd[2])] });
+  const hurts = q => q.alive && inTeam(q) && (!mineFriend(mine, q) || (CFG.friendlyFire && q.id !== mine.owner));
+  if (mine.k === 'pmn') {
+    const P = MINE.pmn;
+    if (stepper) applyDamage(stepper, owner, P.damage, 'legs', 'pmn', 1, null, [mine.p[0], mine.p[1] - 0.5, mine.p[2]]);
+    for (const q of players.values()) {
+      if (q === stepper || !hurts(q)) continue;
+      const chest = [q.p[0], q.p[1] + 1.1, q.p[2]], d = dist3(at, chest);
+      if (d < P.splash && lineOfSight(at, chest)) applyDamage(q, owner, P.splashDamage * (1 - d / P.splash), 'he', 'pmn', 1, null, at);
+    }
+  } else {
+    // a fan of fragments forward, and a small blast behind
+    const W = MINE.mon50, o = [mine.p[0], mine.p[1] + 0.3, mine.p[2]];
+    for (const q of players.values()) {
+      if (!hurts(q)) continue;
+      const chest = [q.p[0], q.p[1] + 1.0, q.p[2]], d = dist3(o, chest);
+      const h = Math.hypot(chest[0] - o[0], chest[2] - o[2]) || 1;
+      const ahead = ((chest[0] - o[0]) * fwd[0] + (chest[2] - o[2]) * fwd[2]) / h;
+      let dmg = 0;
+      if (ahead > Math.cos(W.cone) && d < W.range) dmg = W.damage * (1 - d / W.range);
+      else if (d < W.back) dmg = W.backDamage * (1 - d / W.back);
+      if (dmg > 0 && lineOfSight(o, chest)) applyDamage(q, owner, dmg, 'he', 'mon50', 1, null, o);
+    }
+    breakGlass(world.intactGlass.filter(g => {
+      const c = [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2], d = dist3(o, c);
+      return d < W.range * 0.6 && ((c[0] - o[0]) * fwd[0] + (c[2] - o[2]) * fwd[2]) / (d || 1) > Math.cos(W.cone);
+    }).map(g => g.id));
+  }
+  chainMines(at, MINE.chain);
+}
+
+// Mines near an explosion go off too (a moment later, one after another).
+function chainMines(at, r) {
+  for (const mine of game.mines.filter(x => dist3(x.p, at) < r)) setTimeout(() => detonateMine(mine), 120 + Math.random() * 200);
+}
+
+// Ghillie camouflage: crouched, still and quiet long enough, you're hidden (see CAMO).
+function updateCamo(t) {
+  for (const p of players.values()) {
+    const moved = !p.camoPos || Math.hypot(p.p[0] - p.camoPos[0], p.p[2] - p.camoPos[2]) > 0.05;
+    if (moved || !p.c || !p.camo || !p.alive || t - p.lastShot < CAMO.still * 1000) { p.camoPos = p.p.slice(); p.stillSince = t; }
+    p.hidden = p.camo && p.alive && !!p.c && t - p.stillSince >= CAMO.still * 1000;
+  }
 }
 
 function onNade(p, m) {
@@ -1900,6 +2037,7 @@ function explodeNade(n) {
     if (d > 9 || !lineOfSight(o, chest)) continue;
     applyDamage(q, owner, 100 * (1 - d / 9), 'he', 'he', WEAPONS.he.pen, null, o);
   }
+  if (n.k === 'he') chainMines(o, MINE.chain);
   if (n.k === 'he') {
     for (const c of world.cars) {
       const d = dist3(o, [c.p[0], c.p[1] + 0.7, c.p[2]]);
@@ -2055,6 +2193,7 @@ function onBuy(p, id) {
   const def = wdef || idef;
   if (!def || def.price == null) return;
   if (def.team && def.team !== p.team) return fail('Your team cannot buy that.');
+  if ((MINES.includes(id) || id === 'camo') && isZM()) return fail('Not in Zombie mode.');
   if (id === 'mortar') {
     // One mortar per team (in Deathmatch, one on the whole map); not against zombies.
     if (isZM()) return fail('There are no mortars in Zombie mode.');
@@ -2063,7 +2202,7 @@ function onBuy(p, id) {
   }
   let price = def.price;
 
-  if (wdef && wdef.grenade) {
+  if (wdef && (wdef.grenade || wdef.mine)) {
     if (p.inv[id] >= wdef.max) return fail('You cannot carry any more.');
   } else if (wdef) {
     if (p.inv[slotKey(id)]?.id === id) return fail('You already have that weapon.');
@@ -2077,12 +2216,14 @@ function onBuy(p, id) {
     if (p.kit) return fail('You already have a defuse kit.');
   } else if (id === 'nvg') {
     if (p.nvg) return fail('You already have nightvision.');
+  } else if (id === 'camo') {
+    if (p.camo) return fail('You already have camouflage.');
   }
   if (isDM()) price = 0;
   if (p.money < price) return fail('You have insufficient funds!');
 
   p.money -= price;
-  if (wdef && wdef.grenade) p.inv[id]++;
+  if (wdef && (wdef.grenade || wdef.mine)) p.inv[id]++;
   else if (wdef) {
     const slot = slotKey(id);
     if (p.inv[slot]) {
@@ -2096,6 +2237,7 @@ function onBuy(p, id) {
   else if (id === 'vesthelm') { p.armor = 100; p.helmet = true; }
   else if (id === 'kit') p.kit = true;
   else if (id === 'nvg') p.nvg = true;
+  else if (id === 'camo') p.camo = true;
   send(p, { t: 'sfx', s: 'buy' });
   sendMe(p);
 }
@@ -2315,6 +2457,9 @@ function handle(p, m) {
     case 'spot':
       onSpot(p, m);
       break;
+    case 'mine':
+      onMine(p, m);
+      break;
     case 'nade':
       onNade(p, m);
       break;
@@ -2501,6 +2646,8 @@ function tick() {
 
   updateActions(t);
   updatePickups();
+  updateMines(t);
+  updateCamo(t);
   bots.update(1 / CFG.tickRate);
   if (game.hostages.length) {
     for (const ev of updateHostages(game.hostages, players, 1 / CFG.tickRate, world.move(), t)) {
@@ -2518,7 +2665,7 @@ function tick() {
   const pl = [];
   for (const p of players.values()) {
     if (!inTeam(p)) continue;
-    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo || 0]);
+    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo || 0, p.hidden ? 1 : 0]);
   }
   const b = game.bomb;
   const base = {
@@ -2580,6 +2727,7 @@ wss.on('connection', ws => {
     cfg: { ...settingsView(), zombieCountdown: ZOMBIE.countdown, hnsHide: CFG.hnsHide, gameMode: CFG.gameMode, autoBalance: CFG.autoBalance, halftime: CFG.halftime, startMoney: CFG.startMoney, startMoneyChoices: START_MONEY_CHOICES, roundsToWin: CFG.roundsToWin, roundTime: CFG.roundTime, buyTime: CFG.buyTime, freezeTime: CFG.freezeTime, plantTime: CFG.plantTime, friendlyFire: CFG.friendlyFire, httpsPort: httpsReady ? CFG.httpsPort : null },
     sprayImgs, sprays: [...game.sprays.values()], glass: [...world.broken], lights: game.lights, doors: world.doorStates,
   });
+  sendMines(p);
   sendRoster();
   ws.on('message', data => {
     let m;

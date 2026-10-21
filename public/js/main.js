@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_MENU, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_MENU, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, MINES, MINE, CAMO } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -10,8 +10,8 @@ import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, patchTree, ambientAt } from './roomlight.js';
-import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel } from './models.js';
-import { buildMortarSetup } from './guns.js';
+import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setCamoTheme, setFaded } from './models.js';
+import { buildMortarSetup, buildPlacedMine } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
 import { EMOTES, EMOTE } from '/shared/emotes.js';
 import { RANKS } from '/shared/ranks.js';
@@ -93,6 +93,8 @@ function loadMap(id) {
   clearHostages();
   renderer.toneMappingExposure = map.theme.exposure || 1;
   hud.setMap(map);
+  setCamoTheme(map.camo);
+  clearMineModels();
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
@@ -111,7 +113,7 @@ addEventListener('resize', () => {
 
 const me = {
   id: null, joined: false, team: 'SPEC', alive: false, hp: 0, armor: 0, helmet: false, kit: false, nvg: false, money: 0,
-  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, c4: false },
+  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, c4: false },
   slot: 'knife', lastSlot: 'knife', pendingSlot: false,
   p: [0, 0, 0], v: [0, 0, 0], onGround: false, crouch: false, eyeH: PLAYER.eye, airSpeed: 0,
   yaw: 0, pitch: 0, punchP: 0, punchY: 0, lastYaw: 0, sway: 0, bobT: 0,
@@ -158,14 +160,14 @@ function weaponOf(slot) {
     case 'secondary': return me.inv.secondary?.id || null;
     case 'knife': return me.zombie ? 'claws' : 'knife';
     case 'c4': return me.inv.c4 ? 'c4' : null;
-    default: return GRENADES.includes(slot) && me.inv[slot] > 0 ? slot : null;
+    default: return (GRENADES.includes(slot) || MINES.includes(slot)) && me.inv[slot] > 0 ? slot : null;
   }
 }
 // The pickup's gunner always uses the mounted machine gun.
 const current = () => (me.riding?.gunner ? 'pkt' : weaponOf(me.slot) || 'knife');
 const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me.inv[me.slot] : null);
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
-const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, 'c4'];
+const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'c4'];
 
 let vm = null, vmId = null, vmTeam = null;
 function refreshViewModel() {
@@ -202,8 +204,8 @@ function cycleWeapon(dir) {
 }
 
 // Key 4 cycles through the grenades you carry, like CS.
-function cycleGrenades() {
-  const owned = GRENADES.filter(g => me.inv[g] > 0);
+function cycleGrenades(list = GRENADES) {
+  const owned = list.filter(g => me.inv[g] > 0);
   if (!owned.length) return;
   const i = owned.indexOf(me.slot);
   switchSlot(owned[(i + 1) % owned.length]);
@@ -381,6 +383,7 @@ function tryFire(now) {
   if (!def.auto && !me.triggerFresh) return;
   me.triggerFresh = false;
   if (def.mortar) { mortarFire(now); return; }
+  if (def.mine) { layMine(id, now); return; }
   if (def.mounted) {
     me.nextShot = now + def.rate * 1000;
     me.lastFire = now;
@@ -399,6 +402,84 @@ function tryFire(now) {
   me.nextShot = now + def.rate * 1000;
   me.lastFire = now;
   fireBullet(id, def, now);
+}
+
+// ---------------------------------------------------------------- mines
+// Laying (Mouse1 with a mine in hand: on the floor a step in front of you), showing the ones down (your team's
+// always, with a green ring; an enemy's only within MINE.seen metres), and defusing an enemy's (hold E nearby).
+// The server owns them: 'mines' messages carry the list; it sets them off (see updateMines in server.js).
+function layMine(k, now) {
+  if (!me.onGround) return;
+  const fx_ = -Math.sin(me.yaw), fz = -Math.cos(me.yaw);
+  const from = [me.p[0], me.p[1] + 0.3, me.p[2]];
+  if (coll.raycast(from, [fx_, 0, fz], 1.1, 'move')) { hud.small('No room to lay a mine here', 2); return; }
+  const at = [me.p[0] + fx_ * 0.9, me.p[1] + 0.3, me.p[2] + fz * 0.9];
+  const floor = coll.raycast(at, [0, -1, 0], 1.2, 'solid');
+  if (!floor) { hud.small('Lay the mine on the ground', 2); return; }
+  net.send({ t: 'mine', k, p: [at[0], at[1] - floor.t, at[2]], yaw: me.yaw });
+  audio.play('plant');
+  me.inv[k]--;
+  me.nextShot = now + 1000;
+  if (me.inv[k] <= 0) switchSlot(bestSlot(), true);
+}
+
+const mineModels = new Map(); // id -> { obj, m }
+const mineFriendly = m => m.owner === me.id || (!isDM() && m.team === me.team);
+function clearMineModels() {
+  for (const { obj } of mineModels.values()) scene.remove(obj);
+  mineModels.clear();
+}
+function syncMines(list) {
+  const seen = new Set();
+  for (const [id, k, tc, x, y, z, yaw, owner, armed] of list) {
+    seen.add(id);
+    let e = mineModels.get(id);
+    if (!e) {
+      const obj = buildPlacedMine(k, MINE.mon50.wire, MINE.mon50.wireHalf);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.28, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x50ff70, transparent: true, opacity: 0.7, depthWrite: false }));
+      ring.position.y = 0.02;
+      obj.add(ring);
+      obj.userData.ring = ring;
+      obj.position.set(x, y, z);
+      obj.rotation.y = yaw;
+      scene.add(obj);
+      e = { obj };
+      mineModels.set(id, e);
+    }
+    e.m = { id, k, team: tc === 1 ? 'T' : 'CT', p: [x, y, z], yaw, owner, armed };
+  }
+  for (const [id, e] of mineModels) if (!seen.has(id)) { scene.remove(e.obj); mineModels.delete(id); }
+}
+// Per frame: which mines we can see from where we are (or from whoever we're watching).
+function updateMineModels() {
+  const eye = camera.position;
+  for (const { obj, m } of mineModels.values()) {
+    const friendly = mineFriendly(m);
+    // (a MON-50 shows when you get near the mine or its tripwire)
+    const near = (x, z) => Math.hypot(eye.x - x, eye.y - m.p[1], eye.z - z) < MINE.seen + 1;
+    const W = MINE.mon50, wx = m.p[0] - Math.sin(m.yaw) * W.wire, wz = m.p[2] - Math.cos(m.yaw) * W.wire;
+    obj.visible = friendly || near(m.p[0], m.p[2]) || (m.k === 'mon50' && near(wx, wz));
+    obj.userData.ring.visible = friendly;
+  }
+}
+// An enemy mine close enough to defuse (E).
+function mineToDefuse() {
+  if (!me.alive) return null;
+  let best = null, bd = 1.4;
+  for (const { m } of mineModels.values()) {
+    if (mineFriendly(m)) continue;
+    const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
+    if (d < bd) { bd = d; best = m; }
+  }
+  return best;
+}
+
+// Ghillie camouflage: we can't see ourselves fade, so the HUD says when we're hidden (same rule as the server).
+const camoState = { pos: null, since: 0 };
+function camoHidden(now) {
+  const moved = !camoState.pos || Math.hypot(me.p[0] - camoState.pos[0], me.p[2] - camoState.pos[2]) > 0.05;
+  if (moved || !me.camo || !me.crouch || !me.alive || now - (me.lastFire || 0) < CAMO.still * 1000) { camoState.pos = me.p.slice(); camoState.since = now; }
+  return me.camo && me.alive && me.crouch && now - camoState.since >= CAMO.still * 1000;
 }
 
 // ---------------------------------------------------------------- 82-BM-37 mortar
@@ -653,7 +734,8 @@ function priceOf(id) {
 
 function owns(id) {
   const def = WEAPONS[id];
-  if (def?.grenade) return me.inv[id] >= def.max;
+  if (def?.grenade || def?.mine) return me.inv[id] >= def.max;
+  if (id === 'camo') return me.camo;
   if (def) return me.inv[slotKey(id)]?.id === id;
   if (id === 'vest') return me.armor >= 100;
   if (id === 'vesthelm') return me.armor >= 100 && me.helmet;
@@ -867,6 +949,7 @@ function updateRemotes(dt) {
       r.model.rotation.x = Math.min(Math.PI / 2, r.deadT * 5);
     }
     r.model.userData.light.visible = alive && !!r.fl;
+    setFaded(r.model, alive && r.hidden && !isMate(r));
     const deployed = alive && !!r.mo && !killcam;
     if (deployed && !r.mortarSet) { r.mortarSet = new THREE.Group(); scene.add(r.mortarSet); }
     if (r.mortarSet) { r.mortarSet.visible = deployed; if (deployed) placeMortarModel(r.mortarSet, s.p, s.yaw, r.mo); }
@@ -1528,11 +1611,12 @@ document.addEventListener('keydown', e => {
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
+    case 'Digit6': if (me.alive) cycleGrenades(MINES); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': startReload(); break;
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.alive) startUse('key'); break;
-    case 'KeyG': if (me.alive && !['knife', ...GRENADES].includes(current())) net.send({ t: 'drop', w: current() }); break;
+    case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
     case 'KeyO': openBuy('Equipment'); break;
     case 'KeyM': toggleMenu(teamMenu); break;
@@ -1836,7 +1920,7 @@ const net = new Net({
     me.zombie = !!m.zombie;
     if (wasZombie !== me.zombie) { vmId = null; refreshViewModel(); }
     if (me.alive && !m.alive) die();
-    Object.assign(me, { team: m.team, hp: m.hp, armor: m.armor, helmet: m.helmet, kit: m.kit, nvg: m.nvg, money: m.money });
+    Object.assign(me, { team: m.team, hp: m.hp, armor: m.armor, helmet: m.helmet, kit: m.kit, nvg: m.nvg, camo: m.camo, money: m.money });
     if (!me.nvg) me.nvgOn = false;
     applyServerInv(m.inv);
     if (me.team !== prevTeam) {
@@ -1933,7 +2017,7 @@ const net = new Net({
     me.act = m.me;
     hud.score(m.sc);
     const seen = new Set();
-    for (const [id, x, y, z, yaw, pitch, c, w, alive, tc, fl, mo] of m.pl) {
+    for (const [id, x, y, z, yaw, pitch, c, w, alive, tc, fl, mo, hid] of m.pl) {
       if (id === me.id) continue;
       seen.add(id);
       const team = tc === 1 ? 'T' : 'CT';
@@ -1947,6 +2031,7 @@ const net = new Net({
       r.alive = !!alive;
       r.fl = fl;
       r.mo = mo;
+      r.hidden = !!hid;
       r.buf.push({ t: m.time, p: [x, y, z], yaw, pitch, c, w, alive });
       if (r.buf.length > 300) r.buf.shift();
       if (w !== r.w) { r.w = w; setPlayerWeapon(r.model, w); }
@@ -2020,6 +2105,9 @@ const net = new Net({
       else gibBody(m, r?.model, r?.look || teamOf(m.v));
     }
   },
+  mines(m) {
+    syncMines(m.list);
+  },
   spot(m) {
     mortarInfo.target = { p: m.p, name: m.name, at: performance.now() };
     audio.play('radio');
@@ -2047,6 +2135,21 @@ const net = new Net({
   },
   boom(m) {
     if (m.k === 'flash') { fx.flashPop(m.p); audio.play('flashpop', m.p); return; }
+    if (m.k === 'pmn' || m.k === 'mon50') {
+      fx.explosion(m.p, false);
+      audio.play('boom', m.p);
+      // the MON-50's fan of fragments
+      if (m.k === 'mon50') {
+        const base = Math.atan2(m.d[0], m.d[1]);
+        for (let i = 0; i < 90; i++) {
+          const a = base + (Math.random() - 0.5) * MINE.mon50.cone * 2, sp = 25 + Math.random() * 20;
+          fx.emit([m.p[0], m.p[1] + 0.2, m.p[2]], [Math.sin(a) * sp, (Math.random() - 0.3) * 4, Math.cos(a) * sp], [1, 0.75, 0.35], 0.25 + Math.random() * 0.25, 2);
+        }
+      }
+      const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);
+      me.shake = Math.max(me.shake, clamp(1 - d / 15, 0, 1) * 0.7);
+      return;
+    }
     if (m.k === 'rpg' || m.k === 'mortar') {
       fx.explosion(m.p, true);
       audio.play('bigboom', m.p);
@@ -2176,7 +2279,7 @@ function updateLocal(dt, now) {
   }
   const moveBoxes = coll.move(null, me.p, 3);
   const id = current(), def = WEAPONS[id];
-  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere());
+  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse());
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar;
 
   const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar;
@@ -2512,6 +2615,8 @@ function updateHud(now) {
     else if (me.riding) hint = 'Press E to get out of the car';
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
+    else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
+    else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you while you keep still';
     else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the door`;
     else if (!canDefuseHere() && sw) hint = `Press E to switch the lights ${game.lights[sw.group] === false ? 'on' : 'off'}`;
     else if (!canDefuseHere() && car && game.phase !== 'freeze') hint = !car.driver ? 'Press E to drive the car' : car.type === 'pickup' ? 'Press E to man the machine gun' : 'Press E to get in as a passenger';
@@ -2524,7 +2629,7 @@ function updateHud(now) {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
   hud.hint(hint);
-  if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : 'Defusing the bomb...', me.act.pr);
+  if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
 
@@ -2745,6 +2850,7 @@ function frame() {
   updateCamera(dt, now);
   updateMortarHud();
   updateOwnMortarModel();
+  updateMineModels();
   updateFires(dt, now);
   updateZombieGrowls(now);
   fx.update(dt, camera);

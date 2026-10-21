@@ -66,6 +66,7 @@ export default {
   ],
   // Tunnels and roofed passages: no direct sun inside, softer sky light.
   rooms: BSP.ROOMS.map(r => ({ group: 'covered', amb: 0.6, ...r })),
+  camo: 'desert', // the uniforms' camouflage colors (desert, urban or woodland)
   theme: {
     skyTop: '#3f7fc4', skyHorizon: '#c9dce8', fog: ['#d6dfe2', 110, 320],
     sun: { color: '#fff1d8', intensity: 3.0, dir: [-30, 75, 40] },

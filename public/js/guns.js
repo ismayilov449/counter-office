@@ -509,6 +509,42 @@ export function buildMortarSetup(deg = 60) {
   return g;
 }
 
+// PMN: a squat green disc with a black rubber pressure cap. Held in the hand (origin at the grip).
+function pmnMine(gun, P) {
+  const m = X();
+  P.cyl(0.056, 0.055, m.hegreen, 0, 0, -0.08, 0, 0, 0, 16);
+  P.cyl(0.042, 0.012, m.grip, 0, 0.033, -0.08, 0, 0, 0, 14);
+  P.box(0.03, 0.012, 0.016, m.dark, 0.05, 0.0, -0.08);                                       // fuze plug
+  return [0, 0, -0.08];
+}
+
+// MON-50: a curved olive box with its face to the front, folding legs and the detonator well on top.
+function mon50Mine(gun, P) {
+  const m = X();
+  for (let i = -2; i <= 2; i++) P.box(0.046, 0.155, 0.066, m.olive, i * 0.044, 0.05, -0.12 + Math.abs(i) * 0.012, 0, i * 0.12, 0);
+  P.cyl(0.012, 0.03, m.dark, -0.05, 0.14, -0.12, 0, 0, 0, 8);
+  P.cyl(0.012, 0.03, m.dark, 0.05, 0.14, -0.12, 0, 0, 0, 8);
+  return [0, 0.05, -0.16];
+}
+
+// A mine laid on the ground (feet at y = 0, facing -z). A MON-50 stands on its legs with its tripwire stretched
+// across its front between two little stakes (see MINE.mon50 for where).
+export function buildPlacedMine(k, wire = 1.2, half = 1.5) {
+  const g = new THREE.Group(), P = new Parts(), m = X();
+  if (k === 'pmn') {
+    P.cyl(0.056, 0.055, m.hegreen, 0, 0.0, 0, 0, 0, 0, 16);                                    // half sunk in the ground
+    P.cyl(0.042, 0.012, m.grip, 0, 0.033, 0, 0, 0, 0, 14);
+  } else {
+    for (let i = -2; i <= 2; i++) P.box(0.046, 0.155, 0.066, m.olive, i * 0.044, 0.2, Math.abs(i) * 0.012, 0, i * 0.12, 0);
+    for (const x of [-0.08, 0.08]) { rod(P, [x, 0.12, 0.02], [x * 1.6, 0, 0.1], 0.006, m.dark, 6); rod(P, [x, 0.12, 0.02], [x * 1.6, 0, -0.08], 0.006, m.dark, 6); }
+    for (const x of [-half, half]) rod(P, [x, 0, -wire], [x, 0.22, -wire], 0.008, m.wood, 5); // stakes
+    rod(P, [0, 0.22, 0], [0, 0.15, -wire], 0.002, m.steel, 4);                                // wire to the fuze
+    rod(P, [-half, 0.15, -wire], [half, 0.15, -wire], 0.002, m.steel, 4);                     // the tripwire
+  }
+  P.build(g);
+  return g;
+}
+
 // PKT: long heavy barrel, box receiver, ammo can on the side, spade grips at the back.
 function pkt(gun, P) {
   const m = X();
@@ -559,6 +595,8 @@ const BUILD = {
   g3sg1: (g, P) => autoSniper(g, P, { g3: true }),
   rpg: (g, P) => rpg7(g, P),
   mortar: (g, P) => mortar(g, P),
+  pmn: (g, P) => pmnMine(g, P),
+  mon50: (g, P) => mon50Mine(g, P),
   pkt: (g, P) => pkt(g, P),
   sg550: (g, P) => autoSniper(g, P, {}),
   m249: (g, P) => mg(g, P),

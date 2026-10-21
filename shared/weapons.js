@@ -55,9 +55,32 @@ export const WEAPONS = {
   // Breaks on the first floor it lands on and sets the area on fire (see FIRE).
   molotov: { name: 'Molotov', slot: 4, cls: 'grenade', price: 400, grenade: true, impact: true, max: 1, fuse: 4, speed: 6.3 },
   c4: { name: 'C4 Explosive', slot: 5, cls: 'c4', speed: 6.3 },
+  // Anti-personnel mines (buy menu -> Mines & camo; 6 selects them, Mouse1 lays one in front of you; see MINE).
+  // PMN: a pressure mine flat on the ground, takes the leg off whoever steps on it. MON-50: directional, a tripwire
+  // across its front fires a fan of fragments forward.
+  pmn: { name: 'PMN mine', slot: 6, cls: 'mine', mine: 'pressure', price: 500, max: 2, speed: 6.3 },
+  mon50: { name: 'MON-50 mine', slot: 6, cls: 'mine', mine: 'directional', price: 600, max: 2, speed: 6.3 },
 };
 
 export const GRENADES = ['he', 'flash', 'smoke', 'molotov'];
+export const MINES = ['pmn', 'mon50'];
+
+// Mines: armed arm seconds after they're laid; enemies only see one within seen metres (your own team always sees
+// its own, and never sets them off); defused by holding E (defuse seconds, kitDefuse with a defuse kit). An
+// explosion within chain metres sets a mine off too. Each player has at most perPlayer down at once.
+// PMN: goes off when an enemy's feet come within trigger metres: damage to the one who stepped on it (a leg hit),
+// splashDamage to others within splash metres. MON-50: its tripwire runs across its front (wire metres ahead,
+// wireHalf to each side, all of it inside the cone); fragments fly up to range metres in a cone (cone radians each side), plus a small blast
+// behind it (back metres).
+export const MINE = {
+  arm: 1.5, seen: 3, defuse: 3, kitDefuse: 1.5, chain: 3, perPlayer: 4,
+  pmn: { trigger: 0.45, damage: 160, splash: 3, splashDamage: 60 },
+  mon50: { wire: 3, wireHalf: 1.4, range: 25, cone: 0.52, damage: 180, back: 3, backDamage: 40 },
+};
+
+// Ghillie camouflage: crouched, not moving and not shooting for still seconds, you're nearly invisible to enemies
+// (and bots can't make you out beyond botSees metres). Lost when you die.
+export const CAMO = { still: 1.5, botSees: 4 };
 
 // Molotov fire: an impact burst a bit weaker than an HE (up to 80 vs 100 in the middle, nothing at the edge), then a
 // burning patch of this radius for life seconds. Standing in it burns dps HP per second (armor doesn't help), and you
@@ -69,6 +92,7 @@ export const ITEMS = {
   vesthelm: { name: 'Kevlar + Helmet', price: 1000 },
   kit: { name: 'Defuse Kit', price: 200, team: 'CT' },
   nvg: { name: 'Nightvision', price: 1250 },
+  camo: { name: 'Ghillie camo', price: 1000 },
 };
 
 // CS 1.6 style buy menu: number keys pick a category, then an item.
@@ -81,6 +105,7 @@ export const BUY_MENU = [
   { title: 'Primary ammo', action: 'ammo1' },
   { title: 'Secondary ammo', action: 'ammo2' },
   { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg'] },
+  { title: 'Mines & camo', items: ['pmn', 'mon50', 'camo'] },
 ];
 
 // Gun Game: one kill with each weapon moves you to the next; a knife kill on the last level wins.

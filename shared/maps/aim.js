@@ -67,6 +67,7 @@ export default {
     { w: 'deagle', p: [-5, 0, 12] },
     { w: 'deagle', p: [5, 0, -12] },
   ],
+  camo: 'urban', // the uniforms' camouflage colors (desert, urban or woodland)
   theme: {
     skyTop: '#3e7cc4', skyHorizon: '#d6e6f0', fog: ['#dde6ea', 70, 200],
     sun: { color: '#fff4e0', intensity: 2.9, dir: [30, 75, 20] },

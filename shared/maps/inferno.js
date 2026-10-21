@@ -61,6 +61,7 @@ export default {
   water: [],
   doors: DOORS,
   rooms: BSP.ROOMS.map(r => ({ group: 'covered', amb: 0.6, ...r })),
+  camo: 'desert', // the uniforms' camouflage colors (desert, urban or woodland)
   theme: {
     skyTop: '#3d78c0', skyHorizon: '#d4dfe6', fog: ['#dde3e2', 110, 320],
     sun: { color: '#fff3d0', intensity: 2.9, dir: [40, 70, -30] },

@@ -10,7 +10,7 @@ function mat(color) {
 }
 
 function bx(parent, w, h, d, color, x = 0, y = 0, z = 0) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'object' ? color : mat(color));
   m.position.set(x, y, z);
   m.castShadow = true;
   parent.add(m);
@@ -26,6 +26,131 @@ const TEAM = {
   // Zombie: rotten green skin, bare arms, torn dark clothes, no helmet.
   Z: { shirt: 0x3a4232, pants: 0x2a2a24, head: 0x6f8a4e, vest: 0x2e3428, hat: 0x55703c, sleeve: 0x6f8a4e, eyes: 0xd03020 },
 };
+
+// ---- camouflage uniforms. Terrorists wear Soviet patterns (Flora's wavy bands; KLMK's leafy patches in the woods),
+// Counter-Terrorists Western ones (M81 woodland blotches; DCU chocolate chip in the desert), in the map's colors
+// (map.camo: desert, urban or woodland). Vests and helmets keep the team colors.
+const CAMO = {
+  T: {
+    desert: { style: 'flora', base: '#b49a6a', spots: ['#8a6a40', '#6a5636', '#cdb98a'] },
+    urban: { style: 'flora', base: '#8c8c86', spots: ['#5e5e5a', '#a8a8a0', '#46464a'] },
+    woodland: { style: 'klmk', base: '#6a7a48', spots: ['#3e4a2a', '#a8b07a', '#55603a'] },
+  },
+  CT: {
+    desert: { style: 'dcu', base: '#c8b48a', spots: ['#9a7a52', '#6e5a42', '#2a2420', '#ece6d8'] },
+    urban: { style: 'm81', base: '#9a9a96', spots: ['#6a6a6a', '#3a3a3e', '#c8c8c4', '#222226'] },
+    woodland: { style: 'm81', base: '#6e6c4a', spots: ['#3a4a2a', '#7a5a3a', '#1e1e1a', '#8a8a5a'] },
+  },
+};
+let camoTheme = 'desert';
+const camoMats = {};
+
+function camoTexture(team, theme) {
+  const { style, base, spots } = CAMO[team][theme] || CAMO[team].desert;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = base;
+  g.fillRect(0, 0, 128, 128);
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  // draw everything three times across the edges so the pattern tiles
+  const wrap = draw => { for (const dx of [-128, 0, 128]) for (const dy of [-128, 0, 128]) { g.save(); g.translate(dx, dy); draw(); g.restore(); } };
+  const blob = (x, y, rx, ry, color) => {
+    g.fillStyle = color;
+    g.beginPath();
+    const n = 9;
+    for (let i = 0; i <= n; i++) {
+      const t = (i / n) * Math.PI * 2, k = rnd(0.7, 1.25);
+      g[i ? 'lineTo' : 'moveTo'](x + Math.cos(t) * rx * k, y + Math.sin(t) * ry * k);
+    }
+    g.fill();
+  };
+  if (style === 'flora') {
+    // Flora: wavy horizontal bands
+    for (let i = 0; i < 9; i++) {
+      const y0 = rnd(0, 128), hgt = rnd(5, 12), color = spots[i % spots.length], ph = rnd(0, 6), amp = rnd(3, 7);
+      wrap(() => {
+        g.fillStyle = color;
+        g.beginPath();
+        for (let x = 0; x <= 128; x += 8) g.lineTo(x, y0 + Math.sin(x / 18 + ph) * amp);
+        for (let x = 128; x >= 0; x -= 8) g.lineTo(x, y0 + hgt + Math.sin(x / 15 + ph) * amp);
+        g.fill();
+      });
+    }
+  } else if (style === 'klmk') {
+    // KLMK: small leafy patches and short streaks
+    for (let i = 0; i < 70; i++) {
+      const x = rnd(0, 128), y = rnd(0, 128), color = spots[i % spots.length], s = rnd(2, 6);
+      wrap(() => blob(x, y, s * rnd(1, 2.2), s, color));
+    }
+  } else if (style === 'm81') {
+    // M81 woodland: big irregular blotches, black branches on top
+    for (let i = 0; i < 16; i++) {
+      const x = rnd(0, 128), y = rnd(0, 128), color = spots[i % 2], s = rnd(10, 18);
+      wrap(() => blob(x, y, s * rnd(1.2, 1.8), s * 0.8, color));
+    }
+    for (let i = 0; i < 10; i++) {
+      const x = rnd(0, 128), y = rnd(0, 128);
+      wrap(() => blob(x, y, rnd(7, 12), rnd(3, 5), spots[2]));
+    }
+    for (let i = 0; i < 6; i++) {
+      const x = rnd(0, 128), y = rnd(0, 128);
+      wrap(() => blob(x, y, rnd(5, 9), rnd(3, 5), spots[3]));
+    }
+  } else {
+    // DCU / chocolate chip: soft blotches with little dark and light chips
+    for (let i = 0; i < 12; i++) {
+      const x = rnd(0, 128), y = rnd(0, 128), color = spots[i % 2], s = rnd(12, 20);
+      wrap(() => blob(x, y, s * 1.4, s * 0.8, color));
+    }
+    for (let i = 0; i < 40; i++) {
+      const x = rnd(0, 128), y = rnd(0, 128), color = spots[2 + (i % 2)];
+      wrap(() => blob(x, y, rnd(1.5, 3), rnd(1.2, 2.5), color));
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+// The uniform's material for a team (camouflage for T and CT; plain color for hostages and zombies).
+function cloth(team, color) {
+  if (team !== 'T' && team !== 'CT') return color;
+  if (!camoMats[team]) camoMats[team] = new THREE.MeshLambertMaterial({ map: camoTexture(team, camoTheme) });
+  return camoMats[team];
+}
+
+// Switch every uniform to a map's colors (called when a map loads).
+export function setCamoTheme(theme) {
+  if (!theme || theme === camoTheme) return;
+  camoTheme = theme;
+  for (const team of Object.keys(camoMats)) {
+    camoMats[team].map.dispose();
+    camoMats[team].map = camoTexture(team, theme);
+    camoMats[team].needsUpdate = true;
+  }
+}
+
+// A camouflaged player keeping still: enemies see only a faint shimmer of them.
+const fadeMats = new Map();
+export function setFaded(model, on) {
+  if (!!model.userData.faded === on) return;
+  model.userData.faded = on;
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    if (on) {
+      o.userData.solid = o.material;
+      let f = fadeMats.get(o.material);
+      if (!f) { f = o.material.clone(); f.transparent = true; f.opacity = 0.12; f.depthWrite = false; fadeMats.set(o.material, f); }
+      o.material = f;
+      o.castShadow = false;
+    } else if (o.userData.solid) {
+      o.material = o.userData.solid;
+      o.castShadow = true;
+    }
+  });
+}
 
 // Civilian hostage: same rig as a player, no weapon, hands raised while waiting.
 export function createHostageModel() {
@@ -45,7 +170,7 @@ export function createPlayerModel(team) {
   const legs = [-0.12, 0.12].map(x => {
     const leg = new THREE.Group();
     leg.position.x = x;
-    bx(leg, 0.18, 0.78, 0.2, C.pants, 0, -0.39, 0);
+    bx(leg, 0.18, 0.78, 0.2, cloth(team, C.pants), 0, -0.39, 0);
     bx(leg, 0.2, 0.1, 0.28, 0x1c1c1c, 0, -0.8, -0.03);
     hip.add(leg);
     return leg;
@@ -53,7 +178,7 @@ export function createPlayerModel(team) {
 
   const upper = new THREE.Group();
   hip.add(upper);
-  bx(upper, 0.48, 0.62, 0.28, C.shirt, 0, 0.31, 0);
+  bx(upper, 0.48, 0.62, 0.28, cloth(team, C.shirt), 0, 0.31, 0);
   bx(upper, 0.52, 0.42, 0.32, C.vest, 0, 0.36, 0);
   const headG = new THREE.Group();
   headG.position.set(0, 0.64, 0);
@@ -70,11 +195,11 @@ export function createPlayerModel(team) {
   const rArm = new THREE.Group();
   rArm.position.set(0.2, -0.06, 0.03);
   arms.add(rArm);
-  bx(rArm, 0.1, 0.1, 0.42, C.sleeve, 0, 0, -0.21);
+  bx(rArm, 0.1, 0.1, 0.42, cloth(team, C.sleeve), 0, 0, -0.21);
   const lArm = new THREE.Group();
   lArm.position.set(-0.2, -0.06, 0.03);
   arms.add(lArm);
-  bx(lArm, 0.1, 0.1, 0.42, C.sleeve, 0.06, 0, -0.27).rotation.y = 0.45;
+  bx(lArm, 0.1, 0.1, 0.42, cloth(team, C.sleeve), 0.06, 0, -0.27).rotation.y = 0.45;
   const hand = new THREE.Group();
   hand.position.set(0.1, -0.05, -0.4);
   arms.add(hand);
@@ -166,17 +291,18 @@ export function setPlayerWeapon(model, id) {
 const FLESH = 0x7a0c0c, MEAT = [0x6a0808, 0x8e1414, 0x5a0606], BONE = 0xd8cfc0;
 const PIECE = {
   head: (g, C) => { bx(g, 0.28, 0.3, 0.28, C.head); bx(g, 0.32, 0.1, 0.32, C.hat, 0, 0.18, 0); bx(g, 0.15, 0.06, 0.15, FLESH, 0, -0.17, 0); return 1.62; },
-  torso: (g, C) => { bx(g, 0.48, 0.62, 0.28, C.shirt); bx(g, 0.52, 0.42, 0.32, C.vest, 0, 0.05, 0); bx(g, 0.18, 0.05, 0.18, FLESH, 0, 0.33, 0); bx(g, 0.4, 0.05, 0.22, FLESH, 0, -0.32, 0); return 1.16; },
-  rArm: (g, C) => { bx(g, 0.1, 0.42, 0.1, C.sleeve); bx(g, 0.08, 0.05, 0.08, FLESH, 0, 0.22, 0); bx(g, 0.03, 0.06, 0.03, BONE, 0, 0.26, 0); return 1.25; },
-  lArm: (g, C) => { bx(g, 0.1, 0.42, 0.1, C.sleeve); bx(g, 0.08, 0.05, 0.08, FLESH, 0, 0.22, 0); bx(g, 0.03, 0.06, 0.03, BONE, 0, 0.26, 0); return 1.25; },
-  lLeg: (g, C) => { bx(g, 0.18, 0.7, 0.2, C.pants); bx(g, 0.2, 0.1, 0.28, 0x1c1c1c, 0, -0.38, -0.03); bx(g, 0.15, 0.05, 0.17, FLESH, 0, 0.36, 0); bx(g, 0.05, 0.07, 0.05, BONE, 0, 0.4, 0); return 0.45; },
-  rLeg: (g, C) => { bx(g, 0.18, 0.7, 0.2, C.pants); bx(g, 0.2, 0.1, 0.28, 0x1c1c1c, 0, -0.38, -0.03); bx(g, 0.15, 0.05, 0.17, FLESH, 0, 0.36, 0); bx(g, 0.05, 0.07, 0.05, BONE, 0, 0.4, 0); return 0.45; },
+  torso: (g, C) => { bx(g, 0.48, 0.62, 0.28, C.cloth.shirt); bx(g, 0.52, 0.42, 0.32, C.vest, 0, 0.05, 0); bx(g, 0.18, 0.05, 0.18, FLESH, 0, 0.33, 0); bx(g, 0.4, 0.05, 0.22, FLESH, 0, -0.32, 0); return 1.16; },
+  rArm: (g, C) => { bx(g, 0.1, 0.42, 0.1, C.cloth.sleeve); bx(g, 0.08, 0.05, 0.08, FLESH, 0, 0.22, 0); bx(g, 0.03, 0.06, 0.03, BONE, 0, 0.26, 0); return 1.25; },
+  lArm: (g, C) => { bx(g, 0.1, 0.42, 0.1, C.cloth.sleeve); bx(g, 0.08, 0.05, 0.08, FLESH, 0, 0.22, 0); bx(g, 0.03, 0.06, 0.03, BONE, 0, 0.26, 0); return 1.25; },
+  lLeg: (g, C) => { bx(g, 0.18, 0.7, 0.2, C.cloth.pants); bx(g, 0.2, 0.1, 0.28, 0x1c1c1c, 0, -0.38, -0.03); bx(g, 0.15, 0.05, 0.17, FLESH, 0, 0.36, 0); bx(g, 0.05, 0.07, 0.05, BONE, 0, 0.4, 0); return 0.45; },
+  rLeg: (g, C) => { bx(g, 0.18, 0.7, 0.2, C.cloth.pants); bx(g, 0.2, 0.1, 0.28, 0x1c1c1c, 0, -0.38, -0.03); bx(g, 0.15, 0.05, 0.17, FLESH, 0, 0.36, 0); bx(g, 0.05, 0.07, 0.05, BONE, 0, 0.4, 0); return 0.45; },
 };
 const PIECE_X = { head: 0, torso: 0, rArm: 0.27, lArm: -0.27, lLeg: -0.12, rLeg: 0.12 };
 
 // The pieces as meshes, each with where it sat on the body (local, feet at 0, facing -z) and its rough size.
 export function createGibPieces(look, parts, scraps) {
-  const C = TEAM[look] || TEAM.T;
+  const T0 = TEAM[look] || TEAM.T;
+  const C = { ...T0, cloth: { shirt: cloth(look, T0.shirt), pants: cloth(look, T0.pants), sleeve: cloth(look, T0.sleeve) } };
   const out = [];
   for (const part of parts) {
     const g = new THREE.Group();
@@ -243,6 +369,7 @@ export function createNameTag(text, color) {
 const VM_BASE = {
   knife: [0.16, -0.17, -0.3],
   grenade: [0.16, -0.16, -0.3],
+  mine: [0.16, -0.17, -0.32],
   c4: [0.12, -0.2, -0.32],
   pistol: [0.15, -0.15, -0.42],
 };
@@ -261,20 +388,20 @@ export function createViewModel(id, team) {
   const ra = new THREE.Group();
   ra.position.set(0.02, -0.08, 0.03);
   bx(ra, 0.07, 0.07, 0.09, glove, 0, 0, 0);
-  bx(ra, 0.09, 0.09, 0.45, C.sleeve, 0.03, -0.06, 0.26).rotation.x = 0.35;
+  bx(ra, 0.09, 0.09, 0.45, cloth(team, C.sleeve), 0.03, -0.06, 0.26).rotation.x = 0.35;
   root.add(ra);
 
   if (twoHanded) {
     const la = new THREE.Group();
     la.position.set(0, -0.02, cls === 'smg' ? -0.28 : -0.45);
     bx(la, 0.08, 0.06, 0.1, glove, 0, 0, 0);
-    bx(la, 0.09, 0.09, 0.5, C.sleeve, -0.12, -0.1, 0.22).rotation.set(0.3, 0.55, 0);
+    bx(la, 0.09, 0.09, 0.5, cloth(team, C.sleeve), -0.12, -0.1, 0.22).rotation.set(0.3, 0.55, 0);
     root.add(la);
   } else if (cls === 'pistol') {
     const la = new THREE.Group();
     la.position.set(-0.04, -0.06, 0.04);
     bx(la, 0.07, 0.07, 0.08, glove, 0, 0, 0);
-    bx(la, 0.09, 0.09, 0.45, C.sleeve, -0.08, -0.08, 0.26).rotation.set(0.35, 0.3, 0);
+    bx(la, 0.09, 0.09, 0.45, cloth(team, C.sleeve), -0.08, -0.08, 0.26).rotation.set(0.35, 0.3, 0);
     root.add(la);
   }
 

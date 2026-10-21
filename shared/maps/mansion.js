@@ -150,6 +150,7 @@ export default {
     { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },
   ],
   labels: {},
+  camo: 'woodland', // the uniforms' camouflage colors (desert, urban or woodland)
   theme: {
     skyTop: '#3f7fc4', skyHorizon: '#cfe0ec', fog: ['#d8e2e8', 90, 300],
     sun: { color: '#fff4e2', intensity: 2.8, dir: [35, 75, 25] },
