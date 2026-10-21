@@ -504,9 +504,15 @@ function updateMortarHud() {
     '<div class="mp-dim">Mouse or A D: turn · Mouse or W S: elevation · Mouse1: fire · E: pack up</div>');
 }
 
-// Radar marks: the called-in target, and where the last shell landed (a dashed ring when nobody saw it).
+// Radar marks: the called-in target, where the last shell landed (a dashed ring when nobody saw it), and while
+// aiming, live, where the tube's bearing and elevation will drop the next shell.
 function mortarRadarMarks(now) {
   const marks = [];
+  const m = me.mortar;
+  if (m?.phase === 'aim' && me.alive) {
+    const b = (mortarBearing() / MILS) * Math.PI * 2, d = mortarRange(m.elev);
+    marks.push({ kind: 'aim', p: [me.p[0] + Math.sin(b) * d, 0, me.p[2] - Math.cos(b) * d] });
+  }
   if (mortarInfo.target && now - mortarInfo.target.at < 60000) marks.push({ kind: 'target', p: mortarInfo.target.p });
   if (mortarInfo.impact && now - mortarInfo.impact.at < 15000) marks.push({ kind: 'impact', p: mortarInfo.impact.p, rough: !mortarInfo.impact.seen });
   return marks;

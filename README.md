@@ -173,7 +173,8 @@ a match anyone can also vote from the Esc menu: more than half the players votin
   - **Mouse1** sets it up (2 seconds, on open ground: not under a roof); you stay crouched and can't move.
   - You look out along the tube. The **mouse** (or **A D**) turns it — the panel shows the **bearing**, e.g. 31-50 —
     and raises or lowers it (or **W S**): the **elevation**, from 7-50 (45°, the furthest: 80 m) to 14-15 (85°, 14 m).
-    The **firing table** on the panel says how far each elevation throws. You don't see where it will land.
+    The **firing table** on the panel says how far each elevation throws, and a bold **red dot** on the radar shows,
+    live, where the next shell will come down as you turn and tilt the tube.
   - **V** calls in a target — anyone on the team (or you, before setting up): the spot you're looking at. The
     gunner's panel shows its bearing and distance from the mortar and how far to turn, and it's marked on the radar.
   - **Mouse1** fires. The shell flies a high arc for 3½–5 seconds; everyone near where it comes down hears it whistle

@@ -448,8 +448,8 @@ export class Hud {
     return { s, toR: (x, z) => [(x - min) * s, (z - min) * s] };
   }
 
-  // marks: the mortar's called-in target (a red cross) and where its last shell landed (an orange ring, dashed when
-  // nobody saw it).
+  // marks: the mortar's called-in target (a yellow cross), where its last shell landed (an orange ring, dashed when
+  // nobody saw it) and, for the gunner, where the next shell will land (a bold red dot).
   radar(self, mates, bomb, hostages = [], marks = []) {
     if (!this.radarBg) return;
     const g = this.radarCtx;
@@ -471,8 +471,12 @@ export class Hud {
     for (const mk of marks) {
       const [x, z] = toR(mk.p[0], mk.p[2]);
       g.lineWidth = 2;
-      if (mk.kind === 'target') {
-        g.strokeStyle = '#ff3a2a';
+      if (mk.kind === 'aim') {
+        g.fillStyle = '#ff2020';
+        g.strokeStyle = '#fff';
+        g.beginPath(); g.arc(x, z, 5, 0, Math.PI * 2); g.fill(); g.stroke();
+      } else if (mk.kind === 'target') {
+        g.strokeStyle = '#ffe040';
         g.beginPath(); g.moveTo(x - 5, z - 5); g.lineTo(x + 5, z + 5); g.moveTo(x + 5, z - 5); g.lineTo(x - 5, z + 5); g.stroke();
       } else {
         g.strokeStyle = '#ffa040';
