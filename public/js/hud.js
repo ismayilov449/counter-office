@@ -476,6 +476,25 @@ export class Hud {
         g.fillStyle = '#ff2020';
         g.strokeStyle = '#fff';
         g.beginPath(); g.arc(x, z, 5, 0, Math.PI * 2); g.fill(); g.stroke();
+      } else if (mk.kind === 'ping') {
+        // a bold "!" in a yellow badge, with a ring pulsing out for the first seconds; fades at the end
+        g.globalAlpha = Math.min(1, (6 - mk.age) / 1.5);
+        if (mk.age < 2) {
+          const r = 6 + ((mk.age * 1.5) % 1) * 10;
+          g.strokeStyle = '#ffd030';
+          g.beginPath(); g.arc(x, z, r, 0, Math.PI * 2); g.stroke();
+        }
+        g.fillStyle = '#ffd030';
+        g.strokeStyle = '#000';
+        g.beginPath(); g.arc(x, z, 7, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = '#000';
+        g.font = 'bold 12px sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText('!', x, z + 1);
+        g.textAlign = 'start';
+        g.textBaseline = 'alphabetic';
+        g.globalAlpha = 1;
       } else if (mk.kind === 'target') {
         g.strokeStyle = '#ffe040';
         g.beginPath(); g.moveTo(x - 5, z - 5); g.lineTo(x + 5, z + 5); g.moveTo(x + 5, z - 5); g.lineTo(x - 5, z + 5); g.stroke();

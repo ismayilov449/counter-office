@@ -193,11 +193,11 @@ a match anyone can also vote from the Esc menu: more than half the players votin
     their life — and anyone close by is hurt too.
   - **MON-50** ($600): a Soviet directional mine on little legs, with a tripwire stretched across its front 3 m out.
     An enemy walking into the wire sets it off: a fan of fragments up to 25 m ahead (60° wide), a small blast behind.
-- **Ghillie camo** (buy menu → 9, $1000): crouch, keep still and don't shoot for 1.5 seconds, and enemies see only a
-  faint shimmer of you (bots can't make you out beyond 4 m). Moving or shooting ends it. Lost when you die.
-- **Uniforms**: Terrorists wear Soviet camouflage (Flora's wavy bands; KLMK's leafy patches on woodland maps),
-  Counter-Terrorists Western patterns (M81 woodland blotches; DCU desert), in each map's colors — desert on Dust,
-  Dust II and Inferno, urban on Assault and aim_map, woodland on Mansion. Vests and helmets keep the team colors.
+- **Ghillie camo** (buy menu → 9, $1000): press **H** to switch it on and off. While it's on, enemies see only a faint
+  shimmer of you (bots can't make you out beyond 4 m); each shot shows you for 1.5 seconds. Teammates always see you.
+  Lost when you die.
+- **Pings**: click the **middle mouse button** (the scroll wheel) to put a yellow **!** on your team's radar where
+  you're looking. It lasts 6 seconds; one per player at a time.
 - **Molotov** (buy menu → Equipment → 6, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor
@@ -324,6 +324,7 @@ The HUD shows the active party modes under the timer.
 | J | emotes | V | call in a mortar target |
 | Y / U | chat / team chat | Tab | scores |
 | M | choose team | F5 | screenshot |
+| H | ghillie camo on / off | Middle click | ping "!" on the team radar |
 | Esc | menu (settings, map vote) | 0–9 | pick in menus |
 
 Ducking makes you 0.9 m tall, as in CS, so you fit through vents and crawl spaces. Duck in mid-air (jump, then

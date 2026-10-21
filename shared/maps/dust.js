@@ -100,7 +100,6 @@ export default {
     CT: [...rowSpawns(-42, [-10, -6, -2, 2, 6, 10], Math.PI), ...rowSpawns(-46, [-8, -4, 0, 4, 8], Math.PI)],
   },
   labels: { A: [34, -34], B: [-34, -34] },
-  camo: 'desert', // the uniforms' camouflage colors (desert, urban or woodland)
   theme: {
     skyTop: '#4a86c8', skyHorizon: '#cfe2ee', fog: ['#d9e3e6', 80, 220],
     sun: { color: '#fff0d6', intensity: 2.8, dir: [35, 70, 25] },

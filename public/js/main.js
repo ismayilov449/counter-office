@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_MENU, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, MINES, MINE, CAMO } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_MENU, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, MINES, MINE, CAMO, PING } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -10,7 +10,7 @@ import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, patchTree, ambientAt } from './roomlight.js';
-import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setCamoTheme, setFaded } from './models.js';
+import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
 import { EMOTES, EMOTE } from '/shared/emotes.js';
@@ -93,7 +93,6 @@ function loadMap(id) {
   clearHostages();
   renderer.toneMappingExposure = map.theme.exposure || 1;
   hud.setMap(map);
-  setCamoTheme(map.camo);
   clearMineModels();
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
@@ -481,12 +480,23 @@ function mineToDefuse() {
   return best;
 }
 
-// Ghillie camouflage: we can't see ourselves fade, so the HUD says when we're hidden (same rule as the server).
-const camoState = { pos: null, since: 0 };
-function camoHidden(now) {
-  const moved = !camoState.pos || Math.hypot(me.p[0] - camoState.pos[0], me.p[2] - camoState.pos[2]) > 0.05;
-  if (moved || !me.camo || !me.crouch || !me.alive || now - (me.lastFire || 0) < CAMO.still * 1000) { camoState.pos = me.p.slice(); camoState.since = now; }
-  return me.camo && me.alive && me.crouch && now - camoState.since >= CAMO.still * 1000;
+// Ghillie camouflage: H switches it on and off. We can't see ourselves fade, so the HUD says when we're hidden
+// (same rule as the server: on, and not just after a shot).
+function toggleCamo() {
+  if (!me.camo) { hud.small('You do not own ghillie camouflage (buy menu -> Mines & camo).', 2); return; }
+  me.camoOn = !me.camoOn;
+  net.send({ t: 'camo', on: me.camoOn });
+  audio.play('click');
+  hud.small(me.camoOn ? 'Camouflage ON' : 'Camouflage OFF', 1.5);
+}
+const camoHidden = now => !!(me.camo && me.camoOn && me.alive && now - (me.lastFire || 0) >= CAMO.still * 1000);
+
+// Pings: the middle mouse button puts a "!" on the team's radar where we're looking.
+const pings = [];
+function sendPing() {
+  const o = eyePos(), d = aimDir(me.yaw, me.pitch);
+  const t = coll.raycast(o, d, PING.range, 'bullet')?.t ?? 60;
+  net.send({ t: 'mark', p: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] });
 }
 
 // ---------------------------------------------------------------- 82-BM-37 mortar
@@ -603,6 +613,7 @@ function mortarRadarMarks(now) {
   }
   if (mortarInfo.target && now - mortarInfo.target.at < 60000) marks.push({ kind: 'target', p: mortarInfo.target.p });
   if (mortarInfo.impact && now - mortarInfo.impact.at < 15000) marks.push({ kind: 'impact', p: mortarInfo.impact.p, rough: !mortarInfo.impact.seen });
+  for (const pg of pings) if (now - pg.at < PING.life * 1000) marks.push({ kind: 'ping', p: pg.p, age: (now - pg.at) / 1000 });
   return marks;
 }
 
@@ -1549,6 +1560,9 @@ document.addEventListener('mousedown', e => {
     else if (WEAPONS[current()].grenade) holdNade(true);
   } else if (e.button === 2) {
     secondary();
+  } else if (e.button === 1) {
+    e.preventDefault();
+    if (me.alive && me.team !== 'SPEC') sendPing();
   }
 });
 document.addEventListener('mouseup', e => {
@@ -1641,6 +1655,7 @@ document.addEventListener('keydown', e => {
     case 'KeyF':
       if (me.alive) { me.flashlight = !me.flashlight; audio.play('click'); }
       break;
+    case 'KeyH': if (me.alive) toggleCamo(); break;
     case 'KeyN':
       if (!me.nvg) hud.small('You do not own nightvision goggles.');
       else { me.nvgOn = !me.nvgOn; audio.play('nvg'); }
@@ -1930,7 +1945,7 @@ const net = new Net({
     me.zombie = !!m.zombie;
     if (wasZombie !== me.zombie) { vmId = null; refreshViewModel(); }
     if (me.alive && !m.alive) die();
-    Object.assign(me, { team: m.team, hp: m.hp, armor: m.armor, helmet: m.helmet, kit: m.kit, nvg: m.nvg, camo: m.camo, money: m.money });
+    Object.assign(me, { team: m.team, hp: m.hp, armor: m.armor, helmet: m.helmet, kit: m.kit, nvg: m.nvg, camo: m.camo, camoOn: m.camoOn, money: m.money });
     if (!me.nvg) me.nvgOn = false;
     applyServerInv(m.inv);
     if (me.team !== prevTeam) {
@@ -2117,6 +2132,13 @@ const net = new Net({
   },
   mines(m) {
     syncMines(m.list);
+  },
+  mark(m) {
+    const at = performance.now();
+    for (let i = pings.length - 1; i >= 0; i--) if (pings[i].by === m.by) pings.splice(i, 1); // one each
+    pings.push({ p: m.p, by: m.by, at });
+    audio.play('radio');
+    if (m.by !== me.id) hud.small(`${m.name} marked a spot on the radar (!)`, 2);
   },
   spot(m) {
     mortarInfo.target = { p: m.p, name: m.name, at: performance.now() };
@@ -2627,7 +2649,7 @@ function updateHud(now) {
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
-    else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you while you keep still';
+    else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you (H to switch off)';
     else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the door`;
     else if (!canDefuseHere() && sw) hint = `Press E to switch the lights ${game.lights[sw.group] === false ? 'on' : 'off'}`;
     else if (!canDefuseHere() && car && game.phase !== 'freeze') hint = !car.driver ? 'Press E to drive the car' : car.type === 'pickup' ? 'Press E to man the machine gun' : 'Press E to get in as a passenger';

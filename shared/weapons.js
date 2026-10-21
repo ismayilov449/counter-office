@@ -81,6 +81,8 @@ export const MINE = {
 // Ghillie camouflage: crouched, not moving and not shooting for still seconds, you're nearly invisible to enemies
 // (and bots can't make you out beyond botSees metres). Lost when you die.
 export const CAMO = { still: 1.5, botSees: 4 };
+// Middle mouse button: a "!" on the team's radar where you're looking (it fades after life seconds).
+export const PING = { life: 6, cooldown: 1, range: 300 };
 
 // Molotov fire: an impact burst a bit weaker than an HE (up to 80 vs 100 in the middle, nothing at the edge), then a
 // burning patch of this radius for life seconds. Standing in it burns dps HP per second (armor doesn't help), and you

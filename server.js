@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -266,7 +266,7 @@ function addMoney(p, amount) {
 function sendMe(p) {
   send(p, {
     t: 'me', team: p.team, alive: p.alive, hp: Math.max(0, Math.round(p.hp)), armor: Math.round(p.armor),
-    helmet: p.helmet, kit: p.kit, nvg: p.nvg, camo: !!p.camo, money: p.money, inv: p.inv, zombie: !!p.zombie,
+    helmet: p.helmet, kit: p.kit, nvg: p.nvg, camo: !!p.camo, camoOn: !!p.camoOn, money: p.money, inv: p.inv, zombie: !!p.zombie,
   });
 }
 
@@ -286,6 +286,7 @@ function resetLoadout(p) {
   p.kit = false;
   p.nvg = false;
   p.camo = false;
+  p.camoOn = false;
 }
 
 // ---------------------------------------------------------------- spawning, teams, maps
@@ -1949,13 +1950,18 @@ function chainMines(at, r) {
   for (const mine of game.mines.filter(x => dist3(x.p, at) < r)) setTimeout(() => detonateMine(mine), 120 + Math.random() * 200);
 }
 
-// Ghillie camouflage: crouched, still and quiet long enough, you're hidden (see CAMO).
+// Ghillie camouflage: switched on (H), you're hidden from enemies, except for a moment after each shot (see CAMO).
 function updateCamo(t) {
-  for (const p of players.values()) {
-    const moved = !p.camoPos || Math.hypot(p.p[0] - p.camoPos[0], p.p[2] - p.camoPos[2]) > 0.05;
-    if (moved || !p.c || !p.camo || !p.alive || t - p.lastShot < CAMO.still * 1000) { p.camoPos = p.p.slice(); p.stillSince = t; }
-    p.hidden = p.camo && p.alive && !!p.c && t - p.stillSince >= CAMO.still * 1000;
-  }
+  for (const p of players.values()) p.hidden = !!(p.camo && p.camoOn && p.alive && t - (p.lastShot || 0) >= CAMO.still * 1000);
+}
+
+// A ping: the spot a player is looking at, marked with a "!" on their team's radar (in Deathmatch only on their own).
+function onPing(p, m) {
+  const t = now(), pos = vec3(m.p);
+  if (!p.alive || !pos || t - (p.pingAt || 0) < PING.cooldown * 1000 || dist3(eyeOf(p), pos) > PING.range + 5) return;
+  p.pingAt = t;
+  const to = isDM() || !inTeam(p) ? [p] : [...players.values()].filter(q => q === p || mates(q, p));
+  for (const q of to) send(q, { t: 'mark', p: pos.map(r2), by: p.id, name: p.name });
 }
 
 function onNade(p, m) {
@@ -2456,6 +2462,12 @@ function handle(p, m) {
       break;
     case 'spot':
       onSpot(p, m);
+      break;
+    case 'mark':
+      onPing(p, m);
+      break;
+    case 'camo':
+      if (p.camo) { p.camoOn = !!m.on; sendMe(p); }
       break;
     case 'mine':
       onMine(p, m);
