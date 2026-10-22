@@ -98,11 +98,13 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - A **ladder** in the middle of the right (north) wall leads up to a first-floor window — you duck
     through it automatically at the top. Break the glass first (shoot it).
   - **Windows** are real glass: see through them, shoot or grenade them to shatter.
-  - **Destructible house**: explosions blow holes in the walls of the mansion and the shed and smash the furniture —
-    the C4 most, then the mortar, an RPG rocket, a car blowing up, an HE grenade and the mines. The M249, AWP and
-    the PKT chip away at them too (about 15 M249 hits break a piece of wall). A hole that reaches the floor is a new
-    doorway; windows in a broken wall fall out. Floors, ceilings, the stairs and the roof stay. Everything is
-    repaired at the start of each round (with no rounds — warmup, Deathmatch, Gun Game — 90 seconds after it broke).
+  - **Destructible house**: explosions blow ragged holes in the walls and roofs of the mansion and the shed and smash
+    the furniture — the C4 most, then the mortar, an RPG rocket, a car blowing up, an HE grenade and the mines. The
+    M249, AWP and the PKT chip away at them too (about 15 M249 hits break a bit of wall). A hole that reaches the
+    floor is a new doorway; windows in a broken wall fall out. A mortar shell through the roof takes the top floor's
+    ceiling with it, and the next one drops into the room. The floors, the ceiling between the storeys and the
+    stairs stay. Everything is repaired at the start of each round (with no rounds — warmup, Deathmatch, Gun Game —
+    90 seconds after it broke).
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and
@@ -186,7 +188,8 @@ a match anyone can also vote from the Esc menu: more than half the players votin
     in for the last 3½ seconds — a reedy, fluttering shriek dropping in pitch, louder and lower the closer it will
     land, ending in a ripping roar of air: run! The blast is a huge, deep BOOM with thunder rolling on for seconds, heard across the map; right next to it your ears ring and everything goes muffled for a
     few seconds. It lands a little off (1 m + 3% of the distance) and blows up like an RPG rocket (up to
-    300 damage within 10 m, not through walls, bodies burst apart). A roof stops it, so it can't reach indoors.
+    300 damage within 14 m, not through walls, bodies burst apart). A roof stops it — on Mansion until shells have
+    blown a hole in it.
   - After each shell the panel says where it landed: exactly, with the correction ("6 m short, 0-40 left of the
     target"), if someone on the team saw it go off; only roughly ("not observed") if nobody did. It's on the radar
     too. Walk the shells onto the target, like a real crew.

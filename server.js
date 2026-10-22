@@ -492,7 +492,7 @@ function blastMap(at, weapon) {
         if (h && h.box.brk == null) continue;
         if (h && h.box.brk !== pc.id) k = 0.5;
       }
-      hurtPiece(pc, D * (1 - d / R) * k, out);
+      hurtPiece(pc, D * (1 - d / R) * k * (0.75 + Math.random() * 0.5), out);
     }
     breakPieces(out);
   }, 0);
@@ -1896,10 +1896,12 @@ function onMortar(p, m) {
   const x = p.p[0] + Math.sin(bearing) * dist + Math.cos(a) * off, z = p.p[2] - Math.cos(bearing) * dist + Math.sin(a) * off;
   const at = [x, sky.ground(x, z, p.p[1]) + 0.1, z];
   const flight = shellFlight(dist);
+  const fallback = p.p[1];
   broadcast({ t: 'shell', o: o.map(r2), at: at.map(r2), flight, owner: p.id });
   const round = game.round;
   setTimeout(() => {
     if (game.round !== round) return;
+    at[1] = sky.ground(x, z, fallback) + 0.1; // (a roof broken meanwhile lets it through)
     explodeRocket(at, p, def, 'mortar');
     // Where it landed, for the gunner's team: exact if one of them saw it go off, rough if nobody did.
     const team = [...players.values()].filter(q => q === p || mates(q, p));

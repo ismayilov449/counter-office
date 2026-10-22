@@ -35,8 +35,10 @@ for (const f of BSP.FACES.out_grnd2) {
 }
 FACE_MATS.out_grnd2_wall = 'greybrick';
 
-// ---- what explosions can break: the walls and furniture of the house and the shed. Floors, ceilings, the roof
-// and the stairs stay, and so does the foundation under the ground floor (0.81 m), so a hole is a doorway.
+// ---- what explosions can break: the walls, furniture and roofs of the house and the shed (a roof together with
+// the top floor's ceiling under it, so a shell through the roof drops into the room). The floors, the ceiling
+// between the storeys and the stairs stay, and so does the foundation under the ground floor (0.81 m), so a hole
+// is a doorway.
 const inHouse = b => b.min[0] > -24.5 && b.max[0] < -5.5 && b.min[2] > -15 && b.max[2] < 12.5;
 const inShed = b => b.min[0] > 12.5 && b.max[0] < 18.5 && b.min[2] > 14 && b.max[2] < 18.5;
 const onStairs = b => b.min[0] > -12.95 && b.max[0] < -11.4 && ((b.min[2] > -9.8 && b.max[2] < -3.4) || (b.min[2] > 0.15 && b.max[2] < 6.55));
@@ -45,7 +47,7 @@ function breakable(b) {
   const house = inHouse(b), shed = inShed(b);
   if (!house && !shed) return null;
   const dx = b.max[0] - b.min[0], dy = b.max[1] - b.min[1], dz = b.max[2] - b.min[2];
-  if (b.min[1] >= (house ? 6.45 : 2.4)) return null; // roof
+  if (b.min[1] >= (house ? 6.45 : 2.4)) return { kind: 'roof' };
   if (dx > 2.6 && dz > 2.6) return null; // floors and ceilings
   if (dy <= 0.3 && [[3.95, 4.3], [6.4, 6.95]].some(([lo, hi]) => b.min[1] >= lo && b.min[1] <= hi)) return null; // floor edges
   if (onStairs(b)) return null;
@@ -55,11 +57,20 @@ function breakable(b) {
   const wall = dy >= 1.8 || (Math.min(dx, dz) <= 0.65 && Math.max(dx, dz) >= 1.2);
   return { kind: wall ? 'wall' : 'prop', from };
 }
-const BRK = breakUp(BSP.SOLIDS, FACES, breakable);
+const ROOF_Y = { house: 6.69, shed: 2.43 };
+function roofFace(f) {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, y0 = Infinity;
+  for (let i = 0; i < f.length; i += 5) {
+    x0 = Math.min(x0, f[i]); x1 = Math.max(x1, f[i]); y0 = Math.min(y0, f[i + 1]); z0 = Math.min(z0, f[i + 2]); z1 = Math.max(z1, f[i + 2]);
+  }
+  const b = { min: [x0, y0, z0], max: [x1, y0, z1] };
+  return (inHouse(b) && y0 >= ROOF_Y.house) || (inShed(b) && y0 >= ROOF_Y.shed);
+}
+const BRK = breakUp(BSP.SOLIDS, FACES, breakable, { roofFace });
 
 // ---- collision: the original level's solid volumes, and the breakable chunks
 for (const b of BRK.statics) m.box(b.min[0], b.min[2], b.max[0], b.max[2], b.max[1] - b.min[1], 'none', b.min[1], { hidden: true });
-for (const p of BRK.pieces) m.box(p.min[0], p.min[2], p.max[0], p.max[2], p.max[1] - p.min[1], 'none', p.min[1], { hidden: true, brk: p.id });
+for (const p of BRK.pieces) for (const b of p.boxes) m.box(b.min[0], b.min[2], b.max[0], b.max[2], b.max[1] - b.min[1], 'none', b.min[1], { hidden: true, brk: p.id });
 
 // ---- rooms (light groups named after the original lamps). Ground floor 0.81-4.06, first floor 4.27-6.71.
 const G = [0.75, 4.1], U = [4.2, 6.75];

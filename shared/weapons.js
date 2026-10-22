@@ -43,7 +43,7 @@ export const WEAPONS = {
   // 82-BM-37 mortar: set it up on open ground (setup seconds), then aim like a real crew: a bearing and an elevation
   // (in mils, see mortarRange); the shell drops there a few seconds later with some spread (server onMortar).
   // One per team; heavy to carry.
-  mortar: primary('mortar', { name: '82-BM-37', auto: false, price: 6000, damage: 300, mortar: true, blast: 10, rate: 2.5, mag: 6, reserve: 0, reload: 0, spread: 0, moveSpread: 0, spreadInc: 0, recoil: 0, rangeMod: 1, pen: 1, speed: 4.2, killReward: 300, maxRange: 80, elev: [750, 1415], setup: 2 }),
+  mortar: primary('mortar', { name: '82-BM-37', auto: false, price: 6000, damage: 300, mortar: true, blast: 14, rate: 2.5, mag: 6, reserve: 0, reload: 0, spread: 0, moveSpread: 0, spreadInc: 0, recoil: 0, rangeMod: 1, pen: 1, speed: 4.2, killReward: 300, maxRange: 80, elev: [750, 1415], setup: 2 }),
   // Mounted on the pickup truck: only the gunner uses it, and it never runs out.
   pkt: { name: 'PKT', slot: 0, cls: 'mg', mounted: true, auto: true, damage: 38, rate: 0.085, spread: 0.006, moveSpread: 0, spreadInc: 0.0012, recoil: 0.007, rangeMod: 0.97, pen: 0.8, speed: 0 },
 
@@ -85,7 +85,7 @@ export const CAMO = { still: 1.5, botSees: 4 };
 // bullet's damage the heavy guns do to them (other bullets don't hurt them). A wall chunk has 200-300 hp,
 // furniture 80-130 (see shared/maps/breakables.js).
 export const BREAK = {
-  blast: { c4: [8, 900], mortar: [3.5, 600], rpg: [3, 520], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
+  blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
   chip: { m249: 0.5, awp: 0.5, pkt: 0.5 },
 };
 // Middle mouse button: a "!" on the team's radar where you're looking (it fades after life seconds).

@@ -66,26 +66,62 @@ function chunksOf(min, max, size, keep) {
   return out;
 }
 
-// solids: the level's collision boxes; pick(b, i) -> null (static) or { kind: 'wall' | 'prop', from? } where `from`
-// is the height the breakable part starts at (below it the solid stays, e.g. a wall's foundation).
-// Returns { statics: solids that stay, pieces, faces: the static faces, pieceFaces: id -> { tex: [polys] } }.
-export function breakUp(solids, faces, pick) {
-  const statics = [], pieces = [];
+// A fixed pseudo-random number in [0, 1) for a piece, so the server and every browser agree.
+const hash = n => {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+// solids: the level's collision boxes; pick(b, i) -> null (static), { kind: 'wall' | 'prop', from? } where `from`
+// is the height the breakable part starts at (below it the solid stays, e.g. a wall's foundation), or
+// { kind: 'roof' }: a roof is cut into columns (roofCell metres square, every roof box in that square together)
+// that take its faces with them (roofFace(poly): a face of the roof, sloped ones too).
+// Returns { statics: solids that stay, pieces (each with its collision `boxes`), faces: the static faces,
+// pieceFaces: id -> { tex: [polys] } }.
+export function breakUp(solids, faces, pick, { roofFace = () => false, roofCell = 0.75 } = {}) {
+  const statics = [], pieces = [], roofBoxes = [];
   for (const [i, s] of solids.entries()) {
     const b = { min: [s[0], s[1], s[2]], max: [s[3], s[4], s[5]] };
     const p = pick(b, i);
     if (!p) { statics.push(b); continue; }
+    if (p.kind === 'roof') { roofBoxes.push(b); continue; }
     if (p.from != null && p.from > b.min[1] + EPS) {
       statics.push({ min: b.min, max: [b.max[0], p.from, b.max[2]] });
       b.min = [b.min[0], p.from, b.min[2]];
     }
     const dims = [0, 1, 2].map(k => b.max[k] - b.min[k]);
     const thick = Math.min(dims[0], dims[2]);
-    const size = p.kind === 'wall' ? [1.0, 1.25, 1.0] : [1.0, 1.2, 1.0];
-    // a wall stays whole through its thickness
-    const keep = p.kind === 'wall' ? [dims[0] === thick ? Infinity : 1.3, 1.6, dims[2] === thick ? Infinity : 1.3] : [1.6, 1.6, 1.6];
+    // small chunks of wall (holes come out ragged); a wall stays whole through its thickness
+    const size = p.kind === 'wall' ? [0.5, 0.5, 0.5] : [1.0, 1.2, 1.0];
+    const keep = p.kind === 'wall' ? [dims[0] === thick ? Infinity : 0.7, 0.7, dims[2] === thick ? Infinity : 0.7] : [1.6, 1.6, 1.6];
     const hp = p.kind === 'wall' ? 150 + 250 * Math.min(thick, 0.6) : 70 + 60 * Math.min(thick, 1);
-    for (const c of chunksOf(b.min, b.max, size, keep)) pieces.push({ id: pieces.length, kind: p.kind, hp, min: c.min, max: c.max, src: i });
+    for (const c of chunksOf(b.min, b.max, size, keep)) {
+      const id = pieces.length;
+      pieces.push({ id, kind: p.kind, hp: Math.round(hp * (0.7 + 0.6 * hash(id))), min: c.min, max: c.max, boxes: [c] });
+    }
+  }
+
+  // The roof in columns: every roof box cut along the grid; the parts in one square make one piece.
+  const ox = -0.013, oz = -0.017; // so the grid lines miss the level's planes
+  const cellKey = (i, k) => i * 100000 + k;
+  const column = new Map();
+  for (const b of roofBoxes) {
+    for (let i = Math.floor((b.min[0] - ox) / roofCell); i * roofCell + ox < b.max[0] - EPS; i++) {
+      for (let k = Math.floor((b.min[2] - oz) / roofCell); k * roofCell + oz < b.max[2] - EPS; k++) {
+        const x0 = Math.max(b.min[0], i * roofCell + ox), x1 = Math.min(b.max[0], (i + 1) * roofCell + ox);
+        const z0 = Math.max(b.min[2], k * roofCell + oz), z1 = Math.min(b.max[2], (k + 1) * roofCell + oz);
+        if (x1 - x0 < EPS || z1 - z0 < EPS) continue;
+        const key = cellKey(i, k);
+        if (!column.has(key)) column.set(key, { i, k, boxes: [] });
+        column.get(key).boxes.push({ min: [x0, b.min[1], z0], max: [x1, b.max[1], z1] });
+      }
+    }
+  }
+  for (const c of column.values()) {
+    const id = pieces.length;
+    const min = [0, 1, 2].map(n => Math.min(...c.boxes.map(b => b.min[n]))), max = [0, 1, 2].map(n => Math.max(...c.boxes.map(b => b.max[n])));
+    c.id = id;
+    pieces.push({ id, kind: 'roof', hp: Math.round(220 * (0.7 + 0.6 * hash(id))), min, max, boxes: c.boxes, cell: [c.i, c.k] });
   }
 
   // Faces: index the chunk sides by plane, then hand each face's slices to the chunks it lies on.
@@ -139,12 +175,51 @@ export function breakUp(solids, faces, pick) {
     }
   }
 
+  // Roof faces go to the columns under them (cut along the grid; sloped ones too).
+  for (const [tex, polys] of Object.entries(staticFaces)) {
+    const keepList = (staticFaces[tex] = []);
+    for (const f of polys) {
+      if (!roofFace(f)) { keepList.push(f); continue; }
+      const xs = [], zs = [];
+      for (let n = 0; n < f.length; n += 5) { xs.push(f[n]); zs.push(f[n + 2]); }
+      for (let i = Math.floor((Math.min(...xs) - ox) / roofCell); i * roofCell + ox < Math.max(...xs); i++) {
+        for (let k = Math.floor((Math.min(...zs) - oz) / roofCell); k * roofCell + oz < Math.max(...zs); k++) {
+          let part = f;
+          for (const [axis, val, above] of [[0, i * roofCell + ox, true], [0, (i + 1) * roofCell + ox, false], [2, k * roofCell + oz, true], [2, (k + 1) * roofCell + oz, false]]) {
+            part = part && clip(part, axis, val, above);
+          }
+          if (!part) continue;
+          const c = column.get(cellKey(i, k));
+          if (c) ((pieceFaces[c.id] ||= {})[tex] ||= []).push(part);
+          else keepList.push(part);
+        }
+      }
+    }
+  }
+
   // Caps: where a chunk sits against something that stays (a floor, a ceiling, the roof), the level has no face
   // there; once the chunk is gone, a cap of rubble fills that hole. [axis, sign, lo, hi]: the cap faces into the
   // chunk and covers just where the two touch.
   const near = (a, b) => Math.abs(a - b) < EPS;
   for (const pc of pieces) {
     pc.caps = [];
+    if (pc.kind === 'roof') {
+      // [axis, sign, lo, hi, neighbour]: a side of the hole, shown while the neighbouring column still stands
+      const [i, k] = pc.cell;
+      for (const [axis, sign, nb] of [[0, -1, [i - 1, k]], [0, 1, [i + 1, k]], [2, -1, [i, k - 1]], [2, 1, [i, k + 1]]]) {
+        const other = column.get(cellKey(...nb));
+        if (!other) continue;
+        const at = sign > 0 ? pc.max[axis] : pc.min[axis], u = axis === 0 ? 2 : 0;
+        for (const b of pc.boxes) {
+          if (!near(sign > 0 ? b.max[axis] : b.min[axis], at)) continue;
+          const lo = [0, 0, 0], hi = [0, 0, 0];
+          lo[axis] = hi[axis] = at;
+          lo[u] = b.min[u]; hi[u] = b.max[u]; lo[1] = b.min[1]; hi[1] = b.max[1];
+          pc.caps.push([axis, -sign, lo, hi, other.id]);
+        }
+      }
+      continue;
+    }
     for (let axis = 0; axis < 3; axis++) {
       const [u, v] = [0, 1, 2].filter(k => k !== axis);
       for (const sign of [-1, 1]) {

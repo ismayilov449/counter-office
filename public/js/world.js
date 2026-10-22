@@ -592,7 +592,8 @@ function buildFaces(map, q, group) {
 // triangles, mending restores them.
 function buildBreakables(map, q, group) {
   const parts = new Map(); // material key -> { pos, uv, shade }
-  const ranges = map.breakables.map(() => ({ live: [], dead: [] }));
+  const ranges = map.breakables.map(() => ({ live: [], dead: [], edges: [] }));
+  const edgesOf = map.breakables.map(() => []); // id -> the pieces with an edge against it
   const part = key => {
     if (!parts.has(key)) parts.set(key, { pos: [], uv: [], shade: [] });
     return parts.get(key);
@@ -625,12 +626,24 @@ function buildBreakables(map, q, group) {
       }
       put(key, r.live, verts, 1);
     }
-    const lo = pc.min.map(v => v + 0.012), hi = pc.max.map(v => v - 0.012), core = [];
-    for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) core.push(...quad(axis, sign, sign > 0 ? hi[axis] : lo[axis], lo, hi));
-    put('rubble', r.live, core, 0.8);
-    const caps = [];
-    for (const [axis, sign, lo, hi] of pc.caps) caps.push(...quad(axis, sign, lo[axis] + sign * 0.004, lo, hi));
+    if (pc.kind !== 'roof') {
+      const lo = pc.min.map(v => v + 0.012), hi = pc.max.map(v => v - 0.012), core = [];
+      for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) core.push(...quad(axis, sign, sign > 0 ? hi[axis] : lo[axis], lo, hi));
+      put('rubble', r.live, core, 0.8);
+    }
+    const caps = [], edges = new Map();
+    for (const [axis, sign, lo, hi, nb] of pc.caps) {
+      const q = quad(axis, sign, lo[axis] + sign * 0.004, lo, hi);
+      if (nb == null) caps.push(...q);
+      else (edges.get(nb) || edges.set(nb, []).get(nb)).push(...q);
+    }
     if (caps.length) put('rubble', r.dead, caps, 0.7);
+    for (const [nb, verts] of edges) {
+      const e = { nb, list: [], on: false };
+      put('rubble', e.list, verts, 0.7);
+      r.edges.push(e);
+      edgesOf[nb].push(pc.id);
+    }
   }
   const geos = new Map();
   for (const [key, { pos, uv, shade }] of parts) {
@@ -658,15 +671,24 @@ function buildBreakables(map, q, group) {
     }
   };
   const gone = new Set();
-  for (const r of ranges) show(r.dead, false);
+  for (const r of ranges) { show(r.dead, false); for (const e of r.edges) show(e.list, false); }
   return function setBroken(ids) {
-    const now = new Set(ids);
+    const now = new Set(ids), touched = new Set();
     for (const pc of map.breakables) {
       const was = gone.has(pc.id), is = now.has(pc.id);
       if (was === is) continue;
       show(ranges[pc.id].live, !is);
       show(ranges[pc.id].dead, is);
       if (is) gone.add(pc.id); else gone.delete(pc.id);
+      touched.add(pc.id);
+      for (const o of edgesOf[pc.id]) touched.add(o);
+    }
+    // the sides of a hole in the roof: where this column is gone and its neighbour isn't
+    for (const id of touched) {
+      for (const e of ranges[id].edges) {
+        const on = gone.has(id) && !gone.has(e.nb);
+        if (on !== e.on) { show(e.list, on); e.on = on; }
+      }
     }
   };
 }
