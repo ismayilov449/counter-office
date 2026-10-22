@@ -188,49 +188,94 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
 const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5] };
 
-// A shell coming down: a shrill, warbling scream falling in pitch, swelling louder and louder, then a split second
-// of silence before it hits. close (0..1): how near it lands to us; a closer one is louder and lower.
+// A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
+// faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
+// swelling and brightening, and in the last moment a ripping roar of air straight into the blast.
+// close (0..1): how near it lands to us; a closer one is louder, lower and ends in a heavier roar.
+function curve(n, fn) {
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i++) c[i] = fn(i / (n - 1));
+  return c;
+}
 function shellWhistle(out, t, dur, close) {
-  const cut = t + dur - 0.18;
-  const hi = 2300 - close * 500, lo = 620 - close * 140;
-  const env = ctx.createGain();
-  env.gain.setValueAtTime(0.0001, t);
-  env.gain.exponentialRampToValueAtTime(0.06, t + dur * 0.35);
-  env.gain.exponentialRampToValueAtTime(0.45 + close * 0.35, cut);
-  env.gain.linearRampToValueAtTime(0, cut + 0.03);
-  env.connect(out);
-  // the warble: a wobble on the pitch, faster as it comes in
-  const lfo = ctx.createOscillator(), depth = ctx.createGain();
-  lfo.frequency.setValueAtTime(4, t);
-  lfo.frequency.linearRampToValueAtTime(11, cut);
-  depth.gain.setValueAtTime(hi * 0.012, t);
-  depth.gain.linearRampToValueAtTime(lo * 0.03, cut);
-  lfo.connect(depth);
-  for (const [type, k, g] of [['sine', 1, 0.6], ['sine', 1.012, 0.35], ['triangle', 2.003, 0.12]]) {
-    const o = ctx.createOscillator(), og = ctx.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(hi * k, t);
-    o.frequency.exponentialRampToValueAtTime(lo * k, cut);
-    depth.connect(o.frequency);
-    og.gain.value = g;
-    o.connect(og).connect(env);
-    o.start(t);
-    o.stop(cut + 0.05);
+  const end = t + dur - 0.03, len = end - t;
+  const hi = 1250 - close * 200, lo = 420 - close * 120;
+  // pitch: slow fall at first, then quickly down at the end
+  const pitch = curve(64, u => lo + (hi - lo) * (1 - Math.pow(u, 2.4)));
+  // loudness: like 1 / distance, the last part rising fast
+  const loud = 0.5 + close * 0.5;
+  const amp = curve(64, u => loud * (0.07 + 0.93 * Math.pow(u, 2.5)));
+
+  const bus = ctx.createGain();
+  const air = ctx.createBiquadFilter(); // far away it's dull; close it's bright
+  air.type = 'lowpass';
+  air.frequency.setValueCurveAtTime(curve(32, u => 1400 + 9000 * Math.pow(u, 2)), t, len);
+  bus.connect(air).connect(out);
+  if (reverb) {
+    const send = ctx.createGain();
+    send.gain.value = 0.45;
+    air.connect(send).connect(reverb);
   }
-  // air tearing past the fins: noise in a narrow band that follows the pitch
-  const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
-  src.buffer = noise;
-  src.loop = true;
-  bp.type = 'bandpass';
-  bp.Q.value = 9;
-  bp.frequency.setValueAtTime(hi, t);
-  bp.frequency.exponentialRampToValueAtTime(lo, cut);
-  ng.gain.value = 1.4;
-  src.connect(bp).connect(ng).connect(env);
-  src.start(t);
-  src.stop(cut + 0.05);
-  lfo.start(t);
-  lfo.stop(cut + 0.05);
+  const env = ctx.createGain();
+  env.gain.setValueCurveAtTime(amp, t, len);
+  env.connect(bus);
+
+  // the flutter: random fast wobbles of loudness from the turbulence
+  const flut = ctx.createBufferSource(), flp = ctx.createBiquadFilter(), fg = ctx.createGain(), fmod = ctx.createGain();
+  flut.buffer = noise;
+  flut.loop = true;
+  flp.type = 'lowpass';
+  flp.frequency.value = 45;
+  fg.gain.value = 14;
+  fmod.gain.value = 1;
+  flut.connect(flp).connect(fg).connect(fmod.gain);
+  fmod.connect(env);
+
+  // the shriek: a reedy tone (sawtooth through a band that follows it) over a pure one
+  const reed = ctx.createOscillator(), band = ctx.createBiquadFilter(), rg = ctx.createGain();
+  reed.type = 'sawtooth';
+  reed.frequency.setValueCurveAtTime(pitch, t, len);
+  band.type = 'bandpass';
+  band.Q.value = 5;
+  band.frequency.setValueCurveAtTime(curve(64, u => pitch[Math.round(u * 63)] * 1.05), t, len);
+  rg.gain.value = 0.55;
+  reed.connect(band).connect(rg).connect(fmod);
+  const pure = ctx.createOscillator(), pg = ctx.createGain();
+  pure.frequency.setValueCurveAtTime(pitch, t, len);
+  pg.gain.value = 0.35;
+  pure.connect(pg).connect(fmod);
+  // breath: air hissing in a wider band around the tone
+  const hiss = ctx.createBufferSource(), hb = ctx.createBiquadFilter(), hg = ctx.createGain();
+  hiss.buffer = noise;
+  hiss.loop = true;
+  hb.type = 'bandpass';
+  hb.Q.value = 2.2;
+  hb.frequency.setValueCurveAtTime(curve(64, u => pitch[Math.round(u * 63)] * 1.4), t, len);
+  hg.gain.value = 1.1;
+  hiss.connect(hb).connect(hg).connect(fmod);
+
+  // the last moment: a ripping roar of air and a low rush, straight into the impact
+  const rip = Math.min(0.75, len * 0.3), r0 = end - rip;
+  const roar = ctx.createBufferSource(), rlp = ctx.createBiquadFilter(), rgn = ctx.createGain();
+  roar.buffer = noise;
+  roar.loop = true;
+  rlp.type = 'lowpass';
+  rlp.frequency.setValueAtTime(400, r0);
+  rlp.frequency.exponentialRampToValueAtTime(4500, end);
+  rgn.gain.setValueAtTime(0.0001, r0);
+  rgn.gain.exponentialRampToValueAtTime(0.5 + close * 0.9, end);
+  rgn.gain.linearRampToValueAtTime(0, end + 0.02);
+  roar.connect(rlp).connect(rgn).connect(bus);
+  const rush = ctx.createOscillator(), rug = ctx.createGain();
+  rush.frequency.setValueAtTime(55, r0);
+  rush.frequency.exponentialRampToValueAtTime(90, end);
+  rug.gain.setValueAtTime(0.0001, r0);
+  rug.gain.exponentialRampToValueAtTime(0.25 + close * 0.6, end);
+  rug.gain.linearRampToValueAtTime(0, end + 0.02);
+  rush.connect(rug).connect(bus);
+
+  for (const src of [flut, reed, pure, hiss]) { src.start(t); src.stop(end + 0.05); }
+  for (const src of [roar, rush]) { src.start(r0); src.stop(end + 0.05); }
 }
 
 // The shell landing: a sharp crack, a distorted blast, a sub-bass punch, the rumble rolling off walls,
