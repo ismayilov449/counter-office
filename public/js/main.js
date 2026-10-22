@@ -87,6 +87,7 @@ function loadMap(id) {
   patchTree(world.group);
   game.lights = {};
   game.broken = [];
+  game.brk = new Set();
   game.doors = [];
   setRooms(map.rooms, game.lights);
   buildCars();
@@ -1151,6 +1152,13 @@ function applyLights(lights) {
   setRooms(map.rooms, game.lights);
 }
 
+// Broken walls and furniture (cs_mansion): no collision, not drawn.
+function applyBrokenPieces(ids) {
+  game.brk = new Set(ids || []);
+  coll.setGone(game.brk);
+  world?.setBrokenPieces([...game.brk]);
+}
+
 function applyBrokenGlass(ids) {
   game.broken = ids || [];
   coll.setBroken(game.broken);
@@ -1856,6 +1864,7 @@ const net = new Net({
     refreshLeaderboard();
     applyLights(m.lights);
     applyBrokenGlass(m.glass);
+    applyBrokenPieces(m.brk);
     applyDoors(m.doors);
     for (const [id, data] of Object.entries(m.sprayImgs || {})) sprayTexture(+id, data);
     for (const s of m.sprays || []) { const tex = getSprayTexture(s.id); if (tex) fx.spray(s.id, tex, s.p, s.n, s.yaw); }
@@ -1996,11 +2005,26 @@ const net = new Net({
   world(m) {
     applyLights(m.lights);
     applyBrokenGlass(m.glass);
+    applyBrokenPieces(m.brk);
     applyDoors(m.doors);
   },
   doors(m) {
     applyDoors(m.doors);
     audio.play(m.open ? 'dooropen' : 'doorclose', m.p);
+  },
+  brk(m) {
+    for (const id of m.ids) game.brk.add(id);
+    applyBrokenPieces([...game.brk]);
+    // chunks bursting into dust and debris, and the crash of it
+    let at = null;
+    for (const id of m.ids.slice(0, 12)) {
+      const pc = map.breakables?.[id];
+      if (!pc) continue;
+      const c = [0, 1, 2].map(k => (pc.min[k] + pc.max[k]) / 2);
+      at ||= c;
+      fx.rubble(c, pc.min, pc.max);
+    }
+    if (at) audio.play('crumble', at, Math.min(1, 0.4 + m.ids.length * 0.1));
   },
   glass(m) {
     for (const id of m.ids) {

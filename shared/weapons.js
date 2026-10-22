@@ -81,6 +81,13 @@ export const MINE = {
 // Ghillie camouflage: crouched, not moving and not shooting for still seconds, you're nearly invisible to enemies
 // (and bots can't make you out beyond botSees metres). Lost when you die.
 export const CAMO = { still: 1.5, botSees: 4 };
+// Breakable walls and furniture (cs_mansion): an explosion's [radius m, damage] against them, and the share of a
+// bullet's damage the heavy guns do to them (other bullets don't hurt them). A wall chunk has 200-300 hp,
+// furniture 80-130 (see shared/maps/breakables.js).
+export const BREAK = {
+  blast: { c4: [8, 900], mortar: [3.5, 600], rpg: [3, 520], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
+  chip: { m249: 0.5, awp: 0.5, pkt: 0.5 },
+};
 // Middle mouse button: a "!" on the team's radar where you're looking (it fades after life seconds).
 export const PING = { life: 6, cooldown: 1, range: 300 };
 

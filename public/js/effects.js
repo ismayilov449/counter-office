@@ -248,6 +248,20 @@ export class Effects {
   }
 
   // Window pane bursting into shards.
+  // A wall chunk or piece of furniture breaking: bits of plaster and brick thrown out, and a cloud of dust.
+  rubble(center, min, max) {
+    const COLORS = [[0.78, 0.72, 0.6], [0.55, 0.5, 0.42], [0.62, 0.38, 0.28], [0.85, 0.82, 0.74], [0.4, 0.36, 0.3]];
+    for (let i = 0; i < 45; i++) {
+      const p = [0, 1, 2].map(k => min[k] + Math.random() * (max[k] - min[k]));
+      const v = [(Math.random() - 0.5) * 6, Math.random() * 3, (Math.random() - 0.5) * 6];
+      this.emit(p, v, COLORS[i % COLORS.length], 0.8 + Math.random() * 1.2, 12);
+    }
+    for (let i = 0; i < 3; i++) {
+      const p = [center[0] + (Math.random() - 0.5), center[1] + (Math.random() - 0.5), center[2] + (Math.random() - 0.5)];
+      this.puff(p, 0xb8ae9c, 3 + Math.random() * 2, 2.5 + Math.random(), 0.15);
+    }
+  }
+
   glassShatter(center, size) {
     for (let i = 0; i < 70; i++) {
       const p = [center[0] + (Math.random() - 0.5) * size[0], center[1] + (Math.random() - 0.5) * size[1], center[2] + (Math.random() - 0.5) * size[2]];

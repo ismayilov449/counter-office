@@ -215,6 +215,8 @@ const PAINTERS = {
       }
     },
   },
+  // broken plaster and brick, inside a blown-out wall
+  rubble: { scale: 1, size: 256, draw: noiseTex('#8a7f6c', ['#5e5548', '#a89a84', '#463f35', '#c4b8a2', '#6e4a3a'], 60, 0.55, 7) },
   concrete: { scale: 2, size: 256, draw: noiseTex('#8a8a80', ['#56564e', '#76766c', '#46463e', '#5a6050'], 30, 0.4, 3) },
   greybrick: { scale: 2.4, size: 256, draw: blocks('#9c9c98', '#c4c4c0', '#6c6c68', '#5c5c58', 6, 3, 0.2) },
   mansionstone: { scale: 2.4, size: 256, draw: blocks('#a69e88', '#c8c0a6', '#766e5c', '#6a6252', 9, 4, 0.22) },
@@ -551,7 +553,7 @@ function boxGeometry(b, scale, floorShade) {
 // they are rescaled to the painter's tile size unless the painter was drawn to match that texture.
 function buildFaces(map, q, group) {
   const byMat = {};
-  for (const [tex, polys] of Object.entries(map.faces)) {
+  for (const [tex, polys] of Object.entries(map.staticFaces || map.faces)) {
     const key = map.faceMats[tex];
     if (!key) continue;
     const p = key.startsWith('img:') ? { native: true } : PAINTERS[key] || PAINTERS.block;
@@ -582,6 +584,91 @@ function buildFaces(map, q, group) {
     obj.castShadow = q.shadows;
     group.add(obj);
   }
+}
+
+// Breakable walls and furniture (map.breakables, cs_mansion; see shared/maps/breakables.js). Each chunk draws its
+// slices of the level's faces and a core of rubble just inside it (seen through the hole once a neighbour is gone);
+// caps of rubble appear where a broken chunk leaves a gap in a floor or ceiling. Breaking a chunk collapses its
+// triangles, mending restores them.
+function buildBreakables(map, q, group) {
+  const parts = new Map(); // material key -> { pos, uv, shade }
+  const ranges = map.breakables.map(() => ({ live: [], dead: [] }));
+  const part = key => {
+    if (!parts.has(key)) parts.set(key, { pos: [], uv: [], shade: [] });
+    return parts.get(key);
+  };
+  const put = (key, list, verts, shade) => {
+    const o = part(key), start = o.pos.length / 3;
+    for (const [x, y, z, u, v] of verts) { o.pos.push(x, y, z); o.uv.push(u, v); o.shade.push(shade); }
+    list.push([key, start, o.pos.length / 3]);
+  };
+  // a quad on the plane pos[axis] = at, facing sign along axis, over [u0, u1] x [v0, v1] of the other two axes
+  const AX = [[1, 2], [2, 0], [0, 1]];
+  const quad = (axis, sign, at, lo, hi) => {
+    const [a, b] = AX[axis], c = [[lo[a], lo[b]], [hi[a], lo[b]], [hi[a], hi[b]], [lo[a], hi[b]]];
+    if (sign < 0) c.reverse();
+    const pts = c.map(([p, s]) => { const v = [0, 0, 0]; v[axis] = at; v[a] = p; v[b] = s; return [...v, p, s]; });
+    return [pts[0], pts[1], pts[2], pts[0], pts[2], pts[3]];
+  };
+  for (const pc of map.breakables) {
+    const r = ranges[pc.id];
+    for (const [tex, polys] of Object.entries(map.pieceFaces[pc.id] || {})) {
+      const key = map.faceMats[tex];
+      if (!key) continue;
+      const p = key.startsWith('img:') ? { native: true } : PAINTERS[key] || PAINTERS.block;
+      const [tw, th] = map.faceTex[tex] || [64, 64];
+      const su = p.native ? 1 : (tw * 0.0254) / p.scale, sv = p.native ? 1 : (th * 0.0254) / p.scale;
+      const verts = [];
+      for (const f of polys) {
+        const n = f.length / 5;
+        for (let i = 1; i < n - 1; i++) for (const k of [0, i, i + 1]) verts.push([f[k * 5], f[k * 5 + 1], f[k * 5 + 2], f[k * 5 + 3] * su, f[k * 5 + 4] * sv]);
+      }
+      put(key, r.live, verts, 1);
+    }
+    const lo = pc.min.map(v => v + 0.012), hi = pc.max.map(v => v - 0.012), core = [];
+    for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) core.push(...quad(axis, sign, sign > 0 ? hi[axis] : lo[axis], lo, hi));
+    put('rubble', r.live, core, 0.8);
+    const caps = [];
+    for (const [axis, sign, lo, hi] of pc.caps) caps.push(...quad(axis, sign, lo[axis] + sign * 0.004, lo, hi));
+    if (caps.length) put('rubble', r.dead, caps, 0.7);
+  }
+  const geos = new Map();
+  for (const [key, { pos, uv, shade }] of parts) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.computeVertexNormals();
+    const col = new Float32Array(shade.length * 3);
+    const nrm = g.attributes.normal;
+    for (let i = 0; i < shade.length; i++) col.fill(shade[i] * (nrm.getY(i) < -0.5 ? 0.82 : 1), i * 3, i * 3 + 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.computeBoundingSphere();
+    const obj = new THREE.Mesh(g, key.startsWith('img:') ? imageMaterial(key.slice(4)).mat : material(key).mat);
+    obj.receiveShadow = q.shadows;
+    obj.castShadow = q.shadows;
+    group.add(obj);
+    geos.set(key, { g, orig: Float32Array.from(pos) });
+  }
+  const show = (list, on) => {
+    for (const [key, a, b] of list) {
+      const { g, orig } = geos.get(key), arr = g.attributes.position.array;
+      if (on) arr.set(orig.subarray(a * 3, b * 3), a * 3);
+      else arr.fill(0, a * 3, b * 3);
+      g.attributes.position.needsUpdate = true;
+    }
+  };
+  const gone = new Set();
+  for (const r of ranges) show(r.dead, false);
+  return function setBroken(ids) {
+    const now = new Set(ids);
+    for (const pc of map.breakables) {
+      const was = gone.has(pc.id), is = now.has(pc.id);
+      if (was === is) continue;
+      show(ranges[pc.id].live, !is);
+      show(ranges[pc.id].dead, is);
+      if (is) gone.add(pc.id); else gone.delete(pc.id);
+    }
+  };
 }
 
 // ---------------------------------------------------------------- sky
@@ -1382,6 +1469,7 @@ export function buildWorld(scene, map, qualityName) {
     group.add(meshObj);
   }
   if (map.faces) buildFaces(map, q, group);
+  const setBrokenPieces = map.breakables ? buildBreakables(map, q, group) : () => {};
 
   // Painted bomb-site letters
   for (const [letter, [x, z, y = 0.03]] of Object.entries(map.labels)) {
@@ -1511,6 +1599,7 @@ export function buildWorld(scene, map, qualityName) {
     group,
     setLights,
     setBrokenGlass,
+    setBrokenPieces,
     setDoors,
     pane: id => panes.get(id),
     update(dt, camPos) {

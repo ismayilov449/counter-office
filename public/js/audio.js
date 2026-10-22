@@ -186,7 +186,7 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6] };
+const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -548,6 +548,18 @@ export const audio = {
       case 'heboom': // an HE grenade: the same kind of blast, smaller
         shellBlast(out, t, 0.6);
         break;
+      case 'crumble': {
+        // a wall giving way: a cracking crash, a heavy slump, then bricks and plaster clattering down. arg: how much
+        const s = arg ?? 1;
+        burst(out, t, { dur: 0.25, type: 'bandpass', freq: 1400, freqEnd: 400, q: 0.8, gain: 0.9 * s });
+        rumble(out, t + 0.03, { dur: 1.4, freq: 600, freqEnd: 60, gain: 1.1 * s, attack: 0.04 });
+        tone(out, t + 0.05, { freq: 70, freqEnd: 35, dur: 0.6, gain: 0.8 * s });
+        for (let i = 0; i < 18 * s + 4; i++) {
+          const at = t + 0.15 + Math.pow(Math.random(), 1.4) * 1.6;
+          burst(out, at, { dur: 0.03 + Math.random() * 0.07, type: 'bandpass', freq: 500 + Math.random() * 2200, q: 1.3, gain: 0.12 + Math.random() * 0.2 });
+        }
+        break;
+      }
       case 'mortarboom':
       case 'rpgboom': // the RPG-7's rocket and the C4 bomb blow up the same way
       case 'c4boom':

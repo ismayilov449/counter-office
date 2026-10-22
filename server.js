@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -222,6 +222,7 @@ const game = {
   plantedThisRound: false,
   hostages: [],
   glassAt: {},
+  pieceHp: new Map(), // breakable chunks' health (see blastMap)
   firstBlood: false,
   teamSize: { T: 0, CT: 0 },
   drops: [],
@@ -438,6 +439,8 @@ function lightGroups() {
 
 function resetWorld() {
   world.setBroken([]);
+  world.setGone([]);
+  game.pieceHp = new Map();
   game.glassAt = {};
   game.lights = {};
   for (const g of lightGroups()) game.lights[g] = true;
@@ -446,7 +449,53 @@ function resetWorld() {
   world.setDoors([]);
   game.hostages = isHostageMap() && CFG.gameMode === 'classic' ? createHostages(MAP) : [];
   clearMines();
-  broadcast({ t: 'world', glass: [], lights: game.lights, doors: world.doorStates });
+  broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
+}
+
+// ---- Breakable walls and furniture (maps with `breakables`: cs_mansion). Explosions and heavy guns wear the
+// chunks down; a broken one is gone (no collision, not drawn) until the next round.
+function breakPieces(ids) {
+  if (!ids.length) return;
+  for (const id of ids) world.gone.add(id);
+  for (const id of ids) (game.pieceAt ||= new Map()).set(id, now());
+  broadcast({ t: 'brk', ids });
+  // windows in a broken wall fall out
+  const pcs = ids.map(id => MAP.breakables[id]);
+  breakGlass(world.intactGlass.filter(g => pcs.some(pc => [0, 1, 2].every(k => g.min[k] < pc.max[k] + 0.1 && g.max[k] > pc.min[k] - 0.1))).map(g => g.id));
+}
+
+function hurtPiece(pc, dmg, out) {
+  const hp = (game.pieceHp.get(pc.id) ?? pc.hp) - dmg;
+  game.pieceHp.set(pc.id, hp);
+  if (hp <= 0) out.push(pc.id);
+}
+
+// An explosion: every chunk within its radius takes damage, less further away and half behind another breakable
+// thing; nothing behind something that can't break (a floor, the stairs). Runs after the blast has hurt people,
+// so a wall it breaks still shielded them.
+function blastMap(at, weapon) {
+  const B = BREAK.blast[weapon];
+  if (!MAP.breakables || !B) return;
+  const round = game.round;
+  setTimeout(() => {
+    if (game.round !== round) return;
+    const [R, D] = B, out = [];
+    for (const pc of MAP.breakables) {
+      if (world.gone.has(pc.id)) continue;
+      if ([0, 1, 2].some(k => at[k] < pc.min[k] - R || at[k] > pc.max[k] + R)) continue;
+      const c = [0, 1, 2].map(k => Math.max(pc.min[k], Math.min(at[k], pc.max[k])));
+      const d = dist3(at, c);
+      if (d > R) continue;
+      let k = 1;
+      if (d > 0.05) {
+        const h = world.raycast(at, c.map((v, i) => (v - at[i]) / d), d - 0.03, 'solid');
+        if (h && h.box.brk == null) continue;
+        if (h && h.box.brk !== pc.id) k = 0.5;
+      }
+      hurtPiece(pc, D * (1 - d / R) * k, out);
+    }
+    breakPieces(out);
+  }, 0);
 }
 
 function breakGlass(ids) {
@@ -527,6 +576,7 @@ function explodeCar(c, attacker) {
   c.steer = 0;
   const center = [c.p[0], c.p[1] + 0.8, c.p[2]];
   broadcast({ t: 'boom', p: center, k: 'car', car: c.id });
+  blastMap(center, 'car');
   const inside = [c.driver, ...c.riders].map(id => players.get(id)).filter(Boolean);
   for (const q of inside) {
     releaseCar(q, false);
@@ -558,13 +608,29 @@ function explodeCar(c, attacker) {
   }
 }
 
-// Warmup has no rounds, so the map repairs itself: windows after 20 s, hostages come back 8 s after
-// being rescued or killed, and cars left away from their parking spot return after 20 s.
+// Without rounds (warmup, Deathmatch, Gun Game) broken walls and furniture come back after 90 s, but not while
+// someone stands where they go back.
+function mendPieces(t) {
+  if (!world.gone.size) return;
+  const mended = [...world.gone].filter(id => {
+    if (t - (game.pieceAt?.get(id) || 0) < 90000) return false;
+    const pc = MAP.breakables[id];
+    return ![...players.values()].some(q => q.alive && overlapsAny([{ min: pc.min, max: pc.max }], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height));
+  });
+  if (!mended.length) return;
+  world.setGone([...world.gone].filter(id => !mended.includes(id)));
+  for (const id of mended) game.pieceHp.delete(id);
+  broadcast({ t: 'world', glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates });
+}
+
+// Warmup has no rounds, so the map repairs itself: windows after 20 s, walls and furniture after 90 s (mendPieces),
+// hostages come back 8 s after being rescued or killed, and cars left away from their parking spot return after 20 s.
 function warmupRepairs(t) {
+  mendPieces(t);
   const fixed = [...world.broken].filter(id => t - (game.glassAt[id] || 0) > 20000);
   if (fixed.length) {
     world.setBroken([...world.broken].filter(id => !fixed.includes(id)));
-    broadcast({ t: 'world', glass: [...world.broken], lights: game.lights, doors: world.doorStates });
+    broadcast({ t: 'world', glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates });
   }
   const fresh = isHostageMap() ? createHostages(MAP) : [];
   game.hostages = game.hostages.map(h =>
@@ -1536,6 +1602,7 @@ function explodeBomb() {
   game.bomb.state = 'exploded';
   endRound('T', 'Target successfully bombed', 3500);
   broadcast({ t: 'boom', p: pos, k: 'c4' });
+  blastMap([pos[0], pos[1] + 0.3, pos[2]], 'c4');
   for (const c of world.cars) if (dist3(c.p, pos) < 15) damageCar(c, 2000, null);
   for (const q of players.values()) {
     if (!q.alive) continue;
@@ -1693,7 +1760,7 @@ function onShoot(p, m) {
   const traces = [];
   const hits = [];
   const ownCar = carOf(p)?.id ?? null;
-  const shattered = [];
+  const shattered = [], chipped = [];
   for (const d of dirs) {
     const wall = world.raycast(o, d, range, 'bullet', ownCar);
     const wallT = wall ? wall.t : range;
@@ -1714,6 +1781,7 @@ function onShoot(p, m) {
     traces.push([r3(d[0]), r3(d[1]), r3(d[2]), r2(best ? best.t : wallT), best ? 1 : 0, !best && wall ? 1 : 0]);
     if (best) hits.push({ ...best, d });
     else if (wall && wall.box.car != null && !def.melee) damageCar(world.cars[wall.box.car], def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p);
+    else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
     for (const g of world.intactGlass) {
       const gh = rayAABB(o, d, g.min, g.max, endT);
@@ -1721,6 +1789,7 @@ function onShoot(p, m) {
     }
   }
   breakGlass(shattered);
+  breakPieces(chipped);
 
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
   if (!hits.length) return;
@@ -1781,6 +1850,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
   const killsBefore = owner.kills;
   if (weapon === 'rpg') setTimeout(() => { if (owner.kills - killsBefore >= 2) unlockAch(owner, 'rpg_double'); }, 0);
   broadcast({ t: 'boom', p: at, k: weapon });
+  blastMap(at, weapon);
   breakGlass(world.intactGlass.filter(g => dist3(at, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < R * 0.7).map(g => g.id));
   for (const q of players.values()) {
     if (!q.alive) continue;
@@ -1915,6 +1985,7 @@ function detonateMine(mine, stepper = null) {
   const at = [mine.p[0], mine.p[1] + 0.15, mine.p[2]];
   const fwd = [-Math.sin(mine.yaw), 0, -Math.cos(mine.yaw)];
   broadcast({ t: 'boom', p: at.map(r2), k: mine.k, d: [r2(fwd[0]), r2(fwd[2])] });
+  blastMap(at, mine.k);
   const hurts = q => q.alive && inTeam(q) && (!mineFriend(mine, q) || (CFG.friendlyFire && q.id !== mine.owner));
   if (mine.k === 'pmn') {
     const P = MINE.pmn;
@@ -2018,6 +2089,7 @@ function explodeNade(n) {
   }
   if (n.k === 'molotov') { igniteMolotov(n, owner, o); return; }
   if (n.k === 'he') {
+    blastMap(o, 'he');
     breakGlass(world.intactGlass.filter(g => dist3(o, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < 5).map(g => g.id));
   }
 
@@ -2579,6 +2651,7 @@ function tick() {
     startMatch();
   }
 
+  if (game.phase === 'live' && (isDM() || isGG())) mendPieces(t);
   if (game.phase === 'warmup') {
     warmupRepairs(t);
     for (const p of players.values()) if (inTeam(p) && !p.alive && t - p.deathAt > 3000) { resetLoadout(p); spawnPlayer(p); }
@@ -2737,7 +2810,7 @@ wss.on('connection', ws => {
   send(p, {
     t: 'welcome', id: p.id, map: MAP.id, mode: mapMode(MAP), maps: MAP_IDS.map(id => ({ id, title: MAPS[id].title })),
     cfg: { ...settingsView(), zombieCountdown: ZOMBIE.countdown, hnsHide: CFG.hnsHide, gameMode: CFG.gameMode, autoBalance: CFG.autoBalance, halftime: CFG.halftime, startMoney: CFG.startMoney, startMoneyChoices: START_MONEY_CHOICES, roundsToWin: CFG.roundsToWin, roundTime: CFG.roundTime, buyTime: CFG.buyTime, freezeTime: CFG.freezeTime, plantTime: CFG.plantTime, friendlyFire: CFG.friendlyFire, httpsPort: httpsReady ? CFG.httpsPort : null },
-    sprayImgs, sprays: [...game.sprays.values()], glass: [...world.broken], lights: game.lights, doors: world.doorStates,
+    sprayImgs, sprays: [...game.sprays.values()], glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates,
   });
   sendMines(p);
   sendRoster();

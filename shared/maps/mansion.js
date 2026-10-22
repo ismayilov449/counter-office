@@ -6,11 +6,10 @@
 // into the house; the right (north) wall has a ladder up to the first-floor window.
 import { createBuilder } from './builder.js';
 import * as BSP from './cs_mansion_bsp.js';
+import { breakUp } from './breakables.js';
 
 const m = createBuilder();
 
-// ---- collision: the original level's solid volumes
-for (const b of BSP.SOLIDS) m.box(b[0], b[2], b[3], b[5], b[4] - b[1], 'none', b[1], { hidden: true });
 
 // GoldSrc texture -> painted material (null: drawn some other way)
 const FACE_MATS = {
@@ -35,6 +34,32 @@ for (const f of BSP.FACES.out_grnd2) {
   (Math.max(...ys) - Math.min(...ys) > 0.3 ? FACES.out_grnd2_wall : FACES.out_grnd2).push(f);
 }
 FACE_MATS.out_grnd2_wall = 'greybrick';
+
+// ---- what explosions can break: the walls and furniture of the house and the shed. Floors, ceilings, the roof
+// and the stairs stay, and so does the foundation under the ground floor (0.81 m), so a hole is a doorway.
+const inHouse = b => b.min[0] > -24.5 && b.max[0] < -5.5 && b.min[2] > -15 && b.max[2] < 12.5;
+const inShed = b => b.min[0] > 12.5 && b.max[0] < 18.5 && b.min[2] > 14 && b.max[2] < 18.5;
+const onStairs = b => b.min[0] > -12.95 && b.max[0] < -11.4 && ((b.min[2] > -9.8 && b.max[2] < -3.4) || (b.min[2] > 0.15 && b.max[2] < 6.55));
+const FLOOR = 0.81;
+function breakable(b) {
+  const house = inHouse(b), shed = inShed(b);
+  if (!house && !shed) return null;
+  const dx = b.max[0] - b.min[0], dy = b.max[1] - b.min[1], dz = b.max[2] - b.min[2];
+  if (b.min[1] >= (house ? 6.45 : 2.4)) return null; // roof
+  if (dx > 2.6 && dz > 2.6) return null; // floors and ceilings
+  if (dy <= 0.3 && [[3.95, 4.3], [6.4, 6.95]].some(([lo, hi]) => b.min[1] >= lo && b.min[1] <= hi)) return null; // floor edges
+  if (onStairs(b)) return null;
+  const from = house ? FLOOR : 0;
+  if (b.max[1] <= from + 0.05) return null;
+  // walls: tall, or long and no more than 0.65 m thick (lintels over doorways); the rest is furniture
+  const wall = dy >= 1.8 || (Math.min(dx, dz) <= 0.65 && Math.max(dx, dz) >= 1.2);
+  return { kind: wall ? 'wall' : 'prop', from };
+}
+const BRK = breakUp(BSP.SOLIDS, FACES, breakable);
+
+// ---- collision: the original level's solid volumes, and the breakable chunks
+for (const b of BRK.statics) m.box(b.min[0], b.min[2], b.max[0], b.max[2], b.max[1] - b.min[1], 'none', b.min[1], { hidden: true });
+for (const p of BRK.pieces) m.box(p.min[0], p.min[2], p.max[0], p.max[2], p.max[1] - p.min[1], 'none', p.min[1], { hidden: true, brk: p.id });
 
 // ---- rooms (light groups named after the original lamps). Ground floor 0.81-4.06, first floor 4.27-6.71.
 const G = [0.75, 4.1], U = [4.2, 6.75];
@@ -124,6 +149,9 @@ export default {
   boxes: m.boxes,
   decor: m.decor,
   faces: FACES,
+  staticFaces: BRK.faces, // drawn as the level; the rest belongs to the breakable chunks
+  breakables: BRK.pieces,
+  pieceFaces: BRK.pieceFaces,
   faceTex: { ...BSP.TEXTURES, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
   faceMats: FACE_MATS,
   bounds: { min: -29.2, max: 29.2 },

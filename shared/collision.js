@@ -16,6 +16,7 @@ export class CollisionWorld {
     this.glass = map.boxes.filter(b => b.glass);
     this.broken = new Set();
     this.intactGlass = this.glass;
+    this.gone = new Set(); // broken walls and furniture: piece ids (see shared/maps/breakables.js)
     this.cars = [];
     this.doorDefs = map.doors || [];
     this.setDoors(this.doorDefs.map(() => 0));
@@ -38,6 +39,11 @@ export class CollisionWorld {
     this.intactGlass = this.glass.filter(g => !this.broken.has(g.id));
   }
 
+  // Broken chunks stop colliding.
+  setGone(ids) {
+    this.gone = new Set(ids);
+  }
+
   breakGlass(id) {
     if (this.broken.has(id)) return false;
     this.broken.add(id);
@@ -58,13 +64,13 @@ export class CollisionWorld {
 
   // Static walls overlapping the horizontal square of half-size r around p (every wall when p is null).
   near(p, r = 4) {
-    if (!p) return this.solids;
+    if (!p) return this.gone.size ? this.solids.filter(b => b.brk == null || !this.gone.has(b.brk)) : this.solids;
     const s = ++this.stamp, out = [];
     for (let cx = Math.floor((p[0] - r) / CELL); cx <= Math.floor((p[0] + r) / CELL); cx++) {
       for (let cz = Math.floor((p[2] - r) / CELL); cz <= Math.floor((p[2] + r) / CELL); cz++) {
         const list = this.cells.get(cellKey(cx, cz));
         if (!list) continue;
-        for (const b of list) if (this.marks.get(b) !== s) { this.marks.set(b, s); out.push(b); }
+        for (const b of list) if (this.marks.get(b) !== s && (b.brk == null || !this.gone.has(b.brk))) { this.marks.set(b, s); out.push(b); }
       }
     }
     return out;
@@ -114,7 +120,7 @@ export class CollisionWorld {
     let tz = sz ? (sz > 0 ? (cz + 1) * CELL - o[2] : o[2] - cz * CELL) / Math.abs(d[2]) : Infinity;
     for (let guard = 0; guard < 4096; guard++) {
       const list = this.cells.get(cellKey(cx, cz));
-      if (list) for (const b of list) if (this.marks.get(b) !== s) { this.marks.set(b, s); test(b); }
+      if (list) for (const b of list) if (this.marks.get(b) !== s && (b.brk == null || !this.gone.has(b.brk))) { this.marks.set(b, s); test(b); }
       const next = Math.min(tx, tz);
       if (next > maxT || (best && best.t <= next)) break;
       if (tx < tz) { cx += sx; tx += tdx; } else { cz += sz; tz += tdz; }
