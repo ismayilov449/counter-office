@@ -278,28 +278,64 @@ function shellWhistle(out, t, dur, close) {
   for (const src of [roar, rush]) { src.start(r0); src.stop(end + 0.05); }
 }
 
-// The shell landing: a sharp crack, a distorted blast, a sub-bass punch, the rumble rolling off walls,
-// and dirt and stones raining down for a few seconds.
+// Long low noise (looped, so it can last seconds): rumble and rolling thunder.
+function rumble(dest, t0, { dur, freq, freqEnd, gain, attack = 0.02, q = 0.7 }) {
+  const src = ctx.createBufferSource();
+  src.buffer = noise;
+  src.loop = true;
+  src.playbackRate.value = 0.6 + Math.random() * 0.2;
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass';
+  f.Q.value = q;
+  f.frequency.setValueAtTime(freq, t0);
+  f.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  src.connect(f).connect(g).connect(dest);
+  src.start(t0, Math.random() * 0.5);
+  src.stop(t0 + dur + 0.05);
+}
+
+// The shell landing, a huge BOOOOOM: a sharp crack, a pressure thump in the chest, a deep distorted blast and a
+// sub-bass that takes seconds to die, thunder rolling back off walls and hills, and dirt and stones raining down.
+// All through a limiter, so it's as loud as it can be without breaking up.
 function shellBlast(out, t) {
-  const sh = drive();
-  sh.connect(out);
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -8;
+  lim.knee.value = 6;
+  lim.ratio.value = 12;
+  lim.attack.value = 0.002;
+  lim.release.value = 0.4;
+  const bus = ctx.createGain();
+  bus.gain.value = 1.6;
+  bus.connect(lim).connect(out);
   if (reverb) {
     const send = ctx.createGain();
-    send.gain.value = 0.9;
-    out.connect(send).connect(reverb);
+    send.gain.value = 1.3;
+    lim.connect(send).connect(reverb);
   }
-  burst(out, t, { dur: 0.06, type: 'highpass', freq: 2200, gain: 2.6 });
-  burst(sh, t, { dur: 1.6, freq: 1800, freqEnd: 70, gain: 2.8 });
-  tone(sh, t, { freq: 120, freqEnd: 30, dur: 0.9, type: 'triangle', gain: 0.9 });
-  tone(out, t, { freq: 58, freqEnd: 17, dur: 3, gain: 2.0 });
-  burst(out, t + 0.15, { dur: 4.5, freq: 380, freqEnd: 50, gain: 0.9 });
-  // echoes off far walls
-  burst(out, t + 0.42, { dur: 1.6, freq: 700, freqEnd: 70, gain: 0.55 });
-  burst(out, t + 1.05, { dur: 1.8, freq: 450, freqEnd: 60, gain: 0.3 });
+  const sh = drive();
+  sh.connect(bus);
+  // the crack and the pressure thump
+  burst(bus, t, { dur: 0.07, type: 'highpass', freq: 1800, gain: 2.2 });
+  tone(bus, t, { freq: 85, freqEnd: 24, dur: 0.6, gain: 2.4 });
+  // the blast itself, torn and distorted
+  rumble(sh, t, { dur: 2.6, freq: 1600, freqEnd: 45, gain: 3.0, attack: 0.008 });
+  tone(sh, t, { freq: 130, freqEnd: 28, dur: 1.2, type: 'triangle', gain: 1.0 });
+  // BOOOOOM: two deep tones slowly falling and beating against each other, dying away over seconds
+  tone(bus, t + 0.02, { freq: 46, freqEnd: 15, dur: 5.5, gain: 2.0 });
+  tone(bus, t + 0.02, { freq: 51, freqEnd: 17, dur: 4.5, gain: 1.3 });
+  rumble(bus, t + 0.05, { dur: 6.5, freq: 260, freqEnd: 35, gain: 1.6, attack: 0.25 });
+  // thunder rolling back from far walls, each echo later, lower and softer
+  for (const [dt, g, fr] of [[0.45, 1.0, 420], [1.1, 0.75, 320], [1.9, 0.55, 240], [2.9, 0.38, 180], [4.0, 0.22, 140]]) {
+    rumble(bus, t + dt, { dur: 2.2, freq: fr, freqEnd: 40, gain: g, attack: 0.12 });
+  }
   // debris raining down
-  for (let i = 0; i < 34; i++) {
-    const at = t + 0.35 + Math.pow(Math.random(), 1.6) * 2.8;
-    burst(out, at, { dur: 0.025 + Math.random() * 0.06, type: 'bandpass', freq: 900 + Math.random() * 3200, q: 1.5, gain: 0.08 + Math.random() * 0.14 });
+  for (let i = 0; i < 40; i++) {
+    const at = t + 0.35 + Math.pow(Math.random(), 1.6) * 3.2;
+    burst(bus, at, { dur: 0.025 + Math.random() * 0.06, type: 'bandpass', freq: 900 + Math.random() * 3200, q: 1.5, gain: 0.06 + Math.random() * 0.12 });
   }
 }
 
