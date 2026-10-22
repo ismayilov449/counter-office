@@ -186,7 +186,7 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5] };
+const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5] };
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -543,7 +543,8 @@ export const audio = {
         shellWhistle(out, t, arg?.dur ?? 3, arg?.close ?? 0);
         break;
       case 'mortarboom':
-      case 'rpgboom': // the RPG-7's rocket blows up the same way
+      case 'rpgboom': // the RPG-7's rocket and the C4 bomb blow up the same way
+      case 'c4boom':
         shellBlast(out, t);
         break;
       case 'shellshock': {

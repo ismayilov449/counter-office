@@ -2212,7 +2212,7 @@ const net = new Net({
     if (m.k === 'molotov') { audio.play('molotov', m.p); return; } // the fire itself arrives as a 'fire' message
     const big = m.k === 'c4';
     fx.explosion(m.p, big);
-    audio.play(big ? 'bigboom' : 'boom', m.p);
+    audio.play(big ? 'c4boom' : 'boom', m.p);
     const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);
     me.shake = Math.max(me.shake, clamp(1 - d / (big ? 40 : 15), 0, 1) * (big ? 1.2 : 0.6));
   },
