@@ -518,6 +518,37 @@ function blastShove(at, weapon) {
   if (S) (game.smokes ||= []).push({ p: [at[0], at[1] + 0.5, at[2]], until: now() + S * 1000 });
 }
 
+// The breakable pieces by 2 m square of the map (made once per map), so blasts and fires only look at what's near.
+const pieceGrids = new WeakMap();
+let pieceQuery = 0;
+function piecesNear(min, max) {
+  let grid = pieceGrids.get(MAP);
+  if (!grid) {
+    grid = new Map();
+    for (const pc of MAP.breakables) {
+      for (let x = Math.floor(pc.min[0] / 2); x <= Math.floor(pc.max[0] / 2); x++) {
+        for (let z = Math.floor(pc.min[2] / 2); z <= Math.floor(pc.max[2] / 2); z++) {
+          const k = x * 65536 + z;
+          if (!grid.has(k)) grid.set(k, []);
+          grid.get(k).push(pc);
+        }
+      }
+    }
+    pieceGrids.set(MAP, grid);
+  }
+  const q = ++pieceQuery, out = [];
+  for (let x = Math.floor(min[0] / 2); x <= Math.floor(max[0] / 2); x++) {
+    for (let z = Math.floor(min[2] / 2); z <= Math.floor(max[2] / 2); z++) {
+      for (const pc of grid.get(x * 65536 + z) || []) {
+        if (pc._q === q) continue;
+        pc._q = q;
+        if (pc.max[1] >= min[1] && pc.min[1] <= max[1]) out.push(pc);
+      }
+    }
+  }
+  return out;
+}
+
 function hurtPiece(pc, dmg, out) {
   const hp = (game.pieceHp.get(pc.id) ?? pc.hp) - dmg;
   game.pieceHp.set(pc.id, hp);
@@ -533,10 +564,10 @@ function blastMap(at, weapon) {
   const round = game.round;
   setTimeout(() => {
     if (game.round !== round) return;
+    const tb = performance.now();
     const [R, D] = B, out = [];
-    for (const pc of MAP.breakables) {
+    for (const pc of piecesNear(at.map(v => v - R), at.map(v => v + R))) {
       if (world.gone.has(pc.id)) continue;
-      if ([0, 1, 2].some(k => at[k] < pc.min[k] - R || at[k] > pc.max[k] + R)) continue;
       const c = [0, 1, 2].map(k => Math.max(pc.min[k], Math.min(at[k], pc.max[k])));
       const d = dist3(at, c);
       if (d > R) continue;
@@ -550,6 +581,7 @@ function blastMap(at, weapon) {
     }
     breakPieces(out, at);
     if (MAP.realism) blastShove(at, weapon);
+    if (env.DEBUG_TICK) console.log(`  [blast] ${weapon}: ${out.length} pieces broken in ${(performance.now() - tb).toFixed(1)} ms`);
   }, 0);
 }
 
@@ -2258,7 +2290,7 @@ function spreadFire(f, t) {
     breakPieces(out);
   }
   if (game.fires.length < B.max) {
-    for (const pc of MAP.breakables) {
+    for (const pc of piecesNear([f.p[0] - r - 0.5, f.p[1] - 0.5, f.p[2] - r - 0.5], [f.p[0] + r + 0.5, f.p[1] + 1.6, f.p[2] + r + 0.5])) {
       if (!pc.fuel || world.gone.has(pc.id) || game.burnt.has(pc.id)) continue;
       if (pc.min[1] > f.p[1] + 1.5 || pc.max[1] < f.p[1] - 0.3) continue;
       const cx = Math.max(pc.min[0], Math.min(f.p[0], pc.max[0])), cz = Math.max(pc.min[2], Math.min(f.p[2], pc.max[2]));
@@ -2885,7 +2917,7 @@ function tick() {
   updateCamo(t);
   bots.update(1 / CFG.tickRate);
   if (game.hostages.length) {
-    for (const ev of updateHostages(game.hostages, players, 1 / CFG.tickRate, world.move(), t)) {
+    for (const ev of updateHostages(game.hostages, players, 1 / CFG.tickRate, p => world.move(null, p, 2), t)) {
       if (ev.type === 'lost' && ev.leader) send(ev.leader, { t: 'msg', text: 'A hostage lost track of you!' });
     }
     for (const h of game.hostages) if (h.state === 'follow' && inRescueZone(MAP, h.p)) rescueHostage(h);
@@ -2931,6 +2963,26 @@ setInterval(() => {
   if (tick.n >= 150) { console.log(`  [tick] avg ${(tick.sum / tick.n).toFixed(2)} ms, max ${tick.max.toFixed(1)} ms`); tick.sum = tick.n = tick.max = 0; }
 }, 1000 / CFG.tickRate);
 setInterval(() => broadcast({ t: 'ping', ts: now() }), 2000);
+// Debugging performance: PROFILE_MS=60000 PROFILE_OUT=server.cpuprofile records a CPU profile of the first minute
+// (open it in Chrome DevTools); with DEBUG_TICK, every stall of the event loop over 15 ms is reported.
+if (env.PROFILE_MS) {
+  import('node:inspector').then(({ Session }) => {
+    const s = new Session();
+    s.connect();
+    s.post('Profiler.enable', () => s.post('Profiler.start', () => setTimeout(() => s.post('Profiler.stop', (e, r) => {
+      fs.writeFileSync(env.PROFILE_OUT || 'server.cpuprofile', JSON.stringify(r.profile));
+      console.log('  [profile] written');
+    }), +env.PROFILE_MS)));
+  });
+}
+if (env.DEBUG_TICK) {
+  let last = performance.now();
+  setInterval(() => {
+    const t = performance.now(), lag = t - last - 10;
+    if (lag > 15) console.log(`  [lag] event loop blocked ${lag.toFixed(0)} ms`);
+    last = t;
+  }, 10);
+}
 setInterval(sendRoster, 2000);
 setInterval(() => syncBots(), 2000);
 

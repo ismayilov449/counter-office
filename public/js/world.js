@@ -675,6 +675,8 @@ function buildBreakables(map, q, group) {
       const { g, orig } = geos.get(key), arr = g.attributes.position.array;
       if (on) arr.set(orig.subarray(a * 3, b * 3), a * 3);
       else arr.fill(0, a * 3, b * 3);
+      // only the changed part goes to the graphics card (the whole wall mesh is megabytes)
+      g.attributes.position.addUpdateRange(a * 3, (b - a) * 3);
       g.attributes.position.needsUpdate = true;
     }
   };

@@ -7,8 +7,10 @@ import { carBoxes } from './vehicles.js';
 import { doorBox } from './doors.js';
 import { rayAABB } from './physics.js';
 
-const CELL = 4;
+const CELL = 2; // small: the breakable walls and roofs are many half-metre boxes
 const cellKey = (cx, cz) => cx * 65536 + cz;
+// Query stamps, unique across every CollisionWorld (the map boxes they mark are shared between them).
+let STAMP = 0;
 
 export class CollisionWorld {
   constructor(map) {
@@ -21,8 +23,6 @@ export class CollisionWorld {
     this.doorDefs = map.doors || [];
     this.setDoors(this.doorDefs.map(() => 0));
     this.cells = new Map();
-    this.stamp = 0;
-    this.marks = new Map(this.solids.map(b => [b, 0]));
     for (const b of this.solids) {
       for (let cx = Math.floor(b.min[0] / CELL); cx <= Math.floor(b.max[0] / CELL); cx++) {
         for (let cz = Math.floor(b.min[2] / CELL); cz <= Math.floor(b.max[2] / CELL); cz++) {
@@ -65,12 +65,12 @@ export class CollisionWorld {
   // Static walls overlapping the horizontal square of half-size r around p (every wall when p is null).
   near(p, r = 4) {
     if (!p) return this.gone.size ? this.solids.filter(b => b.brk == null || !this.gone.has(b.brk)) : this.solids;
-    const s = ++this.stamp, out = [];
+    const s = ++STAMP, out = [];
     for (let cx = Math.floor((p[0] - r) / CELL); cx <= Math.floor((p[0] + r) / CELL); cx++) {
       for (let cz = Math.floor((p[2] - r) / CELL); cz <= Math.floor((p[2] + r) / CELL); cz++) {
         const list = this.cells.get(cellKey(cx, cz));
         if (!list) continue;
-        for (const b of list) if (this.marks.get(b) !== s && (b.brk == null || !this.gone.has(b.brk))) { this.marks.set(b, s); out.push(b); }
+        for (const b of list) if (b._seen !== s && (b.brk == null || !this.gone.has(b.brk))) { b._seen = s; out.push(b); }
       }
     }
     return out;
@@ -112,7 +112,7 @@ export class CollisionWorld {
       for (const b of this.carBoxes(exceptCar)) test(what === 'bullet' ? { ...b, max: [b.max[0], b.min[1] + 1.0, b.max[2]] } : b);
       if (what === 'move') for (const b of this.intactGlass) test(b);
     }
-    const s = ++this.stamp;
+    const s = ++STAMP;
     let cx = Math.floor(o[0] / CELL), cz = Math.floor(o[2] / CELL);
     const sx = Math.sign(d[0]), sz = Math.sign(d[2]);
     const tdx = sx ? CELL / Math.abs(d[0]) : Infinity, tdz = sz ? CELL / Math.abs(d[2]) : Infinity;
@@ -120,7 +120,7 @@ export class CollisionWorld {
     let tz = sz ? (sz > 0 ? (cz + 1) * CELL - o[2] : o[2] - cz * CELL) / Math.abs(d[2]) : Infinity;
     for (let guard = 0; guard < 4096; guard++) {
       const list = this.cells.get(cellKey(cx, cz));
-      if (list) for (const b of list) if (this.marks.get(b) !== s && (b.brk == null || !this.gone.has(b.brk))) { this.marks.set(b, s); test(b); }
+      if (list) for (const b of list) if (b._seen !== s && (b.brk == null || !this.gone.has(b.brk))) { b._seen = s; test(b); }
       const next = Math.min(tx, tz);
       if (next > maxT || (best && best.t <= next)) break;
       if (tx < tz) { cx += sx; tx += tdx; } else { cz += sz; tz += tdz; }

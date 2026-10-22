@@ -125,6 +125,7 @@ export class Batch {
       const { mesh, orig } = this.meshes.get(key), arr = mesh.geometry.attributes.position.array;
       if (on) arr.set(orig.subarray(a * 3, b * 3), a * 3);
       else arr.fill(0, a * 3, b * 3);
+      mesh.geometry.attributes.position.addUpdateRange(a * 3, (b - a) * 3); // just the changed part to the GPU
       mesh.geometry.attributes.position.needsUpdate = true;
     }
   }

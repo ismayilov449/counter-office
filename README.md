@@ -374,7 +374,22 @@ while you move, jump or spray, like CS 1.6, and closes again when you stop; turn
 ## Graphics
 
 Esc → Graphics: **Low** (no shadows, lower resolution — for weak office PCs), **Medium**,
-**High**. Reload the page after changing it.
+**High**. Reload the page after changing it. Only the nearest lamps really light the scene (2 / 4 / 6).
+
+**No freezes in a fight** — how the client keeps every frame short (keep it that way when adding things):
+- **Shaders are compiled while a map loads, never mid-fight.** three.js compiles a shader the first time something
+  new is drawn, which can take a good part of a second. `prewarm()` in main.js draws one of everything (players,
+  guns in hand, every effect, both kinds of shadow pass) once when the map loads. A new kind of object or effect
+  belongs in it. The room lighting is on the Lambert/Phong prototypes (roomlight.js), so a material is compiled once.
+- **Effects reuse their objects.** Sprites and fire glows come from pools and go back to them; a disposed material
+  takes its shader with it (and the next one compiles it again). Smoke, fireballs and flames are billboards — one
+  draw call per kind — capped, and fading out right in front of the camera (stacked full-screen layers are the most
+  expensive thing to draw).
+- **Bullet holes, soot and rubble are instanced**, map decor and windows merged; broken walls upload only the part
+  of their mesh that changed.
+- **No full-screen CSS filters** on the game canvas (shell shock is an overlay; a blur cost a whole extra pass).
+- On the server, collision and the breakable pieces sit in 2 m grids; `DEBUG_TICK=1` prints tick times, event-loop
+  stalls and what each blast cost, `PROFILE_MS=60000` records a CPU profile.
 
 ## Project layout
 
@@ -393,6 +408,7 @@ lib/bots.js          Bots: buying, seeing, aiming, fighting, objectives, moving
 lib/nav.js           Where bots can walk (a grid of floors per map) and path finding; lib/navworker.js runs it in the background
 public/js/           Browser client (Three.js): world, models, effects, HUD, menus, sprays, audio, footstep surfaces
 public/js/batch.js   Fewer draw calls: player parts and guns baked into one mesh each, static decor and windows merged
+public/js/billboards.js Smoke, fireballs and flames: every particle of a kind in one draw call
 public/admin.html    The admin panel (/admin)
 ```
 

@@ -9,7 +9,7 @@ import { CAR, seatPos, stepCar } from '/shared/vehicles.js';
 import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
-import { setRooms, patchTree, ambientAt } from './roomlight.js';
+import { setRooms, ambientAt } from './roomlight.js';
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
@@ -84,7 +84,6 @@ function loadMap(id) {
   coll = new CollisionWorld(map);
   surfaces = new SurfaceGrid(map);
   world = buildWorld(scene, map, settings.quality);
-  patchTree(world.group);
   game.lights = {};
   game.broken = [];
   game.brk = new Set();
@@ -100,6 +99,67 @@ function loadMap(id) {
   drops.clear();
   if (plantedBomb) { scene.remove(plantedBomb); plantedBomb = null; }
   renderMapVotes();
+  prewarm();
+}
+
+// ---- shader warm-up
+// three.js compiles a shader the first time something new is drawn, and on some graphics cards that takes a good
+// part of a second. In the middle of a fight it freezes the game: a first explosion needed about twenty (soot,
+// scorch, craters, rubble, flames, and their shadows). So when a map loads, one of everything is drawn once, high
+// above the middle of the map (inside the sun's shadow, out of sight), and all of it is compiled while it loads instead.
+const warmCam = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 60);
+function prewarm() {
+  const at = [0, 15, 0], by = (dx, dy = 0, dz = 0) => [at[0] + dx, at[1] + dy, at[2] + dz];
+  warmCam.position.set(at[0], at[1] + 2, at[2] + 9);
+  warmCam.lookAt(at[0], at[1] + 0.5, at[2]);
+  warmCam.updateMatrixWorld();
+  const extra = new THREE.Group();
+  const place = (obj, dx, dz = 0) => { obj.position.set(...by(dx, 0, dz)); extra.add(obj); return obj; };
+  // models
+  ['T', 'CT', 'Z'].forEach((team, i) => { const m = createPlayerModel(team); setPlayerWeapon(m, ['ak47', 'm4a1', 'claws'][i]); place(m, -4 + i * 1.2); });
+  place(createHostageModel(), 0);
+  place(createDropModel('ak47'), 1);
+  place(createPlantedBomb(), 1.6);
+  place(buildMortarSetup(60), 2.4);
+  place(buildPlacedMine('pmn', MINE.mon50.wire, MINE.mon50.wireHalf), 3.2);
+  place(buildPlacedMine('mon50', MINE.mon50.wire, MINE.mon50.wireHalf), 3.8);
+  scene.add(extra);
+  // effects
+  fx.crater(by(-2, 0, -2), 1, true);
+  fx.crater(by(2, 0, -2), 1, false);
+  fx.soot(by(0, 0.01, -1), [0, 1, 0], 1, null);
+  fx.decal(by(0.5, 0.01, -1), [0, 1, 0]);
+  fx.debris(by(-0.5, 0, -1), by(0.5, 1, 0), null, 4);
+  fx.gib(createGibPieces('T', ['head', 'torso', 'rArm', 'lArm', 'lLeg', 'rLeg'], 4), by(0, 0, 1), 0, () => [0, 1, 0], true);
+  fx.fire(-1, by(0, 0, -3), 1, 2, at[1] + 3);
+  fx.explosion(by(-1, 0, -3), true);
+  fx.explosion(by(1, 0, -3), false);
+  fx.dust(by(0, 1, -3), 2);
+  fx.glassShatter(by(0, 1, -2), [1, 1, 0.1]);
+  fx.rubble(by(0, 0.5, -2), by(-0.5, 0, -2.5), by(0.5, 1, -1.5));
+  fx.flashPop(by(0, 1, -2));
+  fx.shell(by(0, 5, 0), by(0, 0, -1), 1000);
+  fx.rocket(by(-3, 1, 0), [1, 0, 0], 6, 10);
+  fx.tracer(by(-3, 1.5, 0), by(3, 1.5, 0));
+  fx.update(0.05, warmCam);
+  // draw it all, shadows included (the sun's shadow follows the camera)
+  world.update(0, warmCam.position);
+  renderer.render(scene, warmCam);
+  // and every gun as seen in your own hands
+  for (const id of Object.keys(WEAPONS)) {
+    const m = createViewModel(id, 'T');
+    vmCamera.add(m);
+    renderer.render(vmScene, vmCamera);
+    vmCamera.remove(m);
+  }
+  // three.js builds the shadow pass's shaders with the lights of the render before it: after the first-person
+  // weapon's scene (every normal frame) or after the world's own (when no weapon is drawn — dead, mortar set up).
+  // Both kinds, so neither is compiled mid-fight.
+  renderer.render(scene, warmCam);
+  renderer.render(scene, warmCam);
+  scene.remove(extra);
+  fx.reset();
+  world.update(0, camera.position);
 }
 
 addEventListener('resize', () => {
@@ -1039,7 +1099,6 @@ function buildCars() {
   me.car = null;
   (map.vehicles || []).forEach((v, id) => {
     const model = v.type === 'pickup' ? createPickupModel(v.color) : createCarModel(v.color);
-    patchTree(model);
     scene.add(model);
     cars.set(id, { id, type: v.type || 'car', model, buf: [], p: [v.p[0], 0, v.p[1]], yaw: v.yaw, speed: 0, steer: 0, driver: 0, hp: CAR.hp, riders: v.type === 'pickup' ? [0] : [0, 0], wrecked: false, smokeAt: 0 });
   });
@@ -1112,7 +1171,6 @@ function setWrecked(model, wrecked) {
     if (!o.userData.origMat) o.userData.origMat = o.material;
     o.material = wrecked ? new THREE.MeshLambertMaterial({ color: 0x1c1a18 }) : o.userData.origMat;
   });
-  patchTree(model);
 }
 
 function nearestCar() {
@@ -1284,7 +1342,6 @@ function syncHostages(list, time) {
     let h = hostages.get(id);
     if (!h) {
       const model = createHostageModel();
-      patchTree(model);
       scene.add(model);
       h = { id, model, buf: [], p: [x, y, z], state: st, leader, walk: 0, deadT: 0, lastP: null };
       hostages.set(id, h);
@@ -1376,7 +1433,6 @@ function startKillcam(killerId, weapon, hs) {
   const death = serverNow() - INTERP_MS;
   const ghost = createPlayerModel(me.team);
   setPlayerWeapon(ghost, selfHistory[selfHistory.length - 1]?.w || 'knife');
-  patchTree(ghost);
   scene.add(ghost);
   killcam = { killer: killerId, t: Math.max(death - 3500, r.buf[0].t), death, end: death + 900, ghost, walk: 0, lastP: null };
   hud.killcam({ name: r.name, team: r.team, weapon: WEAPONS[weapon]?.name || weapon, hs });
@@ -2399,7 +2455,7 @@ function updateLocal(dt, now) {
     }
     return;
   }
-  const moveBoxes = coll.move(null, me.p, 3);
+  const moveBoxes = coll.move(null, me.p, 2);
   const id = current(), def = WEAPONS[id];
   const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse());
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar;
@@ -2693,7 +2749,8 @@ const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStar
 
 function updateHud(now) {
   hud.overlays(now, me.alive && me.nvgOn);
-  renderer.domElement.style.filter = me.alive && me.nvgOn ? 'brightness(2.3) contrast(1.15) grayscale(1) sepia(1) hue-rotate(50deg) saturate(3.5)' : '';
+  const nvgFilter = me.alive && me.nvgOn ? 'brightness(2.3) contrast(1.15) grayscale(1) sepia(1) hue-rotate(50deg) saturate(3.5)' : '';
+  if (renderer.domElement.style.filter !== nvgFilter) renderer.domElement.style.filter = nvgFilter; // only when it changes
   if (!me.joined) return;
   const id = current(), def = WEAPONS[id];
   hud.status(me, me.alive ? id : null);
@@ -2802,7 +2859,6 @@ function saveScreenshot() {
 }
 
 let last = performance.now();
-let lastPatch = 0;
 // Molotov fires: crackling, the burning screen when you stand in one, flames on anyone caught in it.
 let burnUntil = 0, nextCrackle = 0;
 function updateFires(dt, now) {
@@ -2952,13 +3008,13 @@ let surfaces = null;
 // ---- realism (map.realism: cs_mansion)
 const indoors = p => !!map.realism && !skyOf(map, coll).open(p);
 
-// Close to a blast: ringing ears and, with realism, a few dazed seconds (blurred, swaying, slower).
+// Close to a blast: ringing ears and, with realism, a few dazed seconds (hazy, swaying, slower).
 function shellShock(s) {
   audio.play('shellshock', null, s);
   if (map.realism) me.daze = { at: performance.now(), until: performance.now() + 4500 * s, s };
 }
 const dazed = now => (me.daze && now < me.daze.until ? me.daze.s * (me.daze.until - now) / (me.daze.until - me.daze.at) : 0);
-let blurPx = 0;
+let dazeShown = 0;
 function updateDaze(now) {
   const k = me.alive ? dazed(now) : 0;
   if (k > 0) {
@@ -2966,8 +3022,10 @@ function updateDaze(now) {
     camera.rotation.z += Math.sin(t * 2.1) * 0.07 * k;
     camera.rotation.x += Math.sin(t * 1.3) * 0.03 * k;
   }
-  const px = Math.round(k * 5 * 2) / 2;
-  if (px !== blurPx) { blurPx = px; renderer.domElement.style.filter = px ? `blur(${px}px)` : ''; }
+  // the edges of the view go dark and hazy (an overlay: a CSS blur on the canvas cost a whole extra pass over the
+  // screen every frame, right when an explosion was already the heaviest thing to draw)
+  const o = Math.round(Math.min(1, k) * 20) / 20;
+  if (o !== dazeShown) { dazeShown = o; $('daze').style.opacity = o; }
 }
 
 // Soot sprayed over everything around a blast, a hanging cloud of dust, and inside, the room shakes and dust
@@ -3022,7 +3080,6 @@ function frame() {
   updateCars(dt);
   updateHostageModels(dt);
   updateBomb(now);
-  if (now - lastPatch > 1000) { lastPatch = now; patchTree(scene); }
   updateCamera(dt, now);
   updateDaze(now);
   updateMortarHud();

@@ -68,18 +68,10 @@ uniform float uRoomAmb[ ${N} ];
     .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n\treflectedLight.indirectDiffuse *= roomAmb;');
 }
 
-export function patchMaterial(mat) {
-  if (!mat || mat.userData.roomPatched || !(mat.isMeshLambertMaterial || mat.isMeshPhongMaterial)) return;
-  mat.userData.roomPatched = true;
-  mat.onBeforeCompile = onBeforeCompile;
-  mat.customProgramCacheKey = () => 'room-light';
-  mat.needsUpdate = true;
-}
-
-export function patchTree(obj) {
-  obj.traverse(o => {
-    if (!o.material) return;
-    if (Array.isArray(o.material)) o.material.forEach(patchMaterial);
-    else patchMaterial(o.material);
-  });
+// Every Lambert and Phong material has it from the start (set on their prototypes when this module loads), so a
+// material is compiled once, with it, the first time it's drawn — patching materials one by one later meant a
+// second compile (a freeze) for every new kind of thing on screen.
+for (const M of [THREE.MeshLambertMaterial, THREE.MeshPhongMaterial]) {
+  M.prototype.onBeforeCompile = onBeforeCompile;
+  M.prototype.customProgramCacheKey = () => 'room-light';
 }

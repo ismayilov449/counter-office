@@ -228,6 +228,13 @@ button.ghost { background: transparent; border-style: dashed; }
 #burn { position: fixed; inset: 0; pointer-events: none; z-index: 19; opacity: 0; transition: opacity 0.15s;
   background: radial-gradient(ellipse at center, rgba(255, 120, 20, 0) 35%, rgba(255, 110, 10, 0.45) 75%, rgba(200, 40, 0, 0.75) 100%); }
 #flashbang { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 20; }
+/* shell shock: the edges of the view go dark and hazy (an overlay — a CSS blur on the canvas cost a whole extra
+   pass over the screen every frame, right next to an explosion) */
+#daze {
+  position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: 0; will-change: opacity;
+  background: radial-gradient(ellipse at center, rgba(230, 220, 200, 0.18) 25%, rgba(60, 45, 30, 0.6) 70%, rgba(20, 14, 8, 0.92) 100%);
+}
+
 #nvg {
   position: fixed; inset: 0; pointer-events: none; z-index: 5;
   background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 30, 0, 0.85) 100%),

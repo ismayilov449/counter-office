@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { simulateNade } from '/shared/physics.js';
 import { WEAPONS, FIRE } from '/shared/weapons.js';
 import { flashTexture } from './models.js';
+import { Billboards } from './billboards.js';
 
 const MAX_PARTICLES = 1000;
 
@@ -27,7 +28,7 @@ function flameTexture() {
   return new THREE.CanvasTexture(c);
 }
 const MAX_DECALS = 160;
-const MAX_SPRITES = 260; // smoke puffs and dust at once (each is drawn on its own)
+const MAX_SPRITES = 260; // smoke puffs and dust at once
 const MAX_FLAMES = 600;
 
 // Flat marks stuck on surfaces (bullet holes, soot), all drawn as one instanced mesh. tag: what the mark is on, so
@@ -186,6 +187,14 @@ export class Effects {
       molotov: new THREE.MeshLambertMaterial({ color: 0x4a6a24 }),
     };
     this.thirdFlashes = [];
+    this.spritePool = new Map();
+    // free-floating particles, one draw call per kind (see billboards.js)
+    this.boards = {
+      smoke: new Billboards(this.group, this.softTex, { max: MAX_SPRITES + 120, sort: true }),
+      flash: new Billboards(this.group, flashTexture(), { additive: true, max: 128 }),
+      flame: new Billboards(this.group, this.flameTex, { additive: true, max: MAX_FLAMES + 300 }),
+    };
+    this.glowPool = [];
     this.sprayMeshes = new Map();
     this.gibs = [];
     this.gibSets = [];
@@ -202,12 +211,61 @@ export class Effects {
     this.pActive = Math.min(MAX_PARTICLES, this.pActive + 1);
   }
 
+  // ---- pooled sprites and glows
+  // Short-lived effects take their sprite (and its material) from a pool and give it back, instead of making new
+  // ones and disposing them: a disposed material takes its compiled shader with it once nothing else uses it, so
+  // the next fire or explosion compiled it again (a freeze), and a fight's worth of garbage made collector pauses.
+  takeSprite(map, color = 0xffffff, additive = false, opacity = 1) {
+    const key = map.uuid + (additive ? '+' : '');
+    const free = this.spritePool.get(key);
+    const s = free?.pop() || new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending }));
+    s.pool = key;
+    s.material.color.set(color);
+    s.material.opacity = opacity;
+    s.material.rotation = 0;
+    s.center.set(0.5, 0.5);
+    s.position.set(0, 0, 0);
+    s.scale.set(1, 1, 1);
+    s.userData = {};
+    return s;
+  }
+
+  // A free-floating particle (see billboards.js): kind smoke, flash or flame. null when that kind is full.
+  particle(kind, color = 0xffffff, opacity = 1) {
+    const p = this.boards[kind].take();
+    if (p) { p.material.color.set(color); p.material.opacity = opacity; }
+    return p;
+  }
+
+  dropSprite(s) {
+    if (s.board) { s.board.drop(s); return; }
+    s.parent?.remove(s);
+    if (!s.pool) { s.material.dispose(); return; }
+    if (!this.spritePool.has(s.pool)) this.spritePool.set(s.pool, []);
+    this.spritePool.get(s.pool).push(s);
+  }
+
+  takeGlow(r) {
+    const g = this.glowPool.pop() || new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({
+      map: this.softTex, color: 0xff6a10, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    g.rotation.set(-Math.PI / 2, 0, 0);
+    g.scale.set(r, r, 1);
+    g.material.opacity = 0;
+    return g;
+  }
+
+  dropGlow(g) {
+    g.parent?.remove(g);
+    this.glowPool.push(g);
+  }
+
   puff(p, color, size, life, rise = 0.3, ceil = null) {
     if (this.sprites.length >= MAX_SPRITES) return;
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.softTex, color, transparent: true, opacity: 0.6, depthWrite: false }));
+    const s = this.particle('smoke', color, 0.6);
+    if (!s) return;
     s.position.set(p[0], p[1], p[2]);
     s.scale.set(size * 0.3, size * 0.3, 1);
-    this.group.add(s);
     this.sprites.push({ s, life, max: life, grow: size, rise, base: 0.6, ceil });
   }
 
@@ -268,7 +326,7 @@ export class Effects {
   }
 
   thirdPersonFlash(object) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const s = this.takeSprite(flashTexture(), 0xffffff, true);
     s.scale.set(0.35, 0.35, 1);
     object.add(s);
     this.thirdFlashes.push({ s, parent: object, life: 0.05 });
@@ -277,10 +335,11 @@ export class Effects {
   explosion(p, big) {
     const scale = big ? 3 : 1;
     this.flashLight([p[0], p[1] + 1, p[2]], big ? 4000 : 800, big ? 0.8 : 0.4, 0xffa040);
-    const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    fire.position.set(p[0], p[1] + 0.6 * scale, p[2]);
-    this.group.add(fire);
-    this.sprites.push({ s: fire, life: 0.45, max: 0.45, grow: 7 * scale, base: 1 });
+    const fire = this.particle('flash');
+    if (fire) {
+      fire.position.set(p[0], p[1] + 0.6 * scale, p[2]);
+      this.sprites.push({ s: fire, life: 0.45, max: 0.45, grow: 7 * scale, base: 1 });
+    }
     for (let i = 0; i < (big ? 14 : 6); i++) {
       this.puff([p[0] + (Math.random() - 0.5) * 2 * scale, p[1] + 0.5 + Math.random() * 1.5 * scale, p[2] + (Math.random() - 0.5) * 2 * scale],
         0x6a645a, 2 * scale + 1.5, 1.5 + Math.random() * 1.5, 0.6);
@@ -678,9 +737,9 @@ export class Effects {
 
   flashPop(p) {
     this.flashLight([p[0], p[1] + 0.3, p[2]], 1500, 0.25, 0xffffff);
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const s = this.particle('flash');
+    if (!s) return;
     s.position.set(p[0], p[1] + 0.2, p[2]);
-    this.group.add(s);
     this.sprites.push({ s, life: 0.25, max: 0.25, grow: 4, base: 1 });
   }
 
@@ -688,13 +747,13 @@ export class Effects {
   smoke(p) {
     const parts = [];
     for (let i = 0; i < 26; i++) {
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.softTex, color: 0xb8b8b8, transparent: true, opacity: 0, depthWrite: false }));
+      const s = this.particle('smoke', 0xb8b8b8, 0);
+      if (!s) break;
       const a = Math.random() * Math.PI * 2, r = Math.random() * 3.2;
       s.userData.target = new THREE.Vector3(p[0] + Math.cos(a) * r, p[1] + 0.6 + Math.random() * 2.6, p[2] + Math.sin(a) * r);
       s.position.set(p[0], p[1] + 0.3, p[2]);
       s.userData.size = 3 + Math.random() * 2;
       s.userData.phase = Math.random() * 10;
-      this.group.add(s);
       parts.push(s);
     }
     this.smokes.push({ parts, t: 0, life: 18 });
@@ -703,10 +762,14 @@ export class Effects {
   // An RPG rocket flying straight from o along d for dist metres, trailing smoke and a flame.
   rocket(o, d, dist, speed) {
     const mesh = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 8).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x4a5236 }));
-    const head = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 8).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a4028 }));
+    this.rocketParts ||= [
+      [new THREE.CylinderGeometry(0.035, 0.035, 0.5, 8).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x4a5236 })],
+      [new THREE.ConeGeometry(0.06, 0.28, 8).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a4028 })],
+    ];
+    const body = new THREE.Mesh(...this.rocketParts[0]);
+    const head = new THREE.Mesh(...this.rocketParts[1]);
     head.position.z = -0.38;
-    const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), color: 0xffb050, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const flame = this.takeSprite(flashTexture(), 0xffb050, true);
     flame.scale.set(0.6, 0.6, 1);
     flame.position.z = 0.32;
     mesh.add(body, head, flame);
@@ -714,7 +777,7 @@ export class Effects {
     mesh.lookAt(o[0] + d[0], o[1] + d[1], o[2] + d[2]);
     mesh.rotateY(Math.PI);
     this.group.add(mesh);
-    this.rockets.push({ mesh, o, d, dist, speed, t: 0, puffAt: 0 });
+    this.rockets.push({ mesh, flame, o, d, dist, speed, t: 0, puffAt: 0 });
   }
 
   // A mortar shell: a high arc from the tube (o) to where it lands (at) in flight ms, nose along its path.
@@ -759,19 +822,14 @@ export class Effects {
       const o = [p[0], p[1] + 0.35, p[2]], dir = [Math.cos(a), 0, Math.sin(a)];
       const hit = world.raycast(o, dir, d + 0.3);
       if (hit) d = Math.max(0, hit.t - 0.35);
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: this.flameTex, color: i % 3 ? 0xff6a14 : 0xffb030, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
-      }));
+      const s = this.particle('flame', i % 3 ? 0xff6a14 : 0xffb030, 0);
+      if (!s) break;
       s.center.set(0.5, 0.04);
       s.position.set(p[0] + dir[0] * d, p[1] + 0.02, p[2] + dir[2] * d);
       s.userData = { w: 0.45 + Math.random() * 0.35, h: 0.8 + Math.random() * 0.9, ph: Math.random() * 10, sp: 7 + Math.random() * 6 };
-      this.group.add(s);
       flames.push(s);
     }
-    const glow = new THREE.Mesh(new THREE.CircleGeometry(r, 24), new THREE.MeshBasicMaterial({
-      map: this.softTex, color: 0xff6a10, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
-    }));
-    glow.rotation.x = -Math.PI / 2;
+    const glow = this.takeGlow(r);
     glow.position.set(p[0], p[1] + 0.03, p[2]);
     this.group.add(glow);
     this.fires.push({ id, p: p.slice(), r, t: 0, life, flames, glow, nextEmber: 0, nextSmoke: 0, ceil: ceil != null ? ceil - 0.5 : null });
@@ -790,10 +848,8 @@ export class Effects {
   }
 
   removeFire(f) {
-    for (const s of f.flames) { this.group.remove(s); s.material.dispose(); }
-    this.group.remove(f.glow);
-    f.glow.geometry.dispose();
-    f.glow.material.dispose();
+    for (const s of f.flames) this.dropSprite(s);
+    this.dropGlow(f.glow);
   }
 
   // The fire someone standing at pos (feet) is caught in, if any. Same rule as the server.
@@ -843,10 +899,12 @@ export class Effects {
   // Remove everything that belongs to a map (on map change).
   reset() {
     this.clearDecals();
+    for (const b of Object.values(this.boards)) b.clear();
+    this.sprites = [];
     this.clearCraters();
     this.clearGibs();
     for (const id of [...this.sprayMeshes.keys()]) this.removeSpray(id);
-    for (const s of this.smokes) for (const p of s.parts) this.group.remove(p);
+    for (const s of this.smokes) for (const p of s.parts) this.dropSprite(p);
     this.smokes = [];
     for (const n of this.nades) this.group.remove(n.mesh);
     this.nades = [];
@@ -884,7 +942,7 @@ export class Effects {
       const p = [r.o[0] + r.d[0] * s, r.o[1] + r.d[1] * s, r.o[2] + r.d[2] * s];
       r.mesh.position.set(...p);
       if (r.t >= r.puffAt) { r.puffAt = r.t + 0.025; this.puff([p[0] - r.d[0] * 0.4, p[1] - r.d[1] * 0.4, p[2] - r.d[2] * 0.4], 0xc8c4bc, 0.9, 1.4, 0.15); }
-      if (s >= r.dist) { this.group.remove(r.mesh); this.rockets.splice(i, 1); }
+      if (s >= r.dist) { this.dropSprite(r.flame); this.group.remove(r.mesh); this.rockets.splice(i, 1); }
     }
     if (this.pActive > 0) {
       let alive = 0;
@@ -957,8 +1015,7 @@ export class Effects {
       if (sp.ceil != null && sp.s.position.y > sp.ceil) sp.s.position.y = sp.ceil; // smoke gathers under the ceiling
       sp.s.material.opacity = Math.max(0, 1 - f) * (sp.base ?? 0.8);
       if (sp.life <= 0) {
-        this.group.remove(sp.s);
-        sp.s.material.dispose();
+        this.dropSprite(sp.s);
         this.sprites.splice(i, 1);
       }
     }
@@ -975,7 +1032,7 @@ export class Effects {
         s.material.rotation = Math.sin(sm.t * 0.2 + s.userData.phase) * 0.5;
       }
       if (sm.t >= sm.life) {
-        for (const s of sm.parts) { this.group.remove(s); s.material.dispose(); }
+        for (const s of sm.parts) this.dropSprite(s);
         this.smokes.splice(i, 1);
       }
     }
@@ -992,17 +1049,17 @@ export class Effects {
         s.material.rotation = 0.12 * Math.sin(f.t * u.sp * 0.7 + u.ph);
       }
       f.glow.material.opacity = 0.55 * k * (0.85 + 0.15 * Math.sin(f.t * 9));
-      if (f.t >= f.nextEmber) {
+      if (f.flames.length && f.t >= f.nextEmber) {
         f.nextEmber = f.t + 0.03;
         const a = Math.random() * Math.PI * 2;
         const fl = f.flames[Math.floor(Math.random() * f.flames.length)].position;
         this.emit([fl.x + Math.cos(a) * 0.2, fl.y + 0.3, fl.z + Math.sin(a) * 0.2], [(Math.random() - 0.5) * 0.6, 1.6 + Math.random() * 1.5, (Math.random() - 0.5) * 0.6],
           [1, 0.5 + Math.random() * 0.4, 0.1], 0.5 + Math.random() * 0.5, -0.5);
       }
-      if (f.t >= f.nextSmoke && k > 0.3) {
-        f.nextSmoke = f.t + 0.22;
+      if (f.flames.length && f.t >= f.nextSmoke && k > 0.3) {
+        f.nextSmoke = f.t + (f.ceil != null ? 0.4 : 0.22);
         const fl = f.flames[Math.floor(Math.random() * f.flames.length)].position;
-        if (f.ceil != null) this.puff([fl.x, Math.min(fl.y + 1.4, f.ceil), fl.z], 0x1e1a17, 3, 9, 0.9, f.ceil); // indoors: thick, it fills the room
+        if (f.ceil != null) this.puff([fl.x, Math.min(fl.y + 1.4, f.ceil), fl.z], 0x1e1a17, 3.2, 7, 0.9, f.ceil); // indoors: thick, it fills the room
         else this.puff([fl.x, fl.y + 1.4, fl.z], 0x2a2622, 2.2, 2.2, 1.1);
       }
       if (f.t >= f.life) {
@@ -1015,8 +1072,7 @@ export class Effects {
       const f = this.thirdFlashes[i];
       f.life -= dt;
       if (f.life <= 0) {
-        f.parent.remove(f.s);
-        f.s.material.dispose();
+        this.dropSprite(f.s);
         this.thirdFlashes.splice(i, 1);
       }
     }
@@ -1038,6 +1094,8 @@ export class Effects {
         this.nades.splice(i, 1);
       }
     }
+    // the particles, packed for drawing
+    for (const b of Object.values(this.boards)) b.flush(camera);
   }
 }
 
