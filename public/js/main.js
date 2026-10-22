@@ -2197,8 +2197,9 @@ const net = new Net({
     if (m.k === 'rpg') {
       fx.explosion(m.p, true);
       audio.play('rpgboom', m.p);
-      const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);
+      const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 30, 0, 1) * 1.2);
+      if (me.alive && d < 12) audio.play('shellshock', null, clamp(1.3 - d / 12, 0.3, 1)); // ringing ears up close
       return;
     }
     if (m.k === 'car') {
