@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_MENU, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, MINES, MINE, CAMO, PING } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, MINES, MINE, CAMO, PING } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -19,6 +19,8 @@ import { ACHIEVEMENT } from '/shared/achievements.js';
 import { Effects, nadeFuse } from './effects.js';
 import { AutoQuality } from './autoquality.js';
 import { TeamBar, shrinkPicture } from './teambar.js';
+import { BuyMenu } from './buymenu.js';
+import { makeBuyIcons } from './buyicons.js';
 import { audio } from './audio.js';
 import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
@@ -147,6 +149,7 @@ function prewarm() {
   fx.rocket(by(-3, 1, 0), [1, 0, 0], 6, 10);
   fx.tracer(by(-3, 1.5, 0), by(3, 1.5, 0));
   fx.update(0.05, warmCam);
+  makeBuyIcons(renderer, BUY_COLUMNS.flatMap(c => c.items));
   // draw it all, shadows included (the sun's shadow follows the camera)
   world.update(0, warmCam.position);
   renderer.shadowMap.needsUpdate = true;
@@ -789,7 +792,7 @@ function die() {
   stopUse('key');
   stopUse('mouse');
   audio.play('death');
-  if (menu.id === 'buy') menu.close();
+  closeBuy();
 }
 
 // ---------------------------------------------------------------- buying
@@ -841,49 +844,47 @@ function ammoLabel(action) {
   return cost ? `$${cost.price}` : 'full';
 }
 
-function buyCategory(cat) {
-  return {
-    id: 'buy',
-    title: cat.title,
-    build: () => {
-      const reason = buyBlockReason();
-      return {
-        info: `$${me.money}`,
-        footer: reason,
-        items: cat.items.filter(id => availableTo(id, me.team) && !(id === 'kit' && game.mode === 'hostage')).map(id => {
-          const def = itemInfo(id), price = priceOf(id), have = owns(id);
-          const w = WEAPONS[id];
-          const note = have ? '(owned)' : w && w.damage && !w.grenade ? `${w.damage}${w.pellets ? `×${w.pellets}` : ''} dmg · ${w.mag} rds` : '';
-          return { label: def.name, right: `$${price}`, note, disabled: !!reason || have || price > me.money, select: () => buy(id) };
-        }),
-      };
-    },
-  };
+// Why an item can't be bought at all (shown on it, greyed), or ''.
+function cantBuy(id) {
+  const i = itemInfo(id);
+  if (!availableTo(id, me.team)) return `${i.team === 'CT' ? 'CT' : 'T'} only`;
+  if (id === 'kit' && (game.mode !== 'bomb' || game.cfg.gameMode !== 'classic')) return 'Bomb maps only';
+  if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar')) return 'Not in Zombie';
+  return '';
 }
 
-const buyMenu = {
-  id: 'buy',
-  title: 'Buy Item',
-  build: () => {
-    const reason = buyBlockReason();
-    return {
-      info: `$${me.money}`,
-      footer: reason || 'Number keys to choose · F1 autobuy · F2 rebuy · , and . buy ammo',
-      items: BUY_MENU.map(cat => ({
-        label: cat.title,
-        right: cat.action ? ammoLabel(cat.action) : '',
-        disabled: !!reason || (cat.action && ammoLabel(cat.action) === 'full'),
-        select: () => (cat.action ? buy(cat.action) : buyCategory(cat)),
-      })),
-    };
-  },
-};
+// Bought this round and still yours, while you can still buy: it can be sold back (right-click).
+const refundable = id => !buyBlockReason() && me.roundBuys.includes(id) &&
+  (WEAPONS[id]?.grenade || WEAPONS[id]?.mine ? me.inv[id] > 0 : id === 'vest' || id === 'vesthelm' ? me.armor > 0 : owns(id));
 
-function openBuy(direct) {
+// The buy menu (buymenu.js). Open, it frees the mouse to point and click; closed, the game takes it back.
+const buyUI = new BuyMenu($('buymenu'), {
+  money: () => me.money,
+  owns,
+  price: priceOf,
+  why: cantBuy,
+  blocked: buyBlockReason,
+  refundable,
+  ammo: ammoLabel,
+  buy: id => { if (!cantBuy(id) && !buyBlockReason()) buy(id); else if (buyBlockReason()) hud.small(buyBlockReason()); },
+  sell: id => { if (refundable(id)) net.send({ t: 'sell', item: id }); },
+  autobuy: () => autobuy(),
+  rebuy: () => rebuy(),
+  close: () => closeBuy(),
+});
+
+function openBuy(column = null) {
   if (!me.alive || me.team === 'SPEC') return;
-  if (menu.id === 'buy') { menu.close(); return; }
-  menu.open(buyMenu);
-  if (direct) menu.push(buyCategory(BUY_MENU.find(c => c.title === direct)));
+  if (buyUI.isOpen) { closeBuy(); return; }
+  if (menu.isOpen) menu.close();
+  buyUI.open(column);
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function closeBuy() {
+  if (!buyUI.isOpen) return;
+  buyUI.close();
+  lock();
 }
 
 // F1: best rifle you can afford, then armor, kit and grenades.
@@ -1555,7 +1556,7 @@ function pause() {
 }
 
 function updateOverlays() {
-  const show = me.joined && !locked && !sprayEditor.isOpen;
+  const show = me.joined && !locked && !sprayEditor.isOpen && !buyUI.isOpen;
   $('paused').classList.toggle('hidden', !show);
   if (show) { renderMapVotes(); refreshLeaderboard(); refreshAchievements(); }
 }
@@ -1684,6 +1685,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.code === 'Escape') {
     if (!$('match-summary').classList.contains('hidden')) $('match-summary').classList.add('hidden');
+    else if (buyUI.isOpen) { if (!buyUI.back()) closeBuy(); }
     else if (menu.isOpen) menu.close();
     else if (me.joined && locked) pause();
     return;
@@ -1693,6 +1695,18 @@ document.addEventListener('keydown', e => {
     const m = endVote.maps[+vd[2] - 1];
     if (m && !e.repeat) voteNextMap(m.id);
     if (m) return;
+  }
+  // the buy menu, open (the mouse is free then): its number keys, B to close, F1 / F2 and the ammo keys
+  if (buyUI.isOpen) {
+    const d = /^(Digit|Numpad)(\d)$/.exec(e.code);
+    if (d) { if (!e.repeat) buyUI.key(+d[2]); }
+    else if (e.code === 'KeyB' || e.code === 'KeyO') closeBuy();
+    else if (e.code === 'F1') autobuy();
+    else if (e.code === 'F2') rebuy();
+    else if (e.code === 'Comma') buy('ammo1');
+    else if (e.code === 'Period') buy('ammo2');
+    else if (e.code === 'Backspace') buyUI.back();
+    return;
   }
   if (!locked) return;
   const digit = /^(Digit|Numpad)(\d)$/.exec(e.code);
@@ -1714,7 +1728,7 @@ document.addEventListener('keydown', e => {
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.alive) startUse('key'); break;
     case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
-    case 'KeyO': openBuy('Equipment'); break;
+    case 'KeyO': openBuy(0); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;
     case 'KeyZ': case 'KeyX': case 'KeyC':
       if (me.alive && me.team !== 'SPEC') toggleMenu(radioMenu(e.code[3].toLowerCase()));
@@ -1949,6 +1963,11 @@ const net = new Net({
     me.joined = false;
     if (document.pointerLockElement) document.exitPointerLock();
     $('disconnected').classList.remove('hidden');
+  },
+  sold(m) {
+    const i = me.roundBuys.lastIndexOf(m.item);
+    if (i >= 0) me.roundBuys.splice(i, 1);
+    hud.small(`Sold back: ${itemInfo(m.item).name}`, 2);
   },
   bar(m) {
     game.bar = m.l;
@@ -3156,6 +3175,7 @@ function frame() {
   autoQ.frame((now - last) / 1000, now);
   updatePerf(now);
   updateTeamBar();
+  if (buyUI.isOpen && now - (buyUI.drawnAt || 0) > 150) { buyUI.drawnAt = now; buyUI.render(); }
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 

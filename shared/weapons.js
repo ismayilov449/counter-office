@@ -122,16 +122,14 @@ export const ITEMS = {
 };
 
 // CS 1.6 style buy menu: number keys pick a category, then an item.
-export const BUY_MENU = [
+// The buy menu's columns (CS2-style: the whole shop at once; a column's number, then the item's, 0 for a 10th).
+export const BUY_COLUMNS = [
+  { title: 'Equipment', items: ['vest', 'vesthelm', 'kit', 'nvg', 'camo'] },
+  { title: 'Grenades & mines', items: ['he', 'flash', 'smoke', 'molotov', 'pmn', 'mon50'] },
   { title: 'Pistols', items: ['glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite'] },
-  { title: 'Shotguns', items: ['m3', 'xm1014'] },
-  { title: 'SMGs', items: ['mac10', 'tmp', 'mp5', 'ump45', 'p90'] },
-  { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'scout', 'sg552', 'aug', 'sg550', 'g3sg1', 'awp'] },
+  { title: 'Mid-tier', items: ['m3', 'xm1014', 'mac10', 'tmp', 'mp5', 'ump45', 'p90'] },
+  { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'sg552', 'aug', 'scout', 'sg550', 'g3sg1', 'awp'] },
   { title: 'Heavy', items: ['m249', 'rpg', 'mortar'] },
-  { title: 'Primary ammo', action: 'ammo1' },
-  { title: 'Secondary ammo', action: 'ammo2' },
-  { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg'] },
-  { title: 'Mines & camo', items: ['pmn', 'mon50', 'camo'] },
 ];
 
 // Gun Game: one kill with each weapon moves you to the next; a knife kill on the last level wins.

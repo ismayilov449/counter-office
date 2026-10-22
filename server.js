@@ -340,6 +340,7 @@ function randomSpot(p) {
 
 function spawnPlayer(p) {
   p.burnUntil = 0;
+  p.buys = []; // what can be sold back (onSell): this life's purchases
   // Zombie mode: humans spread over both spawn areas, zombies come back at the T spawn.
   const spots = (isZM() && p.team === 'CT' ? [...MAP.spawns.CT, ...MAP.spawns.T] : MAP.spawns[p.team]).slice().sort(() => Math.random() - 0.5);
   const taken = [...players.values()].filter(q => q !== p && q.alive);
@@ -1644,7 +1645,9 @@ function placeOnGround(from, dirYaw, distance) {
 
 function spawnDrop(owner, item, at, thrown = false) {
   const p = thrown ? placeOnGround(owner.p, owner.yaw, 1.6) : [at[0], groundY(at[0], at[1] + 0.5, at[2]), at[2]];
-  game.drops.push({ id: game.nextDropId++, w: item.id, mag: item.mag, res: item.res, p, owner: owner.id, until: now() + 1200 });
+  const drop = { id: game.nextDropId++, w: item.id, mag: item.mag, res: item.res, p, owner: owner.id, until: now() + 1200 };
+  game.drops.push(drop);
+  return drop;
 }
 
 function dropBomb(p, at, thrown = false) {
@@ -2504,12 +2507,14 @@ function onBuy(p, id) {
   if (p.money < price) return fail('You have insufficient funds!');
 
   p.money -= price;
+  const record = { id, price, armor: p.armor, helmet: p.helmet, dropped: null };
+  (p.buys ||= []).push(record);
   if (wdef && (wdef.grenade || wdef.mine)) p.inv[id]++;
   else if (wdef) {
     const slot = slotKey(id);
     if (p.inv[slot]) {
       if (p.reloadUntil && p.reloadWeapon === p.inv[slot].id) p.reloadUntil = 0;
-      if (!isDM()) spawnDrop(p, p.inv[slot], p.p, true);
+      if (!isDM()) record.dropped = spawnDrop(p, p.inv[slot], p.p, true);
     }
     p.inv[slot] = makeItem(id);
     // Deathmatch: you respawn with the guns you picked last.
@@ -2519,6 +2524,40 @@ function onBuy(p, id) {
   else if (id === 'kit') p.kit = true;
   else if (id === 'nvg') p.nvg = true;
   else if (id === 'camo') p.camo = true;
+  send(p, { t: 'sfx', s: 'buy' });
+  sendMe(p);
+}
+
+// Selling back (right-click in the buy menu): something bought in this life, while you can still buy, for the full
+// price — and the gun it replaced back in your hands if it's still lying where it fell.
+function onSell(p, id) {
+  const fail = text => send(p, { t: 'msg', text });
+  const block = canBuy(p, now());
+  if (block) return fail(block);
+  const i = (p.buys || []).map(b => b.id).lastIndexOf(id);
+  if (i < 0) return fail('You can only sell back what you bought this round.');
+  const b = p.buys[i], wdef = WEAPONS[id];
+  if (wdef && (wdef.grenade || wdef.mine)) {
+    if (!(p.inv[id] > 0)) return fail('You don\'t have it any more.');
+    p.inv[id]--;
+  } else if (wdef) {
+    const slot = slotKey(id);
+    if (p.inv[slot]?.id !== id) return fail('You don\'t have it any more.');
+    if (p.reloadUntil && p.reloadWeapon === id) p.reloadUntil = 0;
+    const back = b.dropped && game.drops.indexOf(b.dropped);
+    if (back != null && back >= 0) {
+      const d = game.drops.splice(back, 1)[0];
+      p.inv[slot] = { id: d.w, mag: d.mag, res: d.res };
+    } else p.inv[slot] = slot === 'secondary' && inTeam(p) ? makeItem(defaultPistol(p.team)) : null;
+  } else if (id === 'vest' || id === 'vesthelm') {
+    p.armor = b.armor;
+    p.helmet = b.helmet;
+  } else if (id === 'kit') p.kit = false;
+  else if (id === 'nvg') p.nvg = false;
+  else if (id === 'camo') { p.camo = false; p.camoOn = false; }
+  p.buys.splice(i, 1);
+  p.money += b.price;
+  send(p, { t: 'sold', item: id });
   send(p, { t: 'sfx', s: 'buy' });
   sendMe(p);
 }
@@ -2752,6 +2791,9 @@ function handle(p, m) {
       break;
     case 'buy':
       onBuy(p, m.item);
+      break;
+    case 'sell':
+      onSell(p, m.item);
       break;
     case 'drop':
       onDrop(p, m.w);
