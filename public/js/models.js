@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { WEAPONS } from '/shared/weapons.js';
 import { buildGun } from './guns.js';
+import { bake } from './batch.js';
 
 const matCache = new Map();
 function mat(color) {
@@ -107,6 +108,8 @@ export function createPlayerModel(team) {
   arms.add(light);
 
   root.userData = { hip, legs, upper, arms, rArm, lArm, headG, hand, gun: null, gunId: null, team, light };
+  // one mesh per moving part instead of one per box
+  for (const part of [...legs, upper, headG, rArm, lArm]) bake(part);
   return root;
 }
 
@@ -176,10 +179,28 @@ export function setPlayerWeapon(model, id) {
   const u = model.userData;
   if (u.gunId === id) return;
   if (u.gun) u.hand.remove(u.gun);
-  u.gun = buildGun(id);
-  u.gun.traverse(o => { o.castShadow = true; });
+  u.gun = heldGun(id);
   u.hand.add(u.gun);
   u.gunId = id;
+  u.shadow = null; // (see the shadows of far players in main.js)
+}
+
+// A gun in someone's hands: built and baked once per weapon (one mesh for its plain parts), then copied.
+const heldGuns = new Map();
+function heldGun(id) {
+  if (!heldGuns.has(id)) {
+    const g = buildGun(id);
+    g.traverse(o => { o.castShadow = true; });
+    if (g.userData.muzzle) g.userData.muzzle.name = 'muzzle';
+    bake(g, true);
+    heldGuns.set(id, g);
+  }
+  const src = heldGuns.get(id), ud = src.userData;
+  src.userData = {};
+  const g = src.clone();
+  src.userData = ud;
+  g.userData = { muzzle: g.getObjectByName('muzzle') || null };
+  return g;
 }
 
 // ---- body pieces for a heavy kill (see Effects.gib): head, torso, arms and legs with bloody stumps, and scraps.

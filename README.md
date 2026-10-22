@@ -392,6 +392,7 @@ shared/maps/*_bsp.js cs_mansion / de_dust2 / de_inferno / cs_assault geometry co
 lib/bots.js          Bots: buying, seeing, aiming, fighting, objectives, moving
 lib/nav.js           Where bots can walk (a grid of floors per map) and path finding; lib/navworker.js runs it in the background
 public/js/           Browser client (Three.js): world, models, effects, HUD, menus, sprays, audio, footstep surfaces
+public/js/batch.js   Fewer draw calls: player parts and guns baked into one mesh each, static decor and windows merged
 public/admin.html    The admin panel (/admin)
 ```
 

@@ -1,5 +1,6 @@
 // Visual effects: tracers, bullet holes, particles, shell casings, grenades, explosions, smoke, Molotov fire, sprays.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { simulateNade } from '/shared/physics.js';
 import { WEAPONS, FIRE } from '/shared/weapons.js';
 import { flashTexture } from './models.js';
@@ -26,6 +27,57 @@ function flameTexture() {
   return new THREE.CanvasTexture(c);
 }
 const MAX_DECALS = 160;
+const MAX_SPRITES = 260; // smoke puffs and dust at once (each is drawn on its own)
+const MAX_FLAMES = 600;
+
+// Flat marks stuck on surfaces (bullet holes, soot), all drawn as one instanced mesh. tag: what the mark is on, so
+// remove() can take the marks off something that broke.
+const _o = new THREE.Object3D();
+class Stamps {
+  constructor(group, geo, mat, max) {
+    this.mesh = new THREE.InstancedMesh(geo, mat, max);
+    this.mesh.count = 0;
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 1;
+    group.add(this.mesh);
+    this.max = max;
+    this.list = [];
+    this.next = 0;
+  }
+
+  add(p, n, size, tag = null) {
+    _o.position.set(p[0] + n[0] * 0.012, p[1] + n[1] * 0.012, p[2] + n[2] * 0.012);
+    _o.scale.set(1, 1, 1);
+    _o.rotation.set(0, 0, 0);
+    _o.lookAt(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
+    _o.rotateZ(Math.random() * Math.PI * 2);
+    _o.scale.set(size, size, 1);
+    _o.updateMatrix();
+    const e = { m: _o.matrix.clone(), tag };
+    let i = this.list.length;
+    if (i < this.max) this.list.push(e);
+    else { i = this.next++ % this.max; this.list[i] = e; }
+    this.mesh.setMatrixAt(i, e.m);
+    this.mesh.count = this.list.length;
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  remove(gone) {
+    const keep = this.list.filter(e => !gone(e.tag));
+    if (keep.length === this.list.length) return;
+    this.list = keep;
+    keep.forEach((e, i) => this.mesh.setMatrixAt(i, e.m));
+    this.mesh.count = keep.length;
+    this.next = 0;
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  clear() {
+    this.list = [];
+    this.next = 0;
+    this.mesh.count = 0;
+  }
+}
 const MAX_TRACERS = 24;
 const MAX_CASINGS = 48;
 const MAX_GIB_SETS = 12;
@@ -66,7 +118,7 @@ export class Effects {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.craters = [];
-    this.soots = [];
+    this.soots = null;
     this.smolders = [];
 
     // Particles (sparks, blood, debris)
@@ -87,8 +139,7 @@ export class Effects {
     // Bullet holes
     this.decalGeo = new THREE.PlaneGeometry(0.1, 0.1);
     this.decalMat = new THREE.MeshBasicMaterial({ color: 0x1a140e, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
-    this.decals = [];
-    this.di = 0;
+    this.decals = null; // Stamps, made the first time
 
     // Pooled tracers
     this.tracers = [];
@@ -152,6 +203,7 @@ export class Effects {
   }
 
   puff(p, color, size, life, rise = 0.3, ceil = null) {
+    if (this.sprites.length >= MAX_SPRITES) return;
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.softTex, color, transparent: true, opacity: 0.6, depthWrite: false }));
     s.position.set(p[0], p[1], p[2]);
     s.scale.set(size * 0.3, size * 0.3, 1);
@@ -180,22 +232,11 @@ export class Effects {
   }
 
   decal(p, n) {
-    let m = this.decals[this.di % MAX_DECALS];
-    if (!m) {
-      m = new THREE.Mesh(this.decalGeo, this.decalMat);
-      this.decals.push(m);
-      this.group.add(m);
-    }
-    this.di++;
-    m.position.set(p[0] + n[0] * 0.01, p[1] + n[1] * 0.01, p[2] + n[2] * 0.01);
-    m.lookAt(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
-    m.rotateZ(Math.random() * Math.PI);
+    (this.decals ||= new Stamps(this.group, this.decalGeo, this.decalMat, MAX_DECALS)).add(p, n, 1);
   }
 
   clearDecals() {
-    for (const d of this.decals) this.group.remove(d);
-    this.decals = [];
-    this.di = 0;
+    this.decals?.clear();
   }
 
   tracer(a, b) {
@@ -294,14 +335,16 @@ export class Effects {
       }
       lip.computeVertexNormals();
       g.add(new THREE.Mesh(lip, new THREE.MeshLambertMaterial({ map: this.dirtTex, color: 0x6a5440, side: THREE.DoubleSide })));
+      const clods = [];
       for (let i = 0; i < 16; i++) {
         const a = Math.random() * Math.PI * 2, d = r * (1.05 + Math.random() * 1.4);
-        const c = new THREE.Mesh(this.clodGeo, this.clodMat);
-        c.position.set(Math.cos(a) * d, 0.03, Math.sin(a) * d);
-        c.scale.set(0.05 + Math.random() * 0.1, 0.04 + Math.random() * 0.06, 0.05 + Math.random() * 0.1);
-        c.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
-        g.add(c);
+        _o.position.set(Math.cos(a) * d, 0.03, Math.sin(a) * d);
+        _o.scale.set(0.05 + Math.random() * 0.1, 0.04 + Math.random() * 0.06, 0.05 + Math.random() * 0.1);
+        _o.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        _o.updateMatrix();
+        clods.push(this.clodGeo.clone().applyMatrix4(_o.matrix));
       }
+      g.add(new THREE.Mesh(mergeGeometries(clods), this.clodMat));
     }
     g.position.set(p[0], p[1], p[2]);
     this.group.add(g);
@@ -315,24 +358,14 @@ export class Effects {
   // the chunk does (dropSoot).
   soot(p, n, size, brk) {
     this.blastTextures();
-    if (!this.sootMat) this.sootMat = new THREE.MeshLambertMaterial({ map: this.sootTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
-    const m = new THREE.Mesh(this.sootGeo ||= new THREE.PlaneGeometry(1, 1), this.sootMat);
-    m.position.set(p[0] + n[0] * 0.012, p[1] + n[1] * 0.012, p[2] + n[2] * 0.012);
-    m.lookAt(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
-    m.rotateZ(Math.random() * Math.PI * 2);
-    m.scale.set(size, size, 1);
-    m.renderOrder = 1;
-    this.group.add(m);
-    this.soots.push({ m, brk });
-    if (this.soots.length > 300) this.group.remove(this.soots.shift().m);
+    this.soots ||= new Stamps(this.group, new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({
+      map: this.sootTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    }), 300);
+    this.soots.add(p, n, size, brk);
   }
 
   dropSoot(gone) {
-    this.soots = this.soots.filter(s => {
-      if (s.brk == null || !gone.has(s.brk)) return true;
-      this.group.remove(s.m);
-      return false;
-    });
+    this.soots?.remove(brk => brk != null && gone.has(brk));
   }
 
   // Rubble: bricks and lumps of plaster thrown out of a broken chunk (away from the blast at `from`, or just
@@ -500,8 +533,7 @@ export class Effects {
   clearCraters() {
     for (const c of this.craters) this.group.remove(c);
     this.craters = [];
-    for (const s of this.soots) this.group.remove(s.m);
-    this.soots = [];
+    this.soots?.clear();
     this.smolders = [];
     this.clearRubble();
   }
@@ -717,7 +749,9 @@ export class Effects {
     this.fireOut(id, true);
     const world = this.getWorld();
     const flames = [];
-    const n = 34;
+    // as many flames as the fire is big, and fewer when lots are burning already
+    const burning = this.fires.reduce((s, f) => s + f.flames.length, 0);
+    const n = Math.round(Math.min(burning > MAX_FLAMES ? 8 : 34, Math.max(10, r * 10)));
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       let d = r * Math.sqrt(Math.random()) * 0.95;

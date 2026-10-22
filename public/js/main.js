@@ -969,6 +969,9 @@ function updateRemotes(dt) {
     }
     r.model.userData.light.visible = alive && !!r.fl;
     setFaded(r.model, alive && r.hidden && !isMate(r));
+    // far away, a body's shadow isn't worth drawing
+    const near = camera.position.distanceToSquared(r.model.position) < 900;
+    if (r.model.userData.shadow !== near) { r.model.userData.shadow = near; r.model.traverse(o => { if (o.isMesh) o.castShadow = near; }); }
     const deployed = alive && !!r.mo && !killcam;
     if (deployed && !r.mortarSet) { r.mortarSet = new THREE.Group(); scene.add(r.mortarSet); }
     if (r.mortarSet) { r.mortarSet.visible = deployed; if (deployed) placeMortarModel(r.mortarSet, s.p, s.yaw, r.mo); }

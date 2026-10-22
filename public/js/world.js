@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { doorAngle } from '/shared/doors.js';
+import { Batch } from './batch.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -584,6 +585,13 @@ function buildFaces(map, q, group) {
     obj.castShadow = q.shadows;
     group.add(obj);
   }
+}
+
+// Decor that's only meshes (no lights, sprites or particles) can be merged.
+function staticOnly(obj) {
+  let ok = true;
+  obj.traverse(o => { if (o.isLight || o.isSprite || o.isPoints || o.isLine || o.isInstancedMesh || (o.isMesh && Array.isArray(o.material))) ok = false; });
+  return ok;
 }
 
 // Breakable walls and furniture (map.breakables, cs_mansion; see shared/maps/breakables.js). Each chunk draws its
@@ -1442,9 +1450,9 @@ function createParticles(kind) {
 // ---------------------------------------------------------------- public
 
 export const QUALITY = {
-  low: { pixelRatio: 0.75, shadows: false, shadowSize: 0, antialias: false, particles: false },
-  medium: { pixelRatio: 1, shadows: true, shadowSize: 1024, antialias: true, particles: true },
-  high: { pixelRatio: 1.5, shadows: true, shadowSize: 2048, antialias: true, particles: true },
+  low: { pixelRatio: 0.75, shadows: false, shadowSize: 0, antialias: false, particles: false, lamps: 2 },
+  medium: { pixelRatio: 1, shadows: true, shadowSize: 1024, antialias: true, particles: true, lamps: 4 },
+  high: { pixelRatio: 1.5, shadows: true, shadowSize: 2048, antialias: true, particles: true, lamps: 6 },
 };
 
 export function buildWorld(scene, map, qualityName) {
@@ -1523,16 +1531,34 @@ export function buildWorld(scene, map, qualityName) {
   const around = (p, r) => [p.map(v => v - r), p.map(v => v + r)];
   const piecesIn = (min, max) => (map.breakables || []).filter(pc => [0, 1, 2].every(k => pc.min[k] < max[k] && pc.max[k] > min[k])).map(pc => pc.id);
   const wallAround = b => piecesIn(b.min.map(v => v - 0.12), b.max.map(v => v + 0.12));
+  // Static decor is merged into a few meshes (one per material, casting shadows or not); decor that moves, glows,
+  // gives light or can be switched off stays as it is.
+  const decorCast = new Batch(group, { castShadow: q.shadows, receiveShadow: q.shadows, cell: 20 });
+  const decorFlat = new Batch(group, { receiveShadow: q.shadows, cell: 20 });
+  const KEEP = new Set(['light', 'ceilinglamp']);
   for (const d of map.decor) {
+    const moving = animated.length;
     const obj = buildDecor(d, ctx);
+    if (obj && animated.length === moving && !KEEP.has(d.type) && staticOnly(obj)) {
+      group.remove(obj);
+      decorCast.add(obj, m => m.castShadow);
+      decorFlat.add(obj, m => !m.castShadow);
+      continue;
+    }
     // a lamp under the ceiling, its light half a metre below it
     if (d.type === 'ceilinglamp') fixTo(obj, ...around([d.p[0], d.p[1] + 0.06, d.p[2]], 0.05));
     if (d.type === 'light') fixTo(obj, ...around([d.p[0], d.p[1] + 0.56, d.p[2]], 0.05));
   }
 
-  // Windows: a frame that stays, and a glass pane (with mullions) that can shatter.
+  decorCast.build();
+  decorFlat.build();
+
+  // Windows: a frame that stays, and a glass pane (with mullions) that can shatter. All of them are merged (frames
+  // in one mesh, the glass in one per room) and shown or hidden one by one.
   const panes = new Map();
   const frameMat = lam(0xeae4d6);
+  const windows = new Batch(group, { receiveShadow: q.shadows });
+  const showPane = p => windows.setVisible(p.pane, !p.broken && !p.down);
   for (const b of map.boxes.filter(x => x.glass)) {
     const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1], d = b.max[2] - b.min[2];
     const alongX = w > d;
@@ -1544,8 +1570,7 @@ export function buildWorld(scene, map, qualityName) {
       pane.position.set(...c);
       pane.add(mesh(new THREE.BoxGeometry(Math.max(w, 0.02), Math.max(h, 0.02), Math.max(d, 0.02)),
         new THREE.MeshPhongMaterial({ color: 0x9ab4c0, transparent: true, opacity: 0.3, shininess: 120, specular: 0xffffff, depthWrite: false, side: THREE.DoubleSide }), 0, 0, 0, false));
-      group.add(pane);
-      panes.set(b.id, { pane, center: c, size: [w, h, d], ids: wallAround(b) });
+      panes.set(b.id, { pane: windows.add(pane), center: c, size: [w, h, d], ids: wallAround(b) });
       continue;
     }
     const frame = new THREE.Group();
@@ -1559,10 +1584,9 @@ export function buildWorld(scene, map, qualityName) {
       new THREE.BoxGeometry(0.08, h - 0.14, depth).translate(len / 2 - 0.04, -0.01, 0),
     ];
     frame.add(mesh(mergeGeometries(parts), frameMat));
-    group.add(frame);
     // the wall right around the window holds the frame
-    const ids = wallAround(b);
-    if (ids.length) fixtures.push({ obj: frame, ids });
+    const ids = wallAround(b), frameHandle = windows.add(frame);
+    if (ids.length) fixtures.push({ handle: frameHandle, ids });
 
     const grp = b.group ? ctx.groupOf(b.group) : null;
     let glassMat = grp?.glassMats[0];
@@ -1576,9 +1600,9 @@ export function buildWorld(scene, map, qualityName) {
     pane.add(mesh(new THREE.PlaneGeometry(len, h), glassMat, 0, 0, 0, false));
     pane.add(mesh(new THREE.BoxGeometry(0.05, h, 0.05), frameMat, 0, 0, 0, false));
     pane.add(mesh(new THREE.BoxGeometry(len, 0.05, 0.05), frameMat, 0, h * 0.1, 0, false));
-    group.add(pane);
-    panes.set(b.id, { pane, center: c, size: [w, h, d], ids: wallAround(b) });
+    panes.set(b.id, { pane: windows.add(pane), center: c, size: [w, h, d], ids: wallAround(b) });
   }
+  windows.build();
 
   // Light switches on the walls
   for (const sw of map.switches || []) {
@@ -1612,6 +1636,41 @@ export function buildWorld(scene, map, qualityName) {
     group.add(particles.points);
   }
 
+  // Lamps: a light that's switched on costs every lit surface on screen, so only the few nearest the camera
+  // really shine (q.lamps of them, picked in update); the rest wait as plain records.
+  const lamps = [], pool = [];
+  group.updateMatrixWorld(true);
+  group.traverse(o => { if (o.isPointLight) lamps.push(o); });
+  if (lamps.length > q.lamps) {
+    for (const l of lamps) {
+      l.userData.at = l.getWorldPosition(new THREE.Vector3());
+      l.parent.remove(l);
+    }
+    for (let i = 0; i < q.lamps; i++) {
+      const l = new THREE.PointLight(0xffffff, 0, 1, 2);
+      group.add(l);
+      pool.push(l);
+    }
+  } else lamps.length = 0;
+  let pickAt = 0;
+  const shown = l => {
+    for (let o = l; o; o = o.parent) if (!o.visible) return false;
+    return l.intensity > 0;
+  };
+  function lightNearest(camPos) {
+    const cands = lamps.filter(l => shown(l) && (!l.distance || l.userData.at.distanceTo(camPos) < l.distance + 15))
+      .sort((x, y) => x.userData.at.distanceToSquared(camPos) - y.userData.at.distanceToSquared(camPos));
+    pool.forEach((p, i) => {
+      const l = cands[i];
+      if (!l) { p.intensity = 0; return; }
+      p.position.copy(l.userData.at);
+      p.color.copy(l.color);
+      p.intensity = l.intensity;
+      p.distance = l.distance;
+      p.decay = l.decay;
+    });
+  }
+
   scene.add(group);
 
   function setLights(state) {
@@ -1636,14 +1695,18 @@ export function buildWorld(scene, map, qualityName) {
   function setBrokenPieces(ids) {
     setBrokenChunks(ids);
     const gone = new Set(ids);
-    for (const f of fixtures) f.obj.visible = !f.ids.some(id => gone.has(id));
+    for (const f of fixtures) {
+      const up = !f.ids.some(id => gone.has(id));
+      if (f.handle) windows.setVisible(f.handle, up);
+      else f.obj.visible = up;
+    }
     // a window in a wall that's gone goes with it
-    for (const p of panes.values()) { p.down = p.ids.some(id => gone.has(id)); p.pane.visible = !p.broken && !p.down; }
+    for (const p of panes.values()) { p.down = p.ids.some(id => gone.has(id)); showPane(p); }
   }
 
   function setBrokenGlass(ids) {
     const broken = new Set(ids);
-    for (const [id, p] of panes) { p.broken = broken.has(id); p.pane.visible = !p.broken && !p.down; }
+    for (const [id, p] of panes) { p.broken = broken.has(id); showPane(p); }
   }
 
   let t = 0;
@@ -1657,6 +1720,7 @@ export function buildWorld(scene, map, qualityName) {
     update(dt, camPos) {
       t += dt;
       for (const fn of animated) fn(t, dt);
+      if (pool.length && t >= pickAt) { pickAt = t + 0.1; lightNearest(camPos); }
       for (const o of doors) {
         const diff = o.target - o.pivot.rotation.y;
         o.pivot.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), dt * 4.5);
