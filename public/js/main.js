@@ -2196,7 +2196,7 @@ const net = new Net({
     }
     if (m.k === 'rpg') {
       fx.explosion(m.p, true);
-      audio.play('bigboom', m.p);
+      audio.play('rpgboom', m.p);
       const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 30, 0, 1) * 1.2);
       return;
