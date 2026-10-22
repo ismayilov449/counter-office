@@ -65,6 +65,7 @@ export class Effects {
     this.getWorld = getWorld;
     this.group = new THREE.Group();
     scene.add(this.group);
+    this.craters = [];
 
     // Particles (sparks, blood, debris)
     const geo = new THREE.BufferGeometry();
@@ -260,6 +261,99 @@ export class Effects {
       const p = [center[0] + (Math.random() - 0.5), center[1] + (Math.random() - 0.5), center[2] + (Math.random() - 0.5)];
       this.puff(p, 0xb8ae9c, 3 + Math.random() * 2, 2.5 + Math.random(), 0.15);
     }
+  }
+
+  // A blast mark where a shell or a rocket hit the ground: soot and, in soft ground (dig: grass, sand), a crater —
+  // a dark pit ringed by a rough lip of thrown-up earth, with clods around it. They stay until the next round
+  // (with no rounds the oldest go first, past 30).
+  crater(p, r, dig) {
+    if (!this.scorchTex) {
+      const tex = draw => {
+        const c = document.createElement('canvas');
+        c.width = c.height = 128;
+        draw(c.getContext('2d'));
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      };
+      this.scorchTex = tex(g => {
+        const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+        grad.addColorStop(0, 'rgba(10,8,6,0.95)');
+        grad.addColorStop(0.55, 'rgba(25,20,15,0.75)');
+        grad.addColorStop(1, 'rgba(30,25,20,0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 128, 128);
+        // streaks thrown out from the middle
+        g.strokeStyle = 'rgba(15,12,9,0.5)';
+        for (let i = 0; i < 26; i++) {
+          const a = Math.random() * Math.PI * 2, l = 30 + Math.random() * 32;
+          g.lineWidth = 1 + Math.random() * 3;
+          g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(a) * l, 64 + Math.sin(a) * l); g.stroke();
+        }
+      });
+      this.pitTex = tex(g => {
+        const grad = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+        grad.addColorStop(0, 'rgba(12,9,6,1)');
+        grad.addColorStop(0.6, 'rgba(40,30,20,0.95)');
+        grad.addColorStop(1, 'rgba(70,52,34,0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 128, 128);
+      });
+      this.dirtTex = tex(g => {
+        g.fillStyle = '#6e5538';
+        g.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 900; i++) {
+          g.fillStyle = ['#4a3824', '#856846', '#5c4630', '#2e241a', '#9a805c'][i % 5];
+          g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 3, 1 + Math.random() * 3);
+        }
+      });
+      this.dirtTex.wrapS = this.dirtTex.wrapT = THREE.RepeatWrapping;
+      this.dirtTex.repeat.set(6, 1);
+      this.clodGeo = new THREE.IcosahedronGeometry(1, 0);
+      this.clodMat = new THREE.MeshLambertMaterial({ color: 0x4e3c28, flatShading: true });
+    }
+    const g = new THREE.Group();
+    g.position.set(p[0], p[1], p[2]);
+    const flat = (tex, size, y, offset) => {
+      const m = new THREE.Mesh(new THREE.CircleGeometry(size, 28).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({
+        map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset,
+      }));
+      m.position.y = y;
+      m.rotation.y = Math.random() * Math.PI * 2;
+      m.renderOrder = 1;
+      g.add(m);
+    };
+    flat(this.scorchTex, r * 1.7, 0.012, -4);
+    if (dig) {
+      flat(this.pitTex, r * 0.8, 0.02, -6);
+      // the lip: a low, uneven ring of earth
+      const pts = [[0.55, 0], [0.68, 0.11], [0.82, 0.17], [0.97, 0.09], [1.2, 0]].map(([x, y]) => new THREE.Vector2(x * r, y * r));
+      const lip = new THREE.LatheGeometry(pts, 32);
+      const pos = lip.attributes.position, ph = Math.random() * 6, ph2 = Math.random() * 6;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), a = Math.atan2(z, x);
+        const k = 1 + 0.05 * Math.sin(a * 6 + ph) + 0.04 * Math.sin(a * 13 + ph2) + 0.03 * Math.sin(a * 23 + ph);
+        pos.setXYZ(i, x * k, y * (0.6 + 0.8 * (0.5 + 0.5 * Math.sin(a * 7 + ph2))), z * k);
+      }
+      lip.computeVertexNormals();
+      g.add(new THREE.Mesh(lip, new THREE.MeshLambertMaterial({ map: this.dirtTex, color: 0x6a5440, side: THREE.DoubleSide })));
+      for (let i = 0; i < 16; i++) {
+        const a = Math.random() * Math.PI * 2, d = r * (1.05 + Math.random() * 1.4);
+        const c = new THREE.Mesh(this.clodGeo, this.clodMat);
+        c.position.set(Math.cos(a) * d, 0.03, Math.sin(a) * d);
+        c.scale.set(0.05 + Math.random() * 0.1, 0.04 + Math.random() * 0.06, 0.05 + Math.random() * 0.1);
+        c.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        g.add(c);
+      }
+    }
+    this.group.add(g);
+    this.craters.push(g);
+    if (this.craters.length > 30) this.group.remove(this.craters.shift());
+  }
+
+  clearCraters() {
+    for (const c of this.craters) this.group.remove(c);
+    this.craters = [];
   }
 
   glassShatter(center, size) {
@@ -565,6 +659,7 @@ export class Effects {
   // Remove everything that belongs to a map (on map change).
   reset() {
     this.clearDecals();
+    this.clearCraters();
     this.clearGibs();
     for (const id of [...this.sprayMeshes.keys()]) this.removeSpray(id);
     for (const s of this.smokes) for (const p of s.parts) this.group.remove(p);

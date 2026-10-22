@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK, BLAST_FIRE } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -1851,6 +1851,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
   if (weapon === 'rpg') setTimeout(() => { if (owner.kills - killsBefore >= 2) unlockAch(owner, 'rpg_double'); }, 0);
   broadcast({ t: 'boom', p: at, k: weapon });
   blastMap(at, weapon);
+  blastFire(at, owner, weapon);
   breakGlass(world.intactGlass.filter(g => dist3(at, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < R * 0.7).map(g => g.id));
   for (const q of players.values()) {
     if (!q.alive) continue;
@@ -2136,9 +2137,21 @@ function explodeNade(n) {
 
 // Is q (a player or hostage position) standing in this fire? Walls stop the flames.
 function inFire(f, pos) {
-  if (Math.hypot(pos[0] - f.p[0], pos[2] - f.p[2]) > FIRE.radius) return false;
+  if (Math.hypot(pos[0] - f.p[0], pos[2] - f.p[2]) > (f.r ?? FIRE.radius)) return false;
   if (pos[1] < f.p[1] - 1 || pos[1] > f.p[1] + 1.4) return false;
   return lineOfSight([f.p[0], f.p[1] + 0.35, f.p[2]], [pos[0], f.p[1] + 0.35, pos[2]]);
+}
+
+// A blast on the ground (see BLAST_FIRE) leaves it burning; nothing below it (a rocket into a wall): no fire.
+function blastFire(at, owner, weapon) {
+  const F = BLAST_FIRE[weapon];
+  if (!F) return;
+  const h = world.raycast([at[0], at[1] + 0.2, at[2]], [0, -1, 0], 1.4, 'solid');
+  if (!h) return;
+  const t = now();
+  const fire = { id: game.nextNadeId++, p: [at[0], at[1] + 0.2 - h.t, at[2]], owner: owner?.id ?? null, until: t + F.life * 1000, nextTick: t + FIRE.tick * 1000, round: game.round, r: F.r, w: weapon };
+  game.fires.push(fire);
+  broadcast({ t: 'fire', id: fire.id, p: fire.p.map(r2), life: F.life, r: F.r });
 }
 
 function igniteMolotov(n, owner, o) {
@@ -2155,6 +2168,7 @@ function igniteMolotov(n, owner, o) {
     q.burnUntil = t + FIRE.afterburn * 1000;
     q.burnBy = owner?.id ?? null;
     q.burnFire = fire.id;
+    q.burnWeapon = 'molotov';
     applyDamage(q, owner, FIRE.impact * Math.max(0.05, 1 - d / FIRE.radius), 'chest', 'molotov', 1);
   }
 }
@@ -2176,12 +2190,13 @@ function updateFires(t) {
       q.burnUntil = t + FIRE.afterburn * 1000;
       q.burnBy = f.owner;
       q.burnFire = f.id;
+      q.burnWeapon = f.w || 'molotov';
     }
     for (const h of game.hostages) {
       if (h.state !== 'dead' && h.state !== 'rescued' && inFire(f, h.p)) hurtHostage(h, owner, FIRE.dps * FIRE.tick, 'molotov');
     }
     for (const c of world.cars) {
-      if (!c.wrecked && Math.hypot(c.p[0] - f.p[0], c.p[2] - f.p[2]) < FIRE.radius + 0.8 && Math.abs(c.p[1] - f.p[1]) < 1.5) {
+      if (!c.wrecked && Math.hypot(c.p[0] - f.p[0], c.p[2] - f.p[2]) < (f.r ?? FIRE.radius) + 0.8 && Math.abs(c.p[1] - f.p[1]) < 1.5) {
         damageCar(c, 15 * FIRE.tick, owner);
       }
     }
@@ -2193,7 +2208,7 @@ function updateFires(t) {
     if (t < (q.nextBurn || 0)) continue;
     q.nextBurn = t + FIRE.tick * 1000;
     const by = players.get(q.burnBy) || null;
-    applyDamage(q, by, FIRE.dps * FIRE.tick, 'chest', 'molotov', 1);
+    applyDamage(q, by, FIRE.dps * FIRE.tick, 'chest', q.burnWeapon || 'molotov', 1);
   }
 }
 

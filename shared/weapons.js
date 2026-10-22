@@ -95,6 +95,9 @@ export const PING = { life: 6, cooldown: 1, range: 300 };
 // burning patch of this radius for life seconds. Standing in it burns dps HP per second (armor doesn't help), and you
 // keep burning for afterburn seconds after stepping out. Running straight out costs ~20 HP; staying in kills.
 export const FIRE = { radius: 3.5, life: 7, impact: 80, dps: 15, afterburn: 0.75, tick: 0.25 };
+// A mortar shell, or an RPG rocket that goes off on the ground, leaves the spot burning (life s, radius m): the
+// same flames as a Molotov's, hurting anyone in them.
+export const BLAST_FIRE = { mortar: { life: 20, r: 3 }, rpg: { life: 8, r: 2.2 } };
 
 export const ITEMS = {
   vest: { name: 'Kevlar Vest', price: 650 },

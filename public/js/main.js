@@ -2213,6 +2213,7 @@ const net = new Net({
     }
     if (m.k === 'mortar') {
       fx.explosion(m.p, true);
+      blastMark(m.p, 1.5);
       audio.play('mortarboom', m.p);
       const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 45, 0, 1) * 1.8);
@@ -2221,6 +2222,7 @@ const net = new Net({
     }
     if (m.k === 'rpg') {
       fx.explosion(m.p, true);
+      blastMark(m.p, 1.0);
       audio.play('rpgboom', m.p);
       const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 30, 0, 1) * 1.2);
@@ -2258,6 +2260,7 @@ const net = new Net({
   round(m) {
     mortarInfo.target = mortarInfo.impact = null;
     fx.clearDecals();
+    fx.clearCraters();
     fx.clearGibs();
     fx.clearFires();
     if (me.roundBuys.length) me.lastBuys = me.roundBuys;
@@ -2898,6 +2901,14 @@ function ggStatus() {
 
 // ---- footsteps: the floor under someone decides the sound (sand, grass, wood, metal, tile, carpet, concrete)
 let surfaces = null;
+// Where a shell or a rocket went off on the ground: a crater in soft ground, a scorch mark on anything else.
+function blastMark(p, r) {
+  const h = coll.raycast([p[0], p[1] + 0.2, p[2]], [0, -1, 0], 1.4, 'solid');
+  if (!h || h.n[1] < 0.5) return;
+  const at = [p[0], p[1] + 0.2 - h.t, p[2]];
+  fx.crater(at, r, ['grass', 'sand'].includes(surfaceAt(at)));
+}
+
 function surfaceAt(p) {
   // Standing on a car roof or bonnet: metal.
   for (const c of cars.values()) {

@@ -1395,6 +1395,7 @@ function buildDecor(d, ctx) {
       break;
   }
   if (obj) group.add(obj);
+  return obj;
 }
 
 // Floating dust motes (day) or blinking fireflies (dusk) around the camera.
@@ -1491,7 +1492,7 @@ export function buildWorld(scene, map, qualityName) {
     group.add(meshObj);
   }
   if (map.faces) buildFaces(map, q, group);
-  const setBrokenPieces = map.breakables ? buildBreakables(map, q, group) : () => {};
+  const setBrokenChunks = map.breakables ? buildBreakables(map, q, group) : () => {};
 
   // Painted bomb-site letters
   for (const [letter, [x, z, y = 0.03]] of Object.entries(map.labels)) {
@@ -1511,7 +1512,23 @@ export function buildWorld(scene, map, qualityName) {
 
   const byGroup = {};
   const ctx = { group, animated, lights, quality: qualityName, groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }) };
-  for (const d of map.decor) buildDecor(d, ctx);
+  // Window frames, ceiling lamps (and their light) and light switches hang on breakable walls and ceilings: they
+  // come down with them (see setBrokenPieces).
+  const fixtures = [];
+  const fixTo = (obj, min, max) => {
+    if (!obj || !map.breakables) return;
+    const ids = piecesIn(min, max);
+    if (ids.length) fixtures.push({ obj, ids });
+  };
+  const around = (p, r) => [p.map(v => v - r), p.map(v => v + r)];
+  const piecesIn = (min, max) => (map.breakables || []).filter(pc => [0, 1, 2].every(k => pc.min[k] < max[k] && pc.max[k] > min[k])).map(pc => pc.id);
+  const wallAround = b => piecesIn(b.min.map(v => v - 0.12), b.max.map(v => v + 0.12));
+  for (const d of map.decor) {
+    const obj = buildDecor(d, ctx);
+    // a lamp under the ceiling, its light half a metre below it
+    if (d.type === 'ceilinglamp') fixTo(obj, ...around([d.p[0], d.p[1] + 0.06, d.p[2]], 0.05));
+    if (d.type === 'light') fixTo(obj, ...around([d.p[0], d.p[1] + 0.56, d.p[2]], 0.05));
+  }
 
   // Windows: a frame that stays, and a glass pane (with mullions) that can shatter.
   const panes = new Map();
@@ -1528,7 +1545,7 @@ export function buildWorld(scene, map, qualityName) {
       pane.add(mesh(new THREE.BoxGeometry(Math.max(w, 0.02), Math.max(h, 0.02), Math.max(d, 0.02)),
         new THREE.MeshPhongMaterial({ color: 0x9ab4c0, transparent: true, opacity: 0.3, shininess: 120, specular: 0xffffff, depthWrite: false, side: THREE.DoubleSide }), 0, 0, 0, false));
       group.add(pane);
-      panes.set(b.id, { pane, center: c, size: [w, h, d] });
+      panes.set(b.id, { pane, center: c, size: [w, h, d], ids: wallAround(b) });
       continue;
     }
     const frame = new THREE.Group();
@@ -1543,6 +1560,9 @@ export function buildWorld(scene, map, qualityName) {
     ];
     frame.add(mesh(mergeGeometries(parts), frameMat));
     group.add(frame);
+    // the wall right around the window holds the frame
+    const ids = wallAround(b);
+    if (ids.length) fixtures.push({ obj: frame, ids });
 
     const grp = b.group ? ctx.groupOf(b.group) : null;
     let glassMat = grp?.glassMats[0];
@@ -1557,7 +1577,7 @@ export function buildWorld(scene, map, qualityName) {
     pane.add(mesh(new THREE.BoxGeometry(0.05, h, 0.05), frameMat, 0, 0, 0, false));
     pane.add(mesh(new THREE.BoxGeometry(len, 0.05, 0.05), frameMat, 0, h * 0.1, 0, false));
     group.add(pane);
-    panes.set(b.id, { pane, center: c, size: [w, h, d] });
+    panes.set(b.id, { pane, center: c, size: [w, h, d], ids: wallAround(b) });
   }
 
   // Light switches on the walls
@@ -1570,6 +1590,7 @@ export function buildWorld(scene, map, qualityName) {
     plate.add(lever);
     group.add(plate);
     ctx.groupOf(sw.group).switches.push(lever);
+    fixTo(plate, ...around(sw.p, 0.12));
   }
 
   // Swinging doors: a wooden leaf on a hinge pivot that turns towards its target angle.
@@ -1611,9 +1632,17 @@ export function buildWorld(scene, map, qualityName) {
     });
   }
 
+  function setBrokenPieces(ids) {
+    setBrokenChunks(ids);
+    const gone = new Set(ids);
+    for (const f of fixtures) f.obj.visible = !f.ids.some(id => gone.has(id));
+    // a window in a wall that's gone goes with it
+    for (const p of panes.values()) { p.down = p.ids.some(id => gone.has(id)); p.pane.visible = !p.broken && !p.down; }
+  }
+
   function setBrokenGlass(ids) {
     const broken = new Set(ids);
-    for (const [id, p] of panes) p.pane.visible = !broken.has(id);
+    for (const [id, p] of panes) { p.broken = broken.has(id); p.pane.visible = !p.broken && !p.down; }
   }
 
   let t = 0;
