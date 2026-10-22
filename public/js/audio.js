@@ -186,7 +186,7 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5] };
+const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6] };
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -300,8 +300,10 @@ function rumble(dest, t0, { dur, freq, freqEnd, gain, attack = 0.02, q = 0.7 }) 
 
 // The shell landing, a huge BOOOOOM: a sharp crack, a pressure thump in the chest, a deep distorted blast and a
 // sub-bass that takes seconds to die, thunder rolling back off walls and hills, and dirt and stones raining down.
-// All through a limiter, so it's as loud as it can be without breaking up.
-function shellBlast(out, t) {
+// All through a limiter, so it's as loud as it can be without breaking up. s (0..1): its size; a smaller one
+// (an HE grenade) is a little sharper and higher, and its tail and echoes shorter.
+function shellBlast(out, t, s = 1) {
+  const up = (1 - s) * 40; // smaller blasts sit higher
   const lim = ctx.createDynamicsCompressor();
   lim.threshold.value = -8;
   lim.knee.value = 6;
@@ -320,21 +322,22 @@ function shellBlast(out, t) {
   sh.connect(bus);
   // the crack and the pressure thump
   burst(bus, t, { dur: 0.07, type: 'highpass', freq: 1800, gain: 2.2 });
-  tone(bus, t, { freq: 85, freqEnd: 24, dur: 0.6, gain: 2.4 });
+  tone(bus, t, { freq: 85 + up, freqEnd: 24 + up / 3, dur: 0.6, gain: 2.4 });
   // the blast itself, torn and distorted
-  rumble(sh, t, { dur: 2.6, freq: 1600, freqEnd: 45, gain: 3.0, attack: 0.008 });
-  tone(sh, t, { freq: 130, freqEnd: 28, dur: 1.2, type: 'triangle', gain: 1.0 });
+  rumble(sh, t, { dur: 0.4 + 2.2 * s, freq: 1600 + up * 20, freqEnd: 45 + up, gain: 3.0, attack: 0.008 });
+  tone(sh, t, { freq: 130 + up, freqEnd: 28 + up / 2, dur: 0.4 + 0.8 * s, type: 'triangle', gain: 1.0 });
   // BOOOOOM: two deep tones slowly falling and beating against each other, dying away over seconds
-  tone(bus, t + 0.02, { freq: 46, freqEnd: 15, dur: 5.5, gain: 2.0 });
-  tone(bus, t + 0.02, { freq: 51, freqEnd: 17, dur: 4.5, gain: 1.3 });
-  rumble(bus, t + 0.05, { dur: 6.5, freq: 260, freqEnd: 35, gain: 1.6, attack: 0.25 });
+  tone(bus, t + 0.02, { freq: 46 + up, freqEnd: 15 + up / 2, dur: 5.5 * s, gain: 2.0 * s });
+  tone(bus, t + 0.02, { freq: 51 + up, freqEnd: 17 + up / 2, dur: 4.5 * s, gain: 1.3 * s });
+  rumble(bus, t + 0.05, { dur: 6.5 * s, freq: 260 + up * 3, freqEnd: 35, gain: 1.6 * s, attack: 0.25 * s });
   // thunder rolling back from far walls, each echo later, lower and softer
   for (const [dt, g, fr] of [[0.45, 1.0, 420], [1.1, 0.75, 320], [1.9, 0.55, 240], [2.9, 0.38, 180], [4.0, 0.22, 140]]) {
-    rumble(bus, t + dt, { dur: 2.2, freq: fr, freqEnd: 40, gain: g, attack: 0.12 });
+    if (dt > 4.5 * s) break;
+    rumble(bus, t + dt, { dur: 2.2 * s, freq: fr + up * 3, freqEnd: 40, gain: g * (0.4 + 0.6 * s), attack: 0.12 });
   }
   // debris raining down
-  for (let i = 0; i < 40; i++) {
-    const at = t + 0.35 + Math.pow(Math.random(), 1.6) * 3.2;
+  for (let i = 0; i < 40 * s; i++) {
+    const at = t + 0.35 + Math.pow(Math.random(), 1.6) * 3.2 * s;
     burst(bus, at, { dur: 0.025 + Math.random() * 0.06, type: 'bandpass', freq: 900 + Math.random() * 3200, q: 1.5, gain: 0.06 + Math.random() * 0.12 });
   }
 }
@@ -541,6 +544,9 @@ export const audio = {
       case 'whistle':
         // arg: { dur, close }
         shellWhistle(out, t, arg?.dur ?? 3, arg?.close ?? 0);
+        break;
+      case 'heboom': // an HE grenade: the same kind of blast, smaller
+        shellBlast(out, t, 0.6);
         break;
       case 'mortarboom':
       case 'rpgboom': // the RPG-7's rocket and the C4 bomb blow up the same way
