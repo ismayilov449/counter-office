@@ -376,6 +376,12 @@ while you move, jump or spray, like CS 1.6, and closes again when you stop; turn
 Esc → Graphics: **Low** (no shadows, lower resolution — for weak office PCs), **Medium**,
 **High**. Reload the page after changing it. Only the nearest lamps really light the scene (2 / 4 / 6).
 
+**Auto-adjust** (on by default): when the game can't keep up (under ~48 FPS for a moment) it steps down — lower
+render resolution (85% → 72% → 60% → 50%), shadows redrawn every 2nd or 3rd frame and less sharp, fewer smoke puffs
+and flames — and steps back up, one level every ~12 s, once it runs smoothly again (if a step up makes it struggle,
+it stays down for a minute and a half). It never switches shadows or lamps on and off, so it never causes a freeze.
+**Show FPS and ping** puts a small readout next to the radar (with the resolution when it's turned down).
+
 **No freezes in a fight** — how the client keeps every frame short (keep it that way when adding things):
 - **Shaders are compiled while a map loads, never mid-fight.** three.js compiles a shader the first time something
   new is drawn, which can take a good part of a second. `prewarm()` in main.js draws one of everything (players,
@@ -409,6 +415,7 @@ lib/nav.js           Where bots can walk (a grid of floors per map) and path fin
 public/js/           Browser client (Three.js): world, models, effects, HUD, menus, sprays, audio, footstep surfaces
 public/js/batch.js   Fewer draw calls: player parts and guns baked into one mesh each, static decor and windows merged
 public/js/billboards.js Smoke, fireballs and flames: every particle of a kind in one draw call
+public/js/autoquality.js Automatic quality: steps resolution, shadows and effects down and up to hold the frame rate
 public/admin.html    The admin panel (/admin)
 ```
 

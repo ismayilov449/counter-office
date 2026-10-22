@@ -17,6 +17,7 @@ import { EMOTES, EMOTE } from '/shared/emotes.js';
 import { RANKS } from '/shared/ranks.js';
 import { ACHIEVEMENT } from '/shared/achievements.js';
 import { Effects, nadeFuse } from './effects.js';
+import { AutoQuality } from './autoquality.js';
 import { audio } from './audio.js';
 import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
@@ -31,7 +32,7 @@ const angleDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 // ---------------------------------------------------------------- settings
 
 const SETTINGS_KEY = 'counter-office-settings';
-const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50', chDynamic: true };
+const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50', chDynamic: true, autoQuality: true, showPerf: false };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch { /* storage unavailable */ }
 if (!QUALITY[settings.quality]) settings.quality = 'medium';
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ } };
@@ -47,6 +48,8 @@ renderer.autoClear = false;
 renderer.shadowMap.enabled = Q.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// the sun's shadows are redrawn when the frame asks for it (every frame, or every 2nd or 3rd on a struggling PC)
+renderer.shadowMap.autoUpdate = false;
 $('game').appendChild(renderer.domElement);
 
 const BASE_FOV = 74;
@@ -99,6 +102,7 @@ function loadMap(id) {
   drops.clear();
   if (plantedBomb) { scene.remove(plantedBomb); plantedBomb = null; }
   renderMapVotes();
+  world.setShadowSize(qlevel.shadowSize);
   prewarm();
 }
 
@@ -144,6 +148,7 @@ function prewarm() {
   fx.update(0.05, warmCam);
   // draw it all, shadows included (the sun's shadow follows the camera)
   world.update(0, warmCam.position);
+  renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, warmCam);
   // and every gun as seen in your own hands
   for (const id of Object.keys(WEAPONS)) {
@@ -155,7 +160,9 @@ function prewarm() {
   // three.js builds the shadow pass's shaders with the lights of the render before it: after the first-person
   // weapon's scene (every normal frame) or after the world's own (when no weapon is drawn — dead, mortar set up).
   // Both kinds, so neither is compiled mid-fight.
+  renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, warmCam);
+  renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, warmCam);
   scene.remove(extra);
   fx.reset();
@@ -1787,6 +1794,12 @@ radioVoice.checked = settings.radioVoice;
 killcamBox.checked = settings.killcam;
 announcerBox.checked = settings.announcer;
 killcamBox.addEventListener('change', () => { settings.killcam = killcamBox.checked; saveSettings(); });
+const autoQBox = $('auto-quality'), perfBox = $('show-perf');
+autoQBox.checked = settings.autoQuality;
+perfBox.checked = settings.showPerf;
+$('perf').classList.toggle('hidden', !settings.showPerf);
+autoQBox.addEventListener('change', () => { settings.autoQuality = autoQBox.checked; autoQ.setEnabled(settings.autoQuality); saveSettings(); });
+perfBox.addEventListener('change', () => { settings.showPerf = perfBox.checked; $('perf').classList.toggle('hidden', !settings.showPerf); saveSettings(); });
 announcerBox.addEventListener('change', () => { settings.announcer = announcerBox.checked; saveSettings(); });
 $('match-summary').addEventListener('click', e => {
   const b = e.target.closest('button[data-map]');
@@ -3066,9 +3079,32 @@ function surfaceAt(p) {
   return surfaces ? surfaces.at(p[0], p[1], p[2]) : 'concrete';
 }
 
+// ---- automatic quality and the FPS / ping readout (see autoquality.js)
+let qlevel = { scale: 1, shadowEvery: 1, shadowSize: 1, detail: 1 }, frameNo = 0;
+function applyQuality(lv) {
+  qlevel = lv;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, Q.pixelRatio) * lv.scale);
+  world?.setShadowSize(lv.shadowSize);
+  fx.detail = lv.detail;
+}
+const autoQ = new AutoQuality(applyQuality);
+autoQ.setEnabled(settings.autoQuality);
+let perfAt = 0, perfFrames = 0;
+function updatePerf(now) {
+  perfFrames++;
+  if (!settings.showPerf || now - perfAt < 500) return;
+  const fps = Math.round((perfFrames * 1000) / (now - perfAt || 1));
+  perfAt = now;
+  perfFrames = 0;
+  const ping = game.roster?.find(p => p.id === me.id)?.ping;
+  $('perf').textContent = `${fps} FPS · ${ping != null ? ping + ' ms' : '— ms'}${qlevel.scale < 1 ? ' · ' + Math.round(qlevel.scale * 100) + '% res' : ''}`;
+}
+
 function frame() {
   requestAnimationFrame(frame);
   const now = performance.now();
+  autoQ.frame((now - last) / 1000, now);
+  updatePerf(now);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
@@ -3094,6 +3130,7 @@ function frame() {
   sendState(now);
 
   renderer.clear();
+  renderer.shadowMap.needsUpdate = ++frameNo % qlevel.shadowEvery === 0;
   renderer.render(scene, camera);
   if (vm && vm.visible && !me.emote && me.mortar?.phase !== 'aim') {
     renderer.clearDepth();

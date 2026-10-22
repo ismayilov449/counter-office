@@ -188,6 +188,7 @@ export class Effects {
     };
     this.thirdFlashes = [];
     this.spritePool = new Map();
+    this.detail = 1; // automatic quality turns this down: fewer smoke puffs and flames
     // free-floating particles, one draw call per kind (see billboards.js)
     this.boards = {
       smoke: new Billboards(this.group, this.softTex, { max: MAX_SPRITES + 120, sort: true }),
@@ -261,7 +262,7 @@ export class Effects {
   }
 
   puff(p, color, size, life, rise = 0.3, ceil = null) {
-    if (this.sprites.length >= MAX_SPRITES) return;
+    if (this.sprites.length >= MAX_SPRITES || (this.detail < 1 && Math.random() > this.detail)) return;
     const s = this.particle('smoke', color, 0.6);
     if (!s) return;
     s.position.set(p[0], p[1], p[2]);
@@ -814,7 +815,7 @@ export class Effects {
     const flames = [];
     // as many flames as the fire is big, and fewer when lots are burning already
     const burning = this.fires.reduce((s, f) => s + f.flames.length, 0);
-    const n = Math.round(Math.min(burning > MAX_FLAMES ? 8 : 34, Math.max(10, r * 10)));
+    const n = Math.max(4, Math.round(Math.min(burning > MAX_FLAMES ? 8 : 34, Math.max(10, r * 10)) * this.detail));
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       let d = r * Math.sqrt(Math.random()) * 0.95;

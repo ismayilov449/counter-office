@@ -1718,6 +1718,15 @@ export function buildWorld(scene, map, qualityName) {
     setBrokenGlass,
     setBrokenPieces,
     setDoors,
+    // automatic quality: the sun's shadow map at a fraction of its size (see autoquality.js)
+    setShadowSize(f) {
+      if (!q.shadows) return;
+      const size = Math.max(256, Math.round(q.shadowSize * f));
+      if (sun.shadow.mapSize.x === size) return;
+      sun.shadow.mapSize.set(size, size);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+    },
     pane: id => panes.get(id),
     update(dt, camPos) {
       t += dt;
