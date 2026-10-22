@@ -10,8 +10,12 @@ function mat(color) {
   return matCache.get(color);
 }
 
+// Every box of every model is the same unit box, scaled: making a body, a gib or a scrap never adds anything to the
+// graphics card (a new BoxGeometry per box did, and none of them were ever freed).
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 function bx(parent, w, h, d, color, x = 0, y = 0, z = 0) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'object' ? color : mat(color));
+  const m = new THREE.Mesh(UNIT_BOX, typeof color === 'object' ? color : mat(color));
+  m.scale.set(w, h, d);
   m.position.set(x, y, z);
   m.castShadow = true;
   parent.add(m);
@@ -351,14 +355,21 @@ export function flashTexture() {
 }
 
 // Weapon lying on the ground.
+// A weapon lying on the ground: built once per weapon, then copied (the copies share its geometry, so the drops of a
+// long match don't pile up on the graphics card).
+const dropModels = new Map();
 export function createDropModel(id) {
-  const g = new THREE.Group();
-  const gun = buildGun(id);
-  const flat = id !== 'c4' && !WEAPONS[id]?.grenade;
-  if (flat) gun.rotation.z = Math.PI / 2;
-  gun.position.y = id === 'c4' ? 0.04 : 0.05;
-  g.add(gun);
-  return g;
+  if (!dropModels.has(id)) {
+    const g = new THREE.Group();
+    const gun = buildGun(id);
+    gun.userData = {}; // (its references to its own parts don't survive a copy)
+    const flat = id !== 'c4' && !WEAPONS[id]?.grenade;
+    if (flat) gun.rotation.z = Math.PI / 2;
+    gun.position.y = id === 'c4' ? 0.04 : 0.05;
+    g.add(gun);
+    dropModels.set(id, g);
+  }
+  return dropModels.get(id).clone();
 }
 
 export function createPlantedBomb() {

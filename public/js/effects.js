@@ -372,10 +372,13 @@ export class Effects {
   crater(p, r, dig) {
     this.blastTextures();
     const g = new THREE.Group();
+    // the flat marks share one circle and a material per kind; the lip and the clods are this crater's own
+    this.flatCircle ||= new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2);
+    this.flatMats ||= new Map();
     const flat = (tex, size, y, offset) => {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(size, 28).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({
-        map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset,
-      }));
+      if (!this.flatMats.has(tex)) this.flatMats.set(tex, new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset }));
+      const m = new THREE.Mesh(this.flatCircle, this.flatMats.get(tex));
+      m.scale.set(size, 1, size);
       m.position.y = y;
       m.rotation.y = Math.random() * Math.PI * 2;
       m.renderOrder = 1;
@@ -394,7 +397,8 @@ export class Effects {
         pos.setXYZ(i, x * k, y * (0.6 + 0.8 * (0.5 + 0.5 * Math.sin(a * 7 + ph2))), z * k);
       }
       lip.computeVertexNormals();
-      g.add(new THREE.Mesh(lip, new THREE.MeshLambertMaterial({ map: this.dirtTex, color: 0x6a5440, side: THREE.DoubleSide })));
+      this.lipMat ||= new THREE.MeshLambertMaterial({ map: this.dirtTex, color: 0x6a5440, side: THREE.DoubleSide });
+      g.add(new THREE.Mesh(lip, this.lipMat));
       const clods = [];
       for (let i = 0; i < 16; i++) {
         const a = Math.random() * Math.PI * 2, d = r * (1.05 + Math.random() * 1.4);
@@ -409,7 +413,12 @@ export class Effects {
     g.position.set(p[0], p[1], p[2]);
     this.group.add(g);
     this.craters.push(g);
-    if (this.craters.length > 30) this.group.remove(this.craters.shift());
+    if (this.craters.length > 30) this.dropCrater(this.craters.shift());
+  }
+
+  dropCrater(g) {
+    this.group.remove(g);
+    for (const m of g.children) if (m.geometry !== this.flatCircle) m.geometry.dispose(); // the lip and the clods
   }
 
 
@@ -591,7 +600,7 @@ export class Effects {
   }
 
   clearCraters() {
-    for (const c of this.craters) this.group.remove(c);
+    for (const c of this.craters) this.dropCrater(c);
     this.craters = [];
     this.soots?.clear();
     this.smolders = [];
@@ -784,8 +793,12 @@ export class Effects {
   // A mortar shell: a high arc from the tube (o) to where it lands (at) in flight ms, nose along its path.
   shell(o, at, flight) {
     const mesh = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6).scale(1, 1, 2.6), new THREE.MeshLambertMaterial({ color: 0x3e4630 }));
-    const fins = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.14, 6).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x2a2e22 }));
+    this.shellParts ||= [
+      [new THREE.SphereGeometry(0.06, 8, 6).scale(1, 1, 2.6), new THREE.MeshLambertMaterial({ color: 0x3e4630 })],
+      [new THREE.CylinderGeometry(0.03, 0.05, 0.14, 6).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x2a2e22 })],
+    ];
+    const body = new THREE.Mesh(...this.shellParts[0]);
+    const fins = new THREE.Mesh(...this.shellParts[1]);
     fins.position.z = 0.17;
     mesh.add(body, fins);
     mesh.position.set(...o);
@@ -881,7 +894,7 @@ export class Effects {
   spray(id, texture, p, n, yaw) {
     const old = this.sprayMeshes.get(id);
     if (old) { this.group.remove(old); old.material.dispose(); }
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshLambertMaterial({
+    const m = new THREE.Mesh(this.sprayGeo ||= new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshLambertMaterial({
       map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, alphaTest: 0.02,
     }));
     m.position.set(p[0] + n[0] * 0.02, p[1] + n[1] * 0.02, p[2] + n[2] * 0.02);

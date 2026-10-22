@@ -2985,9 +2985,13 @@ function tick() {
   updatePickups();
   updateMines(t);
   updateCamo(t);
-  bots.update(1 / CFG.tickRate);
+  // the time that really passed since the last tick: on Windows the timer fires every 31 or 47 ms rather than 33,
+  // and moving by a fixed step made bots and hostages stutter on everyone's screen
+  const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
+  tick.prev = t;
+  bots.update(dt);
   if (game.hostages.length) {
-    for (const ev of updateHostages(game.hostages, players, 1 / CFG.tickRate, p => world.move(null, p, 2), t)) {
+    for (const ev of updateHostages(game.hostages, players, dt, p => world.move(null, p, 2), t)) {
       if (ev.type === 'lost' && ev.leader) send(ev.leader, { t: 'msg', text: 'A hostage lost track of you!' });
     }
     for (const h of game.hostages) if (h.state === 'follow' && inRescueZone(MAP, h.p)) rescueHostage(h);
@@ -3054,6 +3058,9 @@ if (env.DEBUG_TICK) {
   }, 10);
 }
 setInterval(sendRoster, 2000);
+// When the same laptop runs the server and a game in the browser, the server should win: a late tick is late for
+// everyone.
+try { os.setPriority(os.constants.priority.PRIORITY_ABOVE_NORMAL); } catch { /* not allowed here: fine */ }
 setInterval(sendTeamBar, 250);
 setInterval(() => syncBots(), 2000);
 

@@ -21,6 +21,7 @@ import { AutoQuality } from './autoquality.js';
 import { TeamBar, shrinkPicture } from './teambar.js';
 import { BuyMenu } from './buymenu.js';
 import { makeBuyIcons } from './buyicons.js';
+import { disposeOwn } from './batch.js';
 import { audio } from './audio.js';
 import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
@@ -56,7 +57,20 @@ renderer.shadowMap.autoUpdate = false;
 $('game').appendChild(renderer.domElement);
 
 const BASE_FOV = 74;
-const INTERP_MS = 100;
+// Other players are drawn a little in the past, between two snapshots, so they move smoothly. How far back adapts
+// to the network: the longest gap between snapshots plus how late they've been arriving (Wi-Fi hiccups), between
+// 70 and 250 ms — too short and they freeze and jump when a snapshot is late, too long and they lag behind. Shots
+// tell the server the same time, so it checks hits where you saw them (lag compensation).
+let interpMs = 100;
+const net$ = { lastTime: 0, gap: 50, late: 20 };
+function trackSnapshot(time) {
+  const late = Math.max(0, performance.now() + (serverOffset ?? 0) - time);
+  if (net$.lastTime) net$.gap = Math.max(time - net$.lastTime, net$.gap * 0.995);
+  net$.lastTime = time;
+  net$.late = Math.max(late, net$.late * 0.995);
+  const want = Math.min(250, Math.max(70, net$.gap + net$.late + 15));
+  interpMs += (want - interpMs) * (want > interpMs ? 0.2 : 0.02); // quick to grow, slow to shrink
+}
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(BASE_FOV, innerWidth / innerHeight, 0.05, 900);
@@ -155,11 +169,14 @@ function prewarm() {
   renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, warmCam);
   // and every gun as seen in your own hands
-  for (const id of Object.keys(WEAPONS)) {
-    const m = createViewModel(id, 'T');
-    vmCamera.add(m);
-    renderer.render(vmScene, vmCamera);
-    vmCamera.remove(m);
+  for (const look of ['T', 'CT']) {
+    for (const id of Object.keys(WEAPONS)) {
+      const m = viewModelOf(id, look);
+      if (m === vm) continue;
+      vmCamera.add(m);
+      renderer.render(vmScene, vmCamera);
+      vmCamera.remove(m);
+    }
   }
   // three.js builds the shadow pass's shaders with the lights of the render before it: after the first-person
   // weapon's scene (every normal frame) or after the world's own (when no weapon is drawn — dead, mortar set up).
@@ -240,13 +257,24 @@ const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
 const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'c4'];
 
+// The gun in your hands: one model per weapon and look, made once and kept (building a new one at every switch was a
+// small hitch each time, and the old ones were never freed). prewarm fills it while the map loads.
 let vm = null, vmId = null, vmTeam = null;
+const vmCache = new Map();
+function viewModelOf(id, look) {
+  const key = id + '|' + look;
+  let m = vmCache.get(key);
+  if (!m) { m = createViewModel(id, look); vmCache.set(key, m); return m; }
+  // back to rest: a reload cut short leaves the magazine or the bolt out
+  for (const k of ['mag', 'action', 'pump']) if (m.userData[k] && m.userData[k + 'Base']) m.userData[k].position.copy(m.userData[k + 'Base']);
+  return m;
+}
 function refreshViewModel() {
   const id = current();
   const look = me.zombie ? 'Z' : me.team;
   if (vm && vmId === id && vmTeam === look) return;
   if (vm) vmCamera.remove(vm);
-  vm = createViewModel(id, look);
+  vm = viewModelOf(id, look);
   vmCamera.add(vm);
   vmId = id;
   vmTeam = look;
@@ -362,7 +390,7 @@ function fireRocket(id, def, now) {
   fx.flashLight(muzzle, 60, 0.08);
   fx.puff(muzzle, 0xd8d4cc, 1.6, 1.2, 0.2);
   me.flashUntil = now + 60;
-  net.send({ t: 'shoot', o: eyePos(), d, w: id, rt: serverNow() - INTERP_MS });
+  net.send({ t: 'shoot', o: eyePos(), d, w: id, rt: serverNow() - interpMs });
   audio.play('shot', null, id);
   me.punchP = Math.min(0.12, me.punchP + def.recoil);
   me.kick = 1;
@@ -387,7 +415,7 @@ function fireBullet(id, def, now) {
   fx.flashLight(muzzle, 40, 0.05);
   me.flashUntil = now + 45;
   ejectCasing();
-  net.send(def.pellets ? { t: 'shoot', o, ds: dirs, w: id, rt: serverNow() - INTERP_MS } : { t: 'shoot', o, d: dirs[0], w: id, rt: serverNow() - INTERP_MS });
+  net.send(def.pellets ? { t: 'shoot', o, ds: dirs, w: id, rt: serverNow() - interpMs } : { t: 'shoot', o, d: dirs[0], w: id, rt: serverNow() - interpMs });
   audio.play('shot', null, id === 'm4a1' ? 'm4a1s' : id);
 
   me.punchP = Math.min(0.075, me.punchP + def.recoil * 0.45 * (1 + Math.min(me.shotsFired, 6) * 0.07));
@@ -414,7 +442,7 @@ function knife(alt) {
   const tr = localTrace(o, d, def.range);
   if (tr.hitR) fx.blood(tr.end);
   else if (tr.wall) fx.sparks(tr.end, tr.wall.n);
-  net.send({ t: 'shoot', o, d, w, alt, rt: serverNow() - INTERP_MS });
+  net.send({ t: 'shoot', o, d, w, alt, rt: serverNow() - interpMs });
   stopEmote();
 }
 
@@ -507,14 +535,16 @@ function clearMineModels() {
   for (const { obj } of mineModels.values()) scene.remove(obj);
   mineModels.clear();
 }
+const mineModelOf = {}, mineRing = {};
 function syncMines(list) {
   const seen = new Set();
   for (const [id, k, tc, x, y, z, yaw, owner, armed] of list) {
     seen.add(id);
     let e = mineModels.get(id);
     if (!e) {
-      const obj = buildPlacedMine(k, MINE.mon50.wire, MINE.mon50.wireHalf);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.28, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x50ff70, transparent: true, opacity: 0.7, depthWrite: false }));
+      // a copy of one model per kind, and one ring for all (each mine used to build its own, never freed)
+      const obj = (mineModelOf[k] ||= buildPlacedMine(k, MINE.mon50.wire, MINE.mon50.wireHalf)).clone();
+      const ring = new THREE.Mesh(mineRing.geo ||= new THREE.RingGeometry(0.22, 0.28, 24).rotateX(-Math.PI / 2), mineRing.mat ||= new THREE.MeshBasicMaterial({ color: 0x50ff70, transparent: true, opacity: 0.7, depthWrite: false }));
       ring.position.y = 0.02;
       obj.add(ring);
       obj.userData.ring = ring;
@@ -972,6 +1002,7 @@ function addRemote(id, team) {
 
 function removeRemote(r) {
   scene.remove(r.model);
+  disposeOwn(r.model);
   if (r.mortarSet) scene.remove(r.mortarSet);
   remotes.delete(r.id);
 }
@@ -980,7 +1011,11 @@ function sampleRemote(r, rt) {
   const b = r.buf;
   let a = b[0], c = b[b.length - 1], f = 0;
   if (rt <= a.t) c = a;
-  else if (rt >= c.t) a = c;
+  else if (rt >= c.t && b.length > 1 && c.alive && b[b.length - 2].alive && rt - c.t < 150) {
+    // the next snapshot is late: keep them going the way they were (up to 150 ms) instead of freezing them
+    const p = b[b.length - 2], k = Math.min(rt - c.t, 150) / (c.t - p.t || 1);
+    return { p: [c.p[0] + (c.p[0] - p.p[0]) * k, c.p[1], c.p[2] + (c.p[2] - p.p[2]) * k], yaw: c.yaw, pitch: c.pitch, c: c.c, alive: c.alive, w: c.w };
+  } else if (rt >= c.t) a = c;
   else {
     for (let i = b.length - 1; i > 0; i--) {
       if (b[i - 1].t <= rt && rt <= b[i].t) {
@@ -1002,7 +1037,7 @@ function sampleRemote(r, rt) {
 
 // Render time for other players: normally slightly in the past for smooth interpolation;
 // during the kill cam it is the replay clock.
-const renderTime = () => (killcam ? killcam.t : serverNow() - INTERP_MS);
+const renderTime = () => (killcam ? killcam.t : serverNow() - interpMs);
 
 let specActive = false;
 
@@ -1340,7 +1375,7 @@ function leaveCar(p, yaw) {
 const hostages = new Map(); // id -> { model, buf, p, state (0 idle, 1 follow, 2 rescued, 3 dead), leader }
 
 function clearHostages() {
-  for (const h of hostages.values()) scene.remove(h.model);
+  for (const h of hostages.values()) { scene.remove(h.model); disposeOwn(h.model); }
   hostages.clear();
 }
 
@@ -1361,7 +1396,7 @@ function syncHostages(list, time) {
     h.state = st;
     h.leader = leader;
   }
-  for (const [id, h] of hostages) if (!seen.has(id)) { scene.remove(h.model); hostages.delete(id); }
+  for (const [id, h] of hostages) if (!seen.has(id)) { scene.remove(h.model); disposeOwn(h.model); hostages.delete(id); } // new ones each round
 }
 
 function updateHostageModels(dt) {
@@ -1436,11 +1471,17 @@ function recordSelf() {
   while (selfHistory.length && selfHistory[0].t < t - 9000) selfHistory.shift();
 }
 
+const killcamGhosts = {};
 function startKillcam(killerId, weapon, hs) {
   const r = remotes.get(killerId);
   if (!settings.killcam || !r || r.buf.length < 10) return;
-  const death = serverNow() - INTERP_MS;
-  const ghost = createPlayerModel(me.team);
+  const death = serverNow() - interpMs;
+  // one figure per team, reused for every kill cam (a new one each death was never freed)
+  const ghost = (killcamGhosts[me.team] ||= createPlayerModel(me.team));
+  mendModel(ghost);
+  ghost.userData.gibAll = false;
+  ghost.visible = true;
+  ghost.rotation.set(0, 0, 0);
   setPlayerWeapon(ghost, selfHistory[selfHistory.length - 1]?.w || 'knife');
   scene.add(ghost);
   killcam = { killer: killerId, t: Math.max(death - 3500, r.buf[0].t), death, end: death + 900, ghost, walk: 0, lastP: null };
@@ -2210,6 +2251,7 @@ const net = new Net({
     const est = m.time - performance.now();
     if (serverOffset === null || est > serverOffset) serverOffset = est;
     else serverOffset += (est - serverOffset) * 0.02;
+    trackSnapshot(m.time);
     Object.assign(game, { phase: m.ph, tl: m.tl, el: m.el, score: m.sc, bomb: m.b, snapRecv: performance.now() });
     me.act = m.me;
     hud.score(m.sc);
@@ -3166,7 +3208,7 @@ function updatePerf(now) {
   perfAt = now;
   perfFrames = 0;
   const ping = game.roster?.find(p => p.id === me.id)?.ping;
-  $('perf').textContent = `${fps} FPS · ${ping != null ? ping + ' ms' : '— ms'}${qlevel.scale < 1 ? ' · ' + Math.round(qlevel.scale * 100) + '% res' : ''}`;
+  $('perf').textContent = `${fps} FPS · ${ping != null ? ping + ' ms' : '— ms'} · buffer ${Math.round(interpMs)} ms${qlevel.scale < 1 ? ' · ' + Math.round(qlevel.scale * 100) + '% res' : ''}`;
 }
 
 function frame() {

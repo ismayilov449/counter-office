@@ -220,7 +220,7 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     target"), if someone on the team saw it go off; only roughly ("not observed") if nobody did. It's on the radar
     too. Walk the shells onto the target, like a real crew.
   - **E** or switching weapons packs it up.
-- **Anti-personnel mines** (buy menu → 2 Grenades & mines, both teams, carry up to 2 of each; classic and Deathmatch only).
+- **Anti-personnel mines** (buy menu → 7 Mines & camo, both teams, carry up to 2 of each; classic and Deathmatch only).
   Press **6** to take one out (again to switch type) and **Mouse1** to lay it on the ground a step in front of you;
   it arms 1.5 seconds later. Your team always sees its own mines (with a green ring) and never sets them off;
   enemies only notice a mine within 3 m. Hold **E** next to an enemy mine to defuse it (3 s, 1.5 s with a defuse
@@ -229,19 +229,20 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     their life — and anyone close by is hurt too.
   - **MON-50** ($600): a Soviet directional mine on little legs, with a tripwire stretched across its front 3 m out.
     An enemy walking into the wire sets it off: a fan of fragments up to 25 m ahead (60° wide), a small blast behind.
-- **Ghillie camo** (buy menu → 1 Equipment, $1000): press **H** to switch it on and off. While it's on, enemies see only a faint
+- **Ghillie camo** (buy menu → 7 Mines & camo, $1000): press **H** to switch it on and off. While it's on, enemies see only a faint
   shimmer of you (bots can't make you out beyond 4 m); each shot shows you for 1.5 seconds. Teammates always see you.
   Lost when you die.
 - **Pings**: click the **middle mouse button** (the scroll wheel) to put a yellow **!** on your team's radar where
   you're looking. It lasts 6 seconds; one per player at a time.
-- **Molotov** (buy menu → 2 Grenades & mines, $400, both teams): the bottle breaks on the first floor it lands on and sets a
+- **Molotov** (buy menu → 6 Equipment, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor
   doesn't help. Walls stop the flames. A smoke grenade thrown into the fire puts it out. Fire also hurts hostages and cars.
 - Dead players drop their primary **and** pistol. Walking over a weapon picks it up when that slot
   is empty; press **E** while standing on one to swap it for the gun you carry.
-- **Buy menu** (CS2-style, **B**): the whole shop at once in six columns — Equipment, Grenades & mines, Pistols,
-  Mid-tier (shotguns and SMGs), Rifles (snipers too), Heavy — with gold pictures of each item. Click to buy, or press
+- **Buy menu** (CS2-style, **B**): the whole shop at once in columns, in the old menu's order and numbers —
+  1 Pistols, 2 Shotguns, 3 SMGs, 4 Rifles, 5 Heavy, 6 Equipment, 7 Mines & camo — with shaded gold pictures made from
+  the game's own models; it fits any window (the columns wrap on a small one). Click to buy, or press
   the column's number then the item's (**0** for a 10th); point at an item for its damage, fire rate, magazine,
   armour penetration, speed and kill reward. Items for the other team are greyed ("CT only"), owned ones ticked,
   ones you can't afford dimmed with the price in red. **Right-click** sells back something you bought this round

@@ -43,12 +43,19 @@ export function bake(root, deep = false) {
   if (parts.length < 2) return null;
   const geos = parts.map(m => painted3(m, _m.multiplyMatrices(_inv, m.matrixWorld)));
   const merged = new THREE.Mesh(mergeGeometries(geos), painted);
+  merged.geometry.userData.own = true; // belongs to this model alone: disposeOwn frees it
   for (const g of geos) g.dispose();
   merged.castShadow = parts.some(m => m.castShadow);
   merged.receiveShadow = parts.some(m => m.receiveShadow);
   for (const m of parts) m.parent.remove(m);
   root.add(merged);
   return merged;
+}
+
+// Free the GPU buffers that belong to this model alone (shared geometry — unit boxes, guns copied from a cache —
+// stays).
+export function disposeOwn(root) {
+  root.traverse(o => { if (o.geometry?.userData.own) o.geometry.dispose(); });
 }
 
 // Static objects merged per material; each added object can be shown or hidden later. With cell (metres) the

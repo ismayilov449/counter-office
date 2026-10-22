@@ -7,6 +7,8 @@ const VOICES = ['bombdef', 'bombpl', 'com_go', 'ctwin', 'terwin', 'ct_fireinhole
 const voiceBuf = new Map();
 let voiceSrc = null;
 const listenerPos = { x: 0, y: 0, z: 0 };
+// What the audio thread was last told (see listener).
+const heard = { x: 1e9, y: 0, z: 0, fx: 0, fy: 0, fz: 0, at: 0 };
 
 // Gunshots are layered: a sharp supersonic crack, a distorted mid "body", a low boom, the action cycling
 // and an echo tail. crack/body/boom are frequencies (Hz), dur the body length (s), tail the echo amount.
@@ -420,6 +422,13 @@ export const audio = {
   listener(pos, fwd) {
     listenerPos.x = pos.x; listenerPos.y = pos.y; listenerPos.z = pos.z;
     if (!ctx) return;
+    // Each change has to reach the audio thread, and in a fight full of sounds that wait could cost the frame several
+    // milliseconds: only when you've moved or turned, at most 30 times a second.
+    const now = performance.now();
+    const moved = Math.abs(pos.x - heard.x) + Math.abs(pos.y - heard.y) + Math.abs(pos.z - heard.z) > 0.05 ||
+      Math.abs(fwd.x - heard.fx) + Math.abs(fwd.y - heard.fy) + Math.abs(fwd.z - heard.fz) > 0.02;
+    if (!moved || now - heard.at < 33) return;
+    Object.assign(heard, { x: pos.x, y: pos.y, z: pos.z, fx: fwd.x, fy: fwd.y, fz: fwd.z, at: now });
     const L = ctx.listener;
     if (L.positionX) {
       L.positionX.value = pos.x; L.positionY.value = pos.y; L.positionZ.value = pos.z;
