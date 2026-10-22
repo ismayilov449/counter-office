@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK, BLAST_FIRE } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK, BLAST_FIRE, REAL } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -19,7 +19,7 @@ const PARTY_WEAPONS = ['', 'awp', 'deagle', 'scout', 'ak47', 'knife', 'rpg'];
 import { CAR, carBoxes, seatPos, exitSpots } from './shared/vehicles.js';
 import { CollisionWorld } from './shared/collision.js';
 import { skyOf } from './shared/maps/sky.js';
-import { doorBox, doorCenter, openingSide } from './shared/doors.js';
+import { doorBox, doorCenter, openingSide, GONE } from './shared/doors.js';
 import { Stats, rating } from './lib/stats.js';
 import { rankIndex } from './shared/ranks.js';
 import { ACHIEVEMENTS } from './shared/achievements.js';
@@ -441,6 +441,9 @@ function resetWorld() {
   world.setBroken([]);
   world.setGone([]);
   game.pieceHp = new Map();
+  game.burnt = new Set();
+  game.doorGoneAt = {};
+  game.doorHeat = {};
   game.glassAt = {};
   game.lights = {};
   for (const g of lightGroups()) game.lights[g] = true;
@@ -454,14 +457,65 @@ function resetWorld() {
 
 // ---- Breakable walls and furniture (maps with `breakables`: cs_mansion). Explosions and heavy guns wear the
 // chunks down; a broken one is gone (no collision, not drawn) until the next round.
-function breakPieces(ids) {
+function breakPieces(ids, from = null, fall = false) {
   if (!ids.length) return;
   for (const id of ids) world.gone.add(id);
   for (const id of ids) (game.pieceAt ||= new Map()).set(id, now());
-  broadcast({ t: 'brk', ids });
+  broadcast({ t: 'brk', ids, from: from && from.map(r2), fall: fall ? 1 : 0 });
   // windows in a broken wall fall out
   const pcs = ids.map(id => MAP.breakables[id]);
   breakGlass(world.intactGlass.filter(g => pcs.some(pc => [0, 1, 2].every(k => g.min[k] < pc.max[k] + 0.1 && g.max[k] > pc.min[k] - 0.1))).map(g => g.id));
+  if (MAP.realism && !fall) collapse();
+}
+
+// What no longer holds on to anything falls (see linkUp in shared/maps/breakables.js) and hurts whoever is under it.
+function collapse() {
+  const P = MAP.breakables, held = new Uint8Array(P.length), queue = [];
+  for (const pc of P) if (pc.anchor && !world.gone.has(pc.id)) { held[pc.id] = 1; queue.push(pc.id); }
+  while (queue.length) for (const n of P[queue.pop()].links) if (!held[n] && !world.gone.has(n)) { held[n] = 1; queue.push(n); }
+  const fallen = P.filter(pc => !held[pc.id] && !world.gone.has(pc.id));
+  if (!fallen.length) return;
+  breakPieces(fallen.map(pc => pc.id), null, true);
+  const hurt = new Map();
+  for (const pc of fallen) {
+    for (const q of players.values()) {
+      if (!q.alive || q.p[1] > pc.min[1] || q.p[1] < pc.min[1] - 4) continue;
+      if (q.p[0] < pc.min[0] - 0.3 || q.p[0] > pc.max[0] + 0.3 || q.p[2] < pc.min[2] - 0.3 || q.p[2] > pc.max[2] + 0.3) continue;
+      hurt.set(q, Math.min(150, (hurt.get(q) || 0) + REAL.collapse));
+    }
+  }
+  for (const [q, dmg] of hurt) applyDamage(q, null, dmg, 'head', 'collapse', 1);
+}
+
+// A door blown off its hinges (or burnt away): gone until the next round.
+function blowDoor(i) {
+  if (world.doorStates[i] === GONE) return;
+  const states = world.doorStates.slice();
+  states[i] = GONE;
+  world.setDoors(states);
+  (game.doorGoneAt ||= {})[i] = now();
+  broadcast({ t: 'doors', doors: states, i, blown: true, p: doorCenter(MAP.doors[i]) });
+}
+
+// Realism (cs_mansion): a blast throws people back and knocks their aim, tears doors off, and leaves a cloud of
+// dust the bots can't see through.
+function blastShove(at, weapon) {
+  const P = REAL.push[weapon];
+  if (P) {
+    const [R, speed] = P;
+    for (const q of players.values()) {
+      if (!q.alive || q.bot) continue;
+      const chest = [q.p[0], q.p[1] + 1.1, q.p[2]];
+      const d = dist3(at, chest);
+      if (d > R || !lineOfSight(at, chest)) continue;
+      const k = 1 - d / R, h = Math.hypot(chest[0] - at[0], chest[2] - at[2]) || 1;
+      send(q, { t: 'knock', v: [((chest[0] - at[0]) / h) * speed * k, speed * 0.35 * k, ((chest[2] - at[2]) / h) * speed * k], aim: 0.35 * k });
+    }
+  }
+  const D = REAL.door[weapon];
+  if (D) (MAP.doors || []).forEach((d, i) => { if (dist3(at, doorCenter(d)) < D) blowDoor(i); });
+  const S = REAL.smoke[weapon];
+  if (S) (game.smokes ||= []).push({ p: [at[0], at[1] + 0.5, at[2]], until: now() + S * 1000 });
 }
 
 function hurtPiece(pc, dmg, out) {
@@ -494,7 +548,8 @@ function blastMap(at, weapon) {
       }
       hurtPiece(pc, D * (1 - d / R) * k * (0.75 + Math.random() * 0.5), out);
     }
-    breakPieces(out);
+    breakPieces(out, at);
+    if (MAP.realism) blastShove(at, weapon);
   }, 0);
 }
 
@@ -611,6 +666,14 @@ function explodeCar(c, attacker) {
 // Without rounds (warmup, Deathmatch, Gun Game) broken walls and furniture come back after 90 s, but not while
 // someone stands where they go back.
 function mendPieces(t) {
+  const doors = Object.entries(game.doorGoneAt || {}).filter(([i, at]) => world.doorStates[i] === GONE && t - at > 90000 &&
+    ![...players.values()].some(q => q.alive && overlapsAny([doorBox(MAP.doors[i], 0)], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height)));
+  if (doors.length) {
+    const states = world.doorStates.slice();
+    for (const [i] of doors) { states[i] = 0; delete game.doorGoneAt[i]; }
+    world.setDoors(states);
+    broadcast({ t: 'doors', doors: states, i: +doors[0][0], open: false, p: doorCenter(MAP.doors[doors[0][0]]) });
+  }
   if (!world.gone.size) return;
   const mended = [...world.gone].filter(id => {
     if (t - (game.pieceAt?.get(id) || 0) < 90000) return false;
@@ -619,7 +682,7 @@ function mendPieces(t) {
   });
   if (!mended.length) return;
   world.setGone([...world.gone].filter(id => !mended.includes(id)));
-  for (const id of mended) game.pieceHp.delete(id);
+  for (const id of mended) { game.pieceHp.delete(id); game.burnt?.delete(id); }
   broadcast({ t: 'world', glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates });
 }
 
@@ -666,7 +729,7 @@ function nearestDoor(p) {
   (MAP.doors || []).forEach((d, i) => {
     const c = doorCenter(d);
     const dd = dist2(p.p, c);
-    if (dd < bd && Math.abs(p.p[1] + 1 - c[1]) < 1.6) { bd = dd; best = { i, d, dist: dd }; }
+    if (dd < bd && Math.abs(p.p[1] + 1 - c[1]) < 1.6 && world.doorStates[i] !== GONE) { bd = dd; best = { i, d, dist: dd }; }
   });
   return best;
 }
@@ -1777,6 +1840,24 @@ function onShoot(p, m) {
       const hit = rayPlayer(o, d, h.p, false, best ? best.t : wallT);
       if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit };
     }
+    // Realism (cs_mansion): through a thin wall or a door, the bullet goes on with half its punch.
+    if (!best && wall && MAP.realism && !def.melee && (wall.box.door != null || (wall.box.brk != null && Math.min(wall.box.max[0] - wall.box.min[0], wall.box.max[2] - wall.box.min[2]) <= REAL.thin))) {
+      const b = wall.box;
+      const exit = Math.min(...[0, 1, 2].filter(k => Math.abs(d[k]) > 1e-6).map(k => ((d[k] > 0 ? b.max[k] : b.min[k]) - o[k]) / d[k]));
+      if (exit > wall.t && exit - wall.t < 1) {
+        const o2 = [o[0] + d[0] * (exit + 0.01), o[1] + d[1] * (exit + 0.01), o[2] + d[2] * (exit + 0.01)];
+        const wall2 = world.raycast(o2, d, range - exit, 'bullet', ownCar), far = wall2 ? wall2.t : range - exit;
+        let beyond = null;
+        for (const q of players.values()) {
+          if (q === p || !q.alive || !inTeam(q)) continue;
+          if (!CFG.friendlyFire && mates(q, p)) continue;
+          const st = rewind(q, m.rt);
+          const hit = rayPlayer(o2, d, st.p, st.c, far, headScale());
+          if (hit && (!beyond || hit.t < beyond.t)) beyond = { q, ...hit };
+        }
+        if (beyond) hits.push({ ...beyond, t: beyond.t + exit, d, through: REAL.wallShot });
+      }
+    }
     const r3 = v => Math.round(v * 1000) / 1000;
     traces.push([r3(d[0]), r3(d[1]), r3(d[2]), r2(best ? best.t : wallT), best ? 1 : 0, !best && wall ? 1 : 0]);
     if (best) hits.push({ ...best, d });
@@ -1805,7 +1886,7 @@ function onShoot(p, m) {
     else if (def.melee) applyDamage(h.q, p, alt ? def.altDamage : def.damage, 'chest', w, def.pen, info);
     else if (CFG.party.headshotsOnly && h.part !== 'head') continue;
     else {
-      const dealt = applyDamage(h.q, p, def.damage * Math.pow(def.rangeMod, h.t / 12.7), h.part, w, def.pen, info, eyeOf(p));
+      const dealt = applyDamage(h.q, p, def.damage * Math.pow(def.rangeMod, h.t / 12.7) * (h.through ?? 1), h.part, w, def.pen, info, eyeOf(p));
       // Bullets push zombies back.
       if (h.q.zombie && dealt) {
         const k = Math.min(7, dealt / 9);
@@ -2154,6 +2235,57 @@ function blastFire(at, owner, weapon) {
   broadcast({ t: 'fire', id: fire.id, p: fire.p.map(r2), life: F.life, r: F.r });
 }
 
+// Realism (cs_mansion): fire catches furniture, bookshelves and doors within reach; a burning piece burns down
+// (and breaks), and its own fire spreads further. A door left standing in flames burns away.
+// The floor a piece of furniture stands on (under the rest of it).
+function floorUnder(pc) {
+  const x = (pc.min[0] + pc.max[0]) / 2, z = (pc.min[2] + pc.max[2]) / 2;
+  let y = pc.min[1] + 0.05;
+  for (let i = 0; i < 8; i++) {
+    const h = world.raycast([x, y, z], [0, -1, 0], 6, 'solid');
+    if (!h) return pc.min[1];
+    if (h.box.brk == null || !MAP.breakables[h.box.brk].fuel) return y - h.t;
+    y = h.box.min[1] - 0.01;
+  }
+  return pc.min[1];
+}
+
+function spreadFire(f, t) {
+  const B = REAL.burn, r = f.r ?? FIRE.radius;
+  if (f.pieces) {
+    const out = [];
+    for (const id of f.pieces) if (!world.gone.has(id)) hurtPiece(MAP.breakables[id], B.dps, out);
+    breakPieces(out);
+  }
+  if (game.fires.length < B.max) {
+    for (const pc of MAP.breakables) {
+      if (!pc.fuel || world.gone.has(pc.id) || game.burnt.has(pc.id)) continue;
+      if (pc.min[1] > f.p[1] + 1.5 || pc.max[1] < f.p[1] - 0.3) continue;
+      const cx = Math.max(pc.min[0], Math.min(f.p[0], pc.max[0])), cz = Math.max(pc.min[2], Math.min(f.p[2], pc.max[2]));
+      if (Math.hypot(cx - f.p[0], cz - f.p[2]) > r + 0.4 || Math.random() > B.chance) continue;
+      // the whole stack of it (a tall bookshelf is several chunks) burns in one fire
+      const stack = MAP.breakables.filter(o => o.fuel && !world.gone.has(o.id) && !game.burnt.has(o.id) &&
+        o.min[0] < pc.max[0] - 0.01 && o.max[0] > pc.min[0] + 0.01 && o.min[2] < pc.max[2] - 0.01 && o.max[2] > pc.min[2] + 0.01 && Math.abs(o.min[1] - pc.min[1]) < 3);
+      for (const o of stack) game.burnt.add(o.id);
+      const fire = {
+        id: game.nextNadeId++, p: [(pc.min[0] + pc.max[0]) / 2, floorUnder(pc), (pc.min[2] + pc.max[2]) / 2],
+        owner: f.owner, until: t + B.life * 1000, nextTick: t + FIRE.tick * 1000, round: game.round,
+        r: Math.max(1, Math.min(2, Math.max(pc.max[0] - pc.min[0], pc.max[2] - pc.min[2]) / 2 + 0.5)), w: 'fire', pieces: stack.map(o => o.id),
+      };
+      game.fires.push(fire);
+      broadcast({ t: 'fire', id: fire.id, p: fire.p.map(r2), life: B.life, r: fire.r });
+      break; // one catch per tick
+    }
+  }
+  (MAP.doors || []).forEach((d, i) => {
+    if (world.doorStates[i] === GONE) return;
+    const c = doorCenter(d);
+    if (Math.hypot(c[0] - f.p[0], c[2] - f.p[2]) > r + 0.6 || Math.abs(c[1] - 1.2 - f.p[1]) > 1.5) return;
+    game.doorHeat[i] = (game.doorHeat[i] || 0) + FIRE.tick;
+    if (game.doorHeat[i] >= B.door) blowDoor(i);
+  });
+}
+
 function igniteMolotov(n, owner, o) {
   const t = now();
   const fire = { id: n.id, p: [n.end[0], groundY(n.end[0], n.end[1] - 0.95, n.end[2]), n.end[2]], owner: n.owner, until: t + FIRE.life * 1000, nextTick: t + FIRE.tick * 1000, round: game.round };
@@ -2183,6 +2315,7 @@ function updateFires(t) {
     }
     if (t < f.nextTick) continue;
     f.nextTick += FIRE.tick * 1000;
+    if (MAP.realism) spreadFire(f, t);
     const owner = players.get(f.owner) || null;
     for (const q of players.values()) {
       if (!q.alive || !inFire(f, q.p)) continue;

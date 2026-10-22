@@ -432,8 +432,18 @@ export const audio = {
   },
 
   // A destination node: positional when `pos` ([x, y, z]) is given.
-  out(pos, [ref, roll] = [3, 1.1]) {
+  // muffled: heard through the walls of a house (inside a blast outside, or the other way round)
+  out(pos, [ref, roll] = [3, 1.1], muffled = false) {
     if (!pos) return master;
+    let dest = master;
+    if (muffled) {
+      const lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      lp.type = 'lowpass';
+      lp.frequency.value = 450;
+      g.gain.value = 0.7;
+      lp.connect(g).connect(master);
+      dest = lp;
+    }
     const p = ctx.createPanner();
     p.panningModel = 'equalpower';
     p.distanceModel = 'inverse';
@@ -442,14 +452,14 @@ export const audio = {
     p.rolloffFactor = roll;
     if (p.positionX) { p.positionX.value = pos[0]; p.positionY.value = pos[1]; p.positionZ.value = pos[2]; }
     else p.setPosition(pos[0], pos[1], pos[2]);
-    p.connect(master);
+    p.connect(dest);
     return p;
   },
 
   play(name, pos = null, arg = null) {
     if (!ctx || ctx.state !== 'running') return;
     const t = ctx.currentTime;
-    const out = this.out(pos, FAR[name]);
+    const out = this.out(pos, FAR[name], this.muffled);
     switch (name) {
       case 'shot': {
         const s = GUN[arg] || GUN.glock;

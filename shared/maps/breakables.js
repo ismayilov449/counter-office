@@ -234,5 +234,58 @@ export function breakUp(solids, faces, pick, { roofFace = () => false, roofCell 
       }
     }
   }
+  linkUp(pieces, statics);
   return { statics, pieces, faces: staticFaces, pieceFaces };
+}
+
+// What holds what: pc.links are the pieces touching it face to face; pc.anchor is set when it rests on something
+// that never breaks (a floor, a foundation, the stairs). A piece with no way through the links to an anchor falls
+// (see collapse in server.js). Pieces that hang free in the level as built count as anchored.
+function linkUp(pieces, statics) {
+  const CELL = 1, E = 0.012, grid = new Map();
+  const keys = (min, max) => {
+    const out = [];
+    for (let x = Math.floor((min[0] - E) / CELL); x <= Math.floor((max[0] + E) / CELL); x++) {
+      for (let y = Math.floor((min[1] - E) / CELL); y <= Math.floor((max[1] + E) / CELL); y++) {
+        for (let z = Math.floor((min[2] - E) / CELL); z <= Math.floor((max[2] + E) / CELL); z++) out.push(`${x},${y},${z}`);
+      }
+    }
+    return out;
+  };
+  const touch = (a, b) => {
+    let overlap = 0;
+    for (let k = 0; k < 3; k++) {
+      if (a.min[k] > b.max[k] + E || b.min[k] > a.max[k] + E) return false;
+      if (Math.min(a.max[k], b.max[k]) - Math.max(a.min[k], b.min[k]) > E) overlap++;
+    }
+    return overlap >= 2;
+  };
+  for (const pc of pieces) {
+    pc.links = [];
+    pc.anchor = false;
+    for (const k of keys(pc.min, pc.max)) (grid.get(k) || grid.set(k, []).get(k)).push(pc);
+  }
+  for (const pc of pieces) {
+    const seen = new Set();
+    for (const k of keys(pc.min, pc.max)) {
+      for (const o of grid.get(k)) {
+        if (o.id <= pc.id || seen.has(o)) continue;
+        seen.add(o);
+        if (pc.boxes.some(a => o.boxes.some(b => touch(a, b)))) { pc.links.push(o.id); o.links.push(pc.id); }
+      }
+    }
+  }
+  const lo = [0, 1, 2].map(k => Math.min(...pieces.map(p => p.min[k])) - 1), hi = [0, 1, 2].map(k => Math.max(...pieces.map(p => p.max[k])) + 1);
+  for (const s of statics) {
+    if ([0, 1, 2].some(k => s.max[k] < lo[k] || s.min[k] > hi[k])) continue;
+    const near = new Set();
+    const cmin = s.min.map((v, k) => Math.max(v, lo[k])), cmax = s.max.map((v, k) => Math.min(v, hi[k]));
+    for (const k of keys(cmin, cmax)) for (const pc of grid.get(k) || []) near.add(pc);
+    for (const pc of near) if (!pc.anchor && pc.boxes.some(b => touch(b, s))) pc.anchor = true;
+  }
+  // as built, everything stands
+  const held = new Uint8Array(pieces.length), queue = pieces.filter(p => p.anchor).map(p => p.id);
+  for (const id of queue) held[id] = 1;
+  while (queue.length) for (const n of pieces[queue.pop()].links) if (!held[n]) { held[n] = 1; queue.push(n); }
+  for (const pc of pieces) if (!held[pc.id]) pc.anchor = true;
 }

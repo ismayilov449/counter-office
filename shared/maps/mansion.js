@@ -67,6 +67,9 @@ function roofFace(f) {
   return (inHouse(b) && y0 >= ROOF_Y.house) || (inShed(b) && y0 >= ROOF_Y.shed);
 }
 const BRK = breakUp(BSP.SOLIDS, FACES, breakable, { roofFace });
+// furniture, bookshelves, wooden panels and doors burn
+const FUEL = new Set(['books', 'wood', 'fabric', 'crate', 'cardboard', 'door1']);
+for (const p of BRK.pieces) p.fuel = p.kind === 'prop' || Object.keys(BRK.pieceFaces[p.id] || {}).some(t => FUEL.has(FACE_MATS[t]));
 
 // ---- collision: the original level's solid volumes, and the breakable chunks
 for (const b of BRK.statics) m.box(b.min[0], b.min[2], b.max[0], b.max[2], b.max[1] - b.min[1], 'none', b.min[1], { hidden: true });
@@ -162,6 +165,9 @@ export default {
   faces: FACES,
   staticFaces: BRK.faces, // drawn as the level; the rest belongs to the breakable chunks
   breakables: BRK.pieces,
+  // the battle leaves its marks: soot, rubble, collapsing walls, dust, shell shock, blast push, spreading fire,
+  // doors blown off, bullets through thin walls, muffled sound indoors (see REAL in shared/weapons.js)
+  realism: true,
   pieceFaces: BRK.pieceFaces,
   faceTex: { ...BSP.TEXTURES, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
   faceMats: FACE_MATS,

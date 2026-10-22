@@ -106,6 +106,20 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     the wall or ceiling they hang on. The floors, the ceiling between the storeys and the
     stairs stay. Everything is repaired at the start of each round (with no rounds — warmup, Deathmatch, Gun Game —
     90 seconds after it broke).
+  - **The battle leaves its marks** (Mansion only):
+    - **Soot** blackens the walls, ceilings and floors around every explosion; **rubble** — bricks and lumps of
+      plaster — flies out of what breaks and stays on the floor; a fresh hole keeps **smoking** for a while.
+    - **Collapse**: whatever no longer holds on to anything (a stretch of wall cut loose, a bit of roof) comes down,
+      hurting whoever is under it.
+    - **Dust** hangs where something blew up (bots can't see through it for a few seconds).
+    - **Shell shock**: close to a blast your ears ring, the screen blurs and sways and you move slower for a few
+      seconds; the **blast throws you back** and knocks your aim.
+    - **Fire spreads** to furniture, bookshelves and doors: they burn down and break, set what's next to them alight,
+      and indoors the smoke gathers under the ceiling and fills the room.
+    - **Doors** are blown off their hinges by a blast nearby, or burn away in a fire.
+    - **Bullets go through** thin walls and doors with half their damage.
+    - **Sound**: explosions outside sound muffled from inside the house (and the other way round); a blast nearby
+      shakes the room and brings dust down from the ceiling.
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and

@@ -88,6 +88,20 @@ export const BREAK = {
   blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
   chip: { m249: 0.5, awp: 0.5, pkt: 0.5 },
 };
+// Maps with `realism` (cs_mansion): what explosions do besides breaking things.
+//   push: [radius m, speed m/s] players are thrown back (and their aim knocked); doors within door m are blown off;
+//   smoke: seconds the dust cloud blocks the bots' view; collapse: damage to someone under a falling piece;
+//   burn: chance per fire tick that furniture within reach catches, how long it burns (s), its damage per tick,
+//   the most fires at once, and how long a door can stand in a fire (s); wallShot: share of a bullet's damage
+//   left after going through a thin wall or a door (at most thin m thick).
+export const REAL = {
+  push: { c4: [22, 16], mortar: [16, 12], rpg: [11, 10], car: [11, 10], he: [8, 7], pmn: [4, 5], mon50: [5, 6] },
+  door: { c4: 8, mortar: 4, rpg: 3, car: 4, he: 2.5, pmn: 1.5, mon50: 2 },
+  smoke: { c4: 9, mortar: 6, rpg: 5, car: 6, he: 4 },
+  collapse: 25,
+  burn: { chance: 0.12, life: 16, dps: 7, max: 28, door: 5 },
+  wallShot: 0.5, thin: 0.45,
+};
 // Middle mouse button: a "!" on the team's radar where you're looking (it fades after life seconds).
 export const PING = { life: 6, cooldown: 1, range: 300 };
 

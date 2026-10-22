@@ -66,6 +66,8 @@ export class Effects {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.craters = [];
+    this.soots = [];
+    this.smolders = [];
 
     // Particles (sparks, blood, debris)
     const geo = new THREE.BufferGeometry();
@@ -149,12 +151,12 @@ export class Effects {
     this.pActive = Math.min(MAX_PARTICLES, this.pActive + 1);
   }
 
-  puff(p, color, size, life, rise = 0.3) {
+  puff(p, color, size, life, rise = 0.3, ceil = null) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.softTex, color, transparent: true, opacity: 0.6, depthWrite: false }));
     s.position.set(p[0], p[1], p[2]);
     s.scale.set(size * 0.3, size * 0.3, 1);
     this.group.add(s);
-    this.sprites.push({ s, life, max: life, grow: size, rise, base: 0.6 });
+    this.sprites.push({ s, life, max: life, grow: size, rise, base: 0.6, ceil });
   }
 
   sparks(p, n) {
@@ -267,53 +269,8 @@ export class Effects {
   // a dark pit ringed by a rough lip of thrown-up earth, with clods around it. They stay until the next round
   // (with no rounds the oldest go first, past 30).
   crater(p, r, dig) {
-    if (!this.scorchTex) {
-      const tex = draw => {
-        const c = document.createElement('canvas');
-        c.width = c.height = 128;
-        draw(c.getContext('2d'));
-        const t = new THREE.CanvasTexture(c);
-        t.colorSpace = THREE.SRGBColorSpace;
-        return t;
-      };
-      this.scorchTex = tex(g => {
-        const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
-        grad.addColorStop(0, 'rgba(10,8,6,0.95)');
-        grad.addColorStop(0.55, 'rgba(25,20,15,0.75)');
-        grad.addColorStop(1, 'rgba(30,25,20,0)');
-        g.fillStyle = grad;
-        g.fillRect(0, 0, 128, 128);
-        // streaks thrown out from the middle
-        g.strokeStyle = 'rgba(15,12,9,0.5)';
-        for (let i = 0; i < 26; i++) {
-          const a = Math.random() * Math.PI * 2, l = 30 + Math.random() * 32;
-          g.lineWidth = 1 + Math.random() * 3;
-          g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(a) * l, 64 + Math.sin(a) * l); g.stroke();
-        }
-      });
-      this.pitTex = tex(g => {
-        const grad = g.createRadialGradient(64, 64, 2, 64, 64, 64);
-        grad.addColorStop(0, 'rgba(12,9,6,1)');
-        grad.addColorStop(0.6, 'rgba(40,30,20,0.95)');
-        grad.addColorStop(1, 'rgba(70,52,34,0)');
-        g.fillStyle = grad;
-        g.fillRect(0, 0, 128, 128);
-      });
-      this.dirtTex = tex(g => {
-        g.fillStyle = '#6e5538';
-        g.fillRect(0, 0, 128, 128);
-        for (let i = 0; i < 900; i++) {
-          g.fillStyle = ['#4a3824', '#856846', '#5c4630', '#2e241a', '#9a805c'][i % 5];
-          g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 3, 1 + Math.random() * 3);
-        }
-      });
-      this.dirtTex.wrapS = this.dirtTex.wrapT = THREE.RepeatWrapping;
-      this.dirtTex.repeat.set(6, 1);
-      this.clodGeo = new THREE.IcosahedronGeometry(1, 0);
-      this.clodMat = new THREE.MeshLambertMaterial({ color: 0x4e3c28, flatShading: true });
-    }
+    this.blastTextures();
     const g = new THREE.Group();
-    g.position.set(p[0], p[1], p[2]);
     const flat = (tex, size, y, offset) => {
       const m = new THREE.Mesh(new THREE.CircleGeometry(size, 28).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({
         map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset,
@@ -346,14 +303,207 @@ export class Effects {
         g.add(c);
       }
     }
+    g.position.set(p[0], p[1], p[2]);
     this.group.add(g);
     this.craters.push(g);
     if (this.craters.length > 30) this.group.remove(this.craters.shift());
   }
 
+
+  // ---- realism (cs_mansion)
+  // Soot: a black blast mark on a wall, ceiling or floor (n: its normal). On a breakable chunk (brk) it goes when
+  // the chunk does (dropSoot).
+  soot(p, n, size, brk) {
+    this.blastTextures();
+    if (!this.sootMat) this.sootMat = new THREE.MeshLambertMaterial({ map: this.sootTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const m = new THREE.Mesh(this.sootGeo ||= new THREE.PlaneGeometry(1, 1), this.sootMat);
+    m.position.set(p[0] + n[0] * 0.012, p[1] + n[1] * 0.012, p[2] + n[2] * 0.012);
+    m.lookAt(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
+    m.rotateZ(Math.random() * Math.PI * 2);
+    m.scale.set(size, size, 1);
+    m.renderOrder = 1;
+    this.group.add(m);
+    this.soots.push({ m, brk });
+    if (this.soots.length > 300) this.group.remove(this.soots.shift().m);
+  }
+
+  dropSoot(gone) {
+    this.soots = this.soots.filter(s => {
+      if (s.brk == null || !gone.has(s.brk)) return true;
+      this.group.remove(s.m);
+      return false;
+    });
+  }
+
+  // Rubble: bricks and lumps of plaster thrown out of a broken chunk (away from the blast at `from`, or just
+  // dropping when it fell), bouncing and coming to rest on the floor until the next round.
+  debris(min, max, from, n) {
+    if (!this.bitMesh) {
+      this.bitMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), 700);
+      this.bitMesh.count = 0;
+      this.bitMesh.frustumCulled = false;
+      this.bitMesh.castShadow = true;
+      this.group.add(this.bitMesh);
+      this.bits = [];
+    }
+    const COLORS = [0xcfc4ae, 0x9a8f7c, 0xa05a42, 0xe2dccb, 0x6e655a, 0x7a4a30];
+    const c = [0, 1, 2].map(k => (min[k] + max[k]) / 2);
+    for (let i = 0; i < n; i++) {
+      let slot = this.bits.length;
+      if (slot >= 700) slot = this.bitNext = ((this.bitNext ?? -1) + 1) % 700;
+      const p = new THREE.Vector3(...[0, 1, 2].map(k => min[k] + Math.random() * (max[k] - min[k])));
+      const out = from ? new THREE.Vector3(c[0] - from[0], c[1] - from[1] + 0.5, c[2] - from[2]).normalize() : new THREE.Vector3(0, 0, 0);
+      const sp = from ? 2 + Math.random() * 5 : 0.5;
+      const bit = {
+        p, v: out.multiplyScalar(sp).add(new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 1.5, (Math.random() - 0.5) * 2)),
+        r: new THREE.Euler(Math.random() * 3, Math.random() * 3, Math.random() * 3), spin: (Math.random() - 0.5) * 12,
+        s: new THREE.Vector3(0.08 + Math.random() * 0.24, 0.05 + Math.random() * 0.12, 0.08 + Math.random() * 0.2), rest: false, age: 0,
+      };
+      this.bits[slot] = bit;
+      this.bitMesh.setColorAt(slot, new THREE.Color(COLORS[(Math.random() * COLORS.length) | 0]));
+      this.placeBit(slot);
+    }
+    this.bitMesh.count = this.bits.length;
+    if (this.bitMesh.instanceColor) this.bitMesh.instanceColor.needsUpdate = true;
+  }
+
+  placeBit(i) {
+    const b = this.bits[i];
+    this._q.setFromEuler(b.r);
+    this._m.compose(b.p, this._q, b.s);
+    this.bitMesh.setMatrixAt(i, this._m);
+    this.bitMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  updateRubble(dt) {
+    const world = this.getWorld();
+    for (let i = 0; i < this.bits.length; i++) {
+      const b = this.bits[i];
+      if (b.rest) continue;
+      b.age += dt;
+      b.v.y -= 15 * dt;
+      const step = b.v.length() * dt;
+      if (step > 1e-4) {
+        const dir = b.v.clone().normalize();
+        const hit = world.raycast([b.p.x, b.p.y, b.p.z], [dir.x, dir.y, dir.z], step + 0.03, 'solid');
+        if (hit) {
+          b.p.addScaledVector(dir, Math.max(0, hit.t - 0.03));
+          const n = new THREE.Vector3(...hit.n);
+          if (n.y > 0.5 && b.v.y < 0) {
+            b.v.y *= -0.25; b.v.x *= 0.5; b.v.z *= 0.5;
+            if (Math.abs(b.v.y) < 0.6) { b.rest = true; b.r.x = 0; b.r.z = 0; b.p.y += b.s.y / 2 - 0.03; }
+          } else b.v.addScaledVector(n, -1.6 * b.v.dot(n)).multiplyScalar(0.5);
+        } else b.p.addScaledVector(b.v, dt);
+      }
+      b.r.x += b.spin * dt;
+      b.r.y += b.spin * 0.6 * dt;
+      if (b.age > 6) b.rest = true;
+      this.placeBit(i);
+    }
+  }
+
+  clearRubble() {
+    if (!this.bitMesh) return;
+    this.bits = [];
+    this.bitNext = -1;
+    this.bitMesh.count = 0;
+  }
+
+  // A cloud of dust and smoke hanging where something blew up (size: the blast's reach).
+  dust(p, size) {
+    for (let i = 0; i < 9; i++) {
+      const q = [p[0] + (Math.random() - 0.5) * size, p[1] + Math.random() * size * 0.5, p[2] + (Math.random() - 0.5) * size];
+      this.puff(q, i % 3 ? 0x9a8e7c : 0x6a625a, size * (1.3 + Math.random() * 0.8), 6 + Math.random() * 3, 0.08);
+    }
+  }
+
+  // Dust shaken down from a ceiling (top: its height) over p.
+  ceilingDust(p, top) {
+    for (let i = 0; i < 50; i++) {
+      this.emit([p[0] + (Math.random() - 0.5) * 4, top - 0.05, p[2] + (Math.random() - 0.5) * 4], [0, -0.2, 0], [0.82, 0.78, 0.7], 1.5 + Math.random(), 2.5);
+    }
+    for (let i = 0; i < 2; i++) this.puff([p[0] + (Math.random() - 0.5) * 2, top - 0.4, p[2] + (Math.random() - 0.5) * 2], 0xc8c0b0, 2.5, 3, -0.15);
+  }
+
+  // Smoke still curling out of a fresh hole for a while.
+  smolder(p, secs) {
+    this.smolders.push({ p, until: secs, t: 0, next: 0 });
+  }
+
+  // The canvases for blast marks, made the first time one is needed.
+  blastTextures() {
+    if (!this.scorchTex) {
+      const tex = draw => {
+        const c = document.createElement('canvas');
+        c.width = c.height = 128;
+        draw(c.getContext('2d'));
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      };
+      this.scorchTex = tex(g => {
+        const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+        grad.addColorStop(0, 'rgba(10,8,6,0.95)');
+        grad.addColorStop(0.55, 'rgba(25,20,15,0.75)');
+        grad.addColorStop(1, 'rgba(30,25,20,0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 128, 128);
+        // streaks thrown out from the middle
+        g.strokeStyle = 'rgba(15,12,9,0.5)';
+        for (let i = 0; i < 26; i++) {
+          const a = Math.random() * Math.PI * 2, l = 30 + Math.random() * 32;
+          g.lineWidth = 1 + Math.random() * 3;
+          g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(a) * l, 64 + Math.sin(a) * l); g.stroke();
+        }
+      });
+      // soot: a soft, blotchy smudge
+      this.sootTex = tex(g => {
+        const grad = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+        grad.addColorStop(0, 'rgba(12,10,8,0.7)');
+        grad.addColorStop(0.5, 'rgba(18,15,12,0.45)');
+        grad.addColorStop(1, 'rgba(20,18,15,0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 40; i++) {
+          const a = Math.random() * Math.PI * 2, d = Math.random() * 40, r = 4 + Math.random() * 14;
+          const x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d;
+          const b = g.createRadialGradient(x, y, 0, x, y, r);
+          b.addColorStop(0, `rgba(10,8,6,${(0.15 + Math.random() * 0.25).toFixed(2)})`);
+          b.addColorStop(1, 'rgba(10,8,6,0)');
+          g.fillStyle = b;
+          g.fillRect(x - r, y - r, r * 2, r * 2);
+        }
+      });
+      this.pitTex = tex(g => {
+        const grad = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+        grad.addColorStop(0, 'rgba(12,9,6,1)');
+        grad.addColorStop(0.6, 'rgba(40,30,20,0.95)');
+        grad.addColorStop(1, 'rgba(70,52,34,0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 128, 128);
+      });
+      this.dirtTex = tex(g => {
+        g.fillStyle = '#6e5538';
+        g.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 900; i++) {
+          g.fillStyle = ['#4a3824', '#856846', '#5c4630', '#2e241a', '#9a805c'][i % 5];
+          g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 3, 1 + Math.random() * 3);
+        }
+      });
+      this.dirtTex.wrapS = this.dirtTex.wrapT = THREE.RepeatWrapping;
+      this.dirtTex.repeat.set(6, 1);
+      this.clodGeo = new THREE.IcosahedronGeometry(1, 0);
+      this.clodMat = new THREE.MeshLambertMaterial({ color: 0x4e3c28, flatShading: true });
+    }
+  }
+
   clearCraters() {
     for (const c of this.craters) this.group.remove(c);
     this.craters = [];
+    for (const s of this.soots) this.group.remove(s.m);
+    this.soots = [];
+    this.smolders = [];
+    this.clearRubble();
   }
 
   glassShatter(center, size) {
@@ -563,7 +713,7 @@ export class Effects {
   }
 
   // A Molotov fire: flames over a patch of floor that walls cut off, burning for `life` seconds.
-  fire(id, p, life, r = FIRE.radius) {
+  fire(id, p, life, r = FIRE.radius, ceil = null) {
     this.fireOut(id, true);
     const world = this.getWorld();
     const flames = [];
@@ -590,7 +740,7 @@ export class Effects {
     glow.rotation.x = -Math.PI / 2;
     glow.position.set(p[0], p[1] + 0.03, p[2]);
     this.group.add(glow);
-    this.fires.push({ id, p: p.slice(), r, t: 0, life, flames, glow, nextEmber: 0, nextSmoke: 0 });
+    this.fires.push({ id, p: p.slice(), r, t: 0, life, flames, glow, nextEmber: 0, nextSmoke: 0, ceil: ceil != null ? ceil - 0.5 : null });
   }
 
   fireOut(id, now = false) {
@@ -686,6 +836,13 @@ export class Effects {
       if (k >= 1) { this.group.remove(s.mesh); this.shells.splice(i, 1); }
     }
     if (this.gibs.length) this.updateGibs(dt);
+    if (this.bits?.length) this.updateRubble(dt);
+    for (let i = this.smolders.length - 1; i >= 0; i--) {
+      const s = this.smolders[i];
+      s.t += dt;
+      if (s.t >= s.next) { s.next = s.t + 0.5; this.puff([s.p[0] + (Math.random() - 0.5) * 0.4, s.p[1], s.p[2] + (Math.random() - 0.5) * 0.4], 0x4a4540, 1.6, 3, 0.6); }
+      if (s.t >= s.until) this.smolders.splice(i, 1);
+    }
     for (let i = this.rockets.length - 1; i >= 0; i--) {
       const r = this.rockets[i];
       r.t += dt;
@@ -763,6 +920,7 @@ export class Effects {
       const size = 0.3 + sp.grow * Math.sqrt(f);
       sp.s.scale.set(size, size, 1);
       if (sp.rise) sp.s.position.y += sp.rise * dt;
+      if (sp.ceil != null && sp.s.position.y > sp.ceil) sp.s.position.y = sp.ceil; // smoke gathers under the ceiling
       sp.s.material.opacity = Math.max(0, 1 - f) * (sp.base ?? 0.8);
       if (sp.life <= 0) {
         this.group.remove(sp.s);
@@ -810,7 +968,8 @@ export class Effects {
       if (f.t >= f.nextSmoke && k > 0.3) {
         f.nextSmoke = f.t + 0.22;
         const fl = f.flames[Math.floor(Math.random() * f.flames.length)].position;
-        this.puff([fl.x, fl.y + 1.4, fl.z], 0x2a2622, 2.2, 2.2, 1.1);
+        if (f.ceil != null) this.puff([fl.x, Math.min(fl.y + 1.4, f.ceil), fl.z], 0x1e1a17, 3, 9, 0.9, f.ceil); // indoors: thick, it fills the room
+        else this.puff([fl.x, fl.y + 1.4, fl.z], 0x2a2622, 2.2, 2.2, 1.1);
       }
       if (f.t >= f.life) {
         this.removeFire(f);

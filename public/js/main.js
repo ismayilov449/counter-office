@@ -1126,7 +1126,7 @@ function nearestDoor() {
   (map.doors || []).forEach((d, i) => {
     const c = doorCenter(d);
     const dist = Math.hypot(me.p[0] - c[0], me.p[2] - c[2]);
-    if (dist < bd && Math.abs(me.p[1] + 1 - c[1]) < 1.6) { bd = dist; best = { i, dist }; }
+    if (dist < bd && Math.abs(me.p[1] + 1 - c[1]) < 1.6 && game.doors[i] !== 9) { bd = dist; best = { i, dist }; }
   });
   return best;
 }
@@ -1920,6 +1920,11 @@ const net = new Net({
     const hs = Math.hypot(me.v[0], me.v[2]);
     if (hs > 12) { me.v[0] *= 12 / hs; me.v[2] *= 12 / hs; }
     if (m.v[1] > 0.3 && me.onGround) { me.v[1] = m.v[1]; me.onGround = false; }
+    if (m.aim) {
+      // a blast throws the aim off
+      me.pitch = clamp(me.pitch + (Math.random() - 0.3) * m.aim, -1.55, 1.55);
+      me.yaw += (Math.random() - 0.5) * m.aim * 1.6;
+    }
     me.airSpeed = Math.max(me.airSpeed || 0, Math.hypot(me.v[0], me.v[2]));
   },
   emote(m) {
@@ -2010,11 +2015,30 @@ const net = new Net({
   },
   doors(m) {
     applyDoors(m.doors);
+    if (m.blown) {
+      const d = map.doors[m.i];
+      fx.debris([m.p[0] - 0.4, m.p[1] - 1, m.p[2] - 0.4], [m.p[0] + 0.4, m.p[1] + 1, m.p[2] + 0.4], null, 10);
+      audio.play('crumble', m.p, 0.5);
+      if (d) fx.puff(m.p, 0x8a7a66, 2, 2);
+      return;
+    }
     audio.play(m.open ? 'dooropen' : 'doorclose', m.p);
   },
   brk(m) {
     for (const id of m.ids) game.brk.add(id);
     applyBrokenPieces([...game.brk]);
+    if (map.realism) {
+      fx.dropSoot(game.brk);
+      const each = Math.max(2, Math.min(6, Math.floor(140 / m.ids.length)));
+      for (const id of m.ids.slice(0, 60)) {
+        const pc = map.breakables[id];
+        if (pc) fx.debris(pc.min, pc.max, m.from, each);
+      }
+      if (m.from) {
+        const pc = map.breakables[m.ids[(Math.random() * m.ids.length) | 0]];
+        if (pc) fx.smolder([0, 1, 2].map(k => (pc.min[k] + pc.max[k]) / 2), 14);
+      }
+    }
     // chunks bursting into dust and debris, and the crash of it
     let at = null;
     for (const id of m.ids.slice(0, 12)) {
@@ -2176,12 +2200,16 @@ const net = new Net({
   },
   shell(m) {
     fx.shell(m.o, m.at, m.flight);
+    audio.muffled = !!map.realism && indoors(me.p) !== indoors(m.o);
     audio.play('mortarfire', m.o);
+    audio.muffled = false;
     // The scream of it coming down for the last few seconds, near where it lands: louder the closer it is to us
     const dur = Math.min(3.6, m.flight / 1000 - 0.3);
     setTimeout(() => {
       const d = Math.hypot(me.p[0] - m.at[0], me.p[2] - m.at[2]);
+      audio.muffled = indoors(me.p);
       audio.play('whistle', m.at, { dur, close: clamp(1 - d / 40, 0, 1) });
+      audio.muffled = false;
     }, m.flight - dur * 1000);
   },
   rocket(m) {
@@ -2194,6 +2222,15 @@ const net = new Net({
     if (settings.radioVoice && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole');
   },
   boom(m) {
+    audio.muffled = !!map.realism && indoors(me.p) !== indoors(m.p);
+    try {
+      this.boomInner(m);
+    } finally {
+      audio.muffled = false;
+    }
+    realBlast(m);
+  },
+  boomInner(m) {
     if (m.k === 'flash') { fx.flashPop(m.p); audio.play('flashpop', m.p); return; }
     if (m.k === 'pmn' || m.k === 'mon50') {
       fx.explosion(m.p, false);
@@ -2208,7 +2245,7 @@ const net = new Net({
       }
       const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 15, 0, 1) * 0.7);
-      if (me.alive && d < 8) audio.play('shellshock', null, clamp(1.2 - d / 8, 0.3, 0.8)); // ringing ears, as for an HE
+      if (me.alive && d < 8) shellShock(clamp(1.2 - d / 8, 0.3, 0.8)); // ringing ears, as for an HE
       return;
     }
     if (m.k === 'mortar') {
@@ -2217,7 +2254,7 @@ const net = new Net({
       audio.play('mortarboom', m.p);
       const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 45, 0, 1) * 1.8);
-      if (me.alive && d < 16) audio.play('shellshock', null, clamp(1.3 - d / 16, 0.3, 1));
+      if (me.alive && d < 16) shellShock(clamp(1.3 - d / 16, 0.3, 1));
       return;
     }
     if (m.k === 'rpg') {
@@ -2226,7 +2263,7 @@ const net = new Net({
       audio.play('rpgboom', m.p);
       const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 30, 0, 1) * 1.2);
-      if (me.alive && d < 12) audio.play('shellshock', null, clamp(1.3 - d / 12, 0.3, 1)); // ringing ears up close
+      if (me.alive && d < 12) shellShock(clamp(1.3 - d / 12, 0.3, 1)); // ringing ears up close
       return;
     }
     if (m.k === 'car') {
@@ -2244,15 +2281,20 @@ const net = new Net({
     const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);
     me.shake = Math.max(me.shake, clamp(1 - d / (big ? 40 : 15), 0, 1) * (big ? 1.2 : 0.6));
     // ringing ears when an HE goes off close by, or the bomb (much further, full strength)
-    if (m.k === 'he' && me.alive && d < 8) audio.play('shellshock', null, clamp(1.2 - d / 8, 0.3, 0.8));
-    if (big && me.alive && d < 25) audio.play('shellshock', null, clamp(1.3 - d / 25, 0.3, 1));
+    if (m.k === 'he' && me.alive && d < 8) shellShock(clamp(1.2 - d / 8, 0.3, 0.8));
+    if (big && me.alive && d < 25) shellShock(clamp(1.3 - d / 25, 0.3, 1));
   },
   flashed(m) {
     hud.flashbang(m.a, m.dur);
     audio.play('ring', null, m.dur * 0.8);
   },
   fire(m) {
-    fx.fire(m.id, m.p, m.life, m.r);
+    let ceil = null;
+    if (map.realism && indoors(m.p)) {
+      const up = coll.raycast([m.p[0], m.p[1] + 0.5, m.p[2]], [0, 1, 0], 8, 'solid');
+      if (up) ceil = m.p[1] + 0.5 + up.t;
+    }
+    fx.fire(m.id, m.p, m.life, m.r, ceil);
   },
   fireOut(m) {
     fx.fireOut(m.id);
@@ -2262,6 +2304,7 @@ const net = new Net({
     fx.clearDecals();
     fx.clearCraters();
     fx.clearGibs();
+    me.daze = null;
     fx.clearFires();
     if (me.roundBuys.length) me.lastBuys = me.roundBuys;
     me.roundBuys = [];
@@ -2394,6 +2437,7 @@ function updateLocal(dt, now) {
   else if (walking) speed *= 0.52;
   const wet = inWater(map.water, me.p);
   if (wet) speed *= 0.7;
+  speed *= 1 - 0.45 * Math.min(1, dazed(performance.now()));
   // Swim up: hold Space in water to rise to the surface and climb out over the edge.
   if (wet && keys.has('Space') && !frozen) { me.v[1] = Math.max(me.v[1], 3.2); me.onGround = false; }
 
@@ -2902,6 +2946,50 @@ function ggStatus() {
 // ---- footsteps: the floor under someone decides the sound (sand, grass, wood, metal, tile, carpet, concrete)
 let surfaces = null;
 // Where a shell or a rocket went off on the ground: a crater in soft ground, a scorch mark on anything else.
+// ---- realism (map.realism: cs_mansion)
+const indoors = p => !!map.realism && !skyOf(map, coll).open(p);
+
+// Close to a blast: ringing ears and, with realism, a few dazed seconds (blurred, swaying, slower).
+function shellShock(s) {
+  audio.play('shellshock', null, s);
+  if (map.realism) me.daze = { at: performance.now(), until: performance.now() + 4500 * s, s };
+}
+const dazed = now => (me.daze && now < me.daze.until ? me.daze.s * (me.daze.until - now) / (me.daze.until - me.daze.at) : 0);
+let blurPx = 0;
+function updateDaze(now) {
+  const k = me.alive ? dazed(now) : 0;
+  if (k > 0) {
+    const t = now / 1000;
+    camera.rotation.z += Math.sin(t * 2.1) * 0.07 * k;
+    camera.rotation.x += Math.sin(t * 1.3) * 0.03 * k;
+  }
+  const px = Math.round(k * 5 * 2) / 2;
+  if (px !== blurPx) { blurPx = px; renderer.domElement.style.filter = px ? `blur(${px}px)` : ''; }
+}
+
+// Soot sprayed over everything around a blast, a hanging cloud of dust, and inside, the room shakes and dust
+// comes down from the ceiling.
+const SOOT = { c4: 5, mortar: 3.5, rpg: 2.5, car: 3, he: 2, pmn: 1.4, mon50: 1.8 };
+function realBlast(m) {
+  const R = SOOT[m.k];
+  if (!map.realism || !R) return;
+  const N = 48;
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (2 * (i + 0.5)) / N, rr = Math.sqrt(1 - y * y), a = i * 2.39996;
+    const h = coll.raycast(m.p, [Math.cos(a) * rr, y, Math.sin(a) * rr], R, 'solid');
+    if (!h) continue;
+    const at = [m.p[0] + Math.cos(a) * rr * h.t, m.p[1] + y * h.t, m.p[2] + Math.sin(a) * rr * h.t];
+    fx.soot(at, h.n, (1 - h.t / R) * R * 0.6 + 0.4, h.box.brk ?? null);
+  }
+  fx.dust(m.p, R);
+  const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
+  if (me.alive && d < 35 && indoors(me.p)) {
+    me.shake = Math.max(me.shake, (1 - d / 35) * 0.9);
+    const up = coll.raycast([me.p[0], me.p[1] + 1.5, me.p[2]], [0, 1, 0], 4, 'solid');
+    if (up) fx.ceilingDust(me.p, me.p[1] + 1.5 + up.t);
+  }
+}
+
 function blastMark(p, r) {
   const h = coll.raycast([p[0], p[1] + 0.2, p[2]], [0, -1, 0], 1.4, 'solid');
   if (!h || h.n[1] < 0.5) return;
@@ -2933,6 +3021,7 @@ function frame() {
   updateBomb(now);
   if (now - lastPatch > 1000) { lastPatch = now; patchTree(scene); }
   updateCamera(dt, now);
+  updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
   updateMineModels();

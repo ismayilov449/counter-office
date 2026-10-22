@@ -5,8 +5,12 @@
 
 const HALF = 0.05;
 
+// State 9: blown off (a blast or a fire on cs_mansion) — nothing there any more.
+export const GONE = 9;
+
 export function doorBox(d, state) {
   const [hx, y0, hz] = d.hinge;
+  if (state === GONE) return { min: [hx, -1000, hz], max: [hx, -1000, hz], mat: 'none', door: d.id };
   let x1, x2, z1, z2;
   const along = state === 0 ? d.axis : d.axis === 'x' ? 'z' : 'x';
   const reach = (state === 0 ? d.dir : state) * d.len;

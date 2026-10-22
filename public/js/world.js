@@ -1627,7 +1627,8 @@ export function buildWorld(scene, map, qualityName) {
 
   function setDoors(states) {
     doors.forEach((o, i) => {
-      const a = doorAngle(o.d, states?.[i] || 0);
+      o.pivot.visible = states?.[i] !== 9; // blown off
+      const a = doorAngle(o.d, states?.[i] === 9 ? 0 : states?.[i] || 0);
       o.target = o.pivot.rotation.y + Math.atan2(Math.sin(a - o.pivot.rotation.y), Math.cos(a - o.pivot.rotation.y));
     });
   }
