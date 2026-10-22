@@ -1,14 +1,20 @@
-// Gold silhouettes for the buy menu, like CS2's: each gun, grenade and mine is the game's own model, rendered once
-// from the side into a small picture (muzzle to the left); armour, the kit, nightvision and the ghillie suit are
+// Gold pictures for the buy menu, like CS2's: each gun, grenade and mine is the game's own model, rendered once from
+// the side in shaded gold metal (a key light, a fill and the sky, so magazines, scopes and stocks stand out), muzzle
+// to the left; armour, the kit, nightvision and the ghillie suit are
 // drawn. Made while a map loads (see prewarm in main.js), so opening the menu never stutters.
 import * as THREE from 'three';
 import { buildGun, buildMortarSetup, buildPlacedMine } from './guns.js';
 
-const GOLD = '#e7b350', W = 200, H = 100;
+const GOLD = '#e7b350', W = 256, H = 128;
 const icons = new Map();
 
 // A model seen from the side, its outline filled with gold.
 function renderModel(renderer, obj, target, scene, camera, gold) {
+  // turned a little toward the viewer and tipped back, so the top and the side catch the light differently
+  const turn = new THREE.Group();
+  turn.add(obj);
+  turn.rotation.set(0.12, 0.38, 0, 'YXZ');
+  obj = turn;
   scene.add(obj);
   obj.updateMatrixWorld(true);
   obj.traverse(o => { if (o.isMesh) o.material = gold; else if (o.isSprite || o.isLine || o.isPoints) o.visible = false; });
@@ -17,7 +23,7 @@ function renderModel(renderer, obj, target, scene, camera, gold) {
   const k = Math.max(size.z / (W * 0.86), size.y / (H * 0.8), 1e-4);
   camera.left = -W / 2 * k; camera.right = W / 2 * k; camera.top = H / 2 * k; camera.bottom = -H / 2 * k;
   camera.near = 0.01; camera.far = 50;
-  camera.position.set(mid.x - 10, mid.y, mid.z);
+  camera.position.set(mid.x + 10, mid.y, mid.z); // from this side the muzzle is on the left, as in CS2
   camera.lookAt(mid);
   camera.updateProjectionMatrix();
   renderer.setRenderTarget(target);
@@ -86,7 +92,12 @@ export function makeBuyIcons(renderer, ids) {
   const target = new THREE.WebGLRenderTarget(W, H, { samples: 4 });
   target.texture.colorSpace = THREE.SRGBColorSpace; // the same gold as on screen
   const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera();
-  const gold = new THREE.MeshBasicMaterial({ color: GOLD });
+  // gold metal (not Lambert or Phong: those carry the indoor-lighting patch), lit from the upper left and front
+  const gold = new THREE.MeshStandardMaterial({ color: 0xf0b850, metalness: 0.35, roughness: 0.42, emissive: 0x4a3008, flatShading: true });
+  const key = new THREE.DirectionalLight(0xfff2d8, 3.6), fill = new THREE.DirectionalLight(0xd8e4ff, 1.3);
+  key.position.set(6, 8, 6);
+  fill.position.set(4, -3, -6);
+  scene.add(key, fill, new THREE.HemisphereLight(0xfff4e0, 0x6a5030, 1.4));
   const prev = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
   for (const id of ids) {
     if (['vest', 'vesthelm', 'kit', 'nvg', 'camo'].includes(id)) { icons.set(id, drawn(id)); continue; }

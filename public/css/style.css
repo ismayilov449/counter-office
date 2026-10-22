@@ -70,12 +70,13 @@ kbd { background: #2a2a24; border: 1px solid #444; border-radius: 3px; padding: 
 #center-msg small { display: block; font-size: 16px; color: var(--muted); margin-top: 4px; }
 /* the buy menu (CS2-style, see buymenu.js) */
 #buymenu { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(0, 0, 0, 0.25); pointer-events: auto; }
-.bm-panel { width: min(1240px, 96vw); max-height: 92vh; display: grid; grid-template-rows: auto 1fr auto auto; background: rgba(18, 20, 24, 0.94); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); }
-.bm-head { display: flex; align-items: center; gap: 16px; padding: 8px 14px; background: rgba(0, 0, 0, 0.35); }
+.bm-panel { width: min(1440px, 97vw); max-height: 94vh; display: grid; grid-template-rows: auto 1fr auto auto; background: rgba(18, 20, 24, 0.94); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); }
+.bm-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 8px 14px; background: rgba(0, 0, 0, 0.35); }
 .bm-title { font: bold 13px Arial, sans-serif; letter-spacing: 3px; color: #ddd; }
 .bm-reason { flex: 1; color: var(--danger); font-size: 12px; text-align: center; }
 .bm-money { font: bold 18px Arial, sans-serif; color: #7ed07e; }
-.bm-cols { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 8px; overflow: auto; min-height: 0; align-items: start; }
+/* the columns fill the width and wrap onto more rows on a narrow screen */
+.bm-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(132px, 13vw, 200px), 1fr)); gap: 6px; padding: 8px; overflow: auto; min-height: 0; align-items: start; }
 .bm-cols.blocked .bm-item { opacity: 0.45; }
 .bm-col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bm-col.sel .bm-colhead { background: rgba(231, 179, 80, 0.35); }
@@ -83,11 +84,11 @@ kbd { background: #2a2a24; border: 1px solid #444; border-radius: 3px; padding: 
 .bm-colhead b { color: #e7b350; margin-right: 4px; }
 .bm-item { position: relative; display: grid; grid-template-columns: 1fr; justify-items: center; padding: 3px 6px 2px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; cursor: pointer; user-select: none; }
 .bm-item:hover { background: rgba(231, 179, 80, 0.16); border-color: rgba(231, 179, 80, 0.6); }
-.bm-item img { width: 100%; max-width: 120px; height: 30px; object-fit: contain; }
+.bm-item img { width: 100%; max-width: 150px; height: clamp(22px, 3.5vh, 42px); object-fit: contain; }
 .bm-line { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; width: 100%; }
 .bm-key { position: absolute; left: 5px; top: 3px; font: bold 10px Arial, sans-serif; color: #999; }
-.bm-name { font-size: 11px; color: #e6e6e6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.bm-price { font: bold 11px Arial, sans-serif; color: #9fd49f; white-space: nowrap; }
+.bm-name { font-size: clamp(10px, 0.8vw, 12px); color: #e6e6e6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bm-price { font: bold clamp(10px, 0.8vw, 12px) Arial, sans-serif; color: #9fd49f; white-space: nowrap; }
 .bm-item.owned { border-color: rgba(126, 208, 126, 0.7); }
 .bm-item.owned .bm-price { color: #7ed07e; }
 .bm-item.poor img, .bm-item.poor .bm-name { opacity: 0.4; }
@@ -104,7 +105,11 @@ kbd { background: #2a2a24; border: 1px solid #444; border-radius: 3px; padding: 
 .bm-stats { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .bm-stat span { color: #999; margin-right: 6px; }
 .bm-refund { color: #e7b350; margin-top: 3px; }
-.bm-foot { display: flex; justify-content: center; gap: 22px; padding: 7px; background: rgba(0, 0, 0, 0.35); font-size: 12px; color: #cfc6a8; }
+@media (max-height: 700px) {
+  .bm-info { min-height: 0; padding: 4px 14px; }
+  .bm-item img { height: 20px; }
+}
+.bm-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; padding: 7px; background: rgba(0, 0, 0, 0.35); font-size: 12px; color: #cfc6a8; }
 .bm-foot span { cursor: pointer; }
 .bm-foot span:hover { color: #fff; }
 .bm-foot b { color: #e7b350; margin-right: 4px; }

@@ -1728,7 +1728,7 @@ document.addEventListener('keydown', e => {
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.alive) startUse('key'); break;
     case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
-    case 'KeyO': openBuy(0); break; // straight to the equipment
+    case 'KeyO': openBuy(5); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;
     case 'KeyZ': case 'KeyX': case 'KeyC':
       if (me.alive && me.team !== 'SPEC') toggleMenu(radioMenu(e.code[3].toLowerCase()));
