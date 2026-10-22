@@ -77,6 +77,7 @@ export class Hud {
   }
 
   timer(text, bomb) {
+    this.onTimer?.(text, bomb); // the team bar's timer too
     this.set('timer', text);
     this.el.timer.classList.toggle('bomb', !!bomb);
   }

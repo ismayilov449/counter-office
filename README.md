@@ -180,6 +180,15 @@ a match anyone can also vote from the Esc menu: more than half the players votin
 
 ## Gameplay
 
+**Team bar** (classic matches, like CS2's): along the top, the round timer — the bomb's 40-second countdown, in
+red, once it's planted — with the score and how many are alive on each side, between the two teams' player
+cards; your team on the left (CT on the left when you spectate). A card shows the player's picture in their
+colour, a health bar, money, the gun they carry, grenades and mines, the defuse kit or the bomb. Of the other
+team you see only who's alive and what gun they hold — everything once you're dead or spectating (the server
+doesn't even send the rest). Dead players are greyed out with a skull. Choose your picture on the join screen
+(it stays in your browser); without one you get your initials, bots a robot. Not shown in Deathmatch, Gun Game,
+Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score and timer).
+
 - **Warmup** until both teams have a player (instant respawn, $16000, buy anywhere), then
   "game commencing" after 3 s and 3 s freeze time per round.
 - **Weapons:** Glock, USP, P228, Desert Eagle, Five-SeveN, Dual Berettas, M3, XM1014, MAC-10, TMP,
@@ -416,6 +425,7 @@ public/js/           Browser client (Three.js): world, models, effects, HUD, men
 public/js/batch.js   Fewer draw calls: player parts and guns baked into one mesh each, static decor and windows merged
 public/js/billboards.js Smoke, fireballs and flames: every particle of a kind in one draw call
 public/js/autoquality.js Automatic quality: steps resolution, shadows and effects down and up to hold the frame rate
+public/js/teambar.js The CS2-style team bar: player cards, pictures and weapon silhouettes
 public/admin.html    The admin panel (/admin)
 ```
 

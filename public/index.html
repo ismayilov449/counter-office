@@ -21,6 +21,7 @@
   <div id="hud" class="hidden">
     <canvas id="radar" width="200" height="200"></canvas>
     <div id="map-name"></div>
+    <div id="teambar" class="hidden"></div>
     <div id="top">
       <span id="scoreT" class="score t">0</span>
       <span id="timer">--:--</span>
@@ -80,6 +81,11 @@
         <button data-team="auto" class="team-btn">Auto-select</button>
         <button data-team="SPEC" class="team-btn spec">Spectate</button>
       </div>
+      <div class="avatar-pick">
+        <img id="avatar-preview" alt="">
+        <label class="ghost avatar-btn">Choose your picture<input id="avatar-file" type="file" accept="image/*" hidden></label>
+        <button id="avatar-clear" class="ghost hidden">Remove</button>
+      </div>
       <button id="draw-spray" class="ghost">Draw your graffiti spray</button>
       <details class="lb" open><summary>Office leaderboard</summary><div id="leaderboard" class="lb-table"></div></details>
       <div id="online" class="muted"></div>
@@ -107,6 +113,7 @@
           <div id="quality-note" class="muted small hidden">Reload the page to apply the new graphics quality.</div>
           <label class="check"><input id="auto-quality" type="checkbox"> Auto-adjust: lower the resolution and effects when the game can't keep up</label>
           <label class="check"><input id="show-perf" type="checkbox"> Show FPS and ping</label>
+          <label class="check"><input id="team-bar-setting" type="checkbox"> Team bar along the top (classic matches)</label>
           <label class="check"><input id="fullscreen" type="checkbox"> Fullscreen &amp; block browser shortcuts</label>
           <label class="check"><input id="rawinput" type="checkbox"> Raw mouse input</label>
           <label class="check"><input id="radiovoice" type="checkbox"> Speak radio commands</label>

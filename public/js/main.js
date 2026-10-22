@@ -18,6 +18,7 @@ import { RANKS } from '/shared/ranks.js';
 import { ACHIEVEMENT } from '/shared/achievements.js';
 import { Effects, nadeFuse } from './effects.js';
 import { AutoQuality } from './autoquality.js';
+import { TeamBar, shrinkPicture } from './teambar.js';
 import { audio } from './audio.js';
 import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
@@ -32,7 +33,7 @@ const angleDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 // ---------------------------------------------------------------- settings
 
 const SETTINGS_KEY = 'counter-office-settings';
-const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50', chDynamic: true, autoQuality: true, showPerf: false };
+const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50', chDynamic: true, autoQuality: true, showPerf: false, teamBar: true, avatar: null };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch { /* storage unavailable */ }
 if (!QUALITY[settings.quality]) settings.quality = 'medium';
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ } };
@@ -1794,6 +1795,30 @@ radioVoice.checked = settings.radioVoice;
 killcamBox.checked = settings.killcam;
 announcerBox.checked = settings.announcer;
 killcamBox.addEventListener('change', () => { settings.killcam = killcamBox.checked; saveSettings(); });
+const teamBarBox = $('team-bar-setting');
+teamBarBox.checked = settings.teamBar;
+teamBarBox.addEventListener('change', () => { settings.teamBar = teamBarBox.checked; saveSettings(); });
+// Your picture on the team bar: chosen on the join screen, kept in this browser, sent when you connect.
+function showAvatar() {
+  if (settings.avatar) $('avatar-preview').src = settings.avatar;
+  else $('avatar-preview').removeAttribute('src');
+  $('avatar-clear').classList.toggle('hidden', !settings.avatar);
+}
+showAvatar();
+$('avatar-file').addEventListener('change', async e => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    settings.avatar = await shrinkPicture(file);
+  } catch {
+    return;
+  }
+  saveSettings();
+  showAvatar();
+  net.send({ t: 'avatar', img: settings.avatar });
+});
+$('avatar-clear').addEventListener('click', () => { settings.avatar = null; saveSettings(); showAvatar(); });
 const autoQBox = $('auto-quality'), perfBox = $('show-perf');
 autoQBox.checked = settings.autoQuality;
 perfBox.checked = settings.showPerf;
@@ -1925,6 +1950,12 @@ const net = new Net({
     if (document.pointerLockElement) document.exitPointerLock();
     $('disconnected').classList.remove('hidden');
   },
+  bar(m) {
+    game.bar = m.l;
+  },
+  avatar(m) {
+    (game.avatars ||= {})[m.id] = m.img;
+  },
   welcome(m) {
     me.id = m.id;
     game.cfg = { ...game.cfg, ...m.cfg };
@@ -1939,6 +1970,8 @@ const net = new Net({
     applyBrokenPieces(m.brk);
     applyDoors(m.doors);
     for (const [id, data] of Object.entries(m.sprayImgs || {})) sprayTexture(+id, data);
+    game.avatars = m.avatars || {};
+    if (settings.avatar) net.send({ t: 'avatar', img: settings.avatar });
     for (const s of m.sprays || []) { const tex = getSprayTexture(s.id); if (tex) fx.spray(s.id, tex, s.p, s.n, s.yaw); }
     joinButtons.forEach(b => { b.disabled = false; });
     shortcutNote();
@@ -2777,7 +2810,10 @@ function updateHud(now) {
   else if (isDM() && game.phase === 'live') { hud.timer(fmtTime(Math.ceil(tl))); phase = dmStatus(); }
   else if (isHNS() && (game.phase === 'live' || game.phase === 'freeze')) { hud.timer(fmtTime(Math.ceil(tl))); phase = hnsStatus(); }
   else if (isZM() && (game.phase === 'live' || game.phase === 'freeze')) { hud.timer(fmtTime(Math.ceil(tl))); phase = zmStatus(); }
-  else if (game.phase === 'live' && game.bomb.s === 'planted') { hud.timer('C4', true); phase = 'The bomb has been planted'; }
+  else if (game.phase === 'live' && game.bomb.s === 'planted') {
+    hud.timer(fmtTime(Math.ceil(Math.max(0, game.bomb.tl - (now - game.snapRecv) / 1000))), true);
+    phase = 'The bomb has been planted';
+  }
   else {
     hud.timer(fmtTime(Math.ceil(tl)));
     if (game.phase === 'freeze') phase = 'Buy time';
@@ -3090,6 +3126,20 @@ function applyQuality(lv) {
 const autoQ = new AutoQuality(applyQuality);
 autoQ.setEnabled(settings.autoQuality);
 let perfAt = 0, perfFrames = 0;
+// The team bar (classic matches; see teambar.js) in place of the plain score and timer.
+const teamBar = new TeamBar($('teambar'));
+hud.onTimer = (text, bomb) => teamBar.timer(text, bomb);
+function updateTeamBar() {
+  const on = settings.teamBar && me.joined && !isDM() && !isGG() && !isZM() && !isHNS() && !!game.bar?.length;
+  if (on !== updateTeamBar.on) {
+    updateTeamBar.on = on;
+    $('teambar').classList.toggle('hidden', !on);
+    $('top').classList.toggle('hidden', on);
+    document.body.classList.toggle('teambar', on);
+  }
+  if (on) teamBar.update(game.roster || [], game.bar, game.avatars || {}, game.score || { T: 0, CT: 0 }, me.id, me.team);
+}
+
 function updatePerf(now) {
   perfFrames++;
   if (!settings.showPerf || now - perfAt < 500) return;
@@ -3105,6 +3155,7 @@ function frame() {
   const now = performance.now();
   autoQ.frame((now - last) / 1000, now);
   updatePerf(now);
+  updateTeamBar();
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 

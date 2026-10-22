@@ -68,7 +68,45 @@ kbd { background: #2a2a24; border: 1px solid #444; border-radius: 3px; padding: 
 .tname-CT { color: var(--ct); }
 #center-msg { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); font-size: 30px; text-align: center; color: #fff; white-space: pre-line; }
 #center-msg small { display: block; font-size: 16px; color: var(--muted); margin-top: 4px; }
-#perf { position: absolute; top: 10px; left: 226px; font: 12px Consolas, monospace; color: #cfe8c0; background: rgba(0, 0, 0, 0.45); padding: 2px 7px; border-radius: 3px; }
+/* the team bar along the top (classic matches, see teambar.js) */
+#teambar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: flex-start; gap: 6px; width: calc(100vw - 470px); max-width: 1500px; pointer-events: none; }
+#teambar .tb-side { display: flex; gap: 3px; flex: 1 1 0; min-width: 0; }
+#teambar .tb-left { justify-content: flex-end; }
+#teambar .tb-right { justify-content: flex-start; }
+.tb-card { flex: 0 1 62px; min-width: 28px; display: flex; flex-direction: column; align-items: center; padding-bottom: 4px; border-radius: 2px; }
+.tb-side.t .tb-card { background: linear-gradient(rgba(58, 44, 20, 0.92), rgba(30, 24, 12, 0.6)); }
+.tb-side.ct .tb-card { background: linear-gradient(rgba(24, 40, 66, 0.92), rgba(12, 20, 36, 0.6)); }
+.tb-pic { position: relative; width: 100%; aspect-ratio: 1; border: 3px solid var(--pc); box-sizing: border-box; background: #1c1c1c; }
+.tb-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tb-skull { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.35); }
+.tb-skull svg { width: 45%; height: auto; }
+.tb-card.dead { opacity: 0.5; }
+.tb-card.dead img { filter: grayscale(1); }
+.tb-hp { width: 100%; height: 4px; background: rgba(0, 0, 0, 0.6); }
+.tb-hp i { display: block; height: 100%; }
+.tb-money { font: bold 12px Arial, sans-serif; color: #fff; margin-top: 3px; min-height: 14px; }
+.tb-gun { min-height: 16px; display: flex; justify-content: center; width: 100%; }
+.tb-gun svg { max-width: 92%; height: auto; max-height: 16px; }
+.tb-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; min-height: 12px; margin-top: 2px; }
+.tb-items svg { height: 11px; width: auto; }
+.tb-name { font-size: 9px; color: #ccc; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.tb-card.me .tb-name { color: #fff; font-weight: bold; }
+.tb-mid { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; background: rgba(15, 17, 20, 0.82); padding: 3px 8px 5px; min-width: 104px; border-radius: 2px; }
+.tb-timer { font: bold 24px Consolas, monospace; color: #fff; }
+.tb-timer.bomb { color: var(--danger); }
+.tb-scores { display: flex; gap: 6px; }
+.tb-score { font: bold 22px Arial, sans-serif; min-width: 34px; text-align: center; padding: 0 6px; background: rgba(0, 0, 0, 0.35); }
+.tb-score.t { color: var(--t); }
+.tb-score.ct { color: var(--ct); }
+.tb-alive { display: flex; gap: 26px; font-size: 12px; color: #ccc; margin-top: 2px; }
+.tb-alive svg { height: 10px; width: auto; margin-right: 3px; vertical-align: -1px; opacity: 0.8; }
+body.teambar #killfeed { top: 150px; }
+body.teambar #phase { top: 140px; }
+.avatar-pick { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.avatar-pick img { width: 40px; height: 40px; border-radius: 3px; object-fit: cover; background: #222; }
+.avatar-pick img:not([src]) { visibility: hidden; }
+.avatar-btn { cursor: pointer; }
+#perf { position: absolute; top: 236px; left: 14px; font: 12px Consolas, monospace; color: #cfe8c0; background: rgba(0, 0, 0, 0.45); padding: 2px 7px; border-radius: 3px; }
 #small-msg { position: absolute; top: 76px; left: 50%; transform: translateX(-50%); font-size: 14px; color: #fff; text-align: center; }
 #hint { position: absolute; top: 62%; left: 50%; transform: translateX(-50%); color: var(--hud); font-size: 15px; }
 /* the mortar gunner's sight panel */

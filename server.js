@@ -271,6 +271,27 @@ function sendMe(p) {
   });
 }
 
+// ---- The team bar along the top (classic matches, like CS2's): for your own team money, health, grenades, the kit
+// and the bomb; for the other team only who's alive and what they hold — everything once you're dead or watching.
+// Each player gets their own copy, so nothing they shouldn't see is ever sent to them.
+// A row: [id, alive, weapon, hp | -1, money | -1, [grenades and mines], flags: 1 kit, 2 the bomb]
+function sendTeamBar() {
+  if (CFG.gameMode !== 'classic') return;
+  const team = [...players.values()].filter(q => q.joined && inTeam(q));
+  if (!team.length) return;
+  const rows = team.map(q => {
+    const nades = [];
+    for (const k of [...GRENADES, ...MINES]) for (let i = 0; i < (q.inv[k] || 0); i++) nades.push(k);
+    const full = [q.id, q.alive ? 1 : 0, q.inv.primary?.id || q.inv.secondary?.id || 'knife', Math.max(0, Math.round(q.hp)), q.money, nades, (q.kit ? 1 : 0) | (q.inv.c4 ? 2 : 0)];
+    return { q, full, enemy: [q.id, q.alive ? 1 : 0, full[2], -1, -1, [], 0] };
+  });
+  for (const p of players.values()) {
+    if (!p.joined) continue;
+    const all = !inTeam(p) || !p.alive;
+    send(p, { t: 'bar', l: rows.map(r => (all || r.q.team === p.team ? r.full : r.enemy)) });
+  }
+}
+
 function sendRoster() {
   const list = [...players.values()].filter(p => p.joined).map(p => ({
     id: p.id, name: p.name, team: p.team, k: p.kills, d: p.deaths, ping: p.ping, alive: p.alive, vote: p.vote || null,
@@ -2750,6 +2771,13 @@ function handle(p, m) {
     case 'spray':
       onSpray(p, m, t);
       break;
+    case 'avatar':
+      // the player's picture for the team bar: a small JPEG made in their browser
+      if (typeof m.img === 'string' && m.img.startsWith('data:image/jpeg;base64,') && m.img.length < 24000) {
+        p.avatar = m.img;
+        broadcast({ t: 'avatar', id: p.id, img: m.img });
+      }
+      break;
     case 'sprayimg':
       if (typeof m.data === 'string' && m.data.startsWith('data:image/png;base64,') && m.data.length < 90000) {
         p.sprayImg = m.data;
@@ -2984,6 +3012,7 @@ if (env.DEBUG_TICK) {
   }, 10);
 }
 setInterval(sendRoster, 2000);
+setInterval(sendTeamBar, 250);
 setInterval(() => syncBots(), 2000);
 
 function newPlayer(ws) {
@@ -3007,12 +3036,13 @@ wss.on('connection', ws => {
   if (players.size >= CFG.maxPlayers) { ws.close(1013, 'Server full'); return; }
   const p = newPlayer(ws);
   players.set(p.id, p);
-  const sprayImgs = {};
+  const sprayImgs = {}, avatars = {};
   for (const q of players.values()) if (q.sprayImg) sprayImgs[q.id] = q.sprayImg;
+  for (const q of players.values()) if (q.avatar) avatars[q.id] = q.avatar;
   send(p, {
     t: 'welcome', id: p.id, map: MAP.id, mode: mapMode(MAP), maps: MAP_IDS.map(id => ({ id, title: MAPS[id].title })),
     cfg: { ...settingsView(), zombieCountdown: ZOMBIE.countdown, hnsHide: CFG.hnsHide, gameMode: CFG.gameMode, autoBalance: CFG.autoBalance, halftime: CFG.halftime, startMoney: CFG.startMoney, startMoneyChoices: START_MONEY_CHOICES, roundsToWin: CFG.roundsToWin, roundTime: CFG.roundTime, buyTime: CFG.buyTime, freezeTime: CFG.freezeTime, plantTime: CFG.plantTime, friendlyFire: CFG.friendlyFire, httpsPort: httpsReady ? CFG.httpsPort : null },
-    sprayImgs, sprays: [...game.sprays.values()], glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates,
+    sprayImgs, avatars, sprays: [...game.sprays.values()], glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates,
   });
   sendMines(p);
   sendRoster();
