@@ -2217,8 +2217,9 @@ const net = new Net({
     audio.play(big ? 'c4boom' : 'heboom', m.p);
     const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);
     me.shake = Math.max(me.shake, clamp(1 - d / (big ? 40 : 15), 0, 1) * (big ? 1.2 : 0.6));
-    // ringing ears when an HE goes off close by
+    // ringing ears when an HE goes off close by, or the bomb (much further, full strength)
     if (m.k === 'he' && me.alive && d < 8) audio.play('shellshock', null, clamp(1.2 - d / 8, 0.3, 0.8));
+    if (big && me.alive && d < 25) audio.play('shellshock', null, clamp(1.3 - d / 25, 0.3, 1));
   },
   flashed(m) {
     hud.flashbang(m.a, m.dur);
