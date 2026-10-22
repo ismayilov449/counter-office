@@ -2173,7 +2173,7 @@ const net = new Net({
     if (m.k === 'flash') { fx.flashPop(m.p); audio.play('flashpop', m.p); return; }
     if (m.k === 'pmn' || m.k === 'mon50') {
       fx.explosion(m.p, false);
-      audio.play('boom', m.p);
+      audio.play('heboom', m.p);
       // the MON-50's fan of fragments
       if (m.k === 'mon50') {
         const base = Math.atan2(m.d[0], m.d[1]);
