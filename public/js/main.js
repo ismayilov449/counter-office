@@ -2153,8 +2153,12 @@ const net = new Net({
   shell(m) {
     fx.shell(m.o, m.at, m.flight);
     audio.play('mortarfire', m.o);
-    // The whistle of it coming down, near where it lands
-    setTimeout(() => audio.play('whistle', m.at), Math.max(0, m.flight - 1900));
+    // The scream of it coming down for the last few seconds, near where it lands: louder the closer it is to us
+    const dur = Math.min(3.6, m.flight / 1000 - 0.3);
+    setTimeout(() => {
+      const d = Math.hypot(me.p[0] - m.at[0], me.p[2] - m.at[2]);
+      audio.play('whistle', m.at, { dur, close: clamp(1 - d / 40, 0, 1) });
+    }, m.flight - dur * 1000);
   },
   rocket(m) {
     fx.rocket(m.o, m.d, m.dist, m.speed);
@@ -2182,7 +2186,15 @@ const net = new Net({
       me.shake = Math.max(me.shake, clamp(1 - d / 15, 0, 1) * 0.7);
       return;
     }
-    if (m.k === 'rpg' || m.k === 'mortar') {
+    if (m.k === 'mortar') {
+      fx.explosion(m.p, true);
+      audio.play('mortarboom', m.p);
+      const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
+      me.shake = Math.max(me.shake, clamp(1 - d / 45, 0, 1) * 1.8);
+      if (me.alive && d < 16) audio.play('shellshock', null, clamp(1.3 - d / 16, 0.3, 1));
+      return;
+    }
+    if (m.k === 'rpg') {
       fx.explosion(m.p, true);
       audio.play('bigboom', m.p);
       const d = Math.hypot(me.p[0] - m.p[0], me.p[2] - m.p[2]);

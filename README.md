@@ -177,8 +177,10 @@ a match anyone can also vote from the Esc menu: more than half the players votin
     live, where the next shell will come down as you turn and tilt the tube.
   - **V** calls in a target — anyone on the team (or you, before setting up): the spot you're looking at. The
     gunner's panel shows its bearing and distance from the mortar and how far to turn, and it's marked on the radar.
-  - **Mouse1** fires. The shell flies a high arc for 3½–5 seconds; everyone near where it comes down hears it whistle
-    in for the last two — run! It lands a little off (1 m + 3% of the distance) and blows up like an RPG rocket (up to
+  - **Mouse1** fires. The shell flies a high arc for 3½–5 seconds; everyone near where it comes down hears it scream
+    in for the last 3 seconds — a warbling whistle, louder and lower the closer it will land, then a moment of
+    silence: run! The blast is heard across the map; right next to it your ears ring and everything goes muffled for a
+    few seconds. It lands a little off (1 m + 3% of the distance) and blows up like an RPG rocket (up to
     300 damage within 10 m, not through walls, bodies burst apart). A roof stops it, so it can't reach indoors.
   - After each shell the panel says where it landed: exactly, with the correction ("6 m short, 0-40 left of the
     target"), if someone on the team saw it go off; only roughly ("not observed") if nobody did. It's on the radar

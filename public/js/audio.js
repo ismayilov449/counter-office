@@ -184,6 +184,80 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
   o.stop(t0 + dur + 0.05);
 }
 
+// ---- the 82-BM-37's shells
+// Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
+const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5] };
+
+// A shell coming down: a shrill, warbling scream falling in pitch, swelling louder and louder, then a split second
+// of silence before it hits. close (0..1): how near it lands to us; a closer one is louder and lower.
+function shellWhistle(out, t, dur, close) {
+  const cut = t + dur - 0.18;
+  const hi = 2300 - close * 500, lo = 620 - close * 140;
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.exponentialRampToValueAtTime(0.06, t + dur * 0.35);
+  env.gain.exponentialRampToValueAtTime(0.45 + close * 0.35, cut);
+  env.gain.linearRampToValueAtTime(0, cut + 0.03);
+  env.connect(out);
+  // the warble: a wobble on the pitch, faster as it comes in
+  const lfo = ctx.createOscillator(), depth = ctx.createGain();
+  lfo.frequency.setValueAtTime(4, t);
+  lfo.frequency.linearRampToValueAtTime(11, cut);
+  depth.gain.setValueAtTime(hi * 0.012, t);
+  depth.gain.linearRampToValueAtTime(lo * 0.03, cut);
+  lfo.connect(depth);
+  for (const [type, k, g] of [['sine', 1, 0.6], ['sine', 1.012, 0.35], ['triangle', 2.003, 0.12]]) {
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(hi * k, t);
+    o.frequency.exponentialRampToValueAtTime(lo * k, cut);
+    depth.connect(o.frequency);
+    og.gain.value = g;
+    o.connect(og).connect(env);
+    o.start(t);
+    o.stop(cut + 0.05);
+  }
+  // air tearing past the fins: noise in a narrow band that follows the pitch
+  const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
+  src.buffer = noise;
+  src.loop = true;
+  bp.type = 'bandpass';
+  bp.Q.value = 9;
+  bp.frequency.setValueAtTime(hi, t);
+  bp.frequency.exponentialRampToValueAtTime(lo, cut);
+  ng.gain.value = 1.4;
+  src.connect(bp).connect(ng).connect(env);
+  src.start(t);
+  src.stop(cut + 0.05);
+  lfo.start(t);
+  lfo.stop(cut + 0.05);
+}
+
+// The shell landing: a sharp crack, a distorted blast, a sub-bass punch, the rumble rolling off walls,
+// and dirt and stones raining down for a few seconds.
+function shellBlast(out, t) {
+  const sh = drive();
+  sh.connect(out);
+  if (reverb) {
+    const send = ctx.createGain();
+    send.gain.value = 0.9;
+    out.connect(send).connect(reverb);
+  }
+  burst(out, t, { dur: 0.06, type: 'highpass', freq: 2200, gain: 2.6 });
+  burst(sh, t, { dur: 1.6, freq: 1800, freqEnd: 70, gain: 2.8 });
+  tone(sh, t, { freq: 120, freqEnd: 30, dur: 0.9, type: 'triangle', gain: 0.9 });
+  tone(out, t, { freq: 58, freqEnd: 17, dur: 3, gain: 2.0 });
+  burst(out, t + 0.15, { dur: 4.5, freq: 380, freqEnd: 50, gain: 0.9 });
+  // echoes off far walls
+  burst(out, t + 0.42, { dur: 1.6, freq: 700, freqEnd: 70, gain: 0.55 });
+  burst(out, t + 1.05, { dur: 1.8, freq: 450, freqEnd: 60, gain: 0.3 });
+  // debris raining down
+  for (let i = 0; i < 34; i++) {
+    const at = t + 0.35 + Math.pow(Math.random(), 1.6) * 2.8;
+    burst(out, at, { dur: 0.025 + Math.random() * 0.06, type: 'bandpass', freq: 900 + Math.random() * 3200, q: 1.5, gain: 0.08 + Math.random() * 0.14 });
+  }
+}
+
 // A footstep on each kind of floor; heavy > 1 for landing from a jump.
 function footstep(out, t, surface, heavy) {
   const r = Math.random();
@@ -256,7 +330,7 @@ export const audio = {
 
   setVolume(v) {
     this.volume = v;
-    if (master) master.gain.value = v;
+    if (master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.value = v; }
   },
 
   listener(pos, fwd) {
@@ -274,14 +348,14 @@ export const audio = {
   },
 
   // A destination node: positional when `pos` ([x, y, z]) is given.
-  out(pos) {
+  out(pos, [ref, roll] = [3, 1.1]) {
     if (!pos) return master;
     const p = ctx.createPanner();
     p.panningModel = 'equalpower';
     p.distanceModel = 'inverse';
-    p.refDistance = 3;
-    p.maxDistance = 200;
-    p.rolloffFactor = 1.1;
+    p.refDistance = ref;
+    p.maxDistance = 400;
+    p.rolloffFactor = roll;
     if (p.positionX) { p.positionX.value = pos[0]; p.positionY.value = pos[1]; p.positionZ.value = pos[2]; }
     else p.setPosition(pos[0], pos[1], pos[2]);
     p.connect(master);
@@ -291,7 +365,7 @@ export const audio = {
   play(name, pos = null, arg = null) {
     if (!ctx || ctx.state !== 'running') return;
     const t = ctx.currentTime;
-    const out = this.out(pos);
+    const out = this.out(pos, FAR[name]);
     switch (name) {
       case 'shot': {
         const s = GUN[arg] || GUN.glock;
@@ -376,18 +450,31 @@ export const audio = {
         tone(out, t, { freq: 220, freqEnd: 60, dur: 0.6, type: 'sawtooth', gain: 0.15 });
         break;
       case 'mortarfire':
-        // the shell dropped down the tube: a hollow metal clink, then a deep thoomp
+        // the shell dropped down the tube: a hollow metal clink, then a deep thoomp heard far across the map
         tone(out, t, { freq: 1900, freqEnd: 1500, dur: 0.12, type: 'triangle', gain: 0.12 });
-        burst(out, t + 0.08, { dur: 0.6, type: 'lowpass', freq: 700, freqEnd: 90, gain: 1.7 });
-        tone(out, t + 0.08, { freq: 95, freqEnd: 32, dur: 0.55, gain: 1.2 });
-        burst(out, t + 0.1, { dur: 1.2, type: 'bandpass', freq: 300, q: 0.6, gain: 0.3 });
+        burst(out, t + 0.08, { dur: 0.7, type: 'lowpass', freq: 800, freqEnd: 80, gain: 2.0 });
+        tone(out, t + 0.08, { freq: 90, freqEnd: 28, dur: 0.8, gain: 1.5 });
+        burst(out, t + 0.1, { dur: 1.6, type: 'bandpass', freq: 300, q: 0.6, gain: 0.35 });
+        burst(out, t + 0.6, { dur: 1.4, freq: 400, freqEnd: 60, gain: 0.3 }); // its echo
         break;
       case 'whistle':
-        // an incoming shell, falling in pitch as it comes down
-        tone(out, t, { freq: 1500, freqEnd: 520, dur: 1.8, gain: 0.16 });
-        tone(out, t, { freq: 1530, freqEnd: 540, dur: 1.8, gain: 0.08 });
-        burst(out, t + 0.6, { dur: 1.2, type: 'bandpass', freq: 1800, freqEnd: 700, q: 3, gain: 0.25 });
+        // arg: { dur, close }
+        shellWhistle(out, t, arg?.dur ?? 3, arg?.close ?? 0);
         break;
+      case 'mortarboom':
+        shellBlast(out, t);
+        break;
+      case 'shellshock': {
+        // a shell landed right next to us: everything goes muffled under a ringing in the ears
+        const s = arg ?? 1, v = this.volume;
+        tone(master, t + 0.1, { freq: 3700, dur: 4.5 * s, gain: 0.09 * s });
+        tone(master, t + 0.1, { freq: 3712, dur: 3.5 * s, gain: 0.05 * s });
+        master.gain.cancelScheduledValues(t);
+        master.gain.setValueAtTime(v, t);
+        master.gain.linearRampToValueAtTime(v * (1 - 0.7 * s), t + 0.25);
+        master.gain.linearRampToValueAtTime(v, t + 0.25 + 4 * s);
+        break;
+      }
       case 'gib':
         // a body bursting: a wet crunch, a thump and a spatter of drips
         burst(out, t, { dur: 0.4, type: 'lowpass', freq: 1800, freqEnd: 250, gain: 1.3 });
