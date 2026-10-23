@@ -430,6 +430,12 @@ network). If it stays near 200 ms or more, that player's Wi-Fi is struggling.
   under the radar; the scoreboard marks that player's ping with ⚠ for everyone.
 - The server process runs at above-normal priority, so the laptop that hosts and plays keeps its ticks on time.
 
+**Updates and loading:**
+- After restarting the server with a new version, open game pages **reload by themselves** (they check every
+  2 s while disconnected). A page that still carries an older version than the server reloads once when it connects.
+- Files are sent gzip-compressed and the browser keeps them: a first load is about 1.1 MB (was 5.5 MB), and a reload
+  or map change downloads only what changed (about 10 KB).
+
 - On the server, collision and the breakable pieces sit in 2 m grids; `DEBUG_TICK=1` prints tick times, event-loop
   stalls and what each blast cost, `PROFILE_MS=60000` records a CPU profile.
 

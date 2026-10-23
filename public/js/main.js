@@ -2007,6 +2007,12 @@ const net = new Net({
     me.joined = false;
     if (document.pointerLockElement) document.exitPointerLock();
     $('disconnected').classList.remove('hidden');
+    // Not kicked and not full: reload by itself as soon as the server answers again (e.g. after a restart).
+    if (e?.code !== 4001 && e?.code !== 1013) {
+      $('disconnect-reason').textContent += ' Reconnecting automatically when the server is back…';
+      const retry = () => fetch('/api/build', { cache: 'no-store' }).then(r => (r.ok ? location.reload() : setTimeout(retry, 2000)), () => setTimeout(retry, 2000));
+      setTimeout(retry, 2000);
+    }
   },
   sold(m) {
     const i = me.roundBuys.lastIndexOf(m.item);
@@ -2020,6 +2026,14 @@ const net = new Net({
     (game.avatars ||= {})[m.id] = m.img;
   },
   welcome(m) {
+    // The server runs a newer version of the game than this page: reload to get it (once, so it can't loop).
+    const pageBuild = document.querySelector('meta[name="build"]')?.content;
+    if (m.build && pageBuild && pageBuild !== 'dev' && m.build !== pageBuild) {
+      let tried = null;
+      try { tried = sessionStorage.getItem('reloadedFor'); sessionStorage.setItem('reloadedFor', m.build); } catch { /* no storage: reload anyway */ }
+      if (tried !== m.build) { location.reload(); return; }
+      hud.small('The game was updated — press Ctrl+F5 to load the new version', 8);
+    }
     me.id = m.id;
     game.cfg = { ...game.cfg, ...m.cfg };
     applyModeNames();

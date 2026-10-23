@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
 import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK, BLAST_FIRE, REAL } from './shared/weapons.js';
@@ -104,20 +105,71 @@ function serveStatic(req, res) {
     res.end(JSON.stringify(stats.top(50)));
     return;
   }
+  if (url === '/api/build') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ build: BUILD }));
+    return;
+  }
   for (const [prefix, dir] of MOUNTS) {
     if (!url.startsWith(prefix)) continue;
     const file = path.join(dir, url.slice(prefix.length) || 'index.html');
     if (!file.startsWith(dir + path.sep)) break;
-    fs.readFile(file, (err, data) => {
+    staticFile(file, (err, f) => {
       if (err) { res.writeHead(404); res.end('Not found'); return; }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-      res.end(data);
+      // The browser asks "has it changed?" each time (no-cache) and gets a tiny "no" (304) when it hasn't.
+      const head = { 'Content-Type': f.type, 'Cache-Control': 'no-cache', ETag: f.etag };
+      if (req.headers['if-none-match'] === f.etag) { res.writeHead(304, head); res.end(); return; }
+      if (f.gz) {
+        head.Vary = 'Accept-Encoding';
+        if (/\bgzip\b/.test(req.headers['accept-encoding'] || '')) { head['Content-Encoding'] = 'gzip'; res.writeHead(200, head); res.end(f.gz); return; }
+      }
+      res.writeHead(200, head);
+      res.end(f.data);
     });
     return;
   }
   res.writeHead(404);
   res.end('Not found');
 }
+
+// Served files, read and compressed once and kept until they change on disk. The page carries the build it came
+// from (see BUILD), so a page left open across an update notices and reloads.
+const COMPRESS = new Set(['.html', '.js', '.css', '.json', '.svg']);
+const fileCache = new Map();
+function staticFile(file, done) {
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) { done(err || new Error('not a file')); return; }
+    const hit = fileCache.get(file);
+    if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) { done(null, hit); return; }
+    fs.readFile(file, (err2, data) => {
+      if (err2) { done(err2); return; }
+      const ext = path.extname(file);
+      if (file === INDEX_HTML) data = Buffer.from(data.toString('utf8').replace('content="dev"', `content="${BUILD}"`));
+      const f = {
+        mtime: st.mtimeMs, size: st.size, data, type: MIME[ext] || 'application/octet-stream',
+        etag: `"${crypto.createHash('sha1').update(data).digest('base64url').slice(0, 16)}"`,
+        gz: COMPRESS.has(ext) && data.length > 1024 ? zlib.gzipSync(data, { level: 9 }) : null,
+      };
+      fileCache.set(file, f);
+      done(null, f);
+    });
+  });
+}
+
+// The game's version: a fingerprint of every file the browser loads, taken when the server starts.
+const INDEX_HTML = path.join(ROOT, 'public', 'index.html');
+const BUILD = (() => {
+  const h = crypto.createHash('sha1');
+  const walk = dir => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else { h.update(path.relative(ROOT, full)); h.update(fs.readFileSync(full)); }
+    }
+  };
+  for (const dir of ['public', 'shared']) walk(path.join(ROOT, dir));
+  return h.digest('hex').slice(0, 10);
+})();
 
 function lanAddresses() {
   const out = [];
@@ -3116,7 +3168,7 @@ wss.on('connection', ws => {
   for (const q of players.values()) if (q.sprayImg) sprayImgs[q.id] = q.sprayImg;
   for (const q of players.values()) if (q.avatar) avatars[q.id] = q.avatar;
   send(p, {
-    t: 'welcome', id: p.id, map: MAP.id, mode: mapMode(MAP), maps: MAP_IDS.map(id => ({ id, title: MAPS[id].title })),
+    t: 'welcome', id: p.id, build: BUILD, map: MAP.id, mode: mapMode(MAP), maps: MAP_IDS.map(id => ({ id, title: MAPS[id].title })),
     cfg: { ...settingsView(), zombieCountdown: ZOMBIE.countdown, hnsHide: CFG.hnsHide, gameMode: CFG.gameMode, autoBalance: CFG.autoBalance, halftime: CFG.halftime, startMoney: CFG.startMoney, startMoneyChoices: START_MONEY_CHOICES, roundsToWin: CFG.roundsToWin, roundTime: CFG.roundTime, buyTime: CFG.buyTime, freezeTime: CFG.freezeTime, plantTime: CFG.plantTime, friendlyFire: CFG.friendlyFire, httpsPort: httpsReady ? CFG.httpsPort : null },
     sprayImgs, avatars, sprays: [...game.sprays.values()], glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates,
   });
