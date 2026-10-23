@@ -414,6 +414,22 @@ network). If it stays near 200 ms or more, that player's Wi-Fi is struggling.
 - **Bullet holes, soot and rubble are instanced**, map decor and windows merged; broken walls upload only the part
   of their mesh that changed.
 - **No full-screen CSS filters** on the game canvas (shell shock is an overlay; a blur cost a whole extra pass).
+- **Models share their geometry.** Every box of a body is one shared unit box, guns on the ground and mines are
+  copies of one model each, the kill cam reuses its figure, and a player who leaves takes their merged mesh with
+  them — nothing piles up on the graphics card over a long match.
+
+**Smooth movement over Wi-Fi:**
+- The server sends **32 snapshots a second** on a fixed beat — 31.25 ms is exactly two steps of the Windows timer
+  (at 30 a second the timer rounded most ticks up to 47 ms). Score, dropped guns, bomb, hostages and cars go out only
+  when they change; the snapshot text is made once per tick for everybody.
+- Your game sends your position every frame (up to ~60 a second), so every snapshot has a fresh one.
+- Other players are drawn a little in the past (the **buffer**, 70–250 ms), adapting to how unevenly snapshots
+  arrive; when one is late they keep moving for a moment instead of freezing. Shots are checked by the server at
+  the same moment in the past, so hits land where you saw them.
+- **Weak connection warning:** no updates for a moment, a ping over 150 ms, or a buffer over 150 ms shows a warning
+  under the radar; the scoreboard marks that player's ping with ⚠ for everyone.
+- The server process runs at above-normal priority, so the laptop that hosts and plays keeps its ticks on time.
+
 - On the server, collision and the breakable pieces sit in 2 m grids; `DEBUG_TICK=1` prints tick times, event-loop
   stalls and what each blast cost, `PROFILE_MS=60000` records a CPU profile.
 

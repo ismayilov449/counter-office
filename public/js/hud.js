@@ -348,10 +348,16 @@ export class Hud {
   }
 
   scoreboard(roster, myId, score, carrierId, mapTitle) {
+    // a weak connection (high ping, or Wi-Fi so unsteady their game draws others far in the past) is marked
+    const pingCell = p => {
+      if (p.bot) return '<td class="n"><span class="muted">BOT</span></td>';
+      const weak = p.ping >= 150 || p.buf >= 150;
+      return weak ? `<td class="n weak" title="Weak connection (ping ${p.ping} ms, players drawn ${p.buf} ms late)">⚠ ${p.ping}</td>` : `<td class="n">${p.ping}</td>`;
+    };
     const gg = roster.some(p => p.lv);
     const row = p => `<tr class="${p.alive ? '' : 'dead'} ${p.id === myId ? 'me' : ''}">
       <td>${rankBadge(p.rank ?? -1)} ${esc(p.name)}${p.id === carrierId ? ' <b style="color:#ff6a50">C4</b>' : ''}${p.alive ? '' : ' <span class="muted">dead</span>'}</td>
-      ${gg ? `<td class="n">${p.lv}</td>` : ''}<td class="n">${p.k}</td><td class="n">${p.d}</td><td class="n">${p.bot ? '<span class="muted">BOT</span>' : p.ping}</td></tr>`;
+      ${gg ? `<td class="n">${p.lv}</td>` : ''}<td class="n">${p.k}</td><td class="n">${p.d}</td>${pingCell(p)}</tr>`;
     const col = team => {
       const list = roster.filter(p => p.team === team).sort((a, b) => (gg ? b.lv - a.lv : 0) || b.k - a.k || a.d - b.d);
       return `<div><h3 style="color:${TEAM_COLOR[team]}"><span>${TEAM_NAME[team]} (${list.length})</span><span>${gg ? '' : score[team]}</span></h3>

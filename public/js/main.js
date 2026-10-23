@@ -63,6 +63,7 @@ const BASE_FOV = 74;
 // tell the server the same time, so it checks hits where you saw them (lag compensation).
 let interpMs = 100;
 const net$ = { lastTime: 0, gap: 50, late: 20 };
+const SLOW_SNAP = ['sc', 'dr', 'b', 'hs', 'cars'], snapKeep = {};
 function trackSnapshot(time) {
   const late = Math.max(0, performance.now() + (serverOffset ?? 0) - time);
   if (net$.lastTime) net$.gap = Math.max(time - net$.lastTime, net$.gap * 0.995);
@@ -2250,6 +2251,8 @@ const net = new Net({
     hud.spectating(null);
   },
   s(m) {
+    // the parts that rarely change come only when they do: keep the last ones
+    for (const k of SLOW_SNAP) { if (k in m) snapKeep[k] = m[k]; else m[k] = snapKeep[k]; }
     const est = m.time - performance.now();
     if (serverOffset === null || est > serverOffset) serverOffset = est;
     else serverOffset += (est - serverOffset) * 0.02;
@@ -2538,7 +2541,7 @@ const net = new Net({
     else if (m.s === 'defusing') hud.small('A teammate is defusing the bomb', 2);
     else audio.play(m.s, m.p || null);
   },
-  ping(m) { net.send({ t: 'pong', ts: m.ts }); },
+  ping(m) { net.send({ t: 'pong', ts: m.ts, buf: Math.round(interpMs) }); },
   left(m) {
     const r = remotes.get(m.id);
     if (r) removeRemote(r);
@@ -2952,8 +2955,11 @@ function updateHud(now) {
 }
 
 let lastSend = 0;
+// Your position goes to the server every frame, up to ~60 times a second, so each of its 32 snapshots a second has a
+// fresh one. (At "every 33 ms", a 60 FPS game sent every 2nd or 3rd frame — frames are 16.7 ms, a hair either side —
+// and everyone else saw you move in small jerks.)
 function sendState(now) {
-  if (!me.alive || now - lastSend < 33) return;
+  if (!me.alive || now - lastSend < 15) return;
   lastSend = now;
   const r3 = v => Math.round(v * 1000) / 1000;
   const yaw = me.car ? me.car.yaw + me.camYaw : me.yaw;
@@ -3213,11 +3219,33 @@ function updatePerf(now) {
   $('perf').textContent = `${fps} FPS · ${ping != null ? ping + ' ms' : '— ms'} · buffer ${Math.round(interpMs)} ms${qlevel.scale < 1 ? ' · ' + Math.round(qlevel.scale * 100) + '% res' : ''}`;
 }
 
+// A warning when your connection is the problem: no updates from the server for a moment, a high ping, or Wi-Fi so
+// unsteady that other players have to be drawn far in the past. It shows after a couple of seconds of it and goes
+// a few seconds after it's fine again. (The scoreboard marks everyone's weak connection the same way.)
+const WEAK = { ping: 150, buf: 150 };
+const netWarn = { bad: 0, good: 0, shown: false, at: 0 };
+function updateNetWarn(now) {
+  if (now - netWarn.at < 250) return;
+  netWarn.at = now;
+  let why = '';
+  if (me.joined && net.ws.readyState === 1) {
+    const ping = game.roster?.find(p => p.id === me.id)?.ping;
+    if (game.snapRecv && now - game.snapRecv > 700) why = 'No updates from the server';
+    else if (ping >= WEAK.ping) why = `High ping: ${ping} ms`;
+    else if (interpMs >= WEAK.buf) why = `Unsteady Wi-Fi: players drawn ${Math.round(interpMs)} ms late`;
+  }
+  if (why) { netWarn.good = 0; netWarn.bad ||= now; } else { netWarn.bad = 0; netWarn.good ||= now; }
+  const show = why ? (netWarn.shown || now - netWarn.bad > 2000 || why.startsWith('No')) : netWarn.shown && now - netWarn.good < 4000;
+  if (show && why) $('netwarn').textContent = '⚠ ' + why;
+  if (show !== netWarn.shown) { netWarn.shown = show; $('netwarn').classList.toggle('hidden', !show); }
+}
+
 function frame() {
   requestAnimationFrame(frame);
   const now = performance.now();
   autoQ.frame((now - last) / 1000, now);
   updatePerf(now);
+  updateNetWarn(now);
   updateTeamBar();
   if (buyUI.isOpen && now - (buyUI.drawnAt || 0) > 150) { buyUI.drawnAt = now; buyUI.render(); }
   const dt = Math.min(0.05, (now - last) / 1000);

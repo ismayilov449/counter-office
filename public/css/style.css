@@ -154,6 +154,9 @@ body.teambar #phase { top: 140px; }
 .avatar-pick img:not([src]) { visibility: hidden; }
 .avatar-btn { cursor: pointer; }
 #perf { position: absolute; top: 236px; left: 14px; font: 12px Consolas, monospace; color: #cfe8c0; background: rgba(0, 0, 0, 0.45); padding: 2px 7px; border-radius: 3px; }
+#netwarn { position: absolute; top: 236px; left: 14px; font: bold 12px Consolas, monospace; color: #ffd27a; background: rgba(90, 30, 10, 0.75); border: 1px solid rgba(255, 140, 60, 0.6); padding: 3px 8px; border-radius: 3px; }
+#perf:not(.hidden) + #netwarn { top: 262px; }
+#scoreboard td.weak { color: #ff8a5c; font-weight: bold; }
 #small-msg { position: absolute; top: 76px; left: 50%; transform: translateX(-50%); font-size: 14px; color: #fff; text-align: center; }
 #hint { position: absolute; top: 62%; left: 50%; transform: translateX(-50%); color: var(--hud); font-size: 15px; }
 /* the mortar gunner's sight panel */

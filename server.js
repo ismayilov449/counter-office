@@ -60,7 +60,9 @@ const CFG = {
   ggRespawn: 2, // Gun Game: seconds before you respawn
   ggProtect: 2, // Gun Game: seconds of spawn protection (ends when you shoot)
   sprayCooldown: 5000,
-  tickRate: 30,
+  // 32 a second, i.e. every 31.25 ms: exactly two steps of the Windows timer (15.6 ms). At 30 the timer rounded
+  // most ticks up to 47 ms, so the game really ran at ~22 snapshots a second, unevenly.
+  tickRate: 32,
   maxPlayers: 32,
 };
 
@@ -294,7 +296,7 @@ function sendTeamBar() {
 
 function sendRoster() {
   const list = [...players.values()].filter(p => p.joined).map(p => ({
-    id: p.id, name: p.name, team: p.team, k: p.kills, d: p.deaths, ping: p.ping, alive: p.alive, vote: p.vote || null,
+    id: p.id, name: p.name, team: p.team, k: p.kills, d: p.deaths, ping: p.ping, buf: p.buf || 0, alive: p.alive, vote: p.vote || null,
     lv: isGG() ? (p.level || 0) + 1 : undefined, rank: rankOf(p.name), z: p.zombie ? 1 : 0, bot: p.bot ? 1 : 0,
   }));
   broadcast({ t: 'roster', list, carrier: game.bomb.carrier }, q => q.team === 'T');
@@ -880,6 +882,7 @@ function changeMap(id) {
   game.sprays.clear();
   for (const p of players.values()) p.vote = null;
   broadcast({ t: 'map', id, mode: mapMode(MAP) });
+  snapSlow = {}; // everything again in the next snapshot
   resetWorld();
   notify(`Changing map to ${MAP.title}`, true);
   enterWarmup(true);
@@ -2873,6 +2876,7 @@ function handle(p, m) {
     }
     case 'pong':
       if (isNum(m.ts)) p.ping = Math.round(t - m.ts);
+      if (isNum(m.buf)) p.buf = Math.max(0, Math.min(999, Math.round(m.buf))); // their smoothing delay (see the scoreboard)
       break;
   }
 }
@@ -3009,33 +3013,56 @@ function tick() {
     pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo || 0, p.hidden ? 1 : 0]);
   }
   const b = game.bomb;
-  const base = {
+  const head = JSON.stringify({
     t: 's',
     time: Math.round(t),
     ph: game.phase,
     tl: game.phase === 'warmup' || (isGG() && game.phase === 'live') ? -1 : Math.max(0, (game.phaseEnd - t) / 1000),
     el: Math.max(0, (t - game.roundStartAt) / 1000),
-    sc: game.score,
     pl,
+  }).slice(0, -1);
+  // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
+  // client keeps the last ones it got. The text is made once for everybody, not once per player.
+  const slow = {
+    sc: game.score,
     dr: game.drops.map(d => [d.id, d.w, r2(d.p[0]), r2(d.p[1]), r2(d.p[2])]),
     b: { s: b.state, p: b.p, tl: b.state === 'planted' ? Math.max(0, (b.explodeAt - t) / 1000) : 0 },
     hs: game.hostages.map(h => [h.id, r2(h.p[0]), r2(h.p[1]), r2(h.p[2]), r2(h.yaw), HOSTAGE_STATE[h.state], h.leader || 0]),
     cars: world.cars.map(c => [c.id, r2(c.p[0]), r2(c.p[1]), r2(c.p[2]), r2(c.yaw), r2(c.speed), r2(c.steer), c.driver || 0, Math.max(0, Math.round(c.hp)), c.riders[0] || 0, c.riders[1] || 0, c.wrecked ? 1 : 0]),
   };
+  let all = '', changed = '';
+  for (const [k, v] of Object.entries(slow)) {
+    const s = `,"${k}":${JSON.stringify(v)}`;
+    all += s;
+    if (s !== snapSlow[k]) { changed += s; snapSlow[k] = s; }
+  }
   for (const p of players.values()) {
-    const me = p.act ? { a: p.act.type, pr: Math.min(1, (t - p.act.start) / p.act.dur) } : null;
-    send(p, { ...base, me });
+    if (p.ws.readyState !== 1) continue;
+    const me = p.act ? JSON.stringify({ a: p.act.type, pr: Math.min(1, (t - p.act.start) / p.act.dur) }) : 'null';
+    p.ws.send(head + (p.gotSnap ? changed : all) + ',"me":' + me + '}');
+    p.gotSnap = true;
   }
 }
+let snapSlow = {}; // what the last snapshot said about each slow part (see tick)
 
-setInterval(() => {
+// The tick loop keeps to a fixed beat (start + n × 31.25 ms) instead of "31.25 ms after the last one", so timer
+// delays don't add up.
+function runTick() {
   if (!env.DEBUG_TICK) return tick();
   const t0 = performance.now();
   tick();
   const ms = performance.now() - t0;
   tick.sum = (tick.sum || 0) + ms; tick.n = (tick.n || 0) + 1; tick.max = Math.max(tick.max || 0, ms);
   if (tick.n >= 150) { console.log(`  [tick] avg ${(tick.sum / tick.n).toFixed(2)} ms, max ${tick.max.toFixed(1)} ms`); tick.sum = tick.n = tick.max = 0; }
-}, 1000 / CFG.tickRate);
+}
+let nextTick = performance.now();
+(function beat() {
+  runTick();
+  const t = performance.now();
+  nextTick += 1000 / CFG.tickRate;
+  if (t - nextTick > 250) nextTick = t; // fell far behind (the PC was asleep): don't race to catch up
+  setTimeout(beat, Math.max(0, nextTick - t - 1));
+})();
 setInterval(() => broadcast({ t: 'ping', ts: now() }), 2000);
 // Debugging performance: PROFILE_MS=60000 PROFILE_OUT=server.cpuprofile records a CPU profile of the first minute
 // (open it in Chrome DevTools); with DEBUG_TICK, every stall of the event loop over 15 ms is reported.
