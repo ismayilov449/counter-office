@@ -137,7 +137,7 @@ function prewarm() {
   const extra = new THREE.Group();
   const place = (obj, dx, dz = 0) => { obj.position.set(...by(dx, 0, dz)); extra.add(obj); return obj; };
   // models
-  ['T', 'CT', 'Z'].forEach((team, i) => { const m = createPlayerModel(team); setPlayerWeapon(m, ['ak47', 'm4a1', 'claws'][i]); place(m, -4 + i * 1.2); });
+  ['T', 'CT', 'Z'].forEach((team, i) => { const m = createPlayerModel(team); setPlayerWeapon(m, ['ak47', 'm4a1', 'claws'][i]); m.userData.light.visible = true; place(m, -4 + i * 1.2); }); // (the flashlight glow too)
   place(createHostageModel(), 0);
   place(createDropModel('ak47'), 1);
   place(createPlantedBomb(), 1.6);
@@ -173,9 +173,11 @@ function prewarm() {
     for (const id of Object.keys(WEAPONS)) {
       const m = viewModelOf(id, look);
       if (m === vm) continue;
+      m.userData.flash.visible = true; // the muzzle flash, or it's built at your first shot
       vmCamera.add(m);
       renderer.render(vmScene, vmCamera);
       vmCamera.remove(m);
+      m.userData.flash.visible = false;
     }
   }
   // three.js builds the shadow pass's shaders with the lights of the render before it: after the first-person

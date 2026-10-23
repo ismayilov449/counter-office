@@ -1451,9 +1451,12 @@ function createParticles(kind) {
 
 // ---------------------------------------------------------------- public
 
+// Measured on Mansion with a laptop's built-in Intel graphics (1536x864): Medium took 13-16 ms a frame with
+// antialiasing and 6-7 ms without it — the smoothed edges cost more than the shadows (~2 ms), the lamps (~1 ms) and
+// the rest together. So only High smooths the edges; Medium keeps shadows and full resolution with room to spare.
 export const QUALITY = {
   low: { pixelRatio: 0.75, shadows: false, shadowSize: 0, antialias: false, particles: false, lamps: 2 },
-  medium: { pixelRatio: 1, shadows: true, shadowSize: 1024, antialias: true, particles: true, lamps: 4 },
+  medium: { pixelRatio: 1, shadows: true, shadowSize: 1024, antialias: false, particles: true, lamps: 4 },
   high: { pixelRatio: 1.5, shadows: true, shadowSize: 2048, antialias: true, particles: true, lamps: 6 },
 };
 

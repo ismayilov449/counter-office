@@ -389,14 +389,18 @@ while you move, jump or spray, like CS 1.6, and closes again when you stop; turn
 
 ## Graphics
 
-Esc → Graphics: **Low** (no shadows, lower resolution — for weak office PCs), **Medium**,
-**High**. Reload the page after changing it. Only the nearest lamps really light the scene (2 / 4 / 6).
+Esc → Graphics: **Low** (no shadows, lower resolution — for weak office PCs), **Medium** (shadows, full resolution,
+no edge smoothing — recommended for laptops), **High** (sharper shadows, smoothed edges — for a real graphics card).
+On a laptop's built-in Intel graphics, edge smoothing alone more than doubles the cost of a frame (Medium: 6–7 ms
+without it, 13–16 ms with it), which is why only High has it. Reload the page after changing it. Only the nearest lamps really light the scene (2 / 4 / 6).
 
 **Auto-adjust** (on by default): when the game can't keep up (under ~48 FPS for a moment) it steps down — lower
 render resolution (85% → 72% → 60% → 50%), shadows redrawn every 2nd or 3rd frame and less sharp, fewer smoke puffs
 and flames — and steps back up, one level every ~12 s, once it runs smoothly again (if a step up makes it struggle,
 it stays down for a minute and a half). It never switches shadows or lamps on and off, so it never causes a freeze.
-**Show FPS and ping** puts a small readout next to the radar (with the resolution when it's turned down).
+**Show FPS and ping** puts a small readout next to the radar (with the resolution when it's turned down), and
+the **buffer**: how far in the past other players are drawn so they move smoothly (70–250 ms, it adapts to the
+network). If it stays near 200 ms or more, that player's Wi-Fi is struggling.
 
 **No freezes in a fight** — how the client keeps every frame short (keep it that way when adding things):
 - **Shaders are compiled while a map loads, never mid-fight.** three.js compiles a shader the first time something
