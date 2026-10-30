@@ -1353,6 +1353,17 @@ function nearestSwitch() {
   return best;
 }
 
+// Mansion's fuse box: everyone hears the power go down (or come back); coming back, the lights flicker first.
+function powerChange(m) {
+  audio.play(m.power === 'off' ? 'powerdown' : 'powerup');
+  if (m.power === 'off') { applyLights(m.lights); return; }
+  const dark = { ...m.lights, power: false };
+  for (const g of map.fusebox?.groups || []) dark[g] = false;
+  [[0, m.lights], [90, dark], [230, m.lights], [330, dark], [600, m.lights], [680, dark], [900, m.lights]]
+    .forEach(([ms, l]) => setTimeout(() => applyLights(l), ms));
+}
+const atFuseBox = () => !!map.fusebox && me.alive && Math.hypot(me.p[0] - map.fusebox.p[0], me.p[2] - map.fusebox.p[2]) < 1.4 && Math.abs(me.p[1] - map.fusebox.floor) < 0.6;
+
 function applyLights(lights) {
   game.lights = lights || {};
   world?.setLights(game.lights);
@@ -2357,6 +2368,7 @@ const net = new Net({
     world?.setBrokenGlass(game.broken);
   },
   lights(m) {
+    if (m.power) { powerChange(m); return; }
     applyLights(m.lights);
     audio.play('switch', m.p);
   },
@@ -2698,7 +2710,7 @@ function updateLocal(dt, now) {
   }
   const moveBoxes = coll.move(null, me.p, 2);
   const id = current(), def = WEAPONS[id];
-  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse());
+  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || atFuseBox());
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar;
 
   const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar;
@@ -3041,6 +3053,7 @@ function updateHud(now) {
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
+    else if (atFuseBox()) hint = game.lights.power === false ? (me.team === 'CT' ? 'Hold E to bring the power back (5 s)' : 'The power is off') : me.team === 'T' ? 'Hold E to cut the power to the house (3 s)' : 'The fuse box — the Terrorists can cut the power here';
     else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you (H to switch off)';
     else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the door`;
     else if (!canDefuseHere() && sw) hint = `Press E to switch the lights ${game.lights[sw.group] === false ? 'on' : 'off'}`;
@@ -3054,7 +3067,7 @@ function updateHud(now) {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
   hud.hint(hint);
-  if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : 'Defusing the bomb...', me.act.pr);
+  if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
 

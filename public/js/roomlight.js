@@ -4,6 +4,8 @@ import * as THREE from 'three';
 
 const N = 24;
 const LIT = 0.85, DARK = 0.12;
+const PAD = 0.06;
+const BLACKOUT = 0.025; // the power cut on Mansion: only flashlights, muzzle flashes and fire light the rooms
 
 const uniforms = {
   uRoomMin: { value: Array.from({ length: N }, () => new THREE.Vector3(1e5, 1e5, 1e5)) },
@@ -18,9 +20,10 @@ export function setRooms(list, lights) {
   for (let i = 0; i < N; i++) {
     const r = rooms[i];
     if (r) {
-      uniforms.uRoomMin.value[i].set(...r.min);
-      uniforms.uRoomMax.value[i].set(...r.max);
-      uniforms.uRoomAmb.value[i] = lights?.[r.group] === false ? DARK : (r.amb ?? LIT);
+      // (a little bigger, so the walls and ceilings on its edges count as inside)
+      uniforms.uRoomMin.value[i].set(r.min[0] - PAD, r.min[1] - PAD, r.min[2] - PAD);
+      uniforms.uRoomMax.value[i].set(r.max[0] + PAD, r.max[1] + PAD, r.max[2] + PAD);
+      uniforms.uRoomAmb.value[i] = lights?.[r.group] === false ? (lights.power === false && r.power ? BLACKOUT : DARK) : (r.amb ?? LIT);
     } else {
       uniforms.uRoomMin.value[i].set(1e5, 1e5, 1e5);
       uniforms.uRoomMax.value[i].set(-1e5, -1e5, -1e5);

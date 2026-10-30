@@ -711,6 +711,21 @@ export const audio = {
         for (const [i, f] of [392, 523, 659, 784, 1047, 1319].entries()) tone(out, t + i * 0.08, { freq: f, dur: 0.3, type: 'square', gain: 0.07 });
         burst(out, t + 0.45, { dur: 0.6, type: 'highpass', freq: 5000, gain: 0.15 });
         break;
+      case 'powerdown':
+        // the big lever thrown, a heavy clunk, and the whole house's hum winding down
+        burst(out, t, { dur: 0.25, freq: 700, gain: 1.1 });
+        tone(out, t, { freq: 70, freqEnd: 40, dur: 0.3, gain: 0.8 });
+        tone(out, t + 0.05, { freq: 120, freqEnd: 18, dur: 2.2, type: 'sawtooth', gain: 0.22 });
+        tone(out, t + 0.05, { freq: 240, freqEnd: 30, dur: 1.8, type: 'square', gain: 0.05 });
+        burst(out, t + 0.1, { dur: 0.5, type: 'highpass', freq: 3000, gain: 0.25 });
+        break;
+      case 'powerup':
+        // a clunk, crackling relays and the mains hum swelling back
+        burst(out, t, { dur: 0.2, freq: 700, gain: 1.0 });
+        for (let i = 0; i < 6; i++) burst(out, t + 0.08 + i * 0.13, { dur: 0.03, type: 'highpass', freq: 2500, gain: 0.5 });
+        tone(out, t + 0.1, { freq: 25, freqEnd: 100, dur: 1.4, type: 'sawtooth', gain: 0.2 });
+        tone(out, t + 1.2, { freq: 100, dur: 0.6, type: 'sawtooth', gain: 0.06 });
+        break;
       case 'switch':
         tone(out, t, { freq: 1800, dur: 0.025, type: 'square', gain: 0.15 });
         burst(out, t, { dur: 0.04, type: 'bandpass', freq: 3000, gain: 0.3 });

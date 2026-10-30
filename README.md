@@ -129,6 +129,12 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - **Wine cellar** under the living room: the walled-up closet off the kitchen (by the doorway to the hall) is open
     now, and a steep wooden stair goes down into a low stone cellar with wine racks, barrels and a table, lit by one
     bulb (its switch is at the foot of the stairs). The ground floor above it never breaks.
+  - **Blackout**: the house's **fuse box** hangs in the cellar, a big red lever on it. A Terrorist **holds E for
+    3 seconds** to cut the power: every light in the house (and the cellar) goes out at once — truly dark, only
+    flashlights (**F**), nightvision (**N**), muzzle flashes, explosions and fire light the rooms — and everyone
+    hears the power die. A CT **holds E for 5 seconds** to bring it back; the lights flicker on. The light switches
+    do nothing while the power is off. It can be cut and restored any number of times; each round starts with the
+    power on.
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and

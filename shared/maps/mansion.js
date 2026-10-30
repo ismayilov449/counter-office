@@ -82,7 +82,7 @@ for (const p of BRK.pieces) for (const b of p.boxes) m.box(b.min[0], b.min[2], b
 
 // ---- rooms (light groups named after the original lamps). Ground floor 0.81-4.06, first floor 4.27-6.71.
 const G = [0.75, 4.1], U = [4.2, 6.75];
-const room = (group, x1, x2, z1, z2, [y1, y2]) => ({ group, min: [x1, y1, z1], max: [x2, y2, z2] });
+const room = (group, x1, x2, z1, z2, [y1, y2]) => ({ group, min: [x1, y1, z1], max: [x2, y2, z2], power: true });
 const ROOMS = [
   room('lampa6', -23.3, -13.31, -14.05, -5.49, G),
   room('lampa4', -13.31, -6.78, -14.05, -10.16, G),
@@ -199,6 +199,8 @@ export default {
     ...RM.rooms,
   ],
   switches: [...SWITCHES, ...RM.switches],
+  // Blackout: holding E at the fuse box in the cellar cuts (T) or restores (CT) the power of these rooms' lights.
+  fusebox: { ...RM.fusebox, groups: [...new Set([...ROOMS.map(r => r.group), ...RM.rooms.map(r => r.group).filter(g => g !== 'tunnel')])] },
   // One pickup truck with a PKT machine gun in the back, on the lawn by the left (south) door.
   vehicles: [
     { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },

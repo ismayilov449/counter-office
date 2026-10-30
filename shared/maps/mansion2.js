@@ -4,6 +4,7 @@
 // out of the level's solids and faces first. Everything is in metres, y up; the house's ground floor is at 0.81.
 //   - a back door from the kitchen (the north-west room) to the back of the house, weak, slow and loud
 //   - a wine cellar under the living room, down a stair from the kitchen through what was a walled-up closet
+//   - the house's fuse box in the cellar (blackout, see the fuse box in server.js)
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -173,8 +174,11 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     decor.push({ type: 'ceilinglamp', p: [-18.6, 0.61, -0.6], group: 'cellar' });
     decor.push({ type: 'light', p: [-18.6, 0.11, -0.6], color: '#ffd8a0', intensity: 14, distance: 11, group: 'cellar' });
     switches.push({ group: 'cellar', p: [-13.32, -0.9, -3.6], rot: -Math.PI / 2 });
-    rooms.push({ group: 'cellar', amb: 0.32, min: [-22.95, -2.3, -9.8], max: [-13.25, 0.6, 4.55] });
+    // the fuse box on the north wall, by the barrels: its lever cuts the power to the whole house
+    decor.push({ type: 'fusebox', p: [-18.3, -0.95, -5.4], rot: 0 });
+    rooms.push({ group: 'cellar', power: true, amb: 0.32, min: [-22.95, -2.3, -9.8], max: [-13.25, 0.6, 4.55] });
   }
 
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches };
+  const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox };
 }

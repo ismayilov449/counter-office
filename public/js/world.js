@@ -1209,6 +1209,23 @@ function buildDecor(d, ctx) {
       }
       break;
     }
+    case 'fusebox': {
+      // Mansion's fuse box: a grey steel cabinet with a warning stripe and a big red-handled lever (up: power on)
+      obj = new THREE.Group();
+      obj.position.set(...d.p);
+      obj.rotation.y = d.rot || 0;
+      obj.add(mesh(new THREE.BoxGeometry(0.6, 0.8, 0.2), lam(0x6a6e70), 0, 0, 0.1));
+      obj.add(mesh(new THREE.BoxGeometry(0.5, 0.06, 0.01), lam(0xe0b020), 0, 0.3, 0.205, false));
+      for (let i = 0; i < 3; i++) obj.add(mesh(new THREE.BoxGeometry(0.1, 0.16, 0.02), lam(0x2a2a2a), -0.15 + i * 0.15, 0.05, 0.21, false));
+      const lever = new THREE.Group();
+      lever.position.set(0.38, -0.05, 0.12);
+      lever.add(mesh(new THREE.BoxGeometry(0.04, 0.04, 0.4), lam(0x444444), 0, 0, 0.2, false));
+      lever.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 8), lam(0xb02020), 0, 0, 0.42, false).rotateZ(Math.PI / 2));
+      lever.rotation.x = -1.1;
+      obj.add(lever);
+      ctx.levers.push(lever);
+      break;
+    }
     case 'barrel': {
       obj = new THREE.Group();
       obj.position.set(...d.p);
@@ -1542,7 +1559,7 @@ export function buildWorld(scene, map, qualityName) {
   }
 
   const byGroup = {};
-  const ctx = { group, animated, lights, quality: qualityName, groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }) };
+  const ctx = { group, animated, lights, quality: qualityName, levers: [], groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }) };
   // Window frames, ceiling lamps (and their light) and light switches hang on breakable walls and ceilings: they
   // come down with them (see setBrokenPieces).
   const fixtures = [];
@@ -1704,6 +1721,7 @@ export function buildWorld(scene, map, qualityName) {
       for (const m of g.glassMats) m.emissive.setHex(on ? 0x6a4c1c : 0x000000);
       for (const lv of g.switches) lv.position.y = on ? 0.03 : -0.03;
     }
+    for (const lv of ctx.levers) lv.rotation.x = state?.power === false ? 1.1 : -1.1;
   }
   setLights({});
 
