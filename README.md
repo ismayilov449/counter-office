@@ -206,6 +206,11 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     and raises or lowers it (or **W S**): the **elevation**, from 7-50 (45°, the furthest: 80 m) to 14-15 (85°, 14 m).
     The **firing table** on the panel says how far each elevation throws, and a bold **red dot** on the radar shows,
     live, where the next shell will come down as you turn and tilt the tube.
+  - **The easy way: Right mouse opens a map.** It shows your mortar, its reach (14–80 m) and the called-in targets
+    and pings. Move the cursor (green when in reach, with a circle showing how far shells scatter there) and **click**
+    where the shell should land: the map closes and the tube swings round and tilts itself onto that spot ("Laying
+    the tube..."), then Mouse1 fires. A click near a called-in target or ping snaps exactly onto it. The map shows
+    nothing the radar doesn't, so you still need someone to call in where the enemies are.
   - **V** calls in a target — anyone on the team (or you, before setting up): the spot you're looking at. The
     gunner's panel shows its bearing and distance from the mortar and how far to turn, and it's marked on the radar.
   - **Mouse1** fires. The shell flies a high arc for 3½–5 seconds; everyone near where it comes down hears it scream

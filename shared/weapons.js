@@ -146,6 +146,12 @@ export const bearingOf = (dx, dz) => (((Math.atan2(dx, -dz) / (Math.PI * 2)) * M
 // The mortar's firing table: how far a shell goes for an elevation (mils). Like a real one, 45 degrees (7-50) reaches
 // furthest (80 m here) and the steeper the tube, the shorter: 14 m at 85 degrees (14-15).
 export const mortarRange = elev => WEAPONS.mortar.maxRange * Math.sin((2 * elev * Math.PI * 2) / MILS);
+// ...and back: the elevation (mils, the steep side of 45 degrees) that throws a shell dist metres.
+export const mortarElev = dist => {
+  const [lo, hi] = WEAPONS.mortar.elev;
+  const e = ((Math.PI - Math.asin(Math.min(1, dist / WEAPONS.mortar.maxRange))) * MILS) / (4 * Math.PI);
+  return Math.max(lo, Math.min(hi, e));
+};
 
 // Mortar shell flight time (ms) for a horizontal distance: a high arc, 3.4 s at 15 m to 5 s at 80 m.
 export const shellFlight = dist => 3000 + dist * 25;

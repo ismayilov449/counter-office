@@ -19,7 +19,7 @@ export class Hud {
     for (const id of ['hud', 'hp', 'armor', 'money', 'ammo', 'weapon-name', 'timer', 'phase', 'scoreT', 'scoreCT', 'killfeed',
       'center-msg', 'small-msg', 'hint', 'progress', 'progress-label', 'progress-fill', 'crosshair', 'hitmarker', 'scope',
       'damage', 'flash', 'flashbang', 'nvg', 'bomb-icon', 'kit-icon', 'nvg-icon', 'slots', 'spec', 'chat', 'chat-log', 'chat-line',
-      'chat-mode', 'chat-input', 'scoreboard', 'radar', 'target-name', 'map-name', 'mortar-panel']) this.el[id] = $(id);
+      'chat-mode', 'chat-input', 'scoreboard', 'radar', 'target-name', 'map-name', 'mortar-panel', 'mortar-map', 'mortar-map-canvas']) this.el[id] = $(id);
     this.radarCtx = this.el.radar.getContext('2d');
     this.radarBg = null;
     this.map = null;
@@ -44,6 +44,7 @@ export class Hud {
   setMap(map) {
     this.map = map;
     this.radarBg = this.drawRadarBackground();
+    this.mortarBg = null; // the big mortar map's, drawn when first opened
     this.set('map-name', esc(map.title));
   }
 
@@ -97,6 +98,66 @@ export class Hud {
     this.el['small-msg'].textContent = text;
     clearTimeout(this.smallTimer);
     this.smallTimer = setTimeout(() => { this.el['small-msg'].textContent = ''; }, secs * 1000);
+  }
+
+  // The mortar's aiming map (right mouse while aiming), or null to hide it. v: the gunner (p, yaw), teammates, the
+  // reach (min, max m), the cursor (world x, z; ok when in reach), where the tube points now, called-in targets and
+  // pings to snap to (snap: the one under the cursor), the last shell, and the spread (m) at the cursor.
+  mortarMap(v) {
+    const wrap = this.el['mortar-map'];
+    wrap.classList.toggle('hidden', !v);
+    if (!v) return;
+    const c = this.el['mortar-map-canvas'], N = c.width, g = c.getContext('2d');
+    if (!this.mortarBg) this.mortarBg = this.drawRadarBackground(N);
+    const { toR, s } = this.radarXform(N);
+    g.clearRect(0, 0, N, N);
+    g.drawImage(this.mortarBg, 0, 0);
+    const [mx, mz] = toR(v.me.p[0], v.me.p[2]);
+    // out of reach: darkened (beyond the far ring and inside the near one)
+    g.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    g.beginPath(); g.rect(0, 0, N, N); g.arc(mx, mz, v.max * s, 0, Math.PI * 2, true); g.fill();
+    g.beginPath(); g.arc(mx, mz, v.min * s, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255, 196, 64, 0.7)'; g.lineWidth = 2;
+    for (const r of [v.min, v.max]) { g.beginPath(); g.arc(mx, mz, r * s, 0, Math.PI * 2); g.stroke(); }
+    g.setLineDash([4, 6]); g.strokeStyle = 'rgba(255, 196, 64, 0.3)'; g.lineWidth = 1;
+    for (let r = 20; r < v.max; r += 20) { g.beginPath(); g.arc(mx, mz, r * s, 0, Math.PI * 2); g.stroke(); }
+    g.setLineDash([]);
+    g.font = 'bold 12px Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(255, 196, 64, 0.8)';
+    for (let r = 20; r <= v.max; r += 20) g.fillText(`${r} m`, mx, mz - r * s + 9);
+    const dot = (p, r, fill, stroke) => { const [x, z] = toR(p[0], p[2]); g.beginPath(); g.arc(x, z, r, 0, Math.PI * 2); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } };
+    if (v.impact) { g.setLineDash(v.impact.rough ? [4, 4] : []); dot(v.impact.p, v.impact.rough ? 12 : 7, null, '#ffa040'); g.setLineDash([]); }
+    for (const t of v.targets) {
+      const [x, z] = toR(t.p[0], t.p[2]), hot = t === v.snap, k = hot ? 11 : 8;
+      g.strokeStyle = '#ffe040'; g.lineWidth = hot ? 4 : 3;
+      if (t.kind === 'target') { g.beginPath(); g.moveTo(x - k, z - k); g.lineTo(x + k, z + k); g.moveTo(x + k, z - k); g.lineTo(x - k, z + k); g.stroke(); }
+      else { g.beginPath(); g.arc(x, z, k, 0, Math.PI * 2); g.stroke(); g.fillStyle = '#ffe040'; g.fillText('!', x, z + 1); }
+      if (t.name) { g.fillStyle = '#ffe9a0'; g.fillText(t.name, x, z + k + 10); }
+    }
+    for (const m of v.mates) dot(m.p, 5, TEAM_COLOR[m.team]);
+    // where the tube points now, and a line out to it
+    if (v.aim) {
+      const [ax, az] = toR(v.aim[0], v.aim[1]);
+      g.strokeStyle = 'rgba(255, 60, 40, 0.5)'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(mx, mz); g.lineTo(ax, az); g.stroke();
+      g.beginPath(); g.arc(ax, az, 6, 0, Math.PI * 2); g.fillStyle = '#ff2020'; g.fill(); g.strokeStyle = '#fff'; g.stroke();
+    }
+    // the gunner: an arrow
+    g.save(); g.translate(mx, mz); g.rotate(Math.atan2(-Math.cos(v.me.yaw), -Math.sin(v.me.yaw)));
+    g.fillStyle = '#fff'; g.beginPath(); g.moveTo(11, 0); g.lineTo(-6, 6); g.lineTo(-3, 0); g.lineTo(-6, -6); g.closePath(); g.fill(); g.restore();
+    // the cursor: crosshairs, the spread circle and the distance
+    const [cx, cz] = toR(v.cursor[0], v.cursor[1]);
+    const col = v.ok ? '#7dff7d' : '#ff5a4a';
+    g.strokeStyle = col; g.lineWidth = 2;
+    g.beginPath(); g.arc(cx, cz, Math.max(5, v.spread * s), 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.moveTo(cx - 16, cz); g.lineTo(cx - 5, cz); g.moveTo(cx + 5, cz); g.lineTo(cx + 16, cz);
+    g.moveTo(cx, cz - 16); g.lineTo(cx, cz - 5); g.moveTo(cx, cz + 5); g.lineTo(cx, cz + 16); g.stroke();
+    const d = Math.hypot(v.cursor[0] - v.me.p[0], v.cursor[1] - v.me.p[2]);
+    const label = v.ok ? `${Math.round(d)} m` : `${Math.round(d)} m — too ${d < v.min ? 'close' : 'far'}`;
+    g.font = 'bold 14px Consolas, monospace'; g.textAlign = cx > N - 160 ? 'right' : 'left';
+    const lx = cx + (cx > N - 160 ? -20 : 20);
+    g.lineWidth = 4; g.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    g.strokeText(label, lx, cz - 14); g.fillStyle = col; g.fillText(label, lx, cz - 14);
+    g.textAlign = 'start'; g.textBaseline = 'alphabetic'; g.lineWidth = 1;
   }
 
   // The mortar gunner's panel (html from main.js), or null to hide it.
@@ -369,13 +430,15 @@ export class Hud {
       ${specs.length ? `<div class="spec-list">Spectators: ${specs.join(', ')}</div>` : ''}`;
   }
 
-  drawRadarBackground() {
+  // The map under the radar (200 px), or under the mortar map at a bigger size.
+  drawRadarBackground(size = 200) {
     const c = document.createElement('canvas');
-    c.width = c.height = 200;
+    c.width = c.height = size;
     const g = c.getContext('2d');
-    const { toR, s } = this.radarXform();
+    const { toR, s } = this.radarXform(size);
+    const fk = Math.min(2, size / 200); // label sizes
     g.fillStyle = 'rgba(10, 12, 8, 0.75)';
-    g.fillRect(0, 0, 200, 200);
+    g.fillRect(0, 0, size, size);
     if (this.map.radar?.floors) {
       // Multi-level maps: paint the walkable floors (upward faces below the roofs), higher floors lighter.
       const { maxY } = this.map.radar;
@@ -429,7 +492,7 @@ export class Hud {
       g.strokeStyle = 'rgba(80, 220, 110, 0.7)';
       g.strokeRect(x, z, (zn.max[0] - zn.min[0]) * s, (zn.max[1] - zn.min[1]) * s);
       g.fillStyle = 'rgba(120, 255, 140, 0.95)';
-      g.font = 'bold 11px Verdana';
+      g.font = `bold ${Math.round(11 * fk)}px Verdana`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText('RESCUE', x + ((zn.max[0] - zn.min[0]) * s) / 2, z + ((zn.max[1] - zn.min[1]) * s) / 2);
@@ -442,7 +505,7 @@ export class Hud {
       g.strokeRect(x, z, (zn.max[0] - zn.min[0]) * s, (zn.max[1] - zn.min[1]) * s);
       const [lx, lz] = toR(...this.map.labels[key]);
       g.fillStyle = 'rgba(255, 110, 80, 0.95)';
-      g.font = 'bold 16px Verdana';
+      g.font = `bold ${Math.round(16 * fk)}px Verdana`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText(key, lx, lz);
@@ -450,9 +513,9 @@ export class Hud {
     return c;
   }
 
-  radarXform() {
+  radarXform(px = 200) {
     const min = this.map.bounds.min, size = this.map.bounds.max - this.map.bounds.min;
-    const s = 200 / size;
+    const s = px / size;
     return { s, toR: (x, z) => [(x - min) * s, (z - min) * s] };
   }
 

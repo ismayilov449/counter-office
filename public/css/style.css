@@ -169,9 +169,15 @@ body.teambar #phase { top: 140px; }
 #mortar-panel .mp-table .on { color: var(--text); background: rgba(255, 196, 64, 0.15); }
 #mortar-panel .mp-table b { color: inherit; font-weight: normal; }
 #mortar-panel .mp-dim { color: var(--muted); }
+#mortar-panel .mp-easy { color: #9fff9f; }
+#mortar-panel .mp-easy b { color: inherit; }
 #mortar-panel .mp-target { color: #ff8a7a; }
 #mortar-panel .mp-impact { color: #ffc070; }
 @media (max-width: 640px) { #mortar-panel { width: calc(100% - 32px); } }
+#mortar-map { position: absolute; z-index: 5; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px; background: rgba(12, 14, 10, 0.9); border: 1px solid var(--hud-dim); border-radius: 6px; text-align: center; }
+#mortar-map canvas { display: block; width: min(78vh, calc(100vw - 52px)); height: auto; aspect-ratio: 1; }
+#mortar-map .mm-help { margin-top: 8px; color: var(--muted); font: 13px Consolas, monospace; }
+#mortar-map .mm-help b { color: var(--hud); }
 #target-name { position: absolute; top: calc(50% + 24px); left: 50%; transform: translateX(-50%); font-size: 13px; }
 #progress { position: absolute; top: 66%; left: 50%; transform: translateX(-50%); width: 320px; text-align: center; }
 #progress-bar { height: 10px; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--hud-dim); margin-top: 4px; }

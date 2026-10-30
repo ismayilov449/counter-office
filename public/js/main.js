@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, MINES, MINE, CAMO, PING } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, mortarElev, MINES, MINE, CAMO, PING } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -611,6 +611,7 @@ function sendPing() {
 // packs it up. Teammates (or you) press V on a spot to call in a target: its bearing and distance from the mortar
 // show on the panel and the radar. After each shell the panel says where it landed: exactly, with a correction, if
 // someone on the team saw it go off; roughly if nobody did. The server fires the shell (onMortar in server.js).
+// The easy way: right mouse opens a big map — click where the shell should land and the tube lays itself there.
 const MORTAR = WEAPONS.mortar;
 const skyOpen = p => skyOf(map, coll).open(p);
 const elevDeg = mils => (mils * 360) / MILS;
@@ -627,10 +628,11 @@ function mortarFire(now) {
     audio.play('draw');
     return;
   }
-  if (m.phase !== 'aim') return;
+  if (m.phase !== 'aim' || mortarMap.open) return;
+  if (m.goal) { hud.small('Still laying the tube...', 1); return; }
   const item = currentItem();
   if (!item || item.mag <= 0) { audio.play('empty'); me.nextShot = now + 400; return; }
-  net.send({ t: 'mortar', b: Math.round(mortarBearing()), e: Math.round(m.elev) });
+  net.send({ t: 'mortar', b: Math.round(mortarBearing() * 10) / 10, e: Math.round(m.elev * 10) / 10 });
   item.mag--;
   me.nextShot = now + MORTAR.rate * 1000;
 }
@@ -642,17 +644,105 @@ const mortarBearing = () => bearingOf(-Math.sin(me.yaw), -Math.cos(me.yaw));
 function updateMortar(now) {
   const m = me.mortar;
   if (!m) return;
-  if (!me.alive || current() !== 'mortar' || me.driving != null || me.riding || game.phase === 'end') { me.mortar = null; return; }
+  if (!me.alive || current() !== 'mortar' || me.driving != null || me.riding || game.phase === 'end') { me.mortar = null; openMortarMap(false); return; }
   if (m.phase === 'setup' && now >= m.until) {
     m.phase = 'aim';
     me.pitch = 0.06; // look out along the bearing, just over the horizon
     audio.play('pickup');
   }
+  // Laying the tube on a spot picked on the map: it swings round and tilts at a crank's pace (about a second).
+  const dt = Math.min(0.1, (now - (m.slewAt ?? now)) / 1000);
+  m.slewAt = now;
+  if (m.goal) {
+    const dy = Math.atan2(Math.sin(m.goal.yaw - me.yaw), Math.cos(m.goal.yaw - me.yaw)), de = m.goal.elev - m.elev;
+    const sy = 4 * dt, se = 600 * dt;
+    if (Math.abs(dy) <= sy && Math.abs(de) <= se) {
+      me.yaw = m.goal.yaw; m.elev = m.goal.elev; m.goal = null;
+      audio.play('pickup');
+    } else {
+      me.yaw = Math.atan2(Math.sin(me.yaw + clamp(dy, -sy, sy)), Math.cos(me.yaw + clamp(dy, -sy, sy)));
+      m.elev += clamp(de, -se, se);
+    }
+  }
+}
+
+// ---- the aiming map
+// Right mouse while aiming opens it (it shows what the radar does, no more). The mouse moves a cursor; a click
+// lays the tube on that spot (or on a called-in target / ping when the cursor is on one) and closes it.
+const mortarMap = { open: false, cursor: [0, 0] };
+const mortarMin = () => mortarRange(MORTAR.elev[1]);
+// Where the tube's bearing and elevation drop the next shell (x, z).
+function mortarAimPoint() {
+  const b = (mortarBearing() / MILS) * Math.PI * 2, d = mortarRange(me.mortar.elev);
+  return [me.p[0] + Math.sin(b) * d, me.p[2] - Math.cos(b) * d];
+}
+function openMortarMap(open) {
+  if (open === mortarMap.open) return;
+  if (open && me.mortar?.phase !== 'aim') return;
+  mortarMap.open = open;
+  if (open) {
+    const t = mortarInfo.target;
+    mortarMap.cursor = t && performance.now() - t.at < 60000 ? [t.p[0], t.p[2]] : mortarAimPoint();
+    audio.play('click');
+  } else hud.mortarMap(null);
+}
+function mortarSnapTargets(now) {
+  const list = [];
+  const t = mortarInfo.target;
+  if (t && now - t.at < 60000) list.push({ kind: 'target', p: t.p, name: t.name });
+  for (const pg of pings) if (now - pg.at < PING.life * 1000) list.push({ kind: 'ping', p: pg.p, name: remotes.get(pg.by)?.name || '' });
+  return list;
+}
+// The spot under the cursor: a target or ping within a few metres, else the cursor itself.
+function mortarMapPick(now) {
+  const [cx, cz] = mortarMap.cursor;
+  const size = map.bounds.max - map.bounds.min;
+  let snap = null, best = size * 0.025;
+  for (const t of mortarSnapTargets(now)) {
+    const d = Math.hypot(t.p[0] - cx, t.p[2] - cz);
+    if (d < best) { best = d; snap = t; }
+  }
+  const at = snap ? [snap.p[0], snap.p[2]] : [cx, cz];
+  const d = Math.hypot(at[0] - me.p[0], at[1] - me.p[2]);
+  return { snap, at, d, ok: d >= mortarMin() - 0.5 && d <= MORTAR.maxRange + 0.5 };
+}
+function moveMortarCursor(dx, dy) {
+  // a pixel of mouse is a pixel on the map, whatever its size on screen
+  const px = $('mortar-map-canvas').getBoundingClientRect().width || 600;
+  const k = (map.bounds.max - map.bounds.min) / px;
+  mortarMap.cursor[0] = clamp(mortarMap.cursor[0] + dx * k, map.bounds.min, map.bounds.max);
+  mortarMap.cursor[1] = clamp(mortarMap.cursor[1] + dy * k, map.bounds.min, map.bounds.max);
+}
+function pickMortarSpot() {
+  const m = me.mortar, now = performance.now();
+  if (m?.phase !== 'aim') { openMortarMap(false); return; }
+  const pick = mortarMapPick(now);
+  if (!pick.ok) {
+    audio.play('deny');
+    hud.small(pick.d < mortarMin() ? `Too close: the mortar can't hit nearer than ${Math.ceil(mortarMin())} m` : `Too far: the mortar reaches ${MORTAR.maxRange} m`, 2);
+    return;
+  }
+  const dx = pick.at[0] - me.p[0], dz = pick.at[1] - me.p[2];
+  m.goal = { yaw: Math.atan2(-dx, -dz), elev: mortarElev(Math.max(mortarMin(), Math.min(MORTAR.maxRange, pick.d))) };
+  m.slewAt = now;
+  openMortarMap(false);
+  audio.play('click');
+}
+function drawMortarMap(now, mates) {
+  if (!mortarMap.open) return;
+  const pick = mortarMapPick(now), i = mortarInfo.impact;
+  hud.mortarMap({
+    me: { p: me.p, yaw: me.yaw }, mates, min: mortarMin(), max: MORTAR.maxRange,
+    cursor: pick.snap ? pick.at : mortarMap.cursor, ok: pick.ok, spread: 1 + pick.d * 0.03,
+    aim: mortarAimPoint(), targets: mortarSnapTargets(now), snap: pick.snap,
+    impact: i && now - i.at < 15000 ? { p: i.p, rough: !i.seen } : null,
+  });
 }
 
 // Turning and tilting the tube: slow and fine with the mouse, or 0-05 / 0-10 a step with A D / W S.
 function aimMortar(dBearing, dElev) {
   const m = me.mortar;
+  m.goal = null; // turning it by hand stops laying it on a map spot
   me.yaw -= (dBearing / MILS) * Math.PI * 2;
   me.yaw = Math.atan2(Math.sin(me.yaw), Math.cos(me.yaw));
   m.elev = clamp(m.elev + dElev, MORTAR.elev[0], MORTAR.elev[1]);
@@ -704,6 +794,8 @@ function updateMortarHud() {
     `<div class="mp-row">Elevation <b>${milsText(m.elev)}</b> (${Math.round(elevDeg(m.elev))}°) → <b>${Math.round(range)} m</b></div>` +
     `<div class="mp-table">${rows}</div>${target}` +
     (mortarInfo.impact ? `<div class="mp-impact">${impactText()}</div>` : '') +
+    (m.goal ? '<div class="mp-target">Laying the tube...</div>' : '') +
+    '<div class="mp-easy"><b>Right mouse: map</b> — click where the shell should land</div>' +
     '<div class="mp-dim">Mouse or A D: turn · Mouse or W S: elevation · Mouse1: fire · E: pack up</div>');
 }
 
@@ -713,8 +805,8 @@ function mortarRadarMarks(now) {
   const marks = [];
   const m = me.mortar;
   if (m?.phase === 'aim' && me.alive) {
-    const b = (mortarBearing() / MILS) * Math.PI * 2, d = mortarRange(m.elev);
-    marks.push({ kind: 'aim', p: [me.p[0] + Math.sin(b) * d, 0, me.p[2] - Math.cos(b) * d] });
+    const [x, z] = mortarAimPoint();
+    marks.push({ kind: 'aim', p: [x, 0, z] });
   }
   if (mortarInfo.target && now - mortarInfo.target.at < 60000) marks.push({ kind: 'target', p: mortarInfo.target.p });
   if (mortarInfo.impact && now - mortarInfo.impact.at < 15000) marks.push({ kind: 'impact', p: mortarInfo.impact.p, rough: !mortarInfo.impact.seen });
@@ -781,6 +873,8 @@ function secondary() {
     knife(true);
   } else if (def.grenade) {
     holdNade(false);
+  } else if (def.mortar && me.mortar?.phase === 'aim') {
+    openMortarMap(true);
   }
 }
 
@@ -1608,6 +1702,7 @@ function updateOverlays() {
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
   if (!locked) {
+    openMortarMap(false);
     keys.clear();
     mouse1 = false;
     me.nadeHold = null;
@@ -1661,6 +1756,7 @@ document.addEventListener('mousemove', e => {
     me.camIdle = 0;
     return;
   }
+  if (mortarMap.open) { moveMortarCursor(e.movementX, e.movementY); return; }
   if (me.mortar?.phase === 'aim') { aimMortar(e.movementX * 0.6 * settings.sens, -e.movementY * 0.6 * settings.sens); return; }
   me.yaw -= e.movementX * k;
   me.yaw = Math.atan2(Math.sin(me.yaw), Math.cos(me.yaw));
@@ -1670,6 +1766,11 @@ document.addEventListener('mousemove', e => {
 document.addEventListener('mousedown', e => {
   if (!locked) return;
   audio.init();
+  if (mortarMap.open) {
+    if (e.button === 0) pickMortarSpot();
+    else if (e.button === 2) openMortarMap(false);
+    return;
+  }
   if (e.button === 0) {
     mouse1 = true;
     me.triggerFresh = true;
@@ -1696,7 +1797,7 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('dragstart', e => e.preventDefault());
 document.addEventListener('wheel', e => {
   if (e.ctrlKey) e.preventDefault();
-  if (locked && me.alive && !ui.chat) cycleWeapon(e.deltaY > 0 ? 1 : -1);
+  if (locked && me.alive && !ui.chat && !mortarMap.open) cycleWeapon(e.deltaY > 0 ? 1 : -1);
 }, { passive: false });
 renderer.domElement.addEventListener('click', () => {
   if (!locked && me.joined && !sprayEditor.isOpen) enterGame();
@@ -2965,6 +3066,7 @@ function updateHud(now) {
   }
   const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
   hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()));
+  drawMortarMap(performance.now(), mates);
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
 
