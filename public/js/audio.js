@@ -188,7 +188,7 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
+const FAR = { creak: [9, 0.7], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -711,6 +711,21 @@ export const audio = {
         for (const [i, f] of [392, 523, 659, 784, 1047, 1319].entries()) tone(out, t + i * 0.08, { freq: f, dur: 0.3, type: 'square', gain: 0.07 });
         burst(out, t + 0.45, { dur: 0.6, type: 'highpass', freq: 5000, gain: 0.15 });
         break;
+      case 'powerdown':
+        // the big lever thrown, a heavy clunk, and the whole house's hum winding down
+        burst(out, t, { dur: 0.25, freq: 700, gain: 1.1 });
+        tone(out, t, { freq: 70, freqEnd: 40, dur: 0.3, gain: 0.8 });
+        tone(out, t + 0.05, { freq: 120, freqEnd: 18, dur: 2.2, type: 'sawtooth', gain: 0.22 });
+        tone(out, t + 0.05, { freq: 240, freqEnd: 30, dur: 1.8, type: 'square', gain: 0.05 });
+        burst(out, t + 0.1, { dur: 0.5, type: 'highpass', freq: 3000, gain: 0.25 });
+        break;
+      case 'powerup':
+        // a clunk, crackling relays and the mains hum swelling back
+        burst(out, t, { dur: 0.2, freq: 700, gain: 1.0 });
+        for (let i = 0; i < 6; i++) burst(out, t + 0.08 + i * 0.13, { dur: 0.03, type: 'highpass', freq: 2500, gain: 0.5 });
+        tone(out, t + 0.1, { freq: 25, freqEnd: 100, dur: 1.4, type: 'sawtooth', gain: 0.2 });
+        tone(out, t + 1.2, { freq: 100, dur: 0.6, type: 'sawtooth', gain: 0.06 });
+        break;
       case 'switch':
         tone(out, t, { freq: 1800, dur: 0.025, type: 'square', gain: 0.15 });
         burst(out, t, { dur: 0.04, type: 'bandpass', freq: 3000, gain: 0.3 });
@@ -752,6 +767,19 @@ export const audio = {
       case 'door':
         tone(out, t, { freq: 160, freqEnd: 90, dur: 0.15, type: 'square', gain: 0.15 });
         break;
+      case 'creak': {
+        // a stuck old door forced open: a thump, then a long groaning creak of dry hinges (arg: seconds)
+        const len = arg || 1.5;
+        burst(out, t, { dur: 0.12, freq: 500, gain: 0.9 });
+        tone(out, t, { freq: 90, freqEnd: 55, dur: 0.15, gain: 0.5 });
+        for (let k = 0; k < 3; k++) {
+          const t0 = t + 0.1 + (k * len) / 3;
+          tone(out, t0, { freq: 140 + k * 30, freqEnd: 260 + k * 40, dur: len / 3 + 0.05, type: 'sawtooth', gain: 0.09 });
+          tone(out, t0, { freq: 420 + k * 60, freqEnd: 610 + k * 50, dur: len / 3, type: 'sawtooth', gain: 0.04 });
+          burst(out, t0, { dur: len / 3, type: 'bandpass', freq: 1100, q: 8, gain: 0.12 });
+        }
+        break;
+      }
     }
   },
 

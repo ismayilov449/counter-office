@@ -161,6 +161,24 @@ const PAINTERS = {
       }
     },
   },
+  // Mansion's wine cellar: a wooden rack of bottle ends, dark glass with a glint
+  winerack: {
+    scale: 1, size: 128, draw: (g, s) => {
+      g.fillStyle = '#3a2412';
+      g.fillRect(0, 0, s, s);
+      const n = 6, c = s / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const x = i * c + c / 2, y = j * c + c / 2;
+        g.fillStyle = '#1a0e06';
+        g.fillRect(i * c + 2, j * c + 2, c - 4, c - 4);
+        if (Math.random() < 0.15) continue; // an empty slot
+        g.fillStyle = ['#1e3a1a', '#3a1018', '#2a2a12'][(Math.random() * 3) | 0];
+        g.beginPath(); g.arc(x, y, c * 0.34, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.35)';
+        g.beginPath(); g.arc(x - c * 0.1, y - c * 0.1, c * 0.07, 0, Math.PI * 2); g.fill();
+      }
+    },
+  },
   stone: { scale: 2, size: 256, draw: blocks('#8a8680', '#b0aca4', '#5a5650', '#3a3632', 4, 3) },
   hedge: { scale: 1, size: 256, draw: noiseTex('#2e5a22', ['#1e4216', '#3e7a2e', '#4a8a36', '#16300f'], 80, 0.7, 5) },
   pooltile: { scale: 1, size: 256, draw: slabs('#4aa8d0', '#9ad8f0', '#2a7aa0', '#e8f4f8', 8) },
@@ -1191,10 +1209,27 @@ function buildDecor(d, ctx) {
       }
       break;
     }
+    case 'fusebox': {
+      // Mansion's fuse box: a grey steel cabinet with a warning stripe and a big red-handled lever (up: power on)
+      obj = new THREE.Group();
+      obj.position.set(...d.p);
+      obj.rotation.y = d.rot || 0;
+      obj.add(mesh(new THREE.BoxGeometry(0.6, 0.8, 0.2), lam(0x6a6e70), 0, 0, 0.1));
+      obj.add(mesh(new THREE.BoxGeometry(0.5, 0.06, 0.01), lam(0xe0b020), 0, 0.3, 0.205, false));
+      for (let i = 0; i < 3; i++) obj.add(mesh(new THREE.BoxGeometry(0.1, 0.16, 0.02), lam(0x2a2a2a), -0.15 + i * 0.15, 0.05, 0.21, false));
+      const lever = new THREE.Group();
+      lever.position.set(0.38, -0.05, 0.12);
+      lever.add(mesh(new THREE.BoxGeometry(0.04, 0.04, 0.4), lam(0x444444), 0, 0, 0.2, false));
+      lever.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 8), lam(0xb02020), 0, 0, 0.42, false).rotateZ(Math.PI / 2));
+      lever.rotation.x = -1.1;
+      obj.add(lever);
+      ctx.levers.push(lever);
+      break;
+    }
     case 'barrel': {
       obj = new THREE.Group();
       obj.position.set(...d.p);
-      obj.add(mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.05, 12), lam([0x2a5a8a, 0x8a3a2a, 0x3a6a3a][(Math.random() * 3) | 0]), 0, 0.53, 0));
+      obj.add(mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.05, 12), lam(d.color ? new THREE.Color(d.color).getHex() : [0x2a5a8a, 0x8a3a2a, 0x3a6a3a][(Math.random() * 3) | 0]), 0, 0.53, 0));
       obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), lam(0x222222), 0, 0.3, 0, false).rotateX(Math.PI / 2));
       obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), lam(0x222222), 0, 0.8, 0, false).rotateX(Math.PI / 2));
       break;
@@ -1524,7 +1559,7 @@ export function buildWorld(scene, map, qualityName) {
   }
 
   const byGroup = {};
-  const ctx = { group, animated, lights, quality: qualityName, groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }) };
+  const ctx = { group, animated, lights, quality: qualityName, levers: [], groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }) };
   // Window frames, ceiling lamps (and their light) and light switches hang on breakable walls and ceilings: they
   // come down with them (see setBrokenPieces).
   const fixtures = [];
@@ -1623,7 +1658,31 @@ export function buildWorld(scene, map, qualityName) {
   }
 
   // Swinging doors: a wooden leaf on a hinge pivot that turns towards its target angle.
+  // A hatch in the floor (Mansion): a plank lid (or an iron grate) hinged on one edge, swinging up to stand open.
+  const hatch = d => {
+    const { min: [x1, z1], max: [x2, z2], y, side } = d.hatch;
+    const alongX = side[1] === 'x', len = alongX ? x2 - x1 : z2 - z1, wid = alongX ? z2 - z1 : x2 - x1;
+    const pivot = new THREE.Group();
+    const s = side[0] === '-' ? 1 : -1; // the lid reaches from the hinge towards +s
+    pivot.position.set(alongX ? (s > 0 ? x1 : x2) : (x1 + x2) / 2, y - 0.04, alongX ? (z1 + z2) / 2 : (s > 0 ? z1 : z2));
+    const lid = new THREE.Group();
+    const mat = d.grate ? lam(0x3a3c3e) : lam(0xffffff, { map: material('wood').mat.map });
+    if (d.grate) {
+      for (let k = 0; k <= 6; k++) lid.add(mesh(new THREE.BoxGeometry(len, 0.05, 0.04), mat, (s * len) / 2, 0, -wid / 2 + (k * wid) / 6, false));
+      for (const k of [0.05, 0.5, 0.95]) lid.add(mesh(new THREE.BoxGeometry(0.05, 0.06, wid), mat, s * len * k, 0, 0, false));
+    } else {
+      lid.add(mesh(new THREE.BoxGeometry(len - 0.02, 0.07, wid - 0.02), mat, (s * len) / 2, 0, 0, false));
+      lid.add(mesh(new THREE.TorusGeometry(0.06, 0.012, 4, 10), lam(0x2a2a2a), s * (len - 0.15), 0.04, 0, false).rotateX(Math.PI / 2));
+    }
+    if (!alongX) lid.rotation.y = -Math.PI / 2; // local +x along world +z
+    pivot.add(lid);
+    group.add(pivot);
+    // open: the far edge goes up, about the hinge line
+    const key = alongX ? 'z' : 'x', open = alongX ? s * Math.PI / 2 : -s * Math.PI / 2;
+    return { d, pivot, target: 0, key, open };
+  };
   const doors = (map.doors || []).map(d => {
+    if (d.hatch) return hatch(d);
     const pivot = new THREE.Group();
     pivot.position.set(...d.hinge);
     const leafMat = lam(0xffffff, { map: material(d.tex || 'door1').mat.map });
@@ -1686,12 +1745,14 @@ export function buildWorld(scene, map, qualityName) {
       for (const m of g.glassMats) m.emissive.setHex(on ? 0x6a4c1c : 0x000000);
       for (const lv of g.switches) lv.position.y = on ? 0.03 : -0.03;
     }
+    for (const lv of ctx.levers) lv.rotation.x = state?.power === false ? 1.1 : -1.1;
   }
   setLights({});
 
   function setDoors(states) {
     doors.forEach((o, i) => {
       o.pivot.visible = states?.[i] !== 9; // blown off
+      if (o.key) { o.target = states?.[i] && states[i] !== 9 ? o.open : 0; return; }
       const a = doorAngle(o.d, states?.[i] === 9 ? 0 : states?.[i] || 0);
       o.target = o.pivot.rotation.y + Math.atan2(Math.sin(a - o.pivot.rotation.y), Math.cos(a - o.pivot.rotation.y));
     });
@@ -1736,8 +1797,8 @@ export function buildWorld(scene, map, qualityName) {
       for (const fn of animated) fn(t, dt);
       if (pool.length && t >= pickAt) { pickAt = t + 0.1; lightNearest(camPos); }
       for (const o of doors) {
-        const diff = o.target - o.pivot.rotation.y;
-        o.pivot.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), dt * 4.5);
+        const k = o.key || 'y', diff = o.target - o.pivot.rotation[k];
+        o.pivot.rotation[k] += Math.sign(diff) * Math.min(Math.abs(diff), dt * (o.d.slow ? 1.6 / o.d.slow : 4.5));
       }
       if (clouds) {
         clouds.material.map.offset.x += dt * 0.004;

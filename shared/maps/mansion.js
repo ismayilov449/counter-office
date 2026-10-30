@@ -7,6 +7,7 @@
 import { createBuilder } from './builder.js';
 import * as BSP from './cs_mansion_bsp.js';
 import { breakUp } from './breakables.js';
+import { remodel, NEW_TEX } from './mansion2.js';
 
 const m = createBuilder();
 
@@ -27,9 +28,13 @@ const FACE_MATS = {
   c1a0_flipsign8: 'metal',
 };
 
+// Mansion 2.0: the new parts, and the openings to them (see mansion2.js)
+const RM = remodel(BSP.SOLIDS, BSP.FACES, BSP.TEXTURES);
+for (const [t, [paint]] of Object.entries(NEW_TEX)) FACE_MATS[t] = paint;
+
 // The street texture is also on the wall behind the CT spawn: give that wall the estate's stone instead.
-const FACES = { ...BSP.FACES, out_grnd2: [], out_grnd2_wall: [] };
-for (const f of BSP.FACES.out_grnd2) {
+const FACES = { ...RM.faces, out_grnd2: [], out_grnd2_wall: [] };
+for (const f of RM.faces.out_grnd2) {
   const ys = f.filter((_, i) => i % 5 === 1);
   (Math.max(...ys) - Math.min(...ys) > 0.3 ? FACES.out_grnd2_wall : FACES.out_grnd2).push(f);
 }
@@ -66,7 +71,7 @@ function roofFace(f) {
   const b = { min: [x0, y0, z0], max: [x1, y0, z1] };
   return (inHouse(b) && y0 >= ROOF_Y.house) || (inShed(b) && y0 >= ROOF_Y.shed);
 }
-const BRK = breakUp(BSP.SOLIDS, FACES, breakable, { roofFace });
+const BRK = breakUp(RM.solids, FACES, breakable, { roofFace });
 // furniture, bookshelves, wooden panels and doors burn
 const FUEL = new Set(['books', 'wood', 'fabric', 'crate', 'cardboard', 'door1']);
 for (const p of BRK.pieces) p.fuel = p.kind === 'prop' || Object.keys(BRK.pieceFaces[p.id] || {}).some(t => FUEL.has(FACE_MATS[t]));
@@ -77,12 +82,12 @@ for (const p of BRK.pieces) for (const b of p.boxes) m.box(b.min[0], b.min[2], b
 
 // ---- rooms (light groups named after the original lamps). Ground floor 0.81-4.06, first floor 4.27-6.71.
 const G = [0.75, 4.1], U = [4.2, 6.75];
-const room = (group, x1, x2, z1, z2, [y1, y2]) => ({ group, min: [x1, y1, z1], max: [x2, y2, z2] });
+const room = (group, x1, x2, z1, z2, [y1, y2]) => ({ group, min: [x1, y1, z1], max: [x2, y2, z2], power: true });
 const ROOMS = [
-  room('lampa6', -23.3, -13.31, -14.05, -10.16, G), room('lampa6', -23.3, -13.31, -10.16, -5.49, G),
+  room('lampa6', -23.3, -13.31, -14.05, -5.49, G),
   room('lampa4', -13.31, -6.78, -14.05, -10.16, G),
   room('lampa5', -12.9, -6.78, -10.16, 6.5, [0.75, 6.75]),
-  room('lampa7', -23.3, -13.31, -5.49, 2.03, G), room('lampa7', -23.3, -13.31, 2.03, 4.88, G),
+  room('lampa7', -23.3, -13.31, -5.49, 4.88, G),
   room('lampa8', -23.3, -16.56, 4.88, 11.0, G),
   room('lampa2', -16.56, -12.9, 4.88, 11.0, G), room('lampa2', -12.9, -6.78, 6.5, 11.0, G),
   room('lampa9', -23.3, -12.9, -14.05, -7.32, U),
@@ -115,7 +120,7 @@ const DOORS = BSP.DOORS.map((d, id) => {
   const axis = x2 - x1 > z2 - z1 ? 'x' : 'z';
   const len = axis === 'x' ? x2 - x1 : z2 - z1;
   return { id, axis, dir: 1, len, h: y2 - y1 - 0.02, hinge: [d.origin[0], y1, d.origin[2]], tex: 'door1' };
-});
+}).concat(RM.doors.map((d, i) => ({ id: BSP.DOORS.length + i, ...d })));
 
 // ---- lights: one lamp per original light (the two lampa10 bulbs share one), switched by the wall buttons
 const seen = new Set();
@@ -142,6 +147,8 @@ const SWITCHES = BSP.BUTTONS.filter(b => /^lampa/.test(b.target)).map(b => {
 // ---- water: the fountain and the tunnel
 for (const w of BSP.WATER) m.add({ type: 'water', min: [w[0], w[2]], max: [w[3], w[5]], y: w[4], color: w[4] > 0 ? '#3a7a90' : '#2e4a3a', murky: w[4] < 0 });
 for (const x of [-16, -4, 8, 20]) m.add({ type: 'tunnel-lamp', p: [x, -2.2, -18.7] });
+for (const d of RM.decor) m.add(d);
+for (const l of RM.ladders) m.ladder(...l);
 
 // Lawns beyond the estate walls (so the city skyline stands on the ground), then the skyline itself
 for (const [x1, z1, x2, z2] of [[-400, -400, 400, -22.9], [-400, 22.9, 400, 400], [-400, -22.9, -29.3, 22.9], [29.3, -22.9, 400, 22.9]]) {
@@ -168,8 +175,9 @@ export default {
   // the battle leaves its marks: soot, rubble, collapsing walls, dust, shell shock, blast push, spreading fire,
   // doors blown off, bullets through thin walls, muffled sound indoors (see REAL in shared/weapons.js)
   realism: true,
+  mansion2: true, // the Mansion 2.0 additions (see mansion2.js and mansionTick in server.js)
   pieceFaces: BRK.pieceFaces,
-  faceTex: { ...BSP.TEXTURES, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
+  faceTex: { ...RM.tex, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
   faceMats: FACE_MATS,
   bounds: { min: -29.2, max: 29.2 },
   zones: {
@@ -188,8 +196,11 @@ export default {
     ...ROOMS,
     { group: 'tunnel', amb: 0.55, min: [-24.4, -4.2, -21.2], max: [26.3, -1.95, -17.8] },
     { group: 'shed', min: [13.1, 0, 14.6], max: [18.0, 2.5, 17.9] },
+    ...RM.rooms,
   ],
-  switches: SWITCHES,
+  switches: [...SWITCHES, ...RM.switches],
+  // Blackout: holding E at the fuse box in the cellar cuts (T) or restores (CT) the power of these rooms' lights.
+  fusebox: { ...RM.fusebox, groups: [...new Set([...ROOMS.map(r => r.group), ...RM.rooms.map(r => r.group).filter(g => g !== 'tunnel')])] },
   // One pickup truck with a PKT machine gun in the back, on the lawn by the left (south) door.
   vehicles: [
     { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },

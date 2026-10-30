@@ -9,7 +9,7 @@
 const EPS = 0.006;
 
 // Keep the part of a polygon on one side of the plane pos[k] = val.
-function clip(poly, k, val, keepAbove) {
+export function clip(poly, k, val, keepAbove) {
   const n = poly.length / 5, out = [];
   const side = i => (poly[i * 5 + k] - val) * (keepAbove ? 1 : -1);
   for (let i = 0; i < n; i++) {
