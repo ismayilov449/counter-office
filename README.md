@@ -133,6 +133,13 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     into a narrow timber-shored passage (about 40 m) east under the lawn and south to below the shed, where a ladder
     goes up to a **trapdoor** in the shed's floor. **E** opens it (from the ladder or from above); it creaks open
     loudly and slowly, and won't close on someone's head.
+  - **Storm drain**: an iron **grate** in the street in front of the gate (CT side) opens with **E** (slowly, with a
+    loud clank) onto a ladder down into a concrete drain with a trickle of dirty water. It runs west under the lawn
+    and the fountain, with a jog half way, to a ladder up through a second grate in the **cellar's floor**. With the
+    smugglers' tunnel it makes a loop under the estate.
+  - **Roof terrace** over the front porch: reached from the top floor through the opening above the front door, or
+    up the **drainpipe ladder** at the porch's north-east corner. A waist-high parapet, a table, a bench and potted
+    shrubs for cover; open to the sky (the mortar reaches it) and seen from three sides.
   - **Blackout**: the house's **fuse box** hangs in the cellar, a big red lever on it. A Terrorist **holds E for
     3 seconds** to cut the power: every light in the house (and the cellar) goes out at once — truly dark, only
     flashlights (**F**), nightvision (**N**), muzzle flashes, explosions and fire light the rooms — and everyone

@@ -6,6 +6,8 @@
 //   - a wine cellar under the living room, down a stair from the kitchen through what was a walled-up closet
 //   - the house's fuse box in the cellar (blackout, see the fuse box in server.js)
 //   - a smugglers' tunnel from the cellar to a hatch in the shed's floor
+//   - a storm drain from a grate in the street to a grate in the cellar's floor
+//   - the roof of the front porch made a terrace, with a drainpipe ladder up to it
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -216,6 +218,55 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     doors.push({ hatch: { min: [hatchAt[0], hatchAt[1]], max: [hatchAt[2], hatchAt[3]], y: floorY, side: '+x' }, hinge: [hatchAt[2], floorY, (hatchAt[1] + hatchAt[3]) / 2], tex: 'wood', slow: 0.9 });
     rooms.push({ group: 'tunnel', amb: 0.4, min: [-14.85, -2.3, 4.45], max: [14.85, -0.15, 6.35] });
     rooms.push({ group: 'tunnel', amb: 0.4, min: [13.45, -2.3, 6.35], max: [14.85, -0.15, 16.85] });
+  }
+
+  // ---------------------------------------------------------------- 9. the storm drain
+  // A grate in the street in front of the gate (the CTs' side) opens onto a shaft and a ladder down into a concrete
+  // drain with a trickle of dirty water; it runs west under the lawn and the fountain (with a jog half way, so it
+  // isn't one long shooting gallery) to below the cellar, where a ladder goes up through a grate in the cellar's
+  // floor. Both iron grates clank open slowly. With the smugglers' tunnel it makes a loop under the estate.
+  {
+    const y1 = -5.0, y2 = -3.0, street = [25.9, -2.6, 26.9, -1.4], cellar = [-19.6, -0.2, -18.6, 1.0];
+    const legs = [[3.4, y1, -2.6, 26.9, y2, -1.4], [3.4, y1, -2.6, 4.6, y2, 1.0], [-19.6, y1, -0.2, 4.6, y2, 1.0]];
+    carve(street[0], -0.5, street[1], street[2], 0.01, street[3]);
+    carve(cellar[0], -2.6, cellar[1], cellar[2], -2.19, cellar[3]);
+    hollow([
+      ...legs.map(box => ({ box, floor: 'x_concrete', ceil: 'x_concrete', wall: 'out_w5' })),
+      { box: [street[0], y2 - 0.05, street[1], street[2], 0, street[3]], floor: 'x_concrete', ceil: 'x_concrete', wall: 'x_concrete', open: ['top', 'bottom'] },
+      { box: [cellar[0], y2 - 0.05, cellar[1], cellar[2], -2.2, cellar[3]], floor: 'x_concrete', ceil: 'x_concrete', wall: 'x_concrete', open: ['top', 'bottom'] },
+    ]);
+    for (const [x1, z1, x2, z2] of [[3.4, -2.6, 26.9, -1.4], [3.4, -1.4, 4.6, -0.2], [-19.6, -0.2, 4.6, 1.0]]) {
+      decor.push({ type: 'water', min: [x1, z1], max: [x2, z2], y: y1 + 0.12, color: '#2e4a3a', murky: true });
+    }
+    for (const p of [[20, -2.0], [9, -2.0], [-2, 0.4], [-13, 0.4]]) decor.push({ type: 'tunnel-lamp', p: [p[0], y2 - 0.15, p[1]] });
+    decor.push({ type: 'pipe', from: [26.9, y2 - 0.3, -1.55], to: [4.6, y2 - 0.3, -1.55] });
+    decor.push({ type: 'pipe', from: [4.6, y2 - 0.3, 0.85], to: [-19.6, y2 - 0.3, 0.85] });
+    ladders.push([street[2], (street[1] + street[3]) / 2, [-1, 0], y1, 0.95, 0.8]);
+    ladders.push([cellar[0], (cellar[1] + cellar[3]) / 2, [1, 0], y1, -2.2 + 0.95, 0.8]);
+    const grate = (r, y, side) => doors.push({ hatch: { min: [r[0], r[1]], max: [r[2], r[3]], y, side }, grate: true, hinge: [(r[0] + r[2]) / 2, y, (r[1] + r[3]) / 2], tex: 'metal', slow: 0.8 });
+    grate(street, 0, '-x');
+    grate(cellar, -2.2, '+x');
+    rooms.push({ group: 'tunnel', amb: 0.4, min: [3.35, -5.1, -2.65], max: [26.95, -2.95, -1.35] });
+    rooms.push({ group: 'tunnel', amb: 0.4, min: [3.35, -5.1, -1.35], max: [4.65, -2.95, -0.25] });
+    rooms.push({ group: 'tunnel', amb: 0.4, min: [-19.65, -5.1, -0.25], max: [4.65, -2.95, 1.05] });
+  }
+
+  // ---------------------------------------------------------------- 10. the roof terrace
+  // The porch roof (4.27 m, the top floor's level, behind a waist-high parapet) was always there, through the opening
+  // over the front door; now it's furnished — a table, a bench and two potted shrubs, cover for whoever crouches —
+  // and a drainpipe with a ladder runs up the porch's north-east corner from the lawn. Open to the sky (the mortar
+  // reaches it) and seen from the lawn on three sides.
+  {
+    const y = 4.27;
+    brush(-5.6, y + 0.72, -6.0, -4.4, y + 0.78, -4.8, 'x_wood');
+    brush(-5.05, y, -5.45, -4.95, y + 0.72, -5.35, 'x_wood', ['bottom']);
+    brush(-6.35, y, 2.0, -5.85, y + 0.45, 4.6, 'x_wood', ['bottom', '-x']);
+    for (const z of [-8.9, 5.6]) {
+      brush(-4.3, y, z - 0.3, -3.7, y + 0.5, z + 0.3, 'c1a4_silo2b', ['bottom']);
+      decor.push({ type: 'tree', kind: 'cypress', p: [-4.0, y + 0.5, z], s: 0.45 });
+    }
+    decor.push({ type: 'pipe', from: [-3.27, 0, -9.62], to: [-3.27, 5.1, -9.62] });
+    ladders.push([-3.35, -9.45, [1, 0], 0, 5.3, 0.5]);
   }
 
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
