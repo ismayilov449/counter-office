@@ -240,6 +240,15 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     their life — and anyone close by is hurt too.
   - **MON-50** ($600): a Soviet directional mine on little legs, with a tripwire stretched across its front 3 m out.
     An enemy walking into the wire sets it off: a fan of fragments up to 25 m ahead (60° wide), a small blast behind.
+- **Signal jammer** (buy menu → 7 Mines & camo, Terrorists, $800; one per Terrorist team per round; not in Zombie
+  mode). Press **6** to take it out (with mines, again to switch) and **Mouse1** to put it down a step in front of you: a
+  small olive box with three antennas and a blinking red light. It works until the round ends or it's destroyed (3 bullets,
+  or a grenade or any other blast nearby). Within 15 m of it:
+  - a Counter-Terrorist's radar shows only static ("NO SIGNAL"), and they can't call in mortar targets (V) or ping;
+  - nobody standing there is spotted onto any radar (no red dots);
+  - drones that fly in lose their signal and crash, the Terrorists' own too.
+
+  It hums, so it can be heard and found. (Bots don't use it, and don't go after it.)
 - **Ghillie camo** (buy menu → 7 Mines & camo, $1000): press **H** to switch it on and off. While it's on, enemies see only a faint
   shimmer of you (bots can't make you out beyond 4 m); each shot shows you for 1.5 seconds. Teammates always see you.
   Lost when you die.

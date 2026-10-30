@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, mortarElev, MINES, MINE, CAMO, PING } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, mortarElev, MINES, MINE, CAMO, PING, JAMMER } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -11,7 +11,7 @@ import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, ambientAt } from './roomlight.js';
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
-import { buildMortarSetup, buildPlacedMine } from './guns.js';
+import { buildMortarSetup, buildPlacedMine, buildPlacedJammer } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
 import { EMOTES, EMOTE } from '/shared/emotes.js';
 import { RANKS } from '/shared/ranks.js';
@@ -115,6 +115,7 @@ function loadMap(id) {
   renderer.toneMappingExposure = map.theme.exposure || 1;
   hud.setMap(map);
   clearMineModels();
+  clearJammerModels();
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
@@ -145,6 +146,7 @@ function prewarm() {
   place(buildMortarSetup(60), 2.4);
   place(buildPlacedMine('pmn', MINE.mon50.wire, MINE.mon50.wireHalf), 3.2);
   place(buildPlacedMine('mon50', MINE.mon50.wire, MINE.mon50.wireHalf), 3.8);
+  place(buildPlacedJammer(), 4.4);
   scene.add(extra);
   // effects
   fx.crater(by(-2, 0, -2), 1, true);
@@ -204,7 +206,7 @@ addEventListener('resize', () => {
 
 const me = {
   id: null, joined: false, team: 'SPEC', alive: false, hp: 0, armor: 0, helmet: false, kit: false, nvg: false, money: 0,
-  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, c4: false },
+  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, c4: false },
   slot: 'knife', lastSlot: 'knife', pendingSlot: false,
   p: [0, 0, 0], v: [0, 0, 0], onGround: false, crouch: false, eyeH: PLAYER.eye, airSpeed: 0,
   yaw: 0, pitch: 0, punchP: 0, punchY: 0, lastYaw: 0, sway: 0, bobT: 0,
@@ -251,14 +253,14 @@ function weaponOf(slot) {
     case 'secondary': return me.inv.secondary?.id || null;
     case 'knife': return me.zombie ? 'claws' : 'knife';
     case 'c4': return me.inv.c4 ? 'c4' : null;
-    default: return (GRENADES.includes(slot) || MINES.includes(slot)) && me.inv[slot] > 0 ? slot : null;
+    default: return (GRENADES.includes(slot) || MINES.includes(slot) || slot === 'jammer') && me.inv[slot] > 0 ? slot : null;
   }
 }
 // The pickup's gunner always uses the mounted machine gun.
 const current = () => (me.riding?.gunner ? 'pkt' : weaponOf(me.slot) || 'knife');
 const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me.inv[me.slot] : null);
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
-const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'c4'];
+const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'jammer', 'c4'];
 
 // The gun in your hands: one model per weapon and look, made once and kept (building a new one at every switch was a
 // small hitch each time, and the old ones were never freed). prewarm fills it while the map loads.
@@ -492,6 +494,7 @@ function tryFire(now) {
   if (!def.auto && !me.triggerFresh) return;
   me.triggerFresh = false;
   if (def.mortar) { mortarFire(now); return; }
+  if (def.device) { placeJammer(now); return; }
   if (def.mine) { layMine(id, now); return; }
   if (def.mounted) {
     me.nextShot = now + def.rate * 1000;
@@ -584,6 +587,53 @@ function mineToDefuse() {
   }
   return best;
 }
+
+// ---- Signal jammer (Terrorists): 6 takes it out, Mouse1 puts it down a step in front of you (like a mine). The server
+// keeps the list ('jammers' messages: [id, team, x, y, z, yaw]); everyone sees it, its light blinks and it hums. A CT
+// within JAMMER.radius of one has static on the radar and can't call in targets or ping (the server says no too).
+function placeJammer(now) {
+  if (!me.onGround) return;
+  const fx_ = -Math.sin(me.yaw), fz = -Math.cos(me.yaw);
+  const clear = !coll.raycast([me.p[0], me.p[1] + 0.3, me.p[2]], [fx_, 0, fz], 1.0, 'move');
+  const at = clear ? [me.p[0] + fx_ * 0.7, me.p[1] + 0.3, me.p[2] + fz * 0.7] : [me.p[0], me.p[1] + 0.3, me.p[2]];
+  const floor = coll.raycast(at, [0, -1, 0], 1.2, 'solid');
+  if (!floor) { hud.small('Put the jammer down on the ground', 2); return; }
+  net.send({ t: 'jammer', p: [at[0], at[1] - floor.t, at[2]], yaw: me.yaw });
+  audio.play('plant');
+  me.inv.jammer--;
+  me.nextShot = now + 1000;
+  if (me.inv.jammer <= 0) switchSlot(bestSlot(), true);
+}
+const jammerModels = new Map(); // id -> { obj, p }
+let jammerModel = null;
+function syncJammers(list) {
+  const seen = new Set();
+  for (const [id, , x, y, z, yaw] of list) {
+    seen.add(id);
+    if (jammerModels.has(id)) continue;
+    const obj = (jammerModel ||= buildPlacedJammer()).clone();
+    obj.position.set(x, y, z);
+    obj.rotation.y = yaw;
+    scene.add(obj);
+    jammerModels.set(id, { obj, led: obj.getObjectByName('led'), p: [x, y, z], hum: [x, y + 0.3, z] });
+  }
+  for (const [id, e] of jammerModels) if (!seen.has(id)) { scene.remove(e.obj); audio.hum(id, null); jammerModels.delete(id); }
+}
+function clearJammerModels() { syncJammers([]); }
+// Per frame: the blinking light and the hum.
+function updateJammers(now) {
+  const on = Math.floor(now / 450) % 3 === 0;
+  for (const [id, e] of jammerModels) {
+    e.led.visible = on;
+    audio.hum(id, e.hum);
+  }
+}
+function jammedHere() {
+  if (me.team !== 'CT' || !me.alive) return false;
+  for (const e of jammerModels.values()) if (Math.hypot(me.p[0] - e.p[0], me.p[1] - e.p[1], me.p[2] - e.p[2]) < JAMMER.radius) return true;
+  return false;
+}
+const JAM_HINT = 'Radar jammed — a signal jammer is near (listen for the hum and shoot it)';
 
 // Ghillie camouflage: H switches it on and off. We can't see ourselves fade, so the HUD says when we're hidden
 // (same rule as the server: on, and not just after a shot).
@@ -987,7 +1037,7 @@ function priceOf(id) {
 
 function owns(id) {
   const def = WEAPONS[id];
-  if (def?.grenade || def?.mine) return me.inv[id] >= def.max;
+  if (def?.grenade || def?.mine || def?.device) return me.inv[id] >= def.max;
   if (id === 'camo') return me.camo;
   if (def) return me.inv[slotKey(id)]?.id === id;
   if (id === 'vest') return me.armor >= 100;
@@ -1012,13 +1062,13 @@ function cantBuy(id) {
   const i = itemInfo(id);
   if (!availableTo(id, me.team)) return `${i.team === 'CT' ? 'CT' : 'T'} only`;
   if (id === 'kit' && (game.mode !== 'bomb' || game.cfg.gameMode !== 'classic')) return 'Bomb maps only';
-  if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar')) return 'Not in Zombie';
+  if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar' || id === 'jammer')) return 'Not in Zombie';
   return '';
 }
 
 // Bought this round and still yours, while you can still buy: it can be sold back (right-click).
 const refundable = id => !buyBlockReason() && me.roundBuys.includes(id) &&
-  (WEAPONS[id]?.grenade || WEAPONS[id]?.mine ? me.inv[id] > 0 : id === 'vest' || id === 'vesthelm' ? me.armor > 0 : owns(id));
+  (WEAPONS[id]?.grenade || WEAPONS[id]?.mine || WEAPONS[id]?.device ? me.inv[id] > 0 : id === 'vest' || id === 'vesthelm' ? me.armor > 0 : owns(id));
 
 // The buy menu (buymenu.js). Open, it frees the mouse to point and click; closed, the game takes it back.
 const buyUI = new BuyMenu($('buymenu'), {
@@ -1819,7 +1869,7 @@ document.addEventListener('mousedown', e => {
     secondary();
   } else if (e.button === 1) {
     e.preventDefault();
-    if (me.alive && me.team !== 'SPEC') sendPing();
+    if (me.alive && me.team !== 'SPEC') { if (jammedHere()) hud.small(JAM_HINT, 2); else sendPing(); }
   }
 });
 document.addEventListener('mouseup', e => {
@@ -1902,12 +1952,12 @@ document.addEventListener('keydown', e => {
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
-    case 'Digit6': if (me.alive) cycleGrenades(MINES); break;
+    case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': startReload(); break;
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.alive) startUse('key'); break;
-    case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES].includes(current())) net.send({ t: 'drop', w: current() }); break;
+    case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES, 'jammer'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
     case 'KeyO': openBuy(5); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;
@@ -1920,7 +1970,7 @@ document.addEventListener('keydown', e => {
     case 'KeyJ': if (me.alive && me.team !== 'SPEC') toggleMenu(emoteMenu); break;
     case 'KeyV':
       if (me.driving != null) me.carCam = me.carCam === 'chase' ? 'seat' : 'chase';
-      else if (me.alive && inTeamName(me.team)) spotTarget();
+      else if (me.alive && inTeamName(me.team)) { if (jammedHere()) hud.small(JAM_HINT, 2); else spotTarget(); }
       break;
     case 'KeyF':
       if (me.alive) { me.flashlight = !me.flashlight; audio.play('click'); }
@@ -2504,6 +2554,16 @@ const net = new Net({
   mines(m) {
     syncMines(m.list);
   },
+  jammers(m) {
+    syncJammers(m.list);
+  },
+  jamdown(m) {
+    // shot to pieces: sparks, a crack and a puff of smoke
+    fx.sparks(m.p, [0, 1, 0]);
+    fx.sparks([m.p[0], m.p[1] + 0.3, m.p[2]], [0, 1, 0]);
+    fx.puff([m.p[0], m.p[1] + 0.3, m.p[2]], 0x3a3836, 1, 1.2, 0.8);
+    audio.play('crash', m.p);
+  },
   mark(m) {
     const at = performance.now();
     for (let i = pings.length - 1; i >= 0; i--) if (pings[i].by === m.by) pings.splice(i, 1); // one each
@@ -3065,6 +3125,8 @@ function updateHud(now) {
     else if (me.riding) hint = 'Press E to get out of the car';
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
+    else if (current() === 'jammer') hint = 'Click to put the signal jammer down — no enemy radar, pings or drones within 15 m';
+    else if (jammedHere()) hint = JAM_HINT;
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
     else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you (H to switch off)';
     else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the door`;
@@ -3104,7 +3166,7 @@ function updateHud(now) {
     bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
   }
   const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
-  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()));
+  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere());
   drawMortarMap(performance.now(), mates);
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
@@ -3419,6 +3481,7 @@ function frame() {
   updateMortarHud();
   updateOwnMortarModel();
   updateMineModels();
+  updateJammers(now);
   updateFires(dt, now);
   updateZombieGrowls(now);
   fx.update(dt, camera);

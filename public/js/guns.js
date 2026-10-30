@@ -545,6 +545,33 @@ export function buildPlacedMine(k, wire = 1.2, half = 1.5) {
   return g;
 }
 
+// Signal jammer: a small olive box with cooling fins, a carry handle and three whip antennas (feet at y = 0).
+function jammerBody(P, m) {
+  P.box(0.26, 0.13, 0.17, m.olive, 0, 0.065, 0);
+  for (let i = 0; i < 6; i++) P.box(0.008, 0.09, 0.15, m.dark, -0.1 + i * 0.04, 0.135, 0);       // fins
+  P.box(0.2, 0.012, 0.02, m.metal, 0, 0.11, 0.1);                                               // handle
+  P.box(0.07, 0.03, 0.004, m.dark, -0.06, 0.07, -0.087);                                        // panel
+  for (const [x, z, h] of [[-0.1, -0.06, 0.38], [0, -0.06, 0.44], [0.1, -0.06, 0.38]]) {
+    P.cyl(0.012, 0.03, m.dark, x, 0.145, z, 0, 0, 0, 8);                                         // antenna mounts
+    P.cyl(0.004, h, m.dark, x, 0.16 + h / 2, z, 0, 0, 0, 5);                                     // antennas
+  }
+}
+function jammerHeld(gun, P) {
+  jammerBody(P, X());
+  return [0, 0.2, -0.1];
+}
+// Put down on the floor: with the red light on top of the middle antenna that blinks (the child named 'led').
+export function buildPlacedJammer() {
+  const g = new THREE.Group(), P = new Parts();
+  jammerBody(P, X());
+  P.build(g);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2a1a }));
+  led.position.set(0, 0.61, -0.06);
+  led.name = 'led';
+  g.add(led);
+  return g;
+}
+
 // PKT: long heavy barrel, box receiver, ammo can on the side, spade grips at the back.
 function pkt(gun, P) {
   const m = X();
@@ -597,6 +624,7 @@ const BUILD = {
   mortar: (g, P) => mortar(g, P),
   pmn: (g, P) => pmnMine(g, P),
   mon50: (g, P) => mon50Mine(g, P),
+  jammer: (g, P) => jammerHeld(g, P),
   pkt: (g, P) => pkt(g, P),
   sg550: (g, P) => autoSniper(g, P, {}),
   m249: (g, P) => mg(g, P),

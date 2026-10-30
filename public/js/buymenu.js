@@ -20,6 +20,7 @@ const ABOUT = {
   smoke: 'A thick cloud for 18 seconds; nobody sees through it, bots neither.',
   molotov: 'Bursts into flames where it lands: a 3.5 m fire for 7 seconds.',
   pmn: 'Soviet pressure mine: an enemy who steps on it loses a leg, usually their life. Hard to see.',
+  jammer: 'Signal jammer (one per team): put it down and, within 15 m, the CTs\' radar shows static, they can\'t ping or call in targets, nobody there is spotted and drones crash. It hums; 3 bullets or a grenade destroy it.',
   mon50: 'Directional mine with a tripwire 3 m ahead: a fan of fragments up to 25 m forward.',
   rpg: 'Rocket launcher: explodes on whatever it hits, 9 m blast, blows holes in the mansion.',
   mortar: '82-BM-37 mortar: set it up, right mouse opens a map — click where the shell should land (or aim by hand in Soviet mils). 14 m blast.',

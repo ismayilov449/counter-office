@@ -12,6 +12,8 @@ export function rankBadge(i) {
   return `<span class="rk" style="color:${rankColor(i)};border-color:${rankColor(i)}" title="${title}">${i >= 0 ? RANK_SHORT[i] : '--'}</span>`;
 }
 export const TEAM_COLOR = { T: '#e8b45a', CT: '#7fb2ff' };
+// the radar's static while a signal jammer is near
+const STATIC = ['#101010', '#2c2c2c', '#4a4a4a', '#6c6c6c', '#909090', '#b8b8b8'];
 
 export class Hud {
   constructor() {
@@ -59,7 +61,7 @@ export class Hud {
     const def = WEAPONS[weaponId];
     this.set('weapon-name', def ? def.name : '');
     let ammo = '';
-    if (def?.grenade || def?.mine) ammo = String(me.inv[weaponId]);
+    if (def?.grenade || def?.mine || def?.device) ammo = String(me.inv[weaponId]);
     else if (def?.mounted) ammo = '∞';
     else if (def && def.mag) {
       const item = me.inv.primary?.id === weaponId ? me.inv.primary : me.inv.secondary;
@@ -70,7 +72,7 @@ export class Hud {
     const slots = [
       ['1', me.inv.primary?.id], ['2', me.inv.secondary?.id], ['3', me.zombie ? 'claws' : 'knife'],
       ...GRENADES.filter(g => me.inv[g] > 0).map(g => ['4', g]),
-      ...MINES.filter(g => me.inv[g] > 0).map(g => ['6', g]),
+      ...[...MINES, 'jammer'].filter(g => me.inv[g] > 0).map(g => ['6', g]),
       ['5', me.inv.c4 ? 'c4' : null],
     ];
     this.set('slots', slots.filter(s => s[1]).map(([k, id]) =>
@@ -522,12 +524,27 @@ export class Hud {
   // marks: the mortar's called-in target (a yellow cross), where its last shell landed (an orange ring, dashed when
   // nobody saw it) and, for the gunner, where the next shell will land (a bold red dot).
   // enemies: red dots for the ones the team sees now; with `fade` (1 -> 0) a hollow ring where one was last seen.
-  radar(self, mates, bomb, hostages = [], marks = [], enemies = []) {
+  // jammed: a signal jammer is near (a CT inside its area): only static, and yourself.
+  radar(self, mates, bomb, hostages = [], marks = [], enemies = [], jammed = false) {
     if (!this.radarBg) return;
     const g = this.radarCtx;
     const { toR } = this.radarXform();
     g.clearRect(0, 0, 200, 200);
     g.drawImage(this.radarBg, 0, 0);
+    if (jammed) {
+      g.fillStyle = 'rgba(30, 32, 30, 0.82)';
+      g.fillRect(0, 0, 200, 200);
+      for (let i = 0; i < 260; i++) {
+        g.fillStyle = STATIC[(Math.random() * STATIC.length) | 0];
+        g.fillRect(Math.random() * 200, Math.random() * 200, 1 + Math.random() * 5, 1 + Math.random() * 2);
+      }
+      g.fillStyle = '#ffd030';
+      g.font = 'bold 13px Consolas, monospace';
+      g.textAlign = 'center';
+      g.fillText('NO SIGNAL', 100, 104);
+      g.textAlign = 'start';
+      mates = []; bomb = null; hostages = []; marks = []; enemies = [];
+    }
     if (bomb) {
       const [x, z] = toR(bomb.p[0], bomb.p[2]);
       if (!bomb.planted || Math.floor(performance.now() / 300) % 2 === 0) {

@@ -11,7 +11,7 @@ import zlib from 'node:zlib';
 import { spawn } from 'node:child_process';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK, BLAST_FIRE, REAL } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, JAMMER, BREAK, BLAST_FIRE, REAL } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -284,6 +284,7 @@ const game = {
   nades: [],
   fires: [],
   mines: [],
+  jammers: [],
   nextMineId: 1,
   endVote: null,
   sprays: new Map(),
@@ -312,7 +313,7 @@ function broadcast(msg, filter) {
 const notify = (text, big = false, filter) => broadcast({ t: 'msg', text, big }, filter);
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
-const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, c4: false });
+const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, c4: false });
 const ownItem = (p, w) => (p.inv.primary?.id === w ? p.inv.primary : p.inv.secondary?.id === w ? p.inv.secondary : null);
 
 function addMoney(p, amount) {
@@ -764,6 +765,7 @@ function explodeCar(c, attacker) {
     const d = dist3(center, [h.p[0], h.p[1] + 1.1, h.p[2]]);
     if (d < R) hurtHostage(h, attacker, 130 * (1 - d / R), 'car');
   }
+  blastJammers(center, 6);
   // Chain reaction
   for (const o of world.cars) {
     if (o === c || o.wrecked) continue;
@@ -1785,6 +1787,7 @@ function explodeBomb() {
     if (dmg > 0) applyDamage(q, null, dmg, 'he', 'c4', 1, null, pos);
   }
   chainMines(pos, 15);
+  blastJammers(pos, 15);
 }
 
 function updateActions(t) {
@@ -1935,7 +1938,7 @@ function onShoot(p, m) {
   const traces = [];
   const hits = [];
   const ownCar = carOf(p)?.id ?? null;
-  const shattered = [], chipped = [];
+  const shattered = [], chipped = [], jamHits = [];
   for (const d of dirs) {
     const wall = world.raycast(o, d, range, 'bullet', ownCar);
     const wallT = wall ? wall.t : range;
@@ -1971,6 +1974,10 @@ function onShoot(p, m) {
       }
     }
     const r3 = v => Math.round(v * 1000) / 1000;
+    for (const j of game.jammers) {
+      if (!CFG.friendlyFire && mates(p, j)) continue;
+      if (rayAABB(o, d, [j.p[0] - 0.2, j.p[1], j.p[2] - 0.2], [j.p[0] + 0.2, j.p[1] + 0.5, j.p[2] + 0.2], best ? best.t : wallT)) jamHits.push(j);
+    }
     traces.push([r3(d[0]), r3(d[1]), r3(d[2]), r2(best ? best.t : wallT), best ? 1 : 0, !best && wall ? 1 : 0]);
     if (best) hits.push({ ...best, d });
     else if (wall && wall.box.car != null && !def.melee) damageCar(world.cars[wall.box.car], def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p);
@@ -1982,6 +1989,7 @@ function onShoot(p, m) {
     }
   }
   breakGlass(shattered);
+  for (const j of jamHits) if (--j.hp <= 0) destroyJammer(j, p);
   breakPieces(chipped);
 
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
@@ -2054,6 +2062,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
     if (d > R || !lineOfSight(at, chest)) continue;
     applyDamage(q, owner, def.damage * (1 - d / R), 'he', weapon, def.pen, null, at);
   }
+  blastJammers(at, Math.max(JAMMER.blast, R * 0.6));
   for (const h of game.hostages) {
     if (h.state === 'dead' || h.state === 'rescued') continue;
     const chest = [h.p[0], h.p[1] + 1.1, h.p[2]];
@@ -2110,6 +2119,7 @@ function onMortar(p, m) {
 // A forward observer calls in a target for the team's mortar: the spot they're looking at (it must be in sight).
 function onSpot(p, m) {
   const t = now(), pos = vec3(m.p);
+  if (p.team === 'CT' && jammedAt(p.p)) return send(p, { t: 'msg', text: JAM_MSG });
   if (!p.alive || !pos || !inTeam(p) || t - (p.spotAt || 0) < 2000) return;
   const eye = eyeOf(p);
   if (dist3(eye, pos) > 250 || !lineOfSight(eye, [pos[0], pos[1] + 0.3, pos[2]])) return;
@@ -2130,6 +2140,7 @@ function sendMines(to = null) {
 }
 
 function clearMines() {
+  clearJammers();
   if (!game.mines?.length) return;
   game.mines = [];
   sendMines();
@@ -2213,11 +2224,67 @@ function detonateMine(mine, stepper = null) {
     }).map(g => g.id));
   }
   chainMines(at, MINE.chain);
+  blastJammers(at, 3);
 }
 
 // Mines near an explosion go off too (a moment later, one after another).
 function chainMines(at, r) {
   for (const mine of game.mines.filter(x => dist3(x.p, at) < r)) setTimeout(() => detonateMine(mine), 120 + Math.random() * 200);
+}
+
+// ---- Signal jammer (Terrorists; see JAMMER in shared/weapons.js): a box with a blinking antenna, put down on the
+// floor like a mine. Until the round ends or it's destroyed (JAMMER.hits bullets, or a blast), within JAMMER.radius
+// metres: the CTs' radar shows static and they can't call in mortar targets or ping; nobody standing there is spotted
+// onto a radar (see spots); drones flying in lose their signal (jammedAt). Everyone sees it and hears it hum.
+const JAM_MSG = 'Signal jammed — no radar, pings or target calls here. Find the jammer (listen for the hum).';
+function jammedAt(pos) {
+  for (const j of game.jammers) if (dist3(j.p, pos) < JAMMER.radius) return true;
+  return false;
+}
+
+function sendJammers(to = null) {
+  const list = game.jammers.map(j => [j.id, j.team === 'T' ? 1 : 2, ...j.p.map(r2), r2(j.yaw)]);
+  if (to) send(to, { t: 'jammers', list });
+  else broadcast({ t: 'jammers', list });
+}
+
+function clearJammers() {
+  game.jamUsed = {};
+  if (!game.jammers.length) return;
+  game.jammers = [];
+  sendJammers();
+}
+
+function onJammer(p, m) {
+  const pos = vec3(m.p);
+  if (!pos || !isNum(m.yaw) || !p.alive || !(p.inv.jammer > 0) || game.phase === 'freeze' || game.phase === 'end') return;
+  if (Math.hypot(pos[0] - p.p[0], pos[2] - p.p[2]) > 2.5 || Math.abs(pos[1] - p.p[1]) > 1.5) return;
+  const floor = world.raycast([pos[0], pos[1] + 0.4, pos[2]], [0, -1, 0], 1, 'solid');
+  if (!floor || floor.t < 0.01) return send(p, { t: 'msg', text: 'Put the jammer down on the ground.' });
+  pos[1] = pos[1] + 0.4 - floor.t;
+  p.inv.jammer--;
+  p.protectUntil = 0;
+  game.jamUsed[p.team] = true;
+  game.jammers.push({ id: game.nextMineId++, team: p.team, owner: p.id, p: pos, yaw: m.yaw, hp: JAMMER.hits });
+  sendMe(p);
+  sendJammers();
+  notify('Signal jammer on — their radar is blind around it.', false, q => q.team === p.team && q !== p);
+}
+
+// Shot to pieces or caught in a blast. (Without rounds — warmup, Deathmatch, Gun Game — the team can buy another.)
+function destroyJammer(j, by) {
+  const i = game.jammers.indexOf(j);
+  if (i < 0) return;
+  game.jammers.splice(i, 1);
+  if (game.phase === 'warmup' || isDM() || isGG()) delete game.jamUsed[j.team];
+  sendJammers();
+  broadcast({ t: 'jamdown', p: j.p.map(r2) });
+  if (by) send(by, { t: 'msg', text: 'Signal jammer destroyed.' });
+  notify('The signal jammer is down — the radar is back.', false, q => q.team === other(j.team));
+}
+
+function blastJammers(at, r) {
+  for (const j of [...game.jammers]) if (dist3(j.p, at) < r && lineOfSight(at, [j.p[0], j.p[1] + 0.3, j.p[2]])) destroyJammer(j, null);
 }
 
 // Ghillie camouflage: switched on (H), you're hidden from enemies, except for a moment after each shot (see CAMO).
@@ -2249,6 +2316,7 @@ function spots(eye, yaw, e, t, fov = SPOT.fov) {
   const d = dist3(eye, head);
   if (d > SPOT.range) return false;
   if (e.hidden && d > CAMO.botSees) return false;
+  if (jammedAt(e.p)) return false;
   if (d > 2) {
     const off = Math.atan2(-(e.p[0] - eye[0]), -(e.p[2] - eye[2])) - yaw;
     if (Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) > fov) return false;
@@ -2280,6 +2348,7 @@ function updateSpotting(t) {
 // A ping: the spot a player is looking at, marked with a "!" on their team's radar (in Deathmatch only on their own).
 function onPing(p, m) {
   const t = now(), pos = vec3(m.p);
+  if (p.team === 'CT' && jammedAt(p.p)) return send(p, { t: 'msg', text: JAM_MSG });
   if (!p.alive || !pos || t - (p.pingAt || 0) < PING.cooldown * 1000 || dist3(eyeOf(p), pos) > PING.range + 5) return;
   p.pingAt = t;
   const to = isDM() || !inTeam(p) ? [p] : [...players.values()].filter(q => q === p || mates(q, p));
@@ -2366,7 +2435,7 @@ function explodeNade(n) {
     if (d > 9 || !lineOfSight(o, chest)) continue;
     applyDamage(q, owner, 100 * (1 - d / 9), 'he', 'he', WEAPONS.he.pen, null, o);
   }
-  if (n.k === 'he') chainMines(o, MINE.chain);
+  if (n.k === 'he') { chainMines(o, MINE.chain); blastJammers(o, JAMMER.blast); }
   if (n.k === 'he') {
     for (const c of world.cars) {
       const d = dist3(o, [c.p[0], c.p[1] + 0.7, c.p[2]]);
@@ -2588,7 +2657,10 @@ function onBuy(p, id) {
   const def = wdef || idef;
   if (!def || def.price == null) return;
   if (def.team && def.team !== p.team) return fail('Your team cannot buy that.');
-  if ((MINES.includes(id) || id === 'camo') && isZM()) return fail('Not in Zombie mode.');
+  if ((MINES.includes(id) || id === 'camo' || id === 'jammer') && isZM()) return fail('Not in Zombie mode.');
+  if (id === 'jammer' && (game.jamUsed?.[p.team] || [...players.values()].some(q => q !== p && q.team === p.team && q.inv.jammer > 0))) {
+    return fail('Your team already has its signal jammer this round.');
+  }
   if (id === 'mortar') {
     // One mortar per team (in Deathmatch, one on the whole map); not against zombies.
     if (isZM()) return fail('There are no mortars in Zombie mode.');
@@ -2597,7 +2669,7 @@ function onBuy(p, id) {
   }
   let price = def.price;
 
-  if (wdef && (wdef.grenade || wdef.mine)) {
+  if (wdef && (wdef.grenade || wdef.mine || wdef.device)) {
     if (p.inv[id] >= wdef.max) return fail('You cannot carry any more.');
   } else if (wdef) {
     if (p.inv[slotKey(id)]?.id === id) return fail('You already have that weapon.');
@@ -2620,7 +2692,7 @@ function onBuy(p, id) {
   p.money -= price;
   const record = { id, price, armor: p.armor, helmet: p.helmet, dropped: null };
   (p.buys ||= []).push(record);
-  if (wdef && (wdef.grenade || wdef.mine)) p.inv[id]++;
+  if (wdef && (wdef.grenade || wdef.mine || wdef.device)) p.inv[id]++;
   else if (wdef) {
     const slot = slotKey(id);
     if (p.inv[slot]) {
@@ -2648,7 +2720,7 @@ function onSell(p, id) {
   const i = (p.buys || []).map(b => b.id).lastIndexOf(id);
   if (i < 0) return fail('You can only sell back what you bought this round.');
   const b = p.buys[i], wdef = WEAPONS[id];
-  if (wdef && (wdef.grenade || wdef.mine)) {
+  if (wdef && (wdef.grenade || wdef.mine || wdef.device)) {
     if (!(p.inv[id] > 0)) return fail('You don\'t have it any more.');
     p.inv[id]--;
   } else if (wdef) {
@@ -2896,6 +2968,9 @@ function handle(p, m) {
       break;
     case 'mine':
       onMine(p, m);
+      break;
+    case 'jammer':
+      onJammer(p, m);
       break;
     case 'nade':
       onNade(p, m);
@@ -3149,7 +3224,7 @@ function tick() {
     if (p.ws.readyState !== 1) continue;
     const me = p.act ? JSON.stringify({ a: p.act.type, pr: Math.min(1, (t - p.act.start) / p.act.dur) }) : 'null';
     // (the enemies the player's team has spotted: only to that team)
-    const sp = inTeam(p) && spotOn() ? ',"sp":' + spotJson[p.team] : '';
+    const sp = inTeam(p) && spotOn() ? ',"sp":' + (p.team === 'CT' && p.alive && jammedAt(p.p) ? '[]' : spotJson[p.team]) : '';
     p.ws.send(head + (p.gotSnap ? changed : all) + sp + ',"me":' + me + '}');
     p.gotSnap = true;
   }
@@ -3232,6 +3307,7 @@ wss.on('connection', ws => {
     sprayImgs, avatars, sprays: [...game.sprays.values()], glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates,
   });
   sendMines(p);
+  sendJammers(p);
   sendRoster();
   ws.on('message', data => {
     let m;

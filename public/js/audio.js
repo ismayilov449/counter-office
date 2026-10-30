@@ -783,6 +783,31 @@ export const audio = {
     e.f.frequency.setTargetAtTime(400 + rpm * 900, t, 0.1);
     e.g.gain.setTargetAtTime(running ? 0.07 + rpm * 0.09 : 0, t, 0.15);
   },
+  // A signal jammer's electric hum (with a slow warble), one per jammer while it stands; hum(id, null) stops it.
+  hums: new Map(),
+  hum(id, pos) {
+    if (!ctx || ctx.state !== 'running') return;
+    let h = this.hums.get(id);
+    if (!pos) {
+      if (h) { h.o1.stop(); h.o2.stop(); h.lfo.stop(); h.g.disconnect(); this.hums.delete(id); }
+      return;
+    }
+    if (h) return;
+    const out = this.out(pos, [2.5, 1.2]);
+    const g = ctx.createGain(), f = ctx.createBiquadFilter();
+    g.gain.value = 0.05;
+    f.type = 'lowpass';
+    f.frequency.value = 1400;
+    const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+    o1.type = 'sawtooth'; o1.frequency.value = 100;
+    o2.type = 'square'; o2.frequency.value = 151;
+    lfo.frequency.value = 3.3; lg.gain.value = 0.02;
+    lfo.connect(lg).connect(g.gain);
+    o1.connect(f); o2.connect(f);
+    f.connect(g).connect(out);
+    for (const o of [o1, o2, lfo]) o.start();
+    this.hums.set(id, { g, o1, o2, lfo });
+  },
   stopEngines() {
     for (const e of this.engines.values()) { e.o1.stop(); e.o2.stop(); e.g.disconnect(); }
     this.engines.clear();

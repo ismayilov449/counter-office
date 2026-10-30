@@ -60,6 +60,8 @@ export const WEAPONS = {
   // across its front fires a fan of fragments forward.
   pmn: { name: 'PMN mine', slot: 6, cls: 'mine', mine: 'pressure', price: 500, max: 2, speed: 6.3 },
   mon50: { name: 'MON-50 mine', slot: 6, cls: 'mine', mine: 'directional', price: 600, max: 2, speed: 6.3 },
+  // Signal jammer (Terrorists): 6 selects it like a mine, Mouse1 puts it down; see JAMMER.
+  jammer: { name: 'Signal jammer', slot: 6, cls: 'mine', device: true, team: 'T', price: 800, max: 1, speed: 6.3 },
 };
 
 export const GRENADES = ['he', 'flash', 'smoke', 'molotov'];
@@ -78,6 +80,10 @@ export const MINE = {
   mon50: { wire: 3, wireHalf: 1.4, range: 25, cone: 0.52, damage: 180, back: 3, backDamage: 40 },
 };
 
+// Signal jammer: one per Terrorist team per round, active until the round ends or it's destroyed (hits bullets, or a
+// blast within blast metres). Within radius metres: the CTs' radar shows static and they can't call in mortar targets
+// or ping, nobody standing there is spotted onto a radar, and drones lose their signal.
+export const JAMMER = { radius: 15, hits: 3, blast: 4 };
 // Ghillie camouflage: crouched, not moving and not shooting for still seconds, you're nearly invisible to enemies
 // (and bots can't make you out beyond botSees metres). Lost when you die.
 export const CAMO = { still: 1.5, botSees: 4 };
@@ -131,7 +137,7 @@ export const BUY_COLUMNS = [
   { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'scout', 'sg552', 'aug', 'sg550', 'g3sg1', 'awp'] },
   { title: 'Heavy', items: ['m249', 'rpg', 'mortar'] },
   { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg'] },
-  { title: 'Mines & camo', items: ['pmn', 'mon50', 'camo'] },
+  { title: 'Mines & camo', items: ['pmn', 'mon50', 'camo', 'jammer'] },
 ];
 
 // Gun Game: one kill with each weapon moves you to the next; a knife kill on the last level wins.
