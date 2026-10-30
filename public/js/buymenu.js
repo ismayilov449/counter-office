@@ -22,7 +22,9 @@ const ABOUT = {
   pmn: 'Soviet pressure mine: an enemy who steps on it loses a leg, usually their life. Hard to see.',
   jammer: 'Signal jammer (one per team): put it down and, within 15 m, the CTs\' radar shows static, they can\'t ping or call in targets, nobody there is spotted and drones crash. It hums; 3 bullets or a grenade destroy it.',
   mon50: 'Directional mine with a tripwire 3 m ahead: a fan of fragments up to 25 m forward.',
+  satchel: 'Satchel charge: throw it and it sticks (walls, doors, floors, cars); then set it off with the phone, from anywhere. 1.5× an HE.',
   rpg: 'Rocket launcher: explodes on whatever it hits, 9 m blast, blows holes in the mansion.',
+  rpg26: 'Throwaway rocket launcher: one shot (6 m blast, up to 400), then the tube is gone. One per team each round.',
   mortar: '82-BM-37 mortar: set it up, right mouse opens a map — click where the shell should land (or aim by hand in Soviet mils). 14 m blast.',
   m249: 'Light machine gun: a 100-round belt, chips through thin walls on the mansion.',
 };

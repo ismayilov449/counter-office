@@ -105,7 +105,7 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     through it automatically at the top. Break the glass first (shoot it).
   - **Windows** are real glass: see through them, shoot or grenade them to shatter.
   - **Destructible house**: explosions blow ragged holes in the walls and roofs of the mansion and the shed and smash
-    the furniture — the C4 most, then the mortar, an RPG rocket, a car blowing up, an HE grenade and the mines. The
+    the furniture — the C4 most, then the mortar, an RPG rocket (an RPG-26's a bit less), a satchel charge, a car blowing up, an HE grenade and the mines. The
     M249, AWP and the PKT chip away at them too (about 15 M249 hits break a bit of wall). A hole that reaches the
     floor is a new doorway; windows in a broken wall fall out. A mortar shell through the roof takes the top floor's
     ceiling with it, and the next one drops into the room. Window frames, lamps and light switches come down with
@@ -219,11 +219,16 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   "game commencing" after 3 s and 3 s freeze time per round.
 - **Weapons:** Glock, USP, P228, Desert Eagle, Five-SeveN, Dual Berettas, M3, XM1014, MAC-10, TMP,
   MP5, UMP45, P90, Galil, FAMAS, AK-47, M4A1, Scout, SG 552, AUG, AWP, the semi-automatic snipers
-  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 (CT only, $6000), 82-BM-37 mortar ($6000); HE, flashbang and smoke
+  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 (CT only, $6000), RPG-26 (T only, $3500), 82-BM-37 mortar ($6000); HE, flashbang and smoke
   grenades, Molotov; Kevlar, helmet, defuse kit, nightvision.
 - **RPG-7** (buy menu → Heavy, CTs only, $6000; a Terrorist can pick it up from a dead CT): the rocket flies to
   the first wall, car or person and explodes for up to 500 damage within 9 m — but only to people who can see the
   explosion. A wall between you and the blast protects you. Rockets also smash windows and blow up cars.
+- **RPG-26** (buy menu → Heavy, Terrorists only, $3500; one per team each round — in Deathmatch one in anyone's hands
+  at a time): a throwaway one-shot tube. Up to 400 damage within 6 m and less accurate than the RPG-7; otherwise the
+  same (walls protect, windows smash, cars blow up, fire, craters and gore, holes in the mansion — a bit smaller).
+  Once fired, the empty tube is thrown away and you're back on your pistol. A CT can pick up an unused one.
+  Bots don't buy it (one that picks it up fires it like the RPG-7).
 - **82-BM-37 mortar** (buy menu → Heavy, both teams, $6000, 6 shells; one per team — in Deathmatch one on the map;
   not in Zombie mode, and bots don't use it). It's heavy: you walk slowly with it. It's aimed like a real one, in
   Soviet mils (60-00 to the full circle; bearings go clockwise from north, the top of the radar):
@@ -271,6 +276,15 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   - drones that fly in lose their signal and crash, the Terrorists' own too.
 
   It hums, so it can be heard and found. (Bots don't use it, and don't go after it.)
+
+- **Satchel charge** (buy menu → 7 Mines & camo, Terrorists only, $1200, carry 1; not in Zombie mode). Press **6** to
+  take it out and **Mouse1** to throw it: it sticks to the first thing it hits — a wall, a door, the floor, a crate or a
+  car (on a car it rides along). Then you hold an old phone (**6** again gets it back): **Mouse1** sets it off, from
+  any distance. The blast is about 1.5 HE grenades (up to 150 damage, 10 m; walls protect): it blows doors open, blows
+  up cars and breaks the mansion's walls. It blinks red and chirps quietly, so it can be found. CTs can shoot it (it
+  goes off) or hold **E** next to it to defuse it (3 s, 1.5 s with a kit, +$200); an explosion nearby sets it off too.
+  If its owner dies it stays (and can still be defused), but nobody can set it off. Up to 2 out at once; cleared every
+  round. Bots don't use it.
 - **Ghillie camo** (buy menu → 7 Mines & camo, $1000): press **H** to switch it on and off. While it's on, enemies see only a faint
   shimmer of you (bots can't make you out beyond 4 m); each shot shows you for 1.5 seconds. Teammates always see you.
   Lost when you die.

@@ -11,7 +11,7 @@ import zlib from 'node:zlib';
 import { spawn } from 'node:child_process';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, JAMMER, BREAK, BLAST_FIRE, REAL } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, JAMMER, BREAK, BLAST_FIRE, REAL, SATCHEL } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -286,6 +286,7 @@ const game = {
   mines: [],
   jammers: [],
   nextMineId: 1,
+  satchels: [],
   endVote: null,
   sprays: new Map(),
   nextDropId: 1,
@@ -313,7 +314,7 @@ function broadcast(msg, filter) {
 const notify = (text, big = false, filter) => broadcast({ t: 'msg', text, big }, filter);
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
-const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, c4: false });
+const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, c4: false });
 const ownItem = (p, w) => (p.inv.primary?.id === w ? p.inv.primary : p.inv.secondary?.id === w ? p.inv.secondary : null);
 
 function addMoney(p, amount) {
@@ -1635,7 +1636,7 @@ function openMatchEnd(winner, extra = {}) {
 // tears off the part it hit, a Scout or Desert Eagle does it with a headshot.
 function gibOf(weapon, hs, how) {
   if (!how) return null;
-  if (how.part === 'he' && ['rpg', 'mortar', 'he', 'c4', 'car', 'mon50'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
+  if (how.part === 'he' && ['rpg', 'rpg26', 'mortar', 'he', 'c4', 'car', 'mon50', 'satchel'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
   if (weapon === 'pmn' && how.part === 'legs') return { k: 'shot', part: 'legs', from: how.from.map(r2) };
   if (['awp', 'm249'].includes(weapon) || (hs && ['scout', 'deagle'].includes(weapon))) return { k: 'shot', part: how.part, from: how.from.map(r2) };
   return null;
@@ -1847,9 +1848,23 @@ function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
-    if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
+    if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
+      continue;
+    }
+    if (a.type === 'satchel') {
+      const s = game.satchels.find(x => x.id === a.satchel);
+      if (!s) { p.act = null; continue; }
+      if (t - a.start >= a.dur) {
+        p.act = null;
+        game.satchels.splice(game.satchels.indexOf(s), 1);
+        sendSatchels();
+        addMoney(p, SATCHEL.reward);
+        sendMe(p);
+        send(p, { t: 'msg', text: 'Satchel charge defused.' });
+        send(p, { t: 'sfx', s: 'defused' });
+      }
       continue;
     }
     if (a.type === 'mine') {
@@ -1922,6 +1937,12 @@ function onUse(p, m, t) {
   const mine = game.mines.filter(x => !mineFriend(x, p) && dist3(p.p, x.p) < 1.4).sort((x, y) => dist3(p.p, x.p) - dist3(p.p, y.p))[0];
   if (mine) {
     p.act = { type: 'mine', mine: mine.id, start: t, pos: p.p.slice(), dur: (p.kit ? MINE.kitDefuse : MINE.defuse) * 1000 };
+    return;
+  }
+  const chest = [p.p[0], p.p[1] + 1, p.p[2]];
+  const sat = game.satchels.filter(x => !satchelFriend(x, p) && dist3(chest, x.p) < SATCHEL.reach).sort((x, y) => dist3(chest, x.p) - dist3(chest, y.p))[0];
+  if (sat) {
+    p.act = { type: 'satchel', satchel: sat.id, start: t, pos: p.p.slice(), dur: (p.kit ? SATCHEL.kitDefuse : SATCHEL.defuse) * 1000 };
     return;
   }
   if (atFuseBox(p) && (game.phase === 'live' || game.phase === 'warmup')) {
@@ -2000,13 +2021,18 @@ function onShoot(p, m) {
   p.lastShot = t;
   if (!def.melee) bots.heard(p, o);
   if (item) item.mag--;
-  if (def.rocket) { launchRocket(p, o, dirs[0], def); return; }
+  if (def.rocket) {
+    launchRocket(p, o, dirs[0], def, w);
+    // A disposable tube (RPG-26) is thrown away once fired: back to the pistol.
+    if (def.disposable && p.inv.primary === item) { p.inv.primary = null; setTimeout(() => sendMe(p), 350); }
+    return;
+  }
 
   const range = def.melee ? def.range : 250;
   const traces = [];
   const hits = [];
   const ownCar = carOf(p)?.id ?? null;
-  const shattered = [], chipped = [], jamHits = [];
+  const shattered = [], chipped = [], jamHits = [], shotSatchels = [];
   for (const d of dirs) {
     const wall = world.raycast(o, d, range, 'bullet', ownCar);
     const wallT = wall ? wall.t : range;
@@ -2052,6 +2078,7 @@ function onShoot(p, m) {
     else if (wall && wall.box.door != null && MAP.doors[wall.box.door]?.weak) shootDoor(wall.box.door, def.melee ? def.damage * 2 : def.damage);
     else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
+    if (!def.melee) for (const s of game.satchels) if (!shotSatchels.includes(s) && raySatchel(o, d, s, endT + 0.1)) shotSatchels.push(s);
     for (const g of world.intactGlass) {
       const gh = rayAABB(o, d, g.min, g.max, endT);
       if (gh) shattered.push(g.id);
@@ -2060,6 +2087,7 @@ function onShoot(p, m) {
   breakGlass(shattered);
   for (const j of jamHits) if (--j.hp <= 0) destroyJammer(j, p);
   breakPieces(chipped);
+  for (const s of shotSatchels) explodeSatchel(s);
 
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
   if (!hits.length) return;
@@ -2088,7 +2116,7 @@ function onShoot(p, m) {
 
 // ---- RPG: the rocket flies to the first wall, car or person in its path and explodes there. The blast
 // only hurts people who can see the explosion: a wall in between protects them.
-function launchRocket(p, o, d, def) {
+function launchRocket(p, o, d, def, weapon = 'rpg') {
   const ownCar = carOf(p)?.id ?? null;
   const wall = world.raycast(o, d, 300, 'bullet', ownCar);
   let dist = wall ? wall.t : 300;
@@ -2106,12 +2134,12 @@ function launchRocket(p, o, d, def) {
   const at = [o[0] + d[0] * back, o[1] + d[1] * back, o[2] + d[2] * back];
   const flight = (dist / def.rocketSpeed) * 1000;
   const round = game.round;
-  broadcast({ t: 'rocket', id: game.nextNadeId++, o, d, dist: r2(dist), speed: def.rocketSpeed, owner: p.id });
+  broadcast({ t: 'rocket', id: game.nextNadeId++, o, d, dist: r2(dist), speed: def.rocketSpeed, owner: p.id, w: weapon });
   for (const g of world.intactGlass) {
     const gh = rayAABB(o, d, g.min, g.max, dist);
     if (gh) setTimeout(() => breakGlass([g.id]), (gh.t / def.rocketSpeed) * 1000);
   }
-  setTimeout(() => { if (game.round === round) explodeRocket(at, p, def); }, flight);
+  setTimeout(() => { if (game.round === round) explodeRocket(at, p, def, weapon); }, flight);
 }
 
 // (Also the mortar's shell landing: weapon 'mortar'.)
@@ -2210,6 +2238,7 @@ function sendMines(to = null) {
 
 function clearMines() {
   clearJammers();
+  clearSatchels();
   if (!game.mines?.length) return;
   game.mines = [];
   sendMines();
@@ -2299,6 +2328,118 @@ function detonateMine(mine, stepper = null) {
 // Mines near an explosion go off too (a moment later, one after another).
 function chainMines(at, r) {
   for (const mine of game.mines.filter(x => dist3(x.p, at) < r)) setTimeout(() => detonateMine(mine), 120 + Math.random() * 200);
+  for (const s of game.satchels.filter(x => dist3(x.p, at) < Math.max(r, SATCHEL.chain))) setTimeout(() => explodeSatchel(s), 150 + Math.random() * 200);
+}
+
+// ---- Satchel charge (see SATCHEL in shared/weapons.js). Thrown, it flies until it hits something and sticks there
+// (on a car: in the car's own frame, so it rides along). Its owner's phone sets it off, in the same life only.
+// Everyone sees it (it blinks); its owner's team (in Deathmatch only its owner) can't defuse it.
+const satchelFriend = (s, q) => (isDM() ? q.id === s.owner : q.team === s.team);
+// A car's frame: its position and yaw (a model turned by yaw about y, like the clients draw it).
+const toCar = (c, v) => { const dx = v[0] - c.p[0], dz = v[2] - c.p[2], cs = Math.cos(c.yaw), sn = Math.sin(c.yaw); return [dx * cs - dz * sn, v[1] - c.p[1], dx * sn + dz * cs]; };
+const fromCar = (c, l) => { const cs = Math.cos(c.yaw), sn = Math.sin(c.yaw); return [c.p[0] + l[0] * cs + l[2] * sn, c.p[1] + l[1], c.p[2] - l[0] * sn + l[2] * cs]; };
+
+// A row: [id, team (1 T, 2 CT), owner, owner's life (spawnSeq), x, y, z, normal x, y, z, car or -1] — on a car the
+// position and the normal are in the car's frame.
+function sendSatchels(to = null) {
+  const list = game.satchels.map(s => [s.id, s.team === 'T' ? 1 : 2, s.owner, s.seq, ...(s.car != null ? s.local : s.p).map(r2), ...(s.car != null ? s.ln : s.n).map(r2), s.car ?? -1]);
+  if (to) send(to, { t: 'satchels', list });
+  else broadcast({ t: 'satchels', list });
+}
+
+function clearSatchels() {
+  if (!game.satchels?.length) return;
+  game.satchels = [];
+  sendSatchels();
+}
+
+// Mouse1 with the satchel: thrown from o at v (m.o, m.v); with the phone (m.det): set off all of ours.
+function onSatchel(p, m) {
+  if (!p.alive || !inTeam(p)) return;
+  if (m.det) {
+    const mine = game.satchels.filter(s => s.owner === p.id && s.seq === p.spawnSeq);
+    for (const s of mine) explodeSatchel(s);
+    return;
+  }
+  if (!(p.inv.satchel > 0) || game.phase === 'freeze' || game.phase === 'end') return;
+  const o = vec3(m.o), v = vec3(m.v);
+  if (!o || !v || Math.hypot(...v) > SATCHEL.throw + 8 || dist3(o, eyeOf(p)) > 2.5) return;
+  p.inv.satchel--;
+  p.protectUntil = 0;
+  sendMe(p);
+  // Fly it (gravity, no bounce) until it hits a wall, a door, the floor or a car body; windows it crosses break.
+  const ownCar = carOf(p)?.id ?? null, dt = NADE.dt, pos = o.slice(), vel = v.slice();
+  let hit = null, steps = 0;
+  for (; steps < 240 && !hit; steps++) {
+    vel[1] -= NADE.gravity * dt;
+    const seg = vel.map(c => c * dt), len = Math.hypot(...seg), dir = seg.map(c => c / len);
+    const h = world.raycast(pos, dir, len, 'bullet', ownCar);
+    for (const g of world.intactGlass) if (rayAABB(pos, dir, g.min, g.max, h ? h.t : len)) breakGlass([g.id]);
+    if (h) hit = { at: pos.map((c, k) => c + dir[k] * Math.max(0, h.t - 0.03)), n: h.n, box: h.box };
+    else for (let k = 0; k < 3; k++) pos[k] += seg[k];
+  }
+  if (!hit) return; // (flew off the map)
+  const flight = steps * dt * 1000, round = game.round, seq = p.spawnSeq;
+  broadcast({ t: 'satchelThrow', o: o.map(r2), v: v.map(r2), at: hit.at.map(r2), ms: Math.round(flight) });
+  setTimeout(() => {
+    if (game.round !== round) return;
+    const s = { id: game.nextMineId++, owner: p.id, seq, team: p.team, p: hit.at, n: hit.n, car: null };
+    const car = hit.box.car != null ? world.cars[hit.box.car] : null;
+    if (car && !car.wrecked) {
+      s.car = hit.box.car;
+      s.local = toCar(car, hit.at);
+      s.ln = toCar({ p: [0, 0, 0], yaw: car.yaw }, hit.n);
+    }
+    const own = game.satchels.filter(x => x.owner === p.id);
+    if (own.length >= SATCHEL.perPlayer) game.satchels.splice(game.satchels.indexOf(own[0]), 1);
+    game.satchels.push(s);
+    sendSatchels();
+  }, flight);
+}
+
+// Each tick: the ones on a car move with it.
+function updateSatchels() {
+  for (const s of game.satchels) if (s.car != null && world.cars[s.car]) s.p = fromCar(world.cars[s.car], s.local);
+}
+
+// A bullet ray through a satchel (a small ball around it)?
+function raySatchel(o, d, s, maxT) {
+  const c = [s.p[0] - o[0], s.p[1] - o[1], s.p[2] - o[2]], t = c[0] * d[0] + c[1] * d[1] + c[2] * d[2];
+  if (t < 0 || t > maxT) return false;
+  return Math.hypot(c[0] - d[0] * t, c[1] - d[1] * t, c[2] - d[2] * t) < 0.2;
+}
+
+// Boom: about 1.5 HE grenades (people in sight of it, cars, hostages, glass), it breaks the mansion's walls and blows
+// doors open, and sets off mines and other satchels nearby. Its owner gets the kills (also when someone shot it).
+function explodeSatchel(s) {
+  const i = game.satchels.indexOf(s);
+  if (i < 0) return;
+  game.satchels.splice(i, 1);
+  sendSatchels();
+  const owner = players.get(s.owner) || null, n = s.car != null && world.cars[s.car] ? fromCar({ p: [0, 0, 0], yaw: world.cars[s.car].yaw }, s.ln) : s.n;
+  const at = [s.p[0] + n[0] * 0.15, s.p[1] + n[1] * 0.15, s.p[2] + n[2] * 0.15], R = SATCHEL.radius;
+  broadcast({ t: 'boom', p: at.map(r2), k: 'satchel' });
+  blastMap(at, 'satchel');
+  // (On maps without realism blastMap doesn't touch doors: blow them open here.)
+  if (!MAP.realism) (MAP.doors || []).forEach((d, k) => { if (dist3(at, doorCenter(d)) < REAL.door.satchel) blowDoor(k); });
+  breakGlass(world.intactGlass.filter(g => dist3(at, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < 6).map(g => g.id));
+  for (const q of players.values()) {
+    if (!q.alive || !inTeam(q)) continue;
+    if (owner && q !== owner && mates(q, owner) && !CFG.friendlyFire) continue;
+    const chest = [q.p[0], q.p[1] + 1.1, q.p[2]], d = dist3(at, chest);
+    if (d > R || !lineOfSight(at, chest)) continue;
+    applyDamage(q, owner, SATCHEL.damage * (1 - d / R), 'he', 'satchel', 1, null, at);
+  }
+  for (const h of game.hostages) {
+    if (h.state === 'dead' || h.state === 'rescued') continue;
+    const chest = [h.p[0], h.p[1] + 1.1, h.p[2]], d = dist3(at, chest);
+    if (d < R && lineOfSight(at, chest)) hurtHostage(h, owner, SATCHEL.damage * (1 - d / R), 'satchel');
+  }
+  for (const c of world.cars) {
+    const d = s.car === c.id ? 0 : dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
+    if (d < R * 0.6) damageCar(c, SATCHEL.car * (1 - d / (R * 0.6)), owner);
+  }
+  chainMines(at, MINE.chain);
 }
 
 // ---- Signal jammer (Terrorists; see JAMMER in shared/weapons.js): a box with a blinking antenna, put down on the
@@ -2726,7 +2867,7 @@ function onBuy(p, id) {
   const def = wdef || idef;
   if (!def || def.price == null) return;
   if (def.team && def.team !== p.team) return fail('Your team cannot buy that.');
-  if ((MINES.includes(id) || id === 'camo' || id === 'jammer') && isZM()) return fail('Not in Zombie mode.');
+  if ((MINES.includes(id) || id === 'camo' || id === 'jammer' || id === 'satchel') && isZM()) return fail('Not in Zombie mode.');
   if (id === 'jammer' && (game.jamUsed?.[p.team] || [...players.values()].some(q => q !== p && q.team === p.team && q.inv.jammer > 0))) {
     return fail('Your team already has its signal jammer this round.');
   }
@@ -2736,9 +2877,14 @@ function onBuy(p, id) {
     const holder = [...players.values()].find(q => q !== p && (isDM() || q.team === p.team) && q.inv.primary?.id === 'mortar');
     if (holder) return fail(isDM() ? `${holder.name} already has the mortar.` : `Your team already has a mortar (${holder.name}).`);
   }
+  // The RPG-26: one per team each round (in Deathmatch and warmup, one in anyone's hands at a time).
+  if (wdef?.perTeam) {
+    const free = isDM() || game.phase === 'warmup';
+    if (free ? [...players.values()].some(q => q.inv.primary?.id === id) : teamBought(p.team, id) >= wdef.perTeam) return fail(free ? `Somebody already has the ${wdef.name}.` : `Your team has already bought the ${wdef.name} this round.`);
+  }
   let price = def.price;
 
-  if (wdef && (wdef.grenade || wdef.mine || wdef.device)) {
+  if (wdef && (wdef.grenade || wdef.mine || wdef.device || wdef.satchel)) {
     if (p.inv[id] >= wdef.max) return fail('You cannot carry any more.');
   } else if (wdef) {
     if (p.inv[slotKey(id)]?.id === id) return fail('You already have that weapon.');
@@ -2761,7 +2907,8 @@ function onBuy(p, id) {
   p.money -= price;
   const record = { id, price, armor: p.armor, helmet: p.helmet, dropped: null };
   (p.buys ||= []).push(record);
-  if (wdef && (wdef.grenade || wdef.mine || wdef.device)) p.inv[id]++;
+  if (wdef?.perTeam) countTeamBuy(p.team, id, 1);
+  if (wdef && (wdef.grenade || wdef.mine || wdef.device || wdef.satchel)) p.inv[id]++;
   else if (wdef) {
     const slot = slotKey(id);
     if (p.inv[slot]) {
@@ -2780,6 +2927,15 @@ function onBuy(p, id) {
   sendMe(p);
 }
 
+// Items a team may buy only so many of each round (perTeam, the RPG-26): how many it has bought this round.
+function teamBought(team, id) {
+  return game.teamBuys?.round === game.round ? game.teamBuys[`${team}:${id}`] || 0 : 0;
+}
+function countTeamBuy(team, id, n) {
+  if (game.teamBuys?.round !== game.round) game.teamBuys = { round: game.round };
+  game.teamBuys[`${team}:${id}`] = Math.max(0, teamBought(team, id) + n);
+}
+
 // Selling back (right-click in the buy menu): something bought in this life, while you can still buy, for the full
 // price — and the gun it replaced back in your hands if it's still lying where it fell.
 function onSell(p, id) {
@@ -2789,7 +2945,7 @@ function onSell(p, id) {
   const i = (p.buys || []).map(b => b.id).lastIndexOf(id);
   if (i < 0) return fail('You can only sell back what you bought this round.');
   const b = p.buys[i], wdef = WEAPONS[id];
-  if (wdef && (wdef.grenade || wdef.mine || wdef.device)) {
+  if (wdef && (wdef.grenade || wdef.mine || wdef.device || wdef.satchel)) {
     if (!(p.inv[id] > 0)) return fail('You don\'t have it any more.');
     p.inv[id]--;
   } else if (wdef) {
@@ -2808,6 +2964,7 @@ function onSell(p, id) {
   else if (id === 'nvg') p.nvg = false;
   else if (id === 'camo') { p.camo = false; p.camoOn = false; }
   p.buys.splice(i, 1);
+  if (wdef?.perTeam) countTeamBuy(p.team, id, -1);
   p.money += b.price;
   send(p, { t: 'sold', item: id });
   send(p, { t: 'sfx', s: 'buy' });
@@ -3041,6 +3198,9 @@ function handle(p, m) {
     case 'jammer':
       onJammer(p, m);
       break;
+    case 'satchel':
+      onSatchel(p, m);
+      break;
     case 'nade':
       onNade(p, m);
       break;
@@ -3241,6 +3401,7 @@ function tick() {
   updateActions(t);
   updatePickups();
   updateMines(t);
+  updateSatchels();
   updateCamo(t);
   updateSpotting(t);
   // the time that really passed since the last tick: on Windows the timer fires every 31 or 47 ms rather than 33,
@@ -3378,6 +3539,7 @@ wss.on('connection', ws => {
   });
   sendMines(p);
   sendJammers(p);
+  sendSatchels(p);
   sendRoster();
   ws.on('message', data => {
     let m;
