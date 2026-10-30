@@ -2302,7 +2302,16 @@ const net = new Net({
     applyDoors(m.doors);
   },
   doors(m) {
+    // a stiff door (Mansion): it starts to swing while it creaks, and lets people through when it's open
+    if (m.creak) {
+      const s = game.doors.slice();
+      s[m.i] = m.side;
+      world?.setDoors(s);
+      audio.play('creak', m.p, m.creak);
+      return;
+    }
     applyDoors(m.doors);
+    if (m.quiet) return;
     if (m.blown) {
       const d = map.doors[m.i];
       fx.debris([m.p[0] - 0.4, m.p[1] - 1, m.p[2] - 0.4], [m.p[0] + 0.4, m.p[1] + 1, m.p[2] + 0.4], null, 10);

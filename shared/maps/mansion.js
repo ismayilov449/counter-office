@@ -7,6 +7,7 @@
 import { createBuilder } from './builder.js';
 import * as BSP from './cs_mansion_bsp.js';
 import { breakUp } from './breakables.js';
+import { remodel, NEW_TEX } from './mansion2.js';
 
 const m = createBuilder();
 
@@ -27,9 +28,13 @@ const FACE_MATS = {
   c1a0_flipsign8: 'metal',
 };
 
+// Mansion 2.0: the new parts, and the openings to them (see mansion2.js)
+const RM = remodel(BSP.SOLIDS, BSP.FACES, BSP.TEXTURES);
+for (const [t, [paint]] of Object.entries(NEW_TEX)) FACE_MATS[t] = paint;
+
 // The street texture is also on the wall behind the CT spawn: give that wall the estate's stone instead.
-const FACES = { ...BSP.FACES, out_grnd2: [], out_grnd2_wall: [] };
-for (const f of BSP.FACES.out_grnd2) {
+const FACES = { ...RM.faces, out_grnd2: [], out_grnd2_wall: [] };
+for (const f of RM.faces.out_grnd2) {
   const ys = f.filter((_, i) => i % 5 === 1);
   (Math.max(...ys) - Math.min(...ys) > 0.3 ? FACES.out_grnd2_wall : FACES.out_grnd2).push(f);
 }
@@ -66,7 +71,7 @@ function roofFace(f) {
   const b = { min: [x0, y0, z0], max: [x1, y0, z1] };
   return (inHouse(b) && y0 >= ROOF_Y.house) || (inShed(b) && y0 >= ROOF_Y.shed);
 }
-const BRK = breakUp(BSP.SOLIDS, FACES, breakable, { roofFace });
+const BRK = breakUp(RM.solids, FACES, breakable, { roofFace });
 // furniture, bookshelves, wooden panels and doors burn
 const FUEL = new Set(['books', 'wood', 'fabric', 'crate', 'cardboard', 'door1']);
 for (const p of BRK.pieces) p.fuel = p.kind === 'prop' || Object.keys(BRK.pieceFaces[p.id] || {}).some(t => FUEL.has(FACE_MATS[t]));
@@ -115,7 +120,7 @@ const DOORS = BSP.DOORS.map((d, id) => {
   const axis = x2 - x1 > z2 - z1 ? 'x' : 'z';
   const len = axis === 'x' ? x2 - x1 : z2 - z1;
   return { id, axis, dir: 1, len, h: y2 - y1 - 0.02, hinge: [d.origin[0], y1, d.origin[2]], tex: 'door1' };
-});
+}).concat(RM.doors.map((d, i) => ({ id: BSP.DOORS.length + i, ...d })));
 
 // ---- lights: one lamp per original light (the two lampa10 bulbs share one), switched by the wall buttons
 const seen = new Set();
@@ -168,8 +173,9 @@ export default {
   // the battle leaves its marks: soot, rubble, collapsing walls, dust, shell shock, blast push, spreading fire,
   // doors blown off, bullets through thin walls, muffled sound indoors (see REAL in shared/weapons.js)
   realism: true,
+  mansion2: true, // the Mansion 2.0 additions (see mansion2.js and mansionTick in server.js)
   pieceFaces: BRK.pieceFaces,
-  faceTex: { ...BSP.TEXTURES, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
+  faceTex: { ...RM.tex, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
   faceMats: FACE_MATS,
   bounds: { min: -29.2, max: 29.2 },
   zones: {

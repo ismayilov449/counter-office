@@ -1737,7 +1737,7 @@ export function buildWorld(scene, map, qualityName) {
       if (pool.length && t >= pickAt) { pickAt = t + 0.1; lightNearest(camPos); }
       for (const o of doors) {
         const diff = o.target - o.pivot.rotation.y;
-        o.pivot.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), dt * 4.5);
+        o.pivot.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), dt * (o.d.slow ? 1.6 / o.d.slow : 4.5));
       }
       if (clouds) {
         clouds.material.map.offset.x += dt * 0.004;

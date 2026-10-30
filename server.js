@@ -521,6 +521,8 @@ function resetWorld() {
   game.burnt = new Set();
   game.doorGoneAt = {};
   game.doorHeat = {};
+  game.doorOpening = {};
+  game.doorHp = {};
   game.glassAt = {};
   game.lights = {};
   for (const g of lightGroups()) game.lights[g] = true;
@@ -590,7 +592,7 @@ function blastShove(at, weapon) {
     }
   }
   const D = REAL.door[weapon];
-  if (D) (MAP.doors || []).forEach((d, i) => { if (dist3(at, doorCenter(d)) < D) blowDoor(i); });
+  if (D) (MAP.doors || []).forEach((d, i) => { if (dist3(at, doorCenter(d)) < D * (d.weak ? 1.6 : 1)) blowDoor(i); });
   const S = REAL.smoke[weapon];
   if (S) (game.smokes ||= []).push({ p: [at[0], at[1] + 0.5, at[2]], until: now() + S * 1000 });
 }
@@ -851,10 +853,46 @@ function useDoor(p, i) {
   const inWay = [...players.values()].some(q => q.alive && overlapsAny([box], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height)) ||
     game.hostages.some(h => h.state !== 'dead' && h.state !== 'rescued' && overlapsAny([box], h.p[0], h.p[1], h.p[2], PLAYER.radius, PLAYER.height));
   if (inWay) { send(p, { t: 'msg', text: 'Someone is in the way of the door.' }); return; }
+  if (d.slow && next !== 0) { slowOpen(i, next); return; }
   const states = world.doorStates.slice();
   states[i] = next;
   world.setDoors(states);
   broadcast({ t: 'doors', doors: states, i, open: next !== 0, p: doorCenter(d) });
+}
+
+// ---- Mansion 2.0 (see shared/maps/mansion2.js)
+// A stiff old door (d.slow seconds): it creaks open loudly, and only when it has swung far enough can anyone pass.
+function slowOpen(i, side) {
+  const d = MAP.doors[i];
+  if ((game.doorOpening ||= {})[i]) return;
+  game.doorOpening[i] = { at: now() + d.slow * 1000, side };
+  broadcast({ t: 'doors', doors: world.doorStates, i, creak: d.slow, side, p: doorCenter(d) });
+}
+
+// A weak door gives way to gunfire too.
+function shootDoor(i, dmg) {
+  const d = MAP.doors[i];
+  if (!d?.weak) return;
+  (game.doorHp ||= {})[i] = (game.doorHp[i] || 0) + dmg;
+  if (game.doorHp[i] >= 260) blowDoor(i);
+}
+
+// Every tick on Mansion: doors that have creaked open.
+function mansionTick(t) {
+  for (const [i, o] of Object.entries(game.doorOpening || {})) {
+    if (t < o.at) continue;
+    delete game.doorOpening[i];
+    if (world.doorStates[i] !== 0) continue;
+    const box = doorBox(MAP.doors[i], o.side);
+    if ([...players.values()].some(q => q.alive && overlapsAny([box], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height))) {
+      game.doorOpening[i] = { at: t + 300, side: o.side };
+      continue;
+    }
+    const states = world.doorStates.slice();
+    states[i] = o.side;
+    world.setDoors(states);
+    broadcast({ t: 'doors', doors: states, i: +i, open: true, quiet: 1, p: doorCenter(MAP.doors[i]) });
+  }
 }
 
 function nearestSwitch(p) {
@@ -1974,6 +2012,7 @@ function onShoot(p, m) {
     traces.push([r3(d[0]), r3(d[1]), r3(d[2]), r2(best ? best.t : wallT), best ? 1 : 0, !best && wall ? 1 : 0]);
     if (best) hits.push({ ...best, d });
     else if (wall && wall.box.car != null && !def.melee) damageCar(world.cars[wall.box.car], def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p);
+    else if (wall && wall.box.door != null && MAP.doors[wall.box.door]?.weak) shootDoor(wall.box.door, def.melee ? def.damage * 2 : def.damage);
     else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
     for (const g of world.intactGlass) {
@@ -2964,6 +3003,7 @@ function tick() {
   }
 
   if (game.phase === 'live' && (isDM() || isGG())) mendPieces(t);
+  if (MAP.mansion2) mansionTick(t);
   if (game.phase === 'warmup') {
     warmupRepairs(t);
     for (const p of players.values()) if (inTeam(p) && !p.alive && t - p.deathAt > 3000) { resetLoadout(p); spawnPlayer(p); }
