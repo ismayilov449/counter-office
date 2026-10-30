@@ -2078,12 +2078,15 @@ function onMortar(p, m) {
   if (!isNum(m.b) || !isNum(m.e) || m.e < def.elev[0] - 1 || m.e > def.elev[1] + 1) return;
   const o = [p.p[0], p.p[1] + 0.9, p.p[2]];
   const sky = skyOf(MAP, world);
-  if (!sky.open(p.p)) return;
+  // Under a breakable roof (and nothing else): the shell blasts its way out through it.
+  const roof = sky.open(p.p) ? null : sky.roofOver(p.p);
+  if (!sky.open(p.p) && !roof) return;
   p.lastShot = t;
   p.protectUntil = 0;
   item.mag--;
   sendMe(p);
   bots.heard(p, o);
+  if (roof) breakPieces(roof, [p.p[0], p.p[1] + 1.2, p.p[2]]);
   const dist = mortarRange(m.e), bearing = (m.b / MILS) * Math.PI * 2;
   const a = Math.random() * Math.PI * 2, off = (1 + dist * 0.03) * Math.sqrt(Math.random());
   const x = p.p[0] + Math.sin(bearing) * dist + Math.cos(a) * off, z = p.p[2] - Math.cos(bearing) * dist + Math.sin(a) * off;

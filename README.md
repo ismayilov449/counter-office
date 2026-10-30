@@ -201,7 +201,9 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
 - **82-BM-37 mortar** (buy menu → Heavy, both teams, $6000, 6 shells; one per team — in Deathmatch one on the map;
   not in Zombie mode, and bots don't use it). It's heavy: you walk slowly with it. It's aimed like a real one, in
   Soviet mils (60-00 to the full circle; bearings go clockwise from north, the top of the radar):
-  - **Mouse1** sets it up (2 seconds, on open ground: not under a roof); you stay crouched and can't move.
+  - **Mouse1** sets it up (2 seconds, on open ground); you stay crouched and can't move. On Mansion you can also set it
+    up under a roof that breaks (the top floor of the house — the Terrorists' spawn — and the shed): the first shell
+    blasts a hole about 1.5 m wide in the roof above you and flies out. Not on the ground floor: a floor is in the way.
   - You look out along the tube. The **mouse** (or **A D**) turns it — the panel shows the **bearing**, e.g. 31-50 —
     and raises or lowers it (or **W S**): the **elevation**, from 7-50 (45°, the furthest: 80 m) to 14-15 (85°, 14 m).
     The **firing table** on the panel says how far each elevation throws, and a bold **red dot** on the radar shows,

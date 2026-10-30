@@ -614,6 +614,9 @@ function sendPing() {
 // The easy way: right mouse opens a big map — click where the shell should land and the tube lays itself there.
 const MORTAR = WEAPONS.mortar;
 const skyOpen = p => skyOf(map, coll).open(p);
+// open sky, or only a roof the first shell can blast through (cs_mansion's house and shed)
+const mortarCanSetUp = p => skyOpen(p) || !!skyOf(map, coll).roofOver(p);
+const NO_SKY = 'The mortar needs open sky above it (or just a roof the shell can blast through)';
 const elevDeg = mils => (mils * 360) / MILS;
 const mortarInfo = { target: null, impact: null };
 
@@ -621,7 +624,8 @@ function mortarFire(now) {
   const m = me.mortar;
   if (!m) {
     if (!me.onGround || inWater(map.water, me.p)) return;
-    if (!skyOpen(me.p)) { hud.small('The mortar needs open sky above it', 2); audio.play('deny'); return; }
+    if (!mortarCanSetUp(me.p)) { hud.small(NO_SKY, 2); audio.play('deny'); return; }
+    if (!skyOpen(me.p)) hud.small('Under a roof: the first shell blasts a hole through it', 3);
     stopEmote();
     me.mortar = { phase: 'setup', start: now, until: now + MORTAR.setup * 1000, elev: 1000 };
     me.scope = 0;
@@ -683,6 +687,7 @@ function openMortarMap(open) {
   if (open) {
     const t = mortarInfo.target;
     mortarMap.cursor = t && performance.now() - t.at < 60000 ? [t.p[0], t.p[2]] : mortarAimPoint();
+    moveMortarCursor(0, 0); // (on a small map the tube may point past its edge)
     audio.play('click');
   } else hud.mortarMap(null);
 }
@@ -3022,7 +3027,7 @@ function updateHud(now) {
     else if (me.mortar?.phase === 'aim') {
       hint = ''; // (the controls are on the mortar panel)
     } else if (me.mortar) hint = '';
-    else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : 'The mortar needs open sky above it';
+    else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : mortarCanSetUp(me.p) ? 'Click to set up the mortar (the first shell blasts through the roof)' : NO_SKY;
     else if (me.riding) hint = 'Press E to get out of the car';
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
