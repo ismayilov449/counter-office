@@ -27,7 +27,6 @@ import { ACHIEVEMENTS } from './shared/achievements.js';
 import { EMOTE } from './shared/emotes.js';
 import { createHostages, updateHostages, HOSTAGE_STATE } from './lib/hostages.js';
 import { BotManager, BOT_LEVELS } from './lib/bots.js';
-import { announce } from './lib/announce.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -3219,6 +3218,4 @@ httpServer.listen(CFG.port, '0.0.0.0', async () => {
   if (!env.ADMIN_PASSWORD) console.log(`  (change the password in ${path.relative(ROOT, ADMIN_FILE)} or with ADMIN_PASSWORD)`);
   const modeName = { gungame: 'Gun Game', zombie: 'Zombie', deathmatch: 'Deathmatch', hns: 'Hide and Seek' }[CFG.gameMode] || 'classic';
   console.log(`\n  Mode: ${modeName}  |  bots: ${CFG.bots.perTeam ? `${CFG.bots.perTeam} per team (${CFG.bots.difficulty})` : 'off'}  |  maps: ${MAP_IDS.join(', ')}  |  rounds to win: ${CFG.roundsToWin}  |  friendly fire: ${CFG.friendlyFire ? 'on' : 'off'}\n`);
-  const link = httpsReady ? `https://${ips[0] || 'localhost'}:${CFG.httpsPort}` : `http://${ips[0] || 'localhost'}:${CFG.port}`;
-  announce(DATA_DIR, env, { link, map: MAP.title });
 });
