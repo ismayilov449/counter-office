@@ -22,6 +22,7 @@ const ABOUT = {
   pmn: 'Soviet pressure mine: an enemy who steps on it loses a leg, usually their life. Hard to see.',
   mon50: 'Directional mine with a tripwire 3 m ahead: a fan of fragments up to 25 m forward.',
   rpg: 'Rocket launcher: explodes on whatever it hits, 9 m blast, blows holes in the mansion.',
+  rpg26: 'Throwaway rocket launcher: one shot (6 m blast, up to 400), then the tube is gone. One per team each round.',
   mortar: '82-BM-37 mortar: set it up, right mouse opens a map — click where the shell should land (or aim by hand in Soviet mils). 14 m blast.',
   m249: 'Light machine gun: a 100-round belt, chips through thin walls on the mansion.',
 };

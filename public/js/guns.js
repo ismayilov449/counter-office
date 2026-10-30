@@ -462,6 +462,21 @@ function rpg7(gun, P) {
   return [0, 0.06, -0.62];
 }
 
+// RPG-26: one sealed olive fibreglass tube with end caps, a flip-up frame sight and a small trigger box under it;
+// nothing sticks out of the front (it's fired from inside the tube and thrown away).
+function rpg26(gun, P) {
+  const m = X();
+  P.cyl(0.036, 0.8, m.olive, 0, 0.06, -0.12, Math.PI / 2, 0, 0, 12);                          // the tube
+  P.cyl(0.042, 0.05, m.dark, 0, 0.06, -0.52, Math.PI / 2, 0, 0, 12);                          // front cap ring
+  P.cyl(0.042, 0.05, m.dark, 0, 0.06, 0.28, Math.PI / 2, 0, 0, 12);                           // rear cap ring
+  for (const z of [-0.3, 0.1]) P.cyl(0.039, 0.02, m.grip, 0, 0.06, z, Math.PI / 2, 0, 0, 12); // carrying-strap rings
+  P.box(0.03, 0.06, 0.1, m.dark, 0, 0.0, -0.06);                                               // trigger box
+  P.box(0.026, 0.085, 0.035, m.grip, 0, -0.06, -0.02, -0.2);                                   // grip
+  P.box(0.004, 0.05, 0.004, m.dark, -0.03, 0.12, -0.28);                                       // flip-up sight frame
+  P.box(0.004, 0.04, 0.004, m.dark, -0.03, 0.115, 0.04);
+  return [0, 0.06, -0.56];
+}
+
 // A round rod from point a to point b (for the mortar's tube and bipod legs).
 const _up = new THREE.Vector3(0, 1, 0), _dir = new THREE.Vector3(), _rq = new THREE.Quaternion();
 function rod(P, a, b, r, mat, seg = 10, rEnd = r) {
@@ -594,6 +609,7 @@ const BUILD = {
   awp: (g, P) => sniper(g, P, { awp: true }),
   g3sg1: (g, P) => autoSniper(g, P, { g3: true }),
   rpg: (g, P) => rpg7(g, P),
+  rpg26: (g, P) => rpg26(g, P),
   mortar: (g, P) => mortar(g, P),
   pmn: (g, P) => pmnMine(g, P),
   mon50: (g, P) => mon50Mine(g, P),

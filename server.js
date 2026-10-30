@@ -1580,7 +1580,7 @@ function openMatchEnd(winner, extra = {}) {
 // tears off the part it hit, a Scout or Desert Eagle does it with a headshot.
 function gibOf(weapon, hs, how) {
   if (!how) return null;
-  if (how.part === 'he' && ['rpg', 'mortar', 'he', 'c4', 'car', 'mon50'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
+  if (how.part === 'he' && ['rpg', 'rpg26', 'mortar', 'he', 'c4', 'car', 'mon50'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
   if (weapon === 'pmn' && how.part === 'legs') return { k: 'shot', part: 'legs', from: how.from.map(r2) };
   if (['awp', 'm249'].includes(weapon) || (hs && ['scout', 'deagle'].includes(weapon))) return { k: 'shot', part: how.part, from: how.from.map(r2) };
   return null;
@@ -1929,7 +1929,12 @@ function onShoot(p, m) {
   p.lastShot = t;
   if (!def.melee) bots.heard(p, o);
   if (item) item.mag--;
-  if (def.rocket) { launchRocket(p, o, dirs[0], def); return; }
+  if (def.rocket) {
+    launchRocket(p, o, dirs[0], def, w);
+    // A disposable tube (RPG-26) is thrown away once fired: back to the pistol.
+    if (def.disposable && p.inv.primary === item) { p.inv.primary = null; setTimeout(() => sendMe(p), 350); }
+    return;
+  }
 
   const range = def.melee ? def.range : 250;
   const traces = [];
@@ -2011,7 +2016,7 @@ function onShoot(p, m) {
 
 // ---- RPG: the rocket flies to the first wall, car or person in its path and explodes there. The blast
 // only hurts people who can see the explosion: a wall in between protects them.
-function launchRocket(p, o, d, def) {
+function launchRocket(p, o, d, def, weapon = 'rpg') {
   const ownCar = carOf(p)?.id ?? null;
   const wall = world.raycast(o, d, 300, 'bullet', ownCar);
   let dist = wall ? wall.t : 300;
@@ -2029,12 +2034,12 @@ function launchRocket(p, o, d, def) {
   const at = [o[0] + d[0] * back, o[1] + d[1] * back, o[2] + d[2] * back];
   const flight = (dist / def.rocketSpeed) * 1000;
   const round = game.round;
-  broadcast({ t: 'rocket', id: game.nextNadeId++, o, d, dist: r2(dist), speed: def.rocketSpeed, owner: p.id });
+  broadcast({ t: 'rocket', id: game.nextNadeId++, o, d, dist: r2(dist), speed: def.rocketSpeed, owner: p.id, w: weapon });
   for (const g of world.intactGlass) {
     const gh = rayAABB(o, d, g.min, g.max, dist);
     if (gh) setTimeout(() => breakGlass([g.id]), (gh.t / def.rocketSpeed) * 1000);
   }
-  setTimeout(() => { if (game.round === round) explodeRocket(at, p, def); }, flight);
+  setTimeout(() => { if (game.round === round) explodeRocket(at, p, def, weapon); }, flight);
 }
 
 // (Also the mortar's shell landing: weapon 'mortar'.)
@@ -2543,6 +2548,11 @@ function onBuy(p, id) {
     const holder = [...players.values()].find(q => q !== p && (isDM() || q.team === p.team) && q.inv.primary?.id === 'mortar');
     if (holder) return fail(isDM() ? `${holder.name} already has the mortar.` : `Your team already has a mortar (${holder.name}).`);
   }
+  // The RPG-26: one per team each round (in Deathmatch and warmup, one in anyone's hands at a time).
+  if (wdef?.perTeam) {
+    const free = isDM() || game.phase === 'warmup';
+    if (free ? [...players.values()].some(q => q.inv.primary?.id === id) : teamBought(p.team, id) >= wdef.perTeam) return fail(free ? `Somebody already has the ${wdef.name}.` : `Your team has already bought the ${wdef.name} this round.`);
+  }
   let price = def.price;
 
   if (wdef && (wdef.grenade || wdef.mine)) {
@@ -2568,6 +2578,7 @@ function onBuy(p, id) {
   p.money -= price;
   const record = { id, price, armor: p.armor, helmet: p.helmet, dropped: null };
   (p.buys ||= []).push(record);
+  if (wdef?.perTeam) countTeamBuy(p.team, id, 1);
   if (wdef && (wdef.grenade || wdef.mine)) p.inv[id]++;
   else if (wdef) {
     const slot = slotKey(id);
@@ -2585,6 +2596,15 @@ function onBuy(p, id) {
   else if (id === 'camo') p.camo = true;
   send(p, { t: 'sfx', s: 'buy' });
   sendMe(p);
+}
+
+// Items a team may buy only so many of each round (perTeam, the RPG-26): how many it has bought this round.
+function teamBought(team, id) {
+  return game.teamBuys?.round === game.round ? game.teamBuys[`${team}:${id}`] || 0 : 0;
+}
+function countTeamBuy(team, id, n) {
+  if (game.teamBuys?.round !== game.round) game.teamBuys = { round: game.round };
+  game.teamBuys[`${team}:${id}`] = Math.max(0, teamBought(team, id) + n);
 }
 
 // Selling back (right-click in the buy menu): something bought in this life, while you can still buy, for the full
@@ -2615,6 +2635,7 @@ function onSell(p, id) {
   else if (id === 'nvg') p.nvg = false;
   else if (id === 'camo') { p.camo = false; p.camoOn = false; }
   p.buys.splice(i, 1);
+  if (wdef?.perTeam) countTeamBuy(p.team, id, -1);
   p.money += b.price;
   send(p, { t: 'sold', item: id });
   send(p, { t: 'sfx', s: 'buy' });

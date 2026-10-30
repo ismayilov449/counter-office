@@ -38,6 +38,7 @@ const GUN = {
   sg550: { crack: 3400, body: 950, boom: 92, dur: 0.18, gain: 1.02, tail: 0.55 },
   pkt: { crack: 3200, body: 900, boom: 88, dur: 0.15, gain: 1.0, tail: 0.5 },
   rpg: { launcher: true },
+  rpg26: { launcher: true },
   awp: { crack: 2400, body: 600, boom: 58, dur: 0.42, gain: 1.45, tail: 1.0, after: 'bolt' },
   m249: { crack: 3600, body: 1000, boom: 95, dur: 0.14, gain: 0.95, tail: 0.45 },
 };

@@ -40,6 +40,9 @@ export const WEAPONS = {
 
   // Rocket launcher: CTs buy it, anyone can pick it up. The rocket flies, then explodes (see server explodeRocket).
   rpg: primary('launcher', { name: 'RPG-7', team: 'CT', auto: false, price: 6000, damage: 500, rocket: true, blast: 9, rocketSpeed: 38, rate: 1.0, mag: 1, reserve: 3, reload: 3.0, spread: 0.002, moveSpread: 0.03, spreadInc: 0, recoil: 0.07, rangeMod: 1, pen: 0.95, speed: 5.0, killReward: 300, ammoPrice: 600 }),
+  // RPG-26: a throwaway one-shot tube for the Terrorists (one per team each round; anyone can pick up an unused one).
+  // A smaller warhead than the RPG-7's and less accurate; once fired the empty tube is thrown away (disposable).
+  rpg26: primary('launcher', { name: 'RPG-26', team: 'T', auto: false, price: 3500, damage: 400, rocket: true, disposable: true, perTeam: 1, blast: 6, rocketSpeed: 34, rate: 1.0, mag: 1, reserve: 0, reload: 0, spread: 0.012, moveSpread: 0.05, spreadInc: 0, recoil: 0.06, rangeMod: 1, pen: 0.95, speed: 5.4, killReward: 300 }),
   // 82-BM-37 mortar: set it up on open ground (setup seconds), then aim like a real crew: a bearing and an elevation
   // (in mils, see mortarRange); the shell drops there a few seconds later with some spread (server onMortar).
   // One per team; heavy to carry.
@@ -85,7 +88,7 @@ export const CAMO = { still: 1.5, botSees: 4 };
 // bullet's damage the heavy guns do to them (other bullets don't hurt them). A wall chunk has 200-300 hp,
 // furniture 80-130 (see shared/maps/breakables.js).
 export const BREAK = {
-  blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
+  blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], rpg26: [2.4, 420], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
   chip: { m249: 0.5, awp: 0.5, pkt: 0.5 },
 };
 // Maps with `realism` (cs_mansion): what explosions do besides breaking things.
@@ -95,9 +98,9 @@ export const BREAK = {
 //   the most fires at once, and how long a door can stand in a fire (s); wallShot: share of a bullet's damage
 //   left after going through a thin wall or a door (at most thin m thick).
 export const REAL = {
-  push: { c4: [22, 16], mortar: [16, 12], rpg: [11, 10], car: [11, 10], he: [8, 7], pmn: [4, 5], mon50: [5, 6] },
-  door: { c4: 8, mortar: 4, rpg: 3, car: 4, he: 2.5, pmn: 1.5, mon50: 2 },
-  smoke: { c4: 9, mortar: 6, rpg: 5, car: 6, he: 4 },
+  push: { c4: [22, 16], mortar: [16, 12], rpg: [11, 10], rpg26: [8, 8], car: [11, 10], he: [8, 7], pmn: [4, 5], mon50: [5, 6] },
+  door: { c4: 8, mortar: 4, rpg: 3, rpg26: 2.5, car: 4, he: 2.5, pmn: 1.5, mon50: 2 },
+  smoke: { c4: 9, mortar: 6, rpg: 5, rpg26: 4, car: 6, he: 4 },
   collapse: 25,
   burn: { chance: 0.12, life: 16, dps: 7, max: 28, door: 5 },
   wallShot: 0.5, thin: 0.45,
@@ -111,7 +114,7 @@ export const PING = { life: 6, cooldown: 1, range: 300 };
 export const FIRE = { radius: 3.5, life: 7, impact: 80, dps: 15, afterburn: 0.75, tick: 0.25 };
 // A mortar shell, or an RPG rocket that goes off on the ground, leaves the spot burning (life s, radius m): the
 // same flames as a Molotov's, hurting anyone in them.
-export const BLAST_FIRE = { mortar: { life: 20, r: 3 }, rpg: { life: 8, r: 2.2 } };
+export const BLAST_FIRE = { mortar: { life: 20, r: 3 }, rpg: { life: 8, r: 2.2 }, rpg26: { life: 6, r: 1.8 } };
 
 export const ITEMS = {
   vest: { name: 'Kevlar Vest', price: 650 },
@@ -129,7 +132,7 @@ export const BUY_COLUMNS = [
   { title: 'Shotguns', items: ['m3', 'xm1014'] },
   { title: 'SMGs', items: ['mac10', 'tmp', 'mp5', 'ump45', 'p90'] },
   { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'scout', 'sg552', 'aug', 'sg550', 'g3sg1', 'awp'] },
-  { title: 'Heavy', items: ['m249', 'rpg', 'mortar'] },
+  { title: 'Heavy', items: ['m249', 'rpg', 'rpg26', 'mortar'] },
   { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg'] },
   { title: 'Mines & camo', items: ['pmn', 'mon50', 'camo'] },
 ];

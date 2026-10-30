@@ -2505,7 +2505,7 @@ const net = new Net({
   },
   rocket(m) {
     fx.rocket(m.o, m.d, m.dist, m.speed);
-    if (m.owner !== me.id) audio.play('shot', m.o, 'rpg');
+    if (m.owner !== me.id) audio.play('shot', m.o, m.w || 'rpg');
   },
   nade(m) {
     fx.nade(m.k, m.o, m.v, nadeFuse(m.k), p => audio.play('bounce', p));
@@ -2548,13 +2548,14 @@ const net = new Net({
       if (me.alive && d < 16) shellShock(clamp(1.3 - d / 16, 0.3, 1));
       return;
     }
-    if (m.k === 'rpg') {
+    if (m.k === 'rpg' || m.k === 'rpg26') {
+      const s = m.k === 'rpg26' ? 0.75 : 1; // the RPG-26's smaller warhead
       fx.explosion(m.p, true);
-      blastMark(m.p, 1.0);
+      blastMark(m.p, 1.0 * s);
       audio.play('rpgboom', m.p);
       const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
-      me.shake = Math.max(me.shake, clamp(1 - d / 30, 0, 1) * 1.2);
-      if (me.alive && d < 12) shellShock(clamp(1.3 - d / 12, 0.3, 1)); // ringing ears up close
+      me.shake = Math.max(me.shake, clamp(1 - d / (30 * s), 0, 1) * 1.2 * s);
+      if (me.alive && d < 12 * s) shellShock(clamp(1.3 - d / (12 * s), 0.3, 1)); // ringing ears up close
       return;
     }
     if (m.k === 'car') {
@@ -3269,7 +3270,7 @@ function updateDaze(now) {
 
 // Soot sprayed over everything around a blast, a hanging cloud of dust, and inside, the room shakes and dust
 // comes down from the ceiling.
-const SOOT = { c4: 5, mortar: 3.5, rpg: 2.5, car: 3, he: 2, pmn: 1.4, mon50: 1.8 };
+const SOOT = { c4: 5, mortar: 3.5, rpg: 2.5, rpg26: 2, car: 3, he: 2, pmn: 1.4, mon50: 1.8 };
 function realBlast(m) {
   const R = SOOT[m.k];
   if (!map.realism || !R) return;
