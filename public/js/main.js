@@ -596,6 +596,37 @@ function toggleCamo() {
 }
 const camoHidden = now => !!(me.camo && me.camoOn && me.alive && now - (me.lastFire || 0) >= CAMO.still * 1000);
 
+// Radar red dots (not in Deathmatch or Hide and Seek): the enemies someone on our team (a player or a bot) sees
+// right now — the server decides and sends only those (m.sp) — and, when sight of one is lost, a hollow ring where it
+// was last seen, fading over SPOT_FADE seconds. Dead players and spectators see everyone, like the team bar.
+const SPOT_FADE = 3;
+const spotted = new Map(), lostSpots = new Map(); // id -> [x, 0, z]; id -> { p, at }
+const spotsOn = () => !isDM() && !isHNS();
+function onSpotted(list) {
+  const now = performance.now(), cur = new Set();
+  for (const [id, x, z] of list || []) { cur.add(id); spotted.set(id, [x, 0, z]); lostSpots.delete(id); }
+  for (const [id, p] of spotted) {
+    if (cur.has(id)) continue;
+    spotted.delete(id);
+    if (remotes.get(id)?.alive) lostSpots.set(id, { p, at: now }); // (no ring for one that just died)
+  }
+}
+function radarEnemies(now) {
+  const out = [];
+  if (!spotsOn() || !inTeamName(me.team)) return out;
+  if (!me.alive) {
+    for (const r of remotes.values()) if (r.alive && !isMate(r)) out.push({ p: r.p });
+    return out;
+  }
+  for (const p of spotted.values()) out.push({ p });
+  for (const [id, s] of lostSpots) {
+    const age = (now - s.at) / 1000;
+    if (age >= SPOT_FADE || !remotes.get(id)?.alive) { lostSpots.delete(id); continue; }
+    out.push({ p: s.p, fade: 1 - age / SPOT_FADE });
+  }
+  return out;
+}
+
 // Pings: the middle mouse button puts a "!" on the team's radar where we're looking.
 const pings = [];
 function sendPing() {
@@ -2401,6 +2432,7 @@ const net = new Net({
       if (w !== r.w) { r.w = w; setPlayerWeapon(r.model, w); }
     }
     for (const r of [...remotes.values()]) if (!seen.has(r.id)) removeRemote(r);
+    onSpotted(m.sp);
     syncDrops(m.dr);
     syncBomb(m.b);
     onCarSnapshot(m.cars, m.time);
@@ -2592,6 +2624,8 @@ const net = new Net({
   },
   round(m) {
     mortarInfo.target = mortarInfo.impact = null;
+    spotted.clear();
+    lostSpots.clear();
     fx.clearDecals();
     fx.clearCraters();
     fx.clearGibs();
@@ -3070,7 +3104,7 @@ function updateHud(now) {
     bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
   }
   const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
-  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()));
+  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()));
   drawMortarMap(performance.now(), mates);
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }

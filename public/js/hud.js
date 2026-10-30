@@ -521,7 +521,8 @@ export class Hud {
 
   // marks: the mortar's called-in target (a yellow cross), where its last shell landed (an orange ring, dashed when
   // nobody saw it) and, for the gunner, where the next shell will land (a bold red dot).
-  radar(self, mates, bomb, hostages = [], marks = []) {
+  // enemies: red dots for the ones the team sees now; with `fade` (1 -> 0) a hollow ring where one was last seen.
+  radar(self, mates, bomb, hostages = [], marks = [], enemies = []) {
     if (!this.radarBg) return;
     const g = this.radarCtx;
     const { toR } = this.radarXform();
@@ -575,6 +576,25 @@ export class Hud {
         g.setLineDash([]);
       }
       g.lineWidth = 1;
+    }
+    for (const e of enemies) {
+      const [x, z] = toR(e.p[0], e.p[2]);
+      g.beginPath();
+      if (e.fade != null) {
+        g.globalAlpha = e.fade;
+        g.strokeStyle = '#ff3a2a';
+        g.lineWidth = 1.5;
+        g.arc(x, z, 4.5, 0, Math.PI * 2);
+        g.stroke();
+        g.globalAlpha = 1;
+        g.lineWidth = 1;
+      } else {
+        g.fillStyle = '#ff2a1a';
+        g.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+        g.arc(x, z, 3.8, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
+      }
     }
     for (const m of mates) {
       const [x, z] = toR(m.p[0], m.p[2]);

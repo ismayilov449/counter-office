@@ -245,6 +245,12 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   Lost when you die.
 - **Pings**: click the **middle mouse button** (the scroll wheel) to put a yellow **!** on your team's radar where
   you're looking. It lasts 6 seconds; one per player at a time.
+- **Radar red dots** (classic, Gun Game and Zombie; not in Deathmatch or Hide and Seek): an enemy that anyone on your
+  team — a player or a bot — can see shows as a red dot on everyone's radar on the team, live while they see it. "See"
+  means in front of them (about the screen's width), in line of sight to the body and not through smoke; someone in
+  ghillie camo only within 4 m. When sight is lost, a hollow red ring stays where they were last seen and fades over
+  3 seconds. The server decides who is spotted and sends each team only its own spotted enemies; it checks each pair
+  of players a few times a second, up to 70 m. Dead players and spectators see every enemy, like on the team bar.
 - **Molotov** (buy menu → 6 Equipment, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor

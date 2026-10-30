@@ -2225,6 +2225,58 @@ function updateCamo(t) {
   for (const p of players.values()) p.hidden = !!(p.camo && p.camoOn && p.alive && t - (p.lastShot || 0) >= CAMO.still * 1000);
 }
 
+// ---- Radar spotting (classic, Gun Game, Zombie): an enemy that anyone on a team can see — in their field of view,
+// in line of sight from the eye to the body, not through smoke, a camouflaged one only within CAMO.botSees — is a red
+// dot on that whole team's radar. Only the spotted enemies' positions go to the team (the "sp" part of the snapshot).
+// Cheap: each viewer-enemy pair is looked at every SPOT.every ticks (staggered), only within SPOT.range metres, and
+// a sighting lasts SPOT.keep ms so the dot doesn't flicker between checks.
+const SPOT = { range: 70, fov: 0.95, every: 4, keep: 350 };
+const spotOn = () => !isDM() && !isHNS();
+const spotJson = { T: '[]', CT: '[]' };
+let spotTick = 0;
+function smokeBetween(a, b, t) {
+  for (const s of game.smokes || []) {
+    if (t >= s.until) continue;
+    const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], len2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2] || 1;
+    const k = Math.max(0, Math.min(1, ((s.p[0] - a[0]) * d[0] + (s.p[1] - a[1]) * d[1] + (s.p[2] - a[2]) * d[2]) / len2));
+    if (Math.hypot(a[0] + d[0] * k - s.p[0], a[1] + d[1] * k - s.p[1], a[2] + d[2] * k - s.p[2]) < 3.2) return true;
+  }
+  return false;
+}
+// Can viewer v (a player, or any eye: { eye, yaw }) make out enemy e?
+function spots(eye, yaw, e, t, fov = SPOT.fov) {
+  const head = [e.p[0], e.p[1] + (e.c ? 0.8 : 1.6), e.p[2]], chest = [e.p[0], e.p[1] + (e.c ? 0.5 : 1.05), e.p[2]];
+  const d = dist3(eye, head);
+  if (d > SPOT.range) return false;
+  if (e.hidden && d > CAMO.botSees) return false;
+  if (d > 2) {
+    const off = Math.atan2(-(e.p[0] - eye[0]), -(e.p[2] - eye[2])) - yaw;
+    if (Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) > fov) return false;
+  }
+  if (smokeBetween(eye, chest, t)) return false;
+  return lineOfSight(eye, head) || lineOfSight(eye, chest);
+}
+function updateSpotting(t) {
+  const seen = { T: [], CT: [] };
+  if (spotOn()) {
+    spotTick++;
+    const list = [];
+    for (const q of players.values()) if (q.alive && inTeam(q)) list.push(q);
+    for (const v of list) {
+      for (const e of list) {
+        if (v.team === e.team || (v.id * 7 + e.id + spotTick) % SPOT.every) continue;
+        if (spots(eyeOf(v), v.yaw, e, t)) (e.spotAt ||= {})[v.team] = t;
+      }
+    }
+    for (const e of list) {
+      const team = other(e.team);
+      if (t - (e.spotAt?.[team] ?? -1e9) < SPOT.keep) seen[team].push([e.id, r2(e.p[0]), r2(e.p[2])]);
+    }
+  }
+  spotJson.T = JSON.stringify(seen.T);
+  spotJson.CT = JSON.stringify(seen.CT);
+}
+
 // A ping: the spot a player is looking at, marked with a "!" on their team's radar (in Deathmatch only on their own).
 function onPing(p, m) {
   const t = now(), pos = vec3(m.p);
@@ -3045,6 +3097,7 @@ function tick() {
   updatePickups();
   updateMines(t);
   updateCamo(t);
+  updateSpotting(t);
   // the time that really passed since the last tick: on Windows the timer fires every 31 or 47 ms rather than 33,
   // and moving by a fixed step made bots and hostages stutter on everyone's screen
   const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
@@ -3095,7 +3148,9 @@ function tick() {
   for (const p of players.values()) {
     if (p.ws.readyState !== 1) continue;
     const me = p.act ? JSON.stringify({ a: p.act.type, pr: Math.min(1, (t - p.act.start) / p.act.dur) }) : 'null';
-    p.ws.send(head + (p.gotSnap ? changed : all) + ',"me":' + me + '}');
+    // (the enemies the player's team has spotted: only to that team)
+    const sp = inTeam(p) && spotOn() ? ',"sp":' + spotJson[p.team] : '';
+    p.ws.send(head + (p.gotSnap ? changed : all) + sp + ',"me":' + me + '}');
     p.gotSnap = true;
   }
 }
