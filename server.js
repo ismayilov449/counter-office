@@ -8,6 +8,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
+import { spawn } from 'node:child_process';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
 import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, BREAK, BLAST_FIRE, REAL } from './shared/weapons.js';
@@ -3218,4 +3219,18 @@ httpServer.listen(CFG.port, '0.0.0.0', async () => {
   if (!env.ADMIN_PASSWORD) console.log(`  (change the password in ${path.relative(ROOT, ADMIN_FILE)} or with ADMIN_PASSWORD)`);
   const modeName = { gungame: 'Gun Game', zombie: 'Zombie', deathmatch: 'Deathmatch', hns: 'Hide and Seek' }[CFG.gameMode] || 'classic';
   console.log(`\n  Mode: ${modeName}  |  bots: ${CFG.bots.perTeam ? `${CFG.bots.perTeam} per team (${CFG.bots.difficulty})` : 'off'}  |  maps: ${MAP_IDS.join(', ')}  |  rounds to win: ${CFG.roundsToWin}  |  friendly fire: ${CFG.friendlyFire ? 'on' : 'off'}\n`);
+  openJoinPage(httpsReady ? `https://${ips[0] || 'localhost'}:${CFG.httpsPort}` : `http://${ips[0] || 'localhost'}:${CFG.port}`);
 });
+
+// The players' join page (a page on claude.ai whose address is kept in data/join-page.txt): on start, copy the
+// game's link and open that page, where the host pastes it once (Ctrl+V) and everyone's Join button follows.
+function openJoinPage(link) {
+  let page = '';
+  try { page = fs.readFileSync(path.join(DATA_DIR, 'join-page.txt'), 'utf8').trim(); } catch { /* not set up */ }
+  if (!/^https:\/\/\S+$/.test(page) || process.platform !== 'win32') return;
+  const clip = spawn('clip', { stdio: ['pipe', 'ignore', 'ignore'] });
+  clip.on('error', () => {});
+  clip.stdin.end(link);
+  spawn('cmd', ['/c', `start "" "${page}"`], { stdio: 'ignore', detached: true, windowsVerbatimArguments: true }).on('error', () => {}).unref();
+  console.log(`  Join page opened, link copied: press Ctrl+V there to update it for everyone\n    ${page}\n`);
+}

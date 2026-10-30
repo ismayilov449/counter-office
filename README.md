@@ -30,6 +30,10 @@ click **Advanced → Continue**. In fullscreen, hold **Esc** to leave.
 **Windows firewall:** allow Node.js on private/domain networks when asked, or open TCP ports
 3000 and 3443 inbound.
 
+**Join page:** put the address of the players' join page (a claude.ai page with a Join button) in
+`data/join-page.txt`. On every start the server then copies the game's link and opens that page. Press **Ctrl+V**
+there and everyone's Join button points at the new link. Players just keep that page bookmarked.
+
 ## Admin panel
 
 Open **`/admin`** on the server address (for example `https://10.50.200.23:3443/admin`), or click **Admin panel** in
