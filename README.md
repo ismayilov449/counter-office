@@ -30,6 +30,24 @@ click **Advanced → Continue**. In fullscreen, hold **Esc** to leave.
 **Windows firewall:** allow Node.js on private/domain networks when asked, or open TCP ports
 3000 and 3443 inbound.
 
+### Posting the link to Bitrix
+
+The server can post its address to a Bitrix24 chat every time it starts, so nobody has to ask for the IP:
+
+1. In Bitrix: **Applications → Developer resources → Other → Inbound webhook**. Tick the **Chat and
+   notifications (im)** permission and save. Copy the webhook address (`https://<portal>/rest/12/abc123…/`).
+2. Open the chat to post in, in the browser; its address ends in `?IM_DIALOG=chat1234`. Copy `chat1234`
+   (or the whole address).
+3. Fill both into `data/announce.json` (made on the first start) and restart the server:
+   ```json
+   { "webhook": "https://<portal>/rest/12/abc123…/", "chat": "chat1234",
+     "message": "[B]Counter-Office is up[/B], map {map}\n{link}" }
+   ```
+
+The message comes from the account that made the webhook. `{link}` is the HTTPS address and `{map}` the map.
+The console says whether the post worked. `BITRIX_WEBHOOK` and `BITRIX_CHAT` override the file. The webhook
+address works like a password, and `data/` stays out of git.
+
 ## Admin panel
 
 Open **`/admin`** on the server address (for example `https://10.50.200.23:3443/admin`), or click **Admin panel** in
