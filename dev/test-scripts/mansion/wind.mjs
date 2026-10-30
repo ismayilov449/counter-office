@@ -1,0 +1,10 @@
+const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/.claude/worktrees/agent-a556089471e441071/';
+const B = await import(G + 'shared/maps/cs_mansion_bsp.js');
+const nrm = f => { const a = f.slice(0, 3), b = f.slice(5, 8), c = f.slice(10, 13); const u = b.map((v, i) => v - a[i]), w = c.map((v, i) => v - a[i]); return [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]].map(v => +v.toFixed(3)); };
+const floor = B.FACES.c1a2_flr1.find(f => Math.abs(f[1] - 0.813) < 0.01);
+console.log('floor', floor.map(v => +v.toFixed(3)).join(','), 'cross', nrm(floor));
+const ceil = B.FACES.fifties_ceil5[0];
+console.log('ceil', ceil.map(v => +v.toFixed(3)).join(','), 'cross', nrm(ceil));
+const ow = B.FACES.out_wall4a.find(f => Math.abs(f[0] + 23.67) < 0.01 && Math.abs(f[5] + 23.67) < 0.01);
+console.log('outwall west', ow.map(v => +v.toFixed(3)).join(','), 'cross', nrm(ow));
+console.log('TEX', JSON.stringify(B.TEXTURES));
