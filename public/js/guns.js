@@ -560,6 +560,51 @@ export function buildPlacedMine(k, wire = 1.2, half = 1.5) {
   return g;
 }
 
+// Satchel charge: a canvas bag of explosive with a flap, a carrying strap and a detonator block with a red light on
+// top. Held in the hand (origin at the grip).
+function satchelBag(P, m, y = 0) {
+  P.box(0.24, 0.16, 0.08, m.tan, 0, y, 0);                                                   // the bag
+  P.box(0.245, 0.06, 0.085, m.rag, 0, y + 0.06, 0.002);                                      // the flap
+  P.box(0.03, 0.17, 0.088, m.olive, -0.07, y, 0).box(0.03, 0.17, 0.088, m.olive, 0.07, y, 0); // straps round it
+  P.box(0.05, 0.03, 0.03, m.dark, 0.05, y + 0.09, 0.02);                                     // detonator block
+}
+function satchel(gun, P) {
+  const m = X();
+  satchelBag(P, m, -0.02);
+  P.box(0.02, 0.1, 0.012, m.olive, 0, 0.1, 0, 0, 0, 0);                                      // carrying strap
+  P.box(0.008, 0.008, 0.008, m.red, 0.05, 0.085, 0.02);
+  return [0, 0, -0.1];
+}
+
+// The detonator: an old push-button mobile phone — grey body, small green screen, keypad, a stub antenna.
+function phone(gun, P) {
+  const m = X(), a = -0.5, c = Math.cos(a), s = Math.sin(a);
+  // a point on the phone (dy up its face, dz out of it, towards us) in the model, the phone tipped back by a
+  const at = (x, dy, dz) => [x, 0.02 + dy * c - dz * s, -0.06 + dy * s + dz * c];
+  P.box(0.05, 0.11, 0.02, m.flashgrey, ...at(0, 0, 0), a);                                    // body
+  P.box(0.036, 0.03, 0.004, new THREE.MeshBasicMaterial({ color: 0x8fbf5a }), ...at(0, 0.03, 0.011), a); // screen
+  for (let i = 0; i < 12; i++) P.box(0.009, 0.006, 0.004, m.dark, ...at(-0.012 + (i % 3) * 0.012, 0.002 - Math.floor(i / 3) * 0.009, 0.011), a); // keys
+  P.cyl(0.005, 0.03, m.dark, ...at(0.016, 0.068, 0), a, 0, 0, 6);                             // antenna
+  return [0, 0.02, -0.1];
+}
+
+// A satchel stuck on something: the bag flat on the surface (its back on y = 0, the surface's normal along +y), and
+// the red light on top (userData.led, its own mesh so it can blink).
+export function buildPlacedSatchel() {
+  const g = new THREE.Group(), P = new Parts(), m = X();
+  satchelBag(P, m, 0);
+  P.build(g);
+  g.rotation.x = -Math.PI / 2; // (the bag's back faces -z: lay it on its back)
+  g.position.y = 0.04;
+  const out = new THREE.Group();
+  out.add(g);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
+  led.position.set(0.05, 0.075, -0.09);
+  out.add(led);
+  out.userData.led = led;
+  return out;
+}
+
 // PKT: long heavy barrel, box receiver, ammo can on the side, spade grips at the back.
 function pkt(gun, P) {
   const m = X();
@@ -612,6 +657,8 @@ const BUILD = {
   rpg26: (g, P) => rpg26(g, P),
   mortar: (g, P) => mortar(g, P),
   pmn: (g, P) => pmnMine(g, P),
+  satchel: (g, P) => satchel(g, P),
+  phone: (g, P) => phone(g, P),
   mon50: (g, P) => mon50Mine(g, P),
   pkt: (g, P) => pkt(g, P),
   sg550: (g, P) => autoSniper(g, P, {}),

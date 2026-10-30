@@ -21,6 +21,7 @@ const ABOUT = {
   molotov: 'Bursts into flames where it lands: a 3.5 m fire for 7 seconds.',
   pmn: 'Soviet pressure mine: an enemy who steps on it loses a leg, usually their life. Hard to see.',
   mon50: 'Directional mine with a tripwire 3 m ahead: a fan of fragments up to 25 m forward.',
+  satchel: 'Satchel charge: throw it and it sticks (walls, doors, floors, cars); then set it off with the phone, from anywhere. 1.5× an HE.',
   rpg: 'Rocket launcher: explodes on whatever it hits, 9 m blast, blows holes in the mansion.',
   rpg26: 'Throwaway rocket launcher: one shot (6 m blast, up to 400), then the tube is gone. One per team each round.',
   mortar: '82-BM-37 mortar: set it up, right mouse opens a map — click where the shell should land (or aim by hand in Soviet mils). 14 m blast.',

@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, mortarElev, MINES, MINE, CAMO, PING } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, mortarElev, MINES, MINE, CAMO, PING, SATCHEL } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -11,7 +11,7 @@ import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, ambientAt } from './roomlight.js';
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
-import { buildMortarSetup, buildPlacedMine } from './guns.js';
+import { buildMortarSetup, buildPlacedMine, buildPlacedSatchel } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
 import { EMOTES, EMOTE } from '/shared/emotes.js';
 import { RANKS } from '/shared/ranks.js';
@@ -115,6 +115,7 @@ function loadMap(id) {
   renderer.toneMappingExposure = map.theme.exposure || 1;
   hud.setMap(map);
   clearMineModels();
+  clearSatchelModels();
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
@@ -204,7 +205,7 @@ addEventListener('resize', () => {
 
 const me = {
   id: null, joined: false, team: 'SPEC', alive: false, hp: 0, armor: 0, helmet: false, kit: false, nvg: false, money: 0,
-  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, c4: false },
+  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, satchel: 0, c4: false },
   slot: 'knife', lastSlot: 'knife', pendingSlot: false,
   p: [0, 0, 0], v: [0, 0, 0], onGround: false, crouch: false, eyeH: PLAYER.eye, airSpeed: 0,
   yaw: 0, pitch: 0, punchP: 0, punchY: 0, lastYaw: 0, sway: 0, bobT: 0,
@@ -251,6 +252,8 @@ function weaponOf(slot) {
     case 'secondary': return me.inv.secondary?.id || null;
     case 'knife': return me.zombie ? 'claws' : 'knife';
     case 'c4': return me.inv.c4 ? 'c4' : null;
+    case 'satchel': return me.inv.satchel > 0 ? 'satchel' : null;
+    case 'phone': return phoneLive() ? 'phone' : null;
     default: return (GRENADES.includes(slot) || MINES.includes(slot)) && me.inv[slot] > 0 ? slot : null;
   }
 }
@@ -258,7 +261,7 @@ function weaponOf(slot) {
 const current = () => (me.riding?.gunner ? 'pkt' : weaponOf(me.slot) || 'knife');
 const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me.inv[me.slot] : null);
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
-const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'c4'];
+const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'satchel', 'phone', 'c4'];
 
 // The gun in your hands: one model per weapon and look, made once and kept (building a new one at every switch was a
 // small hitch each time, and the old ones were never freed). prewarm fills it while the map loads.
@@ -307,7 +310,7 @@ function cycleWeapon(dir) {
 
 // Key 4 cycles through the grenades you carry, like CS.
 function cycleGrenades(list = GRENADES) {
-  const owned = list.filter(g => me.inv[g] > 0);
+  const owned = list.filter(g => weaponOf(g));
   if (!owned.length) return;
   const i = owned.indexOf(me.slot);
   switchSlot(owned[(i + 1) % owned.length]);
@@ -493,6 +496,8 @@ function tryFire(now) {
   me.triggerFresh = false;
   if (def.mortar) { mortarFire(now); return; }
   if (def.mine) { layMine(id, now); return; }
+  if (def.satchel) { throwSatchel(now); return; }
+  if (id === 'phone') { detonateSatchels(now); return; }
   if (def.mounted) {
     me.nextShot = now + def.rate * 1000;
     me.lastFire = now;
@@ -583,6 +588,93 @@ function mineToDefuse() {
     if (d < bd) { bd = d; best = m; }
   }
   return best;
+}
+
+// ---------------------------------------------------------------- satchel charge
+// Mouse1 throws it (the server flies it and sticks it to what it hits, see onSatchel in server.js); from then on 6
+// gives the phone, and Mouse1 with the phone sets off all of ours. Everyone sees them (a red light blinking, a quiet
+// chirp); an enemy's can be defused with E. On a car the model rides on the car's own model.
+const satchelModels = new Map(); // id -> { obj, s }
+let satchelThrownAt = -1e9;
+// Our own, set off-able: thrown in this life (or just thrown and still flying).
+const phoneLive = () => me.alive && (performance.now() - satchelThrownAt < 3000 || [...satchelModels.values()].some(({ s }) => s.owner === me.id && s.seq === me.spawnSeq));
+function throwSatchel(now) {
+  if (!(me.inv.satchel > 0)) return;
+  const o = eyePos(), d = aimDir(me.yaw, me.pitch + 0.08);
+  const k = coll.raycast(o, d, 0.6, 'move') ? 0 : 0.4;
+  const v = [d[0] * SATCHEL.throw + me.v[0] * 0.5, d[1] * SATCHEL.throw + 1 + me.v[1] * 0.3, d[2] * SATCHEL.throw + me.v[2] * 0.5];
+  net.send({ t: 'satchel', o: [o[0] + d[0] * k, o[1] + d[1] * k - 0.1, o[2] + d[2] * k], v });
+  audio.play('throw');
+  me.inv.satchel--;
+  me.nextShot = now + 600;
+  me.swing = 1;
+  me.swingAlt = false;
+  satchelThrownAt = now;
+  switchSlot('phone', true);
+}
+function detonateSatchels(now) {
+  net.send({ t: 'satchel', det: 1 });
+  audio.play('click');
+  me.nextShot = now + 500;
+  me.kick = 0.3;
+}
+function clearSatchelModels() {
+  for (const { obj } of satchelModels.values()) obj.parent?.remove(obj);
+  satchelModels.clear();
+}
+const _up = new THREE.Vector3(0, 1, 0), _sn = new THREE.Vector3();
+function syncSatchels(list) {
+  const seen = new Set();
+  for (const [id, tc, owner, seq, x, y, z, nx, ny, nz, car] of list) {
+    seen.add(id);
+    let e = satchelModels.get(id);
+    if (!e) {
+      const obj = (syncSatchels.model ||= buildPlacedSatchel()).clone();
+      obj.userData.led = obj.children[1];
+      obj.position.set(x, y, z);
+      obj.quaternion.setFromUnitVectors(_up, _sn.set(nx, ny, nz).normalize());
+      (car >= 0 && cars.get(car) ? cars.get(car).model : scene).add(obj);
+      e = { obj };
+      satchelModels.set(id, e);
+    }
+    e.s = { id, team: tc === 1 ? 'T' : 'CT', owner, seq, local: [x, y, z], car };
+  }
+  for (const [id, e] of satchelModels) if (!seen.has(id)) { e.obj.parent?.remove(e.obj); satchelModels.delete(id); }
+  if (!weaponOf(me.slot) && me.alive) switchSlot(bestSlot(), true);
+}
+// Where one is now (in the world, also when it rides on a car).
+const _sw = new THREE.Vector3();
+const satchelPos = e => { e.obj.getWorldPosition(_sw); return [_sw.x, _sw.y, _sw.z]; };
+// Per frame: the red light blinks, and now and then a quiet chirp.
+function updateSatchelModels(now) {
+  for (const e of satchelModels.values()) {
+    const ph = (now / 1000 + e.s.id * 0.37) % 1.2;
+    e.obj.userData.led.visible = ph < 0.15;
+    if (ph < 0.15 && !e.chirped) { e.chirped = true; if ((now / 1200 + e.s.id) % 2 < 1) audio.play('satbeep', satchelPos(e)); }
+    else if (ph >= 0.15) e.chirped = false;
+  }
+}
+// An enemy satchel close enough to defuse (E).
+function satchelToDefuse() {
+  if (!me.alive) return null;
+  const chest = [me.p[0], me.p[1] + 1, me.p[2]];
+  let best = null, bd = SATCHEL.reach;
+  for (const e of satchelModels.values()) {
+    if (isDM() ? e.s.owner === me.id : e.s.team === me.team) continue;
+    const p = satchelPos(e), d = Math.hypot(chest[0] - p[0], chest[1] - p[1], chest[2] - p[2]);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+// A thrown one in the air: the bag flying along its arc for ms (then the stuck one arrives in a 'satchels' message).
+const satchelFlights = [];
+function updateSatchelFlights(now) {
+  for (let i = satchelFlights.length - 1; i >= 0; i--) {
+    const f = satchelFlights[i], t = (now - f.at) / 1000;
+    if (t * 1000 >= f.ms) { scene.remove(f.obj); satchelFlights.splice(i, 1); continue; }
+    f.obj.position.set(f.o[0] + f.v[0] * t, f.o[1] + f.v[1] * t - 7.5 * t * t, f.o[2] + f.v[2] * t); // (NADE gravity 15)
+    f.obj.rotation.x += 0.2;
+  }
 }
 
 // Ghillie camouflage: H switches it on and off. We can't see ourselves fade, so the HUD says when we're hidden
@@ -956,7 +1048,7 @@ function priceOf(id) {
 
 function owns(id) {
   const def = WEAPONS[id];
-  if (def?.grenade || def?.mine) return me.inv[id] >= def.max;
+  if (def?.grenade || def?.mine || def?.satchel) return me.inv[id] >= def.max;
   if (id === 'camo') return me.camo;
   if (def) return me.inv[slotKey(id)]?.id === id;
   if (id === 'vest') return me.armor >= 100;
@@ -981,13 +1073,13 @@ function cantBuy(id) {
   const i = itemInfo(id);
   if (!availableTo(id, me.team)) return `${i.team === 'CT' ? 'CT' : 'T'} only`;
   if (id === 'kit' && (game.mode !== 'bomb' || game.cfg.gameMode !== 'classic')) return 'Bomb maps only';
-  if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar')) return 'Not in Zombie';
+  if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar' || id === 'satchel')) return 'Not in Zombie';
   return '';
 }
 
 // Bought this round and still yours, while you can still buy: it can be sold back (right-click).
 const refundable = id => !buyBlockReason() && me.roundBuys.includes(id) &&
-  (WEAPONS[id]?.grenade || WEAPONS[id]?.mine ? me.inv[id] > 0 : id === 'vest' || id === 'vesthelm' ? me.armor > 0 : owns(id));
+  (WEAPONS[id]?.grenade || WEAPONS[id]?.mine || WEAPONS[id]?.satchel ? me.inv[id] > 0 : id === 'vest' || id === 'vesthelm' ? me.armor > 0 : owns(id));
 
 // The buy menu (buymenu.js). Open, it frees the mouse to point and click; closed, the game takes it back.
 const buyUI = new BuyMenu($('buymenu'), {
@@ -1871,12 +1963,12 @@ document.addEventListener('keydown', e => {
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
-    case 'Digit6': if (me.alive) cycleGrenades(MINES); break;
+    case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'satchel', 'phone']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': startReload(); break;
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.alive) startUse('key'); break;
-    case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES].includes(current())) net.send({ t: 'drop', w: current() }); break;
+    case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES, 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
     case 'KeyO': openBuy(5); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;
@@ -2472,6 +2564,15 @@ const net = new Net({
   mines(m) {
     syncMines(m.list);
   },
+  satchels(m) {
+    syncSatchels(m.list);
+  },
+  satchelThrow(m) {
+    const obj = (syncSatchels.model ||= buildPlacedSatchel()).clone();
+    obj.position.set(...m.o);
+    scene.add(obj);
+    satchelFlights.push({ obj, o: m.o, v: m.v, ms: m.ms, at: performance.now() });
+  },
   mark(m) {
     const at = performance.now();
     for (let i = pings.length - 1; i >= 0; i--) if (pings[i].by === m.by) pings.splice(i, 1); // one each
@@ -2556,6 +2657,15 @@ const net = new Net({
       const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / (30 * s), 0, 1) * 1.2 * s);
       if (me.alive && d < 12 * s) shellShock(clamp(1.3 - d / (12 * s), 0.3, 1)); // ringing ears up close
+      return;
+    }
+    if (m.k === 'satchel') {
+      fx.explosion(m.p, true);
+      blastMark(m.p, 0.9);
+      audio.play('rpgboom', m.p);
+      const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
+      me.shake = Math.max(me.shake, clamp(1 - d / 25, 0, 1) * 1.0);
+      if (me.alive && d < 10) shellShock(clamp(1.2 - d / 10, 0.3, 0.9));
       return;
     }
     if (m.k === 'car') {
@@ -2690,7 +2800,7 @@ function updateLocal(dt, now) {
   }
   const moveBoxes = coll.move(null, me.p, 2);
   const id = current(), def = WEAPONS[id];
-  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse());
+  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || !!satchelToDefuse());
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar;
 
   const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar;
@@ -3033,6 +3143,8 @@ function updateHud(now) {
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
+    else if (satchelToDefuse()) hint = `Hold E to defuse the satchel charge (${me.kit ? SATCHEL.kitDefuse : SATCHEL.defuse} s)`;
+    else if (current() === 'phone') hint = 'Click to set off your satchel charge';
     else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you (H to switch off)';
     else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the door`;
     else if (!canDefuseHere() && sw) hint = `Press E to switch the lights ${game.lights[sw.group] === false ? 'on' : 'off'}`;
@@ -3046,7 +3158,7 @@ function updateHud(now) {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
   hud.hint(hint);
-  if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : 'Defusing the bomb...', me.act.pr);
+  if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
 
@@ -3270,7 +3382,7 @@ function updateDaze(now) {
 
 // Soot sprayed over everything around a blast, a hanging cloud of dust, and inside, the room shakes and dust
 // comes down from the ceiling.
-const SOOT = { c4: 5, mortar: 3.5, rpg: 2.5, rpg26: 2, car: 3, he: 2, pmn: 1.4, mon50: 1.8 };
+const SOOT = { c4: 5, mortar: 3.5, rpg: 2.5, rpg26: 2, satchel: 2.2, car: 3, he: 2, pmn: 1.4, mon50: 1.8 };
 function realBlast(m) {
   const R = SOOT[m.k];
   if (!map.realism || !R) return;
@@ -3386,6 +3498,8 @@ function frame() {
   updateMortarHud();
   updateOwnMortarModel();
   updateMineModels();
+  updateSatchelModels(now);
+  updateSatchelFlights(now);
   updateFires(dt, now);
   updateZombieGrowls(now);
   fx.update(dt, camera);

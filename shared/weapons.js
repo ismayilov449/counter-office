@@ -63,6 +63,10 @@ export const WEAPONS = {
   // across its front fires a fan of fragments forward.
   pmn: { name: 'PMN mine', slot: 6, cls: 'mine', mine: 'pressure', price: 500, max: 2, speed: 6.3 },
   mon50: { name: 'MON-50 mine', slot: 6, cls: 'mine', mine: 'directional', price: 600, max: 2, speed: 6.3 },
+  // Satchel charge (buy menu -> Mines & camo, Terrorists): Mouse1 throws it and it sticks to whatever it hits; then
+  // you hold the detonator, an old phone, and Mouse1 sets it off from anywhere (see SATCHEL).
+  satchel: { name: 'Satchel charge', slot: 6, cls: 'satchel', satchel: true, team: 'T', price: 1200, max: 1, speed: 6.3 },
+  phone: { name: 'Detonator', slot: 6, cls: 'phone', speed: 6.3 },
 };
 
 export const GRENADES = ['he', 'flash', 'smoke', 'molotov'];
@@ -81,6 +85,13 @@ export const MINE = {
   mon50: { wire: 3, wireHalf: 1.4, range: 25, cone: 0.52, damage: 180, back: 3, backDamage: 40 },
 };
 
+// Satchel charge: thrown at throw m/s, it sticks to the first wall, door, floor or car it hits (on a car it rides
+// along). Its owner sets it off with the phone, from any distance, in the same life only (dead: it stays, but nobody can
+// set it off). The blast is about 1.5 HE grenades: damage in the middle, nothing at radius m (walls protect), car
+// damage to cars. Enemies defuse it with E (defuse s, kitDefuse with a kit, +reward), or shoot it (it goes off);
+// an explosion within chain m sets it off too. Each player has at most perPlayer out. Cleared every round.
+export const SATCHEL = { throw: 12, damage: 150, radius: 10, car: 900, defuse: 3, kitDefuse: 1.5, reward: 200, reach: 1.6, chain: 3, perPlayer: 2 };
+
 // Ghillie camouflage: crouched, not moving and not shooting for still seconds, you're nearly invisible to enemies
 // (and bots can't make you out beyond botSees metres). Lost when you die.
 export const CAMO = { still: 1.5, botSees: 4 };
@@ -88,7 +99,7 @@ export const CAMO = { still: 1.5, botSees: 4 };
 // bullet's damage the heavy guns do to them (other bullets don't hurt them). A wall chunk has 200-300 hp,
 // furniture 80-130 (see shared/maps/breakables.js).
 export const BREAK = {
-  blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], rpg26: [2.4, 420], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
+  blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], rpg26: [2.4, 420], satchel: [3.6, 570], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
   chip: { m249: 0.5, awp: 0.5, pkt: 0.5 },
 };
 // Maps with `realism` (cs_mansion): what explosions do besides breaking things.
@@ -98,9 +109,9 @@ export const BREAK = {
 //   the most fires at once, and how long a door can stand in a fire (s); wallShot: share of a bullet's damage
 //   left after going through a thin wall or a door (at most thin m thick).
 export const REAL = {
-  push: { c4: [22, 16], mortar: [16, 12], rpg: [11, 10], rpg26: [8, 8], car: [11, 10], he: [8, 7], pmn: [4, 5], mon50: [5, 6] },
-  door: { c4: 8, mortar: 4, rpg: 3, rpg26: 2.5, car: 4, he: 2.5, pmn: 1.5, mon50: 2 },
-  smoke: { c4: 9, mortar: 6, rpg: 5, rpg26: 4, car: 6, he: 4 },
+  push: { c4: [22, 16], mortar: [16, 12], rpg: [11, 10], rpg26: [8, 8], satchel: [12, 10], car: [11, 10], he: [8, 7], pmn: [4, 5], mon50: [5, 6] },
+  door: { c4: 8, mortar: 4, rpg: 3, rpg26: 2.5, satchel: 4, car: 4, he: 2.5, pmn: 1.5, mon50: 2 },
+  smoke: { c4: 9, mortar: 6, rpg: 5, rpg26: 4, satchel: 5, car: 6, he: 4 },
   collapse: 25,
   burn: { chance: 0.12, life: 16, dps: 7, max: 28, door: 5 },
   wallShot: 0.5, thin: 0.45,
@@ -134,7 +145,7 @@ export const BUY_COLUMNS = [
   { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'scout', 'sg552', 'aug', 'sg550', 'g3sg1', 'awp'] },
   { title: 'Heavy', items: ['m249', 'rpg', 'rpg26', 'mortar'] },
   { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg'] },
-  { title: 'Mines & camo', items: ['pmn', 'mon50', 'camo'] },
+  { title: 'Mines & camo', items: ['pmn', 'mon50', 'satchel', 'camo'] },
 ];
 
 // Gun Game: one kill with each weapon moves you to the next; a knife kill on the last level wins.

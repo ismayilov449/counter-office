@@ -607,6 +607,9 @@ export const audio = {
         // a piece landing
         burst(out, t, { dur: 0.09, type: 'lowpass', freq: 900 + Math.random() * 500, gain: 0.45 });
         break;
+      case 'satbeep': // a satchel charge's quiet chirp
+        tone(out, t, { freq: 2600, dur: 0.04, type: 'square', gain: 0.05 });
+        break;
       case 'beep':
         tone(out, t, { freq: 1950, dur: 0.1, gain: 0.35 });
         break;
