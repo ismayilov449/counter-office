@@ -126,6 +126,9 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     - **Bullets go through** thin walls and doors with half their damage.
     - **Sound**: explosions outside sound muffled from inside the house (and the other way round); a blast nearby
       shakes the room and brings dust down from the ceiling.
+  - **Wine cellar** under the living room: the walled-up closet off the kitchen (by the doorway to the hall) is open
+    now, and a steep wooden stair goes down into a low stone cellar with wine racks, barrels and a table, lit by one
+    bulb (its switch is at the foot of the stairs). The ground floor above it never breaks.
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and

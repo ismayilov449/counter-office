@@ -84,10 +84,10 @@ for (const p of BRK.pieces) for (const b of p.boxes) m.box(b.min[0], b.min[2], b
 const G = [0.75, 4.1], U = [4.2, 6.75];
 const room = (group, x1, x2, z1, z2, [y1, y2]) => ({ group, min: [x1, y1, z1], max: [x2, y2, z2] });
 const ROOMS = [
-  room('lampa6', -23.3, -13.31, -14.05, -10.16, G), room('lampa6', -23.3, -13.31, -10.16, -5.49, G),
+  room('lampa6', -23.3, -13.31, -14.05, -5.49, G),
   room('lampa4', -13.31, -6.78, -14.05, -10.16, G),
   room('lampa5', -12.9, -6.78, -10.16, 6.5, [0.75, 6.75]),
-  room('lampa7', -23.3, -13.31, -5.49, 2.03, G), room('lampa7', -23.3, -13.31, 2.03, 4.88, G),
+  room('lampa7', -23.3, -13.31, -5.49, 4.88, G),
   room('lampa8', -23.3, -16.56, 4.88, 11.0, G),
   room('lampa2', -16.56, -12.9, 4.88, 11.0, G), room('lampa2', -12.9, -6.78, 6.5, 11.0, G),
   room('lampa9', -23.3, -12.9, -14.05, -7.32, U),
@@ -147,6 +147,8 @@ const SWITCHES = BSP.BUTTONS.filter(b => /^lampa/.test(b.target)).map(b => {
 // ---- water: the fountain and the tunnel
 for (const w of BSP.WATER) m.add({ type: 'water', min: [w[0], w[2]], max: [w[3], w[5]], y: w[4], color: w[4] > 0 ? '#3a7a90' : '#2e4a3a', murky: w[4] < 0 });
 for (const x of [-16, -4, 8, 20]) m.add({ type: 'tunnel-lamp', p: [x, -2.2, -18.7] });
+for (const d of RM.decor) m.add(d);
+for (const l of RM.ladders) m.ladder(...l);
 
 // Lawns beyond the estate walls (so the city skyline stands on the ground), then the skyline itself
 for (const [x1, z1, x2, z2] of [[-400, -400, 400, -22.9], [-400, 22.9, 400, 400], [-400, -22.9, -29.3, 22.9], [29.3, -22.9, 400, 22.9]]) {
@@ -194,8 +196,9 @@ export default {
     ...ROOMS,
     { group: 'tunnel', amb: 0.55, min: [-24.4, -4.2, -21.2], max: [26.3, -1.95, -17.8] },
     { group: 'shed', min: [13.1, 0, 14.6], max: [18.0, 2.5, 17.9] },
+    ...RM.rooms,
   ],
-  switches: SWITCHES,
+  switches: [...SWITCHES, ...RM.switches],
   // One pickup truck with a PKT machine gun in the back, on the lawn by the left (south) door.
   vehicles: [
     { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },

@@ -161,6 +161,24 @@ const PAINTERS = {
       }
     },
   },
+  // Mansion's wine cellar: a wooden rack of bottle ends, dark glass with a glint
+  winerack: {
+    scale: 1, size: 128, draw: (g, s) => {
+      g.fillStyle = '#3a2412';
+      g.fillRect(0, 0, s, s);
+      const n = 6, c = s / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const x = i * c + c / 2, y = j * c + c / 2;
+        g.fillStyle = '#1a0e06';
+        g.fillRect(i * c + 2, j * c + 2, c - 4, c - 4);
+        if (Math.random() < 0.15) continue; // an empty slot
+        g.fillStyle = ['#1e3a1a', '#3a1018', '#2a2a12'][(Math.random() * 3) | 0];
+        g.beginPath(); g.arc(x, y, c * 0.34, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.35)';
+        g.beginPath(); g.arc(x - c * 0.1, y - c * 0.1, c * 0.07, 0, Math.PI * 2); g.fill();
+      }
+    },
+  },
   stone: { scale: 2, size: 256, draw: blocks('#8a8680', '#b0aca4', '#5a5650', '#3a3632', 4, 3) },
   hedge: { scale: 1, size: 256, draw: noiseTex('#2e5a22', ['#1e4216', '#3e7a2e', '#4a8a36', '#16300f'], 80, 0.7, 5) },
   pooltile: { scale: 1, size: 256, draw: slabs('#4aa8d0', '#9ad8f0', '#2a7aa0', '#e8f4f8', 8) },
@@ -1194,7 +1212,7 @@ function buildDecor(d, ctx) {
     case 'barrel': {
       obj = new THREE.Group();
       obj.position.set(...d.p);
-      obj.add(mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.05, 12), lam([0x2a5a8a, 0x8a3a2a, 0x3a6a3a][(Math.random() * 3) | 0]), 0, 0.53, 0));
+      obj.add(mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.05, 12), lam(d.color ? new THREE.Color(d.color).getHex() : [0x2a5a8a, 0x8a3a2a, 0x3a6a3a][(Math.random() * 3) | 0]), 0, 0.53, 0));
       obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), lam(0x222222), 0, 0.3, 0, false).rotateX(Math.PI / 2));
       obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), lam(0x222222), 0, 0.8, 0, false).rotateX(Math.PI / 2));
       break;
