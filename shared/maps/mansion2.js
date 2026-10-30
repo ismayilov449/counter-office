@@ -5,6 +5,7 @@
 //   - a back door from the kitchen (the north-west room) to the back of the house, weak, slow and loud
 //   - a wine cellar under the living room, down a stair from the kitchen through what was a walled-up closet
 //   - the house's fuse box in the cellar (blackout, see the fuse box in server.js)
+//   - a smugglers' tunnel from the cellar to a hatch in the shed's floor
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -12,7 +13,7 @@ const IN = 0.0254; // a texel, in metres
 // Painted textures for the new parts: name -> [painter (see world.js), texture size in texels]
 export const NEW_TEX = {
   x_concrete: ['concrete', 64], x_wood: ['wood', 40], x_shelf: ['shelf', 64], x_metal: ['metal', 40],
-  x_gravel: ['gravel', 80], x_wine: ['winerack', 40], x_deck: ['deck', 80], x_trim: ['trim', 40], x_stone: ['stone', 80],
+  x_gravel: ['gravel', 80], x_wine: ['winerack', 40], x_earth: ['rubble', 80], x_deck: ['deck', 80], x_trim: ['trim', 40], x_stone: ['stone', 80],
 };
 
 // ---- geometry: a solid is [x1, y1, z1, x2, y2, z2]; a face is a flat array [x, y, z, u, v, ...] whose first
@@ -80,9 +81,9 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   };
   const face = (t, axis, sign, at, lo, hi) => (faces[t] ||= []).push(quad(axis, sign, at, lo, hi, tex[t] || [64, 64]));
   // A solid box with its faces: `t` is one texture or { top, bottom, side, x, z } (x: the faces looking along x);
-  // skip: sides not drawn ('top', 'bottom', '-x', '+x', '-z', '+z').
-  const brush = (x1, y1, z1, x2, y2, z2, t, skip = []) => {
-    solids.push([x1, y1, z1, x2, y2, z2]);
+  // skip: sides not drawn ('top', 'bottom', '-x', '+x', '-z', '+z'); solid: false for something only drawn.
+  const brush = (x1, y1, z1, x2, y2, z2, t, skip = [], solid = true) => {
+    if (solid) solids.push([x1, y1, z1, x2, y2, z2]);
     const lo = [x1, y1, z1], hi = [x2, y2, z2];
     const pick = (name, axis) => (typeof t === 'string' ? t : t[name] || t[axis === 0 ? 'x' : axis === 2 ? 'z' : name] || t.side);
     for (const [axis, sign, name] of [[1, 1, 'top'], [1, -1, 'bottom'], [0, -1, '-x'], [0, 1, '+x'], [2, -1, '-z'], [2, 1, '+z']]) {
@@ -97,13 +98,15 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   // earlier one's), so connected rooms open into each other.
   const holes = [];
   const hollow = list => {
-    const T = 0.3;
+    const T = 0.3, shells = [];
     for (const h of list) {
       const [x1, y1, z1, x2, y2, z2] = h.box, open = h.open || [];
-      if (!open.includes('bottom')) solids.push([x1 - T, y1 - T, z1 - T, x2 + T, y1, z2 + T]);
-      if (!open.includes('top')) solids.push([x1 - T, y2, z1 - T, x2 + T, y2 + T, z2 + T]);
-      solids.push([x1 - T, y1, z1 - T, x1, y2, z2 + T], [x2, y1, z1 - T, x2 + T, y2, z2 + T], [x1, y1, z1 - T, x2, y2, z1], [x1, y1, z2, x2, y2, z2 + T]);
+      if (!open.includes('bottom')) shells.push([x1 - T, y1 - T, z1 - T, x2 + T, y1, z2 + T]);
+      if (!open.includes('top')) shells.push([x1 - T, y2, z1 - T, x2 + T, y2 + T, z2 + T]);
+      shells.push([x1 - T, y1, z1 - T, x1, y2, z2 + T], [x2, y1, z1 - T, x2 + T, y2, z2 + T], [x1, y1, z1 - T, x2, y2, z1], [x1, y1, z2, x2, y2, z2 + T]);
     }
+    // (a shell never reaches into a room dug earlier: that one may be furnished by now)
+    for (let s of shells) solids.push(...holes.reduce((acc, o) => acc.flatMap(b => minusBox(b, o.box)), [s]));
     for (const h of list) carve(...h.box);
     holes.push(...list);
     for (const h of list) {
@@ -177,6 +180,42 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     // the fuse box on the north wall, by the barrels: its lever cuts the power to the whole house
     decor.push({ type: 'fusebox', p: [-18.3, -0.95, -5.4], rot: 0 });
     rooms.push({ group: 'cellar', power: true, amb: 0.32, min: [-22.95, -2.3, -9.8], max: [-13.25, 0.6, 4.55] });
+  }
+
+  // ---------------------------------------------------------------- 8. the smugglers' tunnel
+  // From the cellar's south-east corner: a narrow dug passage (1.3 m wide, 2 m high, shored up with timber) east
+  // under the lawn, then south to under the shed, where a ladder goes up to a trapdoor in the shed's floor. The
+  // trapdoor creaks loudly when it opens. About 40 m.
+  {
+    const y1 = -2.2, y2 = -0.2;
+    const legs = [
+      [-14.8, y1, 4.4, -13.5, y2, 6.3], // out of the cellar
+      [-14.8, y1, 5.0, 14.8, y2, 6.3], // east under the lawn
+      [13.5, y1, 5.0, 14.8, y2, 16.8], // south to the shed
+    ];
+    const hatchAt = [13.6, 15.7, 14.7, 16.8], floorY = 0.2; // the shed's floor
+    carve(hatchAt[0], 0, hatchAt[1], hatchAt[2], floorY + 0.01, hatchAt[3]);
+    hollow([
+      ...legs.map(box => ({ box, floor: 'x_earth', ceil: 'x_wood', wall: 'x_earth' })),
+      { box: [hatchAt[0], y2 - 0.05, hatchAt[1], hatchAt[2], floorY, hatchAt[3]], floor: 'x_earth', ceil: 'x_wood', wall: 'x_wood', open: ['top', 'bottom'] },
+    ]);
+    // timber frames every 4 m: two posts and a beam (the posts don't catch anyone walking along the wall)
+    for (let x = -11; x < 13; x += 4) {
+      brush(x, y1, 5.0, x + 0.16, y2, 5.1, 'x_wood', ['bottom', 'top', '-z'], false);
+      brush(x, y1, 6.2, x + 0.16, y2, 6.3, 'x_wood', ['bottom', 'top', '+z'], false);
+      brush(x, y2 - 0.14, 5.1, x + 0.16, y2, 6.2, 'x_wood', ['top']);
+    }
+    for (let z = 8.5; z < 15; z += 4) {
+      brush(13.5, y1, z, 13.6, y2, z + 0.16, 'x_wood', ['bottom', 'top', '-x'], false);
+      brush(14.7, y1, z, 14.8, y2, z + 0.16, 'x_wood', ['bottom', 'top', '+x'], false);
+      brush(13.6, y2 - 0.14, z, 14.7, y2, z + 0.16, 'x_wood', ['top']);
+    }
+    for (const p of [[-10, 5.65], [0, 5.65], [10, 5.65]]) decor.push({ type: 'tunnel-lamp', p: [p[0], y2 - 0.2, p[1]] });
+    decor.push({ type: 'tunnel-lamp', p: [14.15, y2 - 0.2, 11] });
+    ladders.push([hatchAt[0], (hatchAt[1] + hatchAt[3]) / 2, [1, 0], y1, floorY + 0.95, 0.8]);
+    doors.push({ hatch: { min: [hatchAt[0], hatchAt[1]], max: [hatchAt[2], hatchAt[3]], y: floorY, side: '+x' }, hinge: [hatchAt[2], floorY, (hatchAt[1] + hatchAt[3]) / 2], tex: 'wood', slow: 0.9 });
+    rooms.push({ group: 'tunnel', amb: 0.4, min: [-14.85, -2.3, 4.45], max: [14.85, -0.15, 6.35] });
+    rooms.push({ group: 'tunnel', amb: 0.4, min: [13.45, -2.3, 6.35], max: [14.85, -0.15, 16.85] });
   }
 
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };

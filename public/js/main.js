@@ -3055,7 +3055,7 @@ function updateHud(now) {
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
     else if (atFuseBox()) hint = game.lights.power === false ? (me.team === 'CT' ? 'Hold E to bring the power back (5 s)' : 'The power is off') : me.team === 'T' ? 'Hold E to cut the power to the house (3 s)' : 'The fuse box — the Terrorists can cut the power here';
     else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you (H to switch off)';
-    else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the door`;
+    else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the ${map.doors[door.i]?.hatch ? (map.doors[door.i].grate ? 'grate' : 'trapdoor') : 'door'}`;
     else if (!canDefuseHere() && sw) hint = `Press E to switch the lights ${game.lights[sw.group] === false ? 'on' : 'off'}`;
     else if (!canDefuseHere() && car && game.phase !== 'freeze') hint = !car.driver ? 'Press E to drive the car' : car.type === 'pickup' ? 'Press E to man the machine gun' : 'Press E to get in as a passenger';
     else if (ladderAt(map.ladders, me.p, PLAYER.height) && !me.onGround) hint = 'Ladder: look up/down + W to climb, Space to jump off';

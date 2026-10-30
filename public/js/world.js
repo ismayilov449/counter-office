@@ -1658,7 +1658,31 @@ export function buildWorld(scene, map, qualityName) {
   }
 
   // Swinging doors: a wooden leaf on a hinge pivot that turns towards its target angle.
+  // A hatch in the floor (Mansion): a plank lid (or an iron grate) hinged on one edge, swinging up to stand open.
+  const hatch = d => {
+    const { min: [x1, z1], max: [x2, z2], y, side } = d.hatch;
+    const alongX = side[1] === 'x', len = alongX ? x2 - x1 : z2 - z1, wid = alongX ? z2 - z1 : x2 - x1;
+    const pivot = new THREE.Group();
+    const s = side[0] === '-' ? 1 : -1; // the lid reaches from the hinge towards +s
+    pivot.position.set(alongX ? (s > 0 ? x1 : x2) : (x1 + x2) / 2, y - 0.04, alongX ? (z1 + z2) / 2 : (s > 0 ? z1 : z2));
+    const lid = new THREE.Group();
+    const mat = d.grate ? lam(0x3a3c3e) : lam(0xffffff, { map: material('wood').mat.map });
+    if (d.grate) {
+      for (let k = 0; k <= 6; k++) lid.add(mesh(new THREE.BoxGeometry(len, 0.05, 0.04), mat, (s * len) / 2, 0, -wid / 2 + (k * wid) / 6, false));
+      for (const k of [0.05, 0.5, 0.95]) lid.add(mesh(new THREE.BoxGeometry(0.05, 0.06, wid), mat, s * len * k, 0, 0, false));
+    } else {
+      lid.add(mesh(new THREE.BoxGeometry(len - 0.02, 0.07, wid - 0.02), mat, (s * len) / 2, 0, 0, false));
+      lid.add(mesh(new THREE.TorusGeometry(0.06, 0.012, 4, 10), lam(0x2a2a2a), s * (len - 0.15), 0.04, 0, false).rotateX(Math.PI / 2));
+    }
+    if (!alongX) lid.rotation.y = -Math.PI / 2; // local +x along world +z
+    pivot.add(lid);
+    group.add(pivot);
+    // open: the far edge goes up, about the hinge line
+    const key = alongX ? 'z' : 'x', open = alongX ? s * Math.PI / 2 : -s * Math.PI / 2;
+    return { d, pivot, target: 0, key, open };
+  };
   const doors = (map.doors || []).map(d => {
+    if (d.hatch) return hatch(d);
     const pivot = new THREE.Group();
     pivot.position.set(...d.hinge);
     const leafMat = lam(0xffffff, { map: material(d.tex || 'door1').mat.map });
@@ -1728,6 +1752,7 @@ export function buildWorld(scene, map, qualityName) {
   function setDoors(states) {
     doors.forEach((o, i) => {
       o.pivot.visible = states?.[i] !== 9; // blown off
+      if (o.key) { o.target = states?.[i] && states[i] !== 9 ? o.open : 0; return; }
       const a = doorAngle(o.d, states?.[i] === 9 ? 0 : states?.[i] || 0);
       o.target = o.pivot.rotation.y + Math.atan2(Math.sin(a - o.pivot.rotation.y), Math.cos(a - o.pivot.rotation.y));
     });
@@ -1772,8 +1797,8 @@ export function buildWorld(scene, map, qualityName) {
       for (const fn of animated) fn(t, dt);
       if (pool.length && t >= pickAt) { pickAt = t + 0.1; lightNearest(camPos); }
       for (const o of doors) {
-        const diff = o.target - o.pivot.rotation.y;
-        o.pivot.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), dt * (o.d.slow ? 1.6 / o.d.slow : 4.5));
+        const k = o.key || 'y', diff = o.target - o.pivot.rotation[k];
+        o.pivot.rotation[k] += Math.sign(diff) * Math.min(Math.abs(diff), dt * (o.d.slow ? 1.6 / o.d.slow : 4.5));
       }
       if (clouds) {
         clouds.material.map.offset.x += dt * 0.004;

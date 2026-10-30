@@ -129,6 +129,10 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - **Wine cellar** under the living room: the walled-up closet off the kitchen (by the doorway to the hall) is open
     now, and a steep wooden stair goes down into a low stone cellar with wine racks, barrels and a table, lit by one
     bulb (its switch is at the foot of the stairs). The ground floor above it never breaks.
+  - **Smugglers' tunnel** from the cellar to the **shed**: a low opening in the cellar's south-east corner leads
+    into a narrow timber-shored passage (about 40 m) east under the lawn and south to below the shed, where a ladder
+    goes up to a **trapdoor** in the shed's floor. **E** opens it (from the ladder or from above); it creaks open
+    loudly and slowly, and won't close on someone's head.
   - **Blackout**: the house's **fuse box** hangs in the cellar, a big red lever on it. A Terrorist **holds E for
     3 seconds** to cut the power: every light in the house (and the cellar) goes out at once — truly dark, only
     flashlights (**F**), nightvision (**N**), muzzle flashes, explosions and fire light the rooms — and everyone
