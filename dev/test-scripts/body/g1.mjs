@@ -17,7 +17,20 @@ const P = (x, y, z) => [x + OFF[0], y, z + OFF[1]];
 const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if (!cond) process.exitCode = 1; };
 const until = async (cond, ms = 3000) => { for (let i = 0; i < ms / 50; i++) { if (await cond()) return true; await sleep(50); } return !!(await cond()); };
 const KEEP = ['msg', 'round', 'bodyDown', 'bodyUp', 'bodyKill', 'bodyPlayDead', 'kill', 'spawn'];
+// the page size (VIEW=WxH, default 960x540: lighter on the PC than game.mjs's 1280x720)
+const [VW, VH] = (process.env.VIEW || '960x540').split('x').map(Number);
+// (and on a cold page the team buttons are still disabled when game.mjs clicks one: click again until we're in)
+const view = async (g, team) => {
+  for (let i = 0; i < 60 && !(await g.ev("document.getElementById('join').classList.contains('hidden')")); i++) {
+    await g.ev(`(b => { if (b && !b.disabled) b.click(); })(document.querySelector('#join .team-btn[data-team="${team}"]')), 1`);
+    await sleep(500);
+  }
+  await sleep(1000);
+  await g.ev("Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => document.querySelector('#game canvas') }); document.dispatchEvent(new Event('pointerlockchange')); document.getElementById('paused').classList.add('hidden'); 'ok'");
+  await g.cmd('Emulation.setDeviceMetricsOverride', { width: VW, height: VH, deviceScaleFactor: 1, mobile: false });
+};
 let g = await open('T', 'Tester', KEEP);
+await view(g, 'T');
 let { tp, key, keyDown, keyUp, shot, msgs, errors, ev, send, look } = g;
 const C1 = await player('Charlie', 'CT'), M = await player('Mate', 'T'), C2 = await player('Cathy', 'CT');
 for (const c of [C1, M, C2]) { c.on.s = m => { c.snap = m; }; c.on.roster = m => { c.roster = m.list; }; }
@@ -43,9 +56,16 @@ M.at(P(20, 0, -30), 0); C1.at(P(20, 0, -24), Math.PI); C2.at(P(8, 0, -22), 0);
 await tp(P(16, 0, -30), -Math.PI / 2, -0.12); await sleep(800);
 for (let i = 0; i < 12 && !M.got('bodyDown').length; i++) await shoot(C1, P(20, 1.2, -30));
 ok('Mate is down', M.got('bodyDown').some(m => m.v === mate));
-for (let i = 1; i <= 8; i++) { M.at(P(20 + i * 0.08, 0, -30), -Math.PI / 2); await sleep(100); } // crawling towards us
+for (let i = 1; i <= 8; i++) { M.at(P(20 + i * 0.08, 0, -30), -Math.PI / 2); await sleep(100); } // crawling (away from us, head first)
 await sleep(600);
 await shot('g1_mate_down.png');
+ok(`aiming over him (where he would stand) shows no name ("${await text('target-name')}")`, (await text('target-name')) === '');
+await tp(P(20.64, 0, -27), 0, Math.atan2(0.2 - EYE, 3)); await sleep(700); // from his side, aiming at his belly
+ok(`3 m away, aiming at him: his name tag over him, no second name under the crosshair ("${await text('target-name')}")`, (await text('target-name')) === '');
+await shot('g1_mate_down_side.png');
+await tp(P(20.64, 0, -28.2), 0, Math.atan2(0.2 - EYE, 1.8)); await sleep(700); // closer: the tag has faded
+ok(`1.8 m away, aiming at him where he lies shows his name ("${await text('target-name')}")`, /Mate/.test(await text('target-name')));
+await shot('g1_mate_down_near.png');
 await tp(P(21.3, 0, -30), Math.PI / 2, -0.6); await sleep(700);
 ok(`the revive hint (${await text('hint')})`, /Hold E to revive Mate/.test(await text('hint')));
 await shot('g1_revive_hint.png');
@@ -67,9 +87,14 @@ ok(`only the pistol (${row(M, me)?.[7]})`, row(M, me)?.[7] === 'glock');
 await key('Digit1'); await sleep(600);
 ok(`1 doesn't take out the AK (${row(M, me)?.[7]})`, row(M, me)?.[7] === 'glock');
 const p0 = row(M, me).slice(1, 4);
-await keyDown('KeyW'); await sleep(2000); await keyUp('KeyW'); await sleep(400);
+// (headless, the page draws a few frames a second and main.js caps a frame's step at 0.05 s, so the game runs slower
+// than the clock: the crawl is measured against the game's own time, summed here the same way)
+await ev("window.__gt = 0; window.__gtN = 0; window.__gtOn = true; (function f(t0) { requestAnimationFrame(t => { if (!window.__gtOn) return; window.__gt += Math.min(0.05, (t - t0) / 1000); window.__gtN++; f(t); }); })(performance.now()), 1");
+await keyDown('KeyW'); await sleep(3000); await keyUp('KeyW');
+const gt = await ev('window.__gtOn = false, window.__gt'), fps = (await ev('window.__gtN')) / 3;
+await sleep(500);
 const p1 = row(M, me).slice(1, 4), moved = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]);
-ok(`crawling: ${moved.toFixed(2)} m in 2 s, crouched (${row(M, me)?.[6]})`, moved > 1.1 && moved < 2.6 && row(M, me)?.[6] === 1);
+ok(`crawling: ${moved.toFixed(2)} m in ${gt.toFixed(2)} s of game time (${fps.toFixed(1)} fps) = ${(moved / gt).toFixed(2)} m/s, crouched (${row(M, me)?.[6]})`, moved / gt > 0.7 && moved / gt < 1.15 && row(M, me)?.[6] === 1);
 await shot('g1_crawled.png');
 M.at([p1[0] + 0.6, 0, p1[2]], Math.PI / 2); await sleep(500);
 M.use(true);
@@ -91,9 +116,13 @@ ok('playing dead (bodyPlayDead)', await has(m => m.t === 'bodyPlayDead' && m.v =
 ok('the CTs got a kill message', C2.got('kill').some(m => m.v === me));
 ok(`eyes half closed (opacity ${await ev("document.getElementById('bd-eyes').style.opacity")})`, +(await ev("document.getElementById('bd-eyes').style.opacity")) > 0.9);
 await shot('g1_playdead.png');
-await keyDown('KeyW'); await sleep(300); await keyUp('KeyW'); await sleep(250);
-ok('moving gets you up', await has(m => m.t === 'bodyUp' && m.v === me && m.pd === 1));
+await keyDown('KeyW'); await sleep(200); await keyUp('KeyW');
+// getting up takes 1 s: the eyes overlay fades over it (read straight away: a headless screenshot can take that long)
+const fade = [];
+for (let i = 0; i < 6; i++) { fade.push(+(await ev("document.getElementById('bd-eyes').style.opacity"))); await sleep(150); }
+ok(`getting up over a second (eyes overlay ${fade.join(' ')})`, fade.some(v => v > 0.1 && v < 0.95) && fade[fade.length - 1] < fade[0]);
 await shot('g1_rising.png');
+ok('moving gets you up', await has(m => m.t === 'bodyUp' && m.v === me && m.pd === 1));
 await sleep(1200);
 await shot('g1_up.png');
 
@@ -108,7 +137,11 @@ console.log('errors (part 1):', errors.length ? errors.slice(0, 5).join('\n') : 
 
 // ---- part 2: the browser is a CT
 C2.close(); await sleep(300);
+// (close the page's connection first: the browser may keep the old page, socket open, in its back/forward cache, and
+// the server would keep "Tester" in the game)
+await ev('window.__ws?.close(), 1'); await sleep(800);
 g = await open('CT', 'Watcher', KEEP);
+await view(g, 'CT');
 ({ tp, key, keyDown, keyUp, shot, msgs, errors, ev, send, look } = g);
 seen = [];
 const Tom = await player('Tom', 'T');
@@ -130,10 +163,12 @@ await keyDown('Tab'); await sleep(400);
 ok('scoreboard: Mate dead', await ev("[...document.querySelectorAll('#scoreboard tr.dead')].some(r => r.textContent.includes('Mate'))"));
 await shot('g1_ct_scoreboard.png');
 await keyUp('Tab');
-M.send({ t: 'bodyPlayDead' }); await sleep(450);
+M.send({ t: 'bodyPlayDead' });
+// (shown for 3 s; headless screenshots are slow, so it's read before them)
+const told = await until(async () => /Mate was playing dead/.test(await text('small-msg')), 2500);
+ok(`"Mate was playing dead!" ("${await text('small-msg')}")`, told);
 await shot('g1_ct_rising.png');
-await sleep(1000);
-ok('"Mate was playing dead!"', /Mate was playing dead/.test(await ev("document.body.innerText")));
+await sleep(1500);
 await shot('g1_ct_up.png');
 console.log('errors (part 2):', errors.length ? errors.slice(0, 5).join('\n') : 'none');
 for (const c of [C1, M, Tom]) c.close();
