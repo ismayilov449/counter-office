@@ -22,7 +22,8 @@ let rooms = [];
 let glow = 0, glowGroups = null;
 
 // Night maps: how strongly a lit room glows (map.theme.roomGlow), and which rooms have lamps (the groups of the
-// map's light switches; a tunnel or a shed without one stays dark).
+// map's light switches, plus map.theme.glowRooms for lamps that are always on, like the tunnels'; a shed without
+// either stays dark).
 export function setGlow(k, groups) {
   glow = k || 0;
   glowGroups = groups || null;
@@ -87,8 +88,9 @@ uniform float uRoomAmb[ ${N} ];
   float roomAmb = 1.0;
   for ( int i = 0; i < ${N}; i ++ ) {
     if ( all( greaterThan( vRoomPos, uRoomMin[ i ] ) ) && all( lessThan( vRoomPos, uRoomMax[ i ] ) ) ) {
+      // (the first room sets it: starting from 1.0, min() would cap a lit room's GLOW + glow and it never glowed)
+      roomAmb = roomIn > 0.5 ? min( roomAmb, uRoomAmb[ i ] ) : uRoomAmb[ i ];
       roomIn = 1.0;
-      roomAmb = min( roomAmb, uRoomAmb[ i ] );
     }
   }
   float roomGlow = max( roomAmb - ${GLOW.toFixed(1)}, 0.0 );

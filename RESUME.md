@@ -218,7 +218,9 @@ firing the RPG-26. Both work.
   `light` decor (only the q.lamps nearest really shine). The estate's lamps are in light group `estate`, added to the
   night map's fuse-box groups: the blackout puts them out (their glows hide, their heads' shared material turns grey).
 - **Lit rooms:** roomlight.js got `setGlow(k, groups)`: on a night map a room whose lights are on (and whose group has a
-  switch) adds a warm light of strength k everywhere in it. It's encoded in the room's existing ambient value (2 + k), so
+  switch, or is in the theme's `glowRooms`: the tunnels, whose lamps are always on) adds a warm light of strength k
+  everywhere in it. (Fixed 2026-10-31: the shader's room loop started from 1.0, so min() capped the 2 + k and no room
+  ever glowed on screen. The tunnels were left lit only by point lights from lamps above ground, so one wall was black.) It's encoded in the room's existing ambient value (2 + k), so
   the per-pixel room loop is unchanged — a second uniform array in that loop cost ~8–10% of a frame on swiftshader. The
   few extra instructions after the loop are in every map's shaders: the day maps measured +1…+5% on swiftshader
   (alternating runs; on a real GPU it should be far less).
@@ -293,7 +295,10 @@ firing the RPG-26. Both work.
   - `carve`: cuts a box out of the original walls, floors and their faces.
   - `brush`: adds a solid box with its faces.
   - `reveal`: draws the inside edges of a doorway.
-  - `hollow`: digs out connected underground rooms with their own walls.
+  - `hollow`: digs out connected underground rooms with their own walls. A face is cut only where another room lies
+    behind it; where overlapping rooms share a wall (the corner of an L-shaped tunnel), the room dug first draws it.
+    Until 2026-10-31 both rooms cut it, so the tunnels' bends had holes (no end walls, floor or ceiling) you could
+    see out of. Check new underground rooms with `dev/test-scripts/mansion/walls.mjs` (no gaps, nothing twice).
 - **Doors** (`shared/doors.js`) can now be `slow`, `weak` (breakable by gunfire), or `hatch` lying in a floor (with `grate: true` for iron grates).
 - **Server:** added `slowOpen`, `shootDoor`, `mansionTick` (runs every tick when `MAP.mansion2` is set), `atFuseBox` and `setPower`.
 - **Blackout:** the power state is `game.lights.power`. In `roomlight.js`, house rooms marked `power: true` go nearly black,
@@ -372,6 +377,8 @@ For every step:
     or stop the headless Edge on 9333.
   - `mansion/game.mjs`: the real game in the headless Edge (join, fake pointer lock, `tp` to put the player anywhere, look,
     keys, clicks, screenshots, page errors). `mansion/loadmap.mjs`: load whatever map runs and screenshot it.
+  - `mansion/walls.mjs`: no server needed; samples every wall, floor and ceiling of the dug-out rooms (cellar, tunnels,
+    drain, shafts, pool) and lists spots with no face (holes you'd see out of) or two faces. Add new rooms to its list.
   - `mansion/views.mjs` + `viewer.js`: fixed views (and `viewTop` plans) with draw calls and triangles; `BENCH=n` times frames.
     `vcost.json` is the fixed set for frame cost. `meshes.mjs` lists the world's meshes (diff two runs).
   - `mansion/botsoak.mjs`: one scripted player for N seconds, so the bots play.

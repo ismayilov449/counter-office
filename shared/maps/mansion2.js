@@ -103,8 +103,9 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   };
   // Rooms dug out of the ground (cellar, tunnels, shafts): each is a box [x1, y1, z1, x2, y2, z2] with { floor, ceil,
   // wall } textures and `open` sides (no face, no shell). Its shell of solid stops anyone leaving, the level inside
-  // it is carved away, and its faces look inwards — except where it meets another dug-out room (this call's or an
-  // earlier one's), so connected rooms open into each other.
+  // it is carved away, and its faces look inwards — except where another dug-out room (this call's or an earlier
+  // one's) lies behind them, so connected rooms open into each other. Where two overlapping rooms share a wall (the
+  // corner of an L-shaped tunnel), it is drawn once, by the room dug first.
   const holes = [];
   const hollow = list => {
     const T = 0.3, shells = [];
@@ -122,8 +123,17 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
       const lo = h.box.slice(0, 3), hi = h.box.slice(3), open = h.open || [];
       for (const [axis, sign, name, t] of [[1, 1, 'bottom', h.floor], [1, -1, 'top', h.ceil], [0, 1, '-x', h.wall], [0, -1, '+x', h.wall], [2, 1, '-z', h.wall], [2, -1, '+z', h.wall]]) {
         if (open.includes(name)) continue;
-        let polys = [quad(axis, sign, sign > 0 ? lo[axis] : hi[axis], lo, hi, tex[t] || [64, 64])];
-        for (const o of holes) if (o !== h) polys = polys.flatMap(f => minusFace(f, o.box.map((v, k) => v + (k < 3 ? -0.01 : 0.01))));
+        const at = sign > 0 ? lo[axis] : hi[axis], back = at - sign * 0.01;
+        let polys = [quad(axis, sign, at, lo, hi, tex[t] || [64, 64])];
+        for (const o of holes) {
+          if (o === h) continue;
+          const behind = o.box[axis] < back && o.box[axis + 3] > back;
+          const shared = holes.indexOf(o) < holes.indexOf(h) && !(o.open || []).includes(name) && Math.abs(o.box[sign > 0 ? axis : axis + 3] - at) < 1e-4;
+          if (!behind && !shared) continue;
+          const c = o.box.slice();
+          c[axis] = at - 0.01; c[axis + 3] = at + 0.01;
+          polys = polys.flatMap(f => minusFace(f, c));
+        }
         (faces[t] ||= []).push(...polys);
       }
     }
@@ -169,14 +179,14 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     // 15 steps down, 0.2 m each, 0.33 m deep: steep enough to pass under the closet's south wall standing up
     for (let i = 0; i < 14; i++) {
       const top = 0.81 - (0.81 + 2.2) * (i + 1) / 15, z = -9.75 + 0.33 * i;
-      brush(-15.54, -2.2, z, -13.31, top, z + 0.33, { top: 'x_wood', side: 'x_wood', x: stone }, ['bottom', '-z', '+x']);
+      brush(-15.54, -2.2, z, -13.31, top, z + 0.33, { top: 'x_wood', side: 'x_wood', x: stone }, ['bottom', '-z', '-x', '+x']);
     }
     // wine racks along the west and south walls, a table, beams under the ceiling
     for (const [z1, z2] of [[-5.3, -2.6], [-1.6, 1.1], [2.0, 4.3]]) brush(-22.9, -2.2, z1, -22.35, -0.1, z2, 'x_wine', ['bottom', '-x']);
     for (const [x1, x2] of [[-21.9, -19.6], [-18.6, -16.4]]) brush(x1, -2.2, 3.95, x2, -0.1, 4.5, 'x_wine', ['bottom', '+z']);
     brush(-18.2, -1.45, -1.3, -16.9, -1.38, -0.2, 'x_wood', []);
     for (const [x, z] of [[-18.1, -1.2], [-17.0, -1.2], [-18.1, -0.3], [-17.0, -0.3]]) brush(x - 0.04, -2.2, z - 0.04, x + 0.04, -1.45, z + 0.04, 'x_wood', ['bottom']);
-    for (const x of [-20.6, -17.6]) brush(x, 0.36, -5.49, x + 0.25, 0.61, 4.5, 'x_wood', ['top']);
+    for (const x of [-20.6, -17.6]) brush(x, 0.36, -5.49, x + 0.25, 0.61, 4.5, 'x_wood', ['top', '-z', '+z']);
     // barrels: a stack by the stairs and a row along the north wall (each a solid under the drawn barrel)
     for (const [x, z] of [[-20.9, -4.9], [-20.2, -4.9], [-19.5, -4.9], [-16.2, -3.6], [-16.2, -2.9], [-20.0, 1.0], [-19.4, 1.5]]) {
       solids.push([x - 0.3, -2.2, z - 0.3, x + 0.3, -1.15, z + 0.3]);

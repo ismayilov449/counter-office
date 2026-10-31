@@ -182,7 +182,8 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - **Streetlights** along the street, lamp posts on the fountain path and by the pool, lanterns at the gate, the front
     door, the kitchen's back door, the garage, the neighbour's door and in the gazebo.
   - **Lit windows:** a room whose lights are on glows warm all through, so you see it lit from outside (and see who's
-    in it). Switch a room's lights off and it goes dark; dark rooms hide you.
+    in it). Switch a room's lights off and it goes dark; dark rooms hide you. The tunnels' lamps are always on, so
+    the smugglers' tunnel, the storm drain and the water tunnel are lit too.
   - **Blackout at night:** cutting the power at the fuse box puts out the house *and* the estate's own lamps (fountain
     path, gate, doors, garden); only the street and the neighbour's house stay lit, and the moon. Flashlights (**F**)
     and nightvision (**N**) matter here.

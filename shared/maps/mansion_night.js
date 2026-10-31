@@ -56,6 +56,7 @@ export default {
     hemi: { sky: '#40528a', ground: '#1c1c24', intensity: 1.15 },
     exposure: 1.25, clouds: 0.3, cloudColor: '#283050', particles: 'fireflies', stars: true,
     roomGlow: 1.1, // a lit room's warm light (see roomlight.js)
+    glowRooms: ['tunnel'], // rooms with no switch whose lamps are always on (the tunnels): they glow too
     litGlass: '#a87430', // a lit room's windows
     viewmodel: 0.45, // your own weapon outdoors (it has its own lights)
   },

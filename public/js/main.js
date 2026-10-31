@@ -109,7 +109,7 @@ function loadMap(id) {
   game.broken = [];
   game.brk = new Set();
   game.doors = [];
-  setGlow(map.theme.roomGlow, new Set((map.switches || []).map(s => s.group)));
+  setGlow(map.theme.roomGlow, new Set([...(map.switches || []).map(s => s.group), ...(map.theme.glowRooms || [])]));
   setRooms(map.rooms, game.lights);
   buildCars();
   clearHostages();

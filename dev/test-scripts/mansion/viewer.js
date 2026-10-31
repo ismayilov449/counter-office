@@ -25,7 +25,7 @@
   const t0 = performance.now();
   const world = buildWorld(scene, map, window.VIEW_Q || 'medium');
   window.buildMs = performance.now() - t0;
-  setGlow(map.theme.roomGlow, new Set((map.switches || []).map(s => s.group)));
+  setGlow(map.theme.roomGlow, new Set([...(map.switches || []).map(s => s.group), ...(map.theme.glowRooms || [])]));
   setRooms(map.rooms, {});
   window.viewWorld = world;
   let cam = camera;
