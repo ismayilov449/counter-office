@@ -8,6 +8,7 @@ import { createBuilder } from './builder.js';
 import * as BSP from './cs_mansion_bsp.js';
 import { breakUp } from './breakables.js';
 import { remodel, NEW_TEX } from './mansion2.js';
+import { moveSwitches } from './mansion_elevator.js'; // elevator
 
 const m = createBuilder();
 
@@ -152,6 +153,7 @@ const SWITCHES = BSP.BUTTONS.filter(b => /^lampa/.test(b.target)).map(b => {
   const n = free(1) ? 1 : -1;
   return { group: b.target, p: c, rot: thinX ? Math.atan2(n, 0) : Math.atan2(0, n) };
 });
+moveSwitches(SWITCHES, RM.elevator); // elevator: the living room's switch was where the lift's shaft is
 
 // ---- water: the fountain and the tunnel
 for (const w of BSP.WATER) m.add({ type: 'water', min: [w[0], w[2]], max: [w[3], w[5]], y: w[4], color: w[4] > 0 ? '#3a7a90' : '#2e4a3a', murky: w[4] < 0 });
@@ -222,6 +224,7 @@ export default {
   zip: RM.zip,
   // CCTV: four cameras and the security desk with their monitors (see mansion2.js and shared/gadgets.js).
   cctv: RM.cctv,
+  elevator: RM.elevator, // elevator: the lift (see mansion_elevator.js and shared/elevator.js)
   theme: {
     skyTop: '#3f7fc4', skyHorizon: '#cfe0ec', fog: ['#d8e2e8', 90, 300],
     sun: { color: '#fff4e2', intensity: 2.8, dir: [35, 75, 25] },
