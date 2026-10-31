@@ -1,8 +1,9 @@
 # Hostages that make it out (fix, branch `fix/hostages`)
 
-## STATUS
+## STATUS (2026-11-01: fixed and tested server side; browser-tested on both Mansion maps)
 - **Fixed (server side), mansion first.** `lib/hostages.js` (the following), two small changes in `lib/nav.js` (the
-  route a bot takes when it leads a hostage), tests in `dev/test-scripts/hostages/`, this doc. No browser code changed.
+  route a bot takes when it leads a hostage), tests in `dev/test-scripts/hostages/` (the browser test `g-hostages.mjs`
+  too), this doc. No browser code changed.
 - **What was wrong.** On cs_mansion no hostage led by a CT ever reached the street: each one lost track at the same
   spot — the two downstairs ones on the front door's jamb (-6.8, 0.8, -2.3), the two upstairs ones on the corner of the
   upstairs doorway at (-13.7, 4.3, 8.2). Same on `main`. Causes:
@@ -50,14 +51,25 @@
     (see "Known, not fixed").
   - The server starts on all 7 maps (2 bots a side, a scripted player in for 12 s each): no errors.
   - Cost: 168 µs per tick for 4 following hostages against 144 µs on `main` (offline bench), i.e. +0.1% of a tick.
-- **Browser checks still to do** (none run, the user's rule until every agent is done):
-  - Lead each of the 4 mansion hostages out by hand (and on cs_mansion_night): through the upstairs doorway at x -13,
-    down the stairs, out of the front door with the door swung either way, cutting corners on purpose; the hostage
-    should round jambs without a visible hitch (a short side-step at most) and never "lose track".
-  - Lead one through the cellar (down the closet stairs and back up): it shouldn't vanish (the old 9 m jump).
-  - Watch a bot lead a hostage on cs_mansion: it should take the stairs, not the gallery edge or a ladder.
-  - cs_assault: lead one out of the office (down the drop the route needs).
-  - The hostage's animation while side-stepping: it keeps facing the breadcrumb, so it may look like a short sidestep.
+- **Browser-verified (2026-11-01, `g-hostages.mjs`, headless Edge + swiftshader at 640x360 (~10 fps), server with
+  `BOTS=0 ROUND_TIME=900`; every screenshot looked at):** the real game as a CT (the page's own position reports, its
+  E, its hints) leading all 4 hostages out, on **cs_mansion 4/4** and **cs_mansion_night 4/4**, no page errors:
+  - hostage 1 (upstairs) through the upstairs doorway at x -13, down the stairs, out of the front door swung **out**,
+    to the street (35 s); hostage 0 (upstairs) the same way with the front door swung **in** (34 s);
+  - hostage 3 down the closet stairs into the cellar (to y -2.2), back up and out (48 s): no vanishing, no jump;
+  - hostage 2 (ground floor) straight out (34 s).
+  - On screen: it follows round the upstairs doorway's corner and past the front door's jamb and leaf (both swings)
+    without a visible hitch; no side-step jerk or stall shows (the corners take 0.8-1.7 s within 1.5 m of the spot where
+    it used to get stuck, i.e. walking past). Its track from the snapshots: never faster than 5.0 m/s across the floor
+    (top speed 5.8), nothing like the old 9 m jump. The hints: "Press E to lead the hostage to the street" by it, "Press
+    E to tell the hostage to wait" while it follows.
+  - No code change was needed. `g-hostages.mjs` walks rescue.mjs's routes (`sim.mjs` helpers) facing back at the
+    hostage (or, with a wall between, the way it came 3 m back) and screenshots every 3 s, every 0.6 s near the two old
+    sticking corners. At 1280x720 headless Edge draws ~2 frames a second (the page would report its position every
+    1.25 m, harder than the real game), hence 640x360.
+- **Not browser-checked (not asked for this pass / by hand):** a bot leading a hostage on cs_mansion (stairs, not the
+  gallery edge or a ladder: the server-side `botsoak.mjs` covers it); cs_assault's office drop (the user doesn't want
+  effort on cs_assault); leading by hand at a real frame rate on a laptop, cutting corners on purpose.
 
 ## README
 Visible change is small (hostages no longer get stuck on door frames). If wanted, in the bots' paragraph, replace
@@ -78,11 +90,16 @@ get through or climb, and by the stairs rather than off a ledge)". In cs_mansion
     `HOSTAGES_LIB=path` to run another version of lib/hostages.js, e.g. main's, for comparison). Its routes: the bots'
     grid with the open door leaves as walls and no ladders/jumps (drops with `DROPS=1`), smoothed like a bot's.
   - `botsoak.mjs` — live with `BOTS=4`: how often bots led a hostage, rescues, kills, round results.
+  - `g-hostages.mjs` — the browser: server as for `rescue.mjs` (cs_mansion or cs_mansion_night), a headless Edge on
+    `CDP_PORT` (see `dev/test-scripts/mansion/game.mjs`), then `GAME_PORT=4100 CDP_PORT=9500 node
+    dev/test-scripts/hostages/g-hostages.mjs` (`WALK=`, `PREFIX=`, screenshots in `OUT`). Four hostages, ~3.5 min.
 - **Known, not fixed (bots, not hostages):** on cs_mansion the CT bots' way *to* the hostages often goes down the storm
   drain by the street (ladder 3, under hatch 3 at (14, 0.2, 16)) and they get stuck at its top, climbing up and down
   under the hatch for the rest of the round; that is why bots still rarely rescue anyone. Bots don't wait for a hostage
   that falls behind (it follows at up to 5.8 m/s, a bot runs ~6.3; beyond 30 m it loses track). The bots' rescue goal is
-  any spot in the rescue rectangle, the tunnel under the street included (it counts: `inRescueZone` is 2D).
+  any spot in the rescue rectangle, the tunnel under the street included (it counts: `inRescueZone` is 2D). E on a
+hostage is a 3D distance (2.2 m) with no line of sight: a CT on the other side of a wall can lead one (seen while
+testing the lift branch, where a CT riding past the upper floor could lead the hostage standing by the shaft).
 - **Test-only caveats:** nav paths keep only 0.12 m off walls, so the scripted CT walks closer to jambs than a real
   player can (harder than the real game). The tour uses spots below y 6 (no roofs). The scripted CT is teleported
   along the route (the server trusts a test player's position), so it never collides with anything itself.
