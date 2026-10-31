@@ -1,11 +1,12 @@
 # RESUME POINT — Counter-Office feature plan (stopped 2026-10-30, finished 2026-10-31 on the new PC)
 
-**To continue:** check out branch `resume/2026-10-30` and tell Claude Code:
-*"Read RESUME.md and continue the plan from the resume point."*
+**To continue:** work on `main` and tell Claude Code:
+*"Read RESUME.md and continue from the resume point."*
 
-Work stopped because the old laptop was too slow to run three agents and their test browsers at once. Everything
-done so far is on the branch `resume/2026-10-30`, which is `main` plus both feature branches, merged and tested
-together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons` and `feature/mansion` are kept as backups.
+Work stopped because the old laptop was too slow to run three agents and their test browsers at once. It went on
+on the branch `resume/2026-10-30` (`main` plus both feature branches, merged and tested together), and on 2026-10-31
+the user had that branch merged into `main` (a fast-forward). So `main` has everything now; the branches
+`resume/2026-10-30`, `feature/t-weapons` and `feature/mansion` are kept as backups.
 
 ---
 
@@ -354,8 +355,7 @@ For every step:
 
 - **Commits:** after each feature, commit **and push**, ending the message with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never force-push or amend pushed commits.
-- **Branches:** keep working on `resume/2026-10-30`, or merge it into `main` first if the user agrees (it's a fast-forward of main
-  plus the two merges). Ask the user which they prefer.
+- **Branches:** work on `main` (the resume branch was merged into it on 2026-10-31 at the user's request).
 - **Real data:** never touch the real `data/` folder (stats, admin password, settings, `join-page.txt`). Test with a separate
   `DATA_DIR`.
 - **Edge:** never kill all Edge processes; the user browses with Edge. Stop only the headless test Edge, **by its command line**.
