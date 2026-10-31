@@ -1,5 +1,19 @@
 # Disguise
 
+## STATUS
+- **Done:** server, client and shared code; all hooks; server-side tests passing (`unit.mjs`, `clientsmoke.mjs`,
+  `t1.mjs` 64 checks, `t2.mjs`, `t3.mjs`, `soak.mjs` / BOTS=4 with no server errors).
+- **Not done:** no browser test was run (user rule: no Edge). `g1.mjs` is written but never run; no screenshots taken.
+- **Next steps (architect):** run `g1.mjs` (needs a server with `MAP=aim_map BOTS=0 FREEZE_TIME=1`, `GAME_PORT`,
+  `CDP_PORT`) and look at `dg_*.png`: the wearer's hint / progress bar / badge / T sleeves, "DISGUISE BLOWN"; a
+  teammate's view (own model, name, mask marker over the head); the enemy's view (a T named "Bob", aim name "Bob"),
+  "IMPOSTOR: Alice", then her real model and name; no page errors. Also check the sounds by ear. Then wire `p.downed` /
+  `p.playingDead` from the other branches (see "Interactions for integration").
+- **Tests:** `dev/test-scripts/disguise/`: `unit.mjs` and `clientsmoke.mjs` (plain node; the latter with
+  `--import ./dev/test-scripts/disguise/register.mjs`), and through `SP=<temp> bash run.sh <test> ENV...`:
+  `t1.mjs` (MAP=aim_map BOTS=0 START_MONEY=16000 FREEZE_TIME=1), `t2.mjs` (MAP=de_dust2 BOTS=0 FREEZE_TIME=1),
+  `t3.mjs` (MAP=aim_map BOTS=2 FREEZE_TIME=1 AUTO_BALANCE=0 ROUND_TIME=60), `soak.mjs` (MAP=de_dust2 BOTS=4 SECS=120).
+
 ## (a) README
 
 - **Disguise** (classic matches, in a live round — not in warmup, Deathmatch, Gun Game, Zombie or Hide and Seek):
@@ -113,10 +127,11 @@
 - `t2.mjs` (de_dust2): a T in a CT's uniform, the CT's snapshot and radar, planting breaks it (the plant goes on).
 - `t3.mjs` (aim_map, BOTS=2): a T bot with the disguised CT 6 m in front of it, in sight, holds fire for 6 s; after
   a shot it fires at her.
-- `g1.mjs` (headless Edge): the wearer's hint, crouched hint, progress bar, badge, sleeves, "DISGUISE BLOWN"; the
-  teammate's view (name, mask); the enemy's view (a T named "Bob", the aim name "Bob" in T colour), the reveal
-  ("IMPOSTOR: Alice") and her real name back; no page errors. Screenshots looked at.
-- The server starts with every map; 60 s with BOTS=4: no server errors.
+- `clientsmoke.mjs` (public/js/disguise.js in Node with a fake DOM and WebAudio, real three.js): hints, markers,
+  badge, view-model look, the body smoothing, `watchable`, every message handler and its sounds — no errors.
+- `soak.mjs` + `mansion/botsoak.mjs` (de_dust2, BOTS=4, 60–120 s, the soak player taking bot uniforms): no server
+  errors; the server log lists all 7 maps.
+- **Not run:** `g1.mjs` (headless Edge) — written for the architect; see STATUS.
 
 ### Not verified / known gaps
 - The sounds by ear (rustle, sting, zip): only that they play without errors.

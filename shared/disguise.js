@@ -23,7 +23,7 @@ export const DISGUISE_WHY = {
   near: 'an enemy saw you up close',
   hurt: 'an enemy hit you',
   downed: 'you went down',
-  gone: 'the dead player is back',
+  gone: 'its owner is back on his feet or has left',
 };
 
 // For the enemies who see through it: how they found out.
