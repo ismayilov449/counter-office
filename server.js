@@ -2376,6 +2376,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
 function onMortar(p, m) {
   const t = now(), def = WEAPONS.mortar;
   if (!p.alive || game.phase === 'freeze' || p.w !== 'mortar' || busy(p)) return;
+  if (bleed.busy(p)) return; // blood trails: no firing while bandaging
   const item = ownItem(p, 'mortar');
   if (!item || item.mag <= 0 || t - p.lastShot < def.rate * 1000 * 0.9) return;
   if (!isNum(m.b) || !isNum(m.e) || m.e < def.elev[0] - 1 || m.e > def.elev[1] + 1) return;

@@ -172,12 +172,16 @@ export class BloodTrails {
     for (const b of this.bleeders.values()) b.last = null;
   }
 
-  // The floor under (x, y, z) (y: the feet): { y, n } or null (nothing within reach, or water).
+  // The floor under (x, y, z) (y: the feet): { y, n } or null (nothing within reach, or water). The drawn face near
+  // the collision's top wins: up to 0.3 m over it (a slope drawn above its steps, a roof) or 0.2 m under it (a slope
+  // drawn below its steps; on the Mansion, the living room's collision over the cellar, 0.1 m above the drawn floor).
+  // A face lower than that is under something the faces don't draw (the gazebo's floor, a decor model 0.25 m up):
+  // then the collision's top is the floor.
   floor(x, y, z) {
     const h = this.coll.raycast([x, y + 0.5, z], [0, -1, 0], 2.3, 'solid');
     let fy = h && h.n[1] > 0 ? y + 0.5 - h.t : null, n = UP;
     if (this.index) {
-      const f = faceFloor(this.index, x, z, fy != null ? fy - 0.3 : y - 1.8, fy != null ? fy + 0.3 : y + 0.5);
+      const f = faceFloor(this.index, x, z, fy != null ? fy - 0.2 : y - 1.8, fy != null ? fy + 0.3 : y + 0.5);
       if (f) { fy = f.y; n = f.n; }
     }
     if (fy == null || inWater(this.map.water, [x, fy + 0.05, z])) return null;
@@ -328,6 +332,9 @@ export class BloodTrails {
     this.fill = this.bar.lastChild.firstChild;
     document.getElementById('hud')?.appendChild(this.bar);
     this.hudKey = null;
+    // the key in the Esc menu's controls list
+    const keys = document.querySelector?.('.controls');
+    if (keys) { const d = document.createElement('div'); d.innerHTML = '<kbd>P</kbd> bandage (when bleeding)'; keys.appendChild(d); }
   }
 
   updateHud(now) {
