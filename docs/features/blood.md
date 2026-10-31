@@ -7,8 +7,13 @@
   the server starts on all 7 maps.
 - **Tested on the Mansion only** (cs_mansion and cs_mansion_night), as the user asked. On the other maps the same code
   runs (the drops find the floor the same way), but nothing was tuned or checked there beyond the server starting.
-- **Not done:** no browser test was run (user rule: no Edge until every agent has finished). `gblood.mjs` is written
-  and ready, never run; no screenshots.
+- **Browser test, first run (paused, cs_mansion + cs_mansion_night, ports 4020/9420):** `gblood.mjs` ran once: all
+  checks pass except the draw-call one (+6.1 measured; too noisy at 7.5 fps on swiftshader, the measurement needs
+  fixing, not the drops: they are one `InstancedMesh`). No page errors. Screenshots looked at: the cap (600 drops on
+  the street, read as blood), the street trail (visible, small), the BLEEDING badge and the "press P" message. Being
+  looked into: in `gb_stairs.png` the drops on the cellar steps are not visible (their positions are on the steps).
+  Still to look at: the bandaging bar, the own trail, the night roof and street, the Esc menu's P line, the first
+  drop freeze, frame time with many drops (`views.mjs`).
 - **Next steps (architect):**
   1. Start the server: `GAME_PORT=4020 bash dev/test-scripts/blood/up.sh MAP=cs_mansion BOTS=0`, a headless Edge on
      9420, then `GAME_PORT=4020 CDP_PORT=9420 node dev/test-scripts/blood/gblood.mjs`. Look at `gb_*.png` in `OUT`.
