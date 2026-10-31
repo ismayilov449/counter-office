@@ -383,7 +383,7 @@ function localTrace(o, d, range) {
   let t = wall ? wall.t : range, hitR = null;
   for (const r of remotes.values()) {
     if (!r.alive || (!game.cfg.friendlyFire && isMate(r))) continue;
-    const h = rayPlayer(o, d, r.p, r.c, t, bigHeads());
+    const h = body.lying(r) ? body.ray(r, o, d, t) : rayPlayer(o, d, r.p, r.c, t, bigHeads()); // body: lying on the floor
     if (h) { t = h.t; hitR = r; }
   }
   for (const hs of hostages.values()) {
@@ -3597,7 +3597,7 @@ function updateHud(now) {
     let best = wall ? wall.t : 120;
     for (const r of remotes.values()) {
       if (!r.alive) continue;
-      const h = rayPlayer(o, d, r.p, r.c, best, bigHeads());
+      const h = body.lying(r) ? body.ray(r, o, d, best) : rayPlayer(o, d, r.p, r.c, best, bigHeads()); // body: lying on the floor
       if (h) { best = h.t; target = r; }
     }
   }

@@ -4,7 +4,7 @@
 // The snapshot's "bd": { d: [[id, bleed left 0..1, revive 0..1, reviver]] (everyone down; the numbers only for our own
 // team), u: [[id, 0..1]] (getting up from playing dead), p: [[id, fake killer]] (our team playing dead) }.
 // The server says a teammate playing dead is dead (snapshot, roster, team bar) to everyone; we undo that for our team.
-import { BODY } from '/shared/body.js';
+import { BODY, rayLying } from '/shared/body.js';
 
 let A = null; // what main.js hands over (initBody)
 const st = {
@@ -19,6 +19,8 @@ const st = {
   rise: new Map(), // id -> when they started getting up from playing dead
   upAt: new Map(), // id -> when they were revived (crawling -> standing)
   tag: new Map(), // victim id -> 'finished' | 'bled', for the kill message that follows
+  cam: null, // the camera (body.camera), for how close a body on the floor is
+  tagged: new Set(), // names of teammates on the floor whose name tag shows (no second name under the crosshair)
 };
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ControlLeft', 'ControlRight'];
 const TAG_Y = 2.15; // (createNameTag)
@@ -183,7 +185,11 @@ function reviveTarget() {
 }
 
 function wrapHud() {
-  const hud = A.hud, hint0 = hud.hint, progress0 = hud.progress, radar0 = hud.radar;
+  const hud = A.hud, hint0 = hud.hint, progress0 = hud.progress, radar0 = hud.radar, targetName0 = hud.targetName;
+  // a teammate on the floor has his name tag right over him, next to the crosshair: not a second name under it
+  hud.targetName = function (name, team) {
+    return targetName0.call(this, name && st.tagged.has(name) ? null : name, team);
+  };
   hud.hint = function (text) {
     const me = A.me;
     let h = null;
@@ -232,7 +238,7 @@ function unpose(r) {
   u.headG.rotation.x = 0;
   u.rArm.rotation.x = 0;
   u.lArm.rotation.x = 0;
-  if (r.tag) r.tag.position.set(0, TAG_Y, 0);
+  if (r.tag) { r.tag.position.set(0, TAG_Y, 0); r.tag.material.opacity = 1; }
   r.bodyPosed = false;
 }
 
@@ -257,6 +263,7 @@ function crawl(r, k) {
 }
 
 function poseRemotes(now) {
+  st.tagged.clear();
   for (const r of A.remotes.values()) {
     let mode = null;
     if (r.alive && r.buf.length) {
@@ -277,6 +284,13 @@ function poseRemotes(now) {
       const a = (Math.PI / 2) * (1 - smooth(f));
       r.model.rotation.x = a;
       tagAt(r, a, 0.75 + (TAG_Y - 0.75) * f, (r.c ? 0.45 : 0.9) * (1 - f));
+    }
+    // The name tag of a body on the floor hangs low, right where you look when you stand over it: up close it would
+    // fill the view and cover the "Hold E to revive" hint (which names him anyway), so it fades out from 3 m to 1.5 m.
+    if (r.tag && st.cam) {
+      const d = Math.hypot(r.p[0] - st.cam.position.x, r.p[2] - st.cam.position.z);
+      r.tag.material.opacity = mode === 'up' || mode === 'rise' ? 1 : Math.max(0, Math.min(1, (d - 1.5) / 1.5));
+      if (r.tag.visible && r.tag.material.opacity >= 0.5) st.tagged.add(r.name);
     }
   }
 }
@@ -378,8 +392,13 @@ export const body = {
     poseRemotes(now);
     overlays(now);
   },
+  // main.js's aim tests (the name under the crosshair, the local hit feedback): someone lying on the floor is hit
+  // where he lies (the server's hitboxes: crawling, or a corpse on its back), not where he would stand
+  lying: r => st.down.has(r.id) || st.pdMates.has(r.id),
+  ray: (r, o, d, maxT) => rayLying(o, d, r.p, r.yaw, st.down.has(r.id) ? 'down' : r.c ? 'deadLow' : 'dead', maxT),
   // after the camera is placed: lying on the floor (and getting up), or a slow sway while down
   camera(cam) {
+    st.cam = cam;
     if (!A.me.alive) return;
     const now = performance.now();
     const lying = st.pd ? 1 : now < st.riseUntil ? smooth((st.riseUntil - now) / (BODY.rise * 1000)) : 0;
