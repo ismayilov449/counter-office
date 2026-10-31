@@ -1,7 +1,7 @@
 // Step 15 in the browser (Mansion, warmup). 1: a Terrorist buys the drone, takes out the remote (6), launches it
 // (Mouse1) and flies it through its camera (grain, signal, battery), climbs, drops the bomb, dives into the ground.
 // 2: the browser is a CT watching a scripted Terrorist fly a drone in front of him while crouching with the remote,
-// and shoots it down. Screenshots in OUT, page errors printed.
+// and shoots it down (4 hits; it smokes once hit). Screenshots in OUT, page errors printed.
 import { open, sleep } from './game.mjs';
 import { player } from './client.mjs';
 let g = await open('T', 'Pilot', ['msg', 'droneStart', 'droneEnd', 'nade', 'boom', 'droneDown']);
@@ -28,7 +28,7 @@ await shot('g15_after.png');
 console.log('errors (pilot):', errors.length ? errors.slice(0, 5).join('\n') : 'none');
 
 // ---- part 2: the browser is a CT; a scripted T flies a drone in front of him
-g = await open('CT', 'Watcher', ['msg', 'droneDown', 'droneEnd']); // (the browser's Terrorist leaves first)
+g = await open('CT', 'Watcher', ['msg', 'droneHit', 'droneDown', 'droneEnd']); // (the browser's Terrorist leaves first)
 ({ tp, key, click, shot, msgs, errors, ev, look } = g);
 const pilot = await player('Flyer', 'T');
 // (both teams now: the match starts; wait for the round to go live, buy in the house, go out onto the lawn)
@@ -57,9 +57,21 @@ await shot('g15_watch.png');
   await tp([6, 0, -16], Math.atan2(-to2[0], -to2[2]), Math.atan2(to2[1], Math.hypot(to2[0], to2[2])));
 }
 await key('Digit2'); await sleep(1500);
-for (let i = 0; i < 6; i++) { pilot.send({ t: 'drone', p: dp, yaw: Math.PI / 2, pitch: -0.4 }); await sleep(60); }
-await click(0, 450); await sleep(900);
-console.log('CT saw:', (await msgs()).map(m => m.t + (m.text ? ': ' + m.text : '')).join(' | '));
+// it takes DRONE.hits (4) bullets: aim again before each shot (the recoil moves it), until it falls; a screenshot of it
+// smoking after the second hit
+const seen = [];
+for (let i = 0; i < 10 && !seen.some(m => m.t === 'droneDown'); i++) {
+  const to2 = [dp[0] - 6, dp[1] - 1.62, dp[2] + 16];
+  await tp([6, 0, -16], Math.atan2(-to2[0], -to2[2]), Math.atan2(to2[1], Math.hypot(to2[0], to2[2])));
+  for (let k = 0; k < 6; k++) { pilot.send({ t: 'drone', p: dp, yaw: Math.PI / 2, pitch: -0.4 }); await sleep(60); }
+  await click(0, 120); await sleep(400);
+  seen.push(...(await msgs()));
+  if (seen.filter(m => m.t === 'droneHit').length === 2 && !seen.some(m => m.t === 'droneDown')) {
+    for (let k = 0; k < 12; k++) { pilot.send({ t: 'drone', p: dp, yaw: Math.PI / 2, pitch: -0.4 }); await sleep(60); }
+    await shot('g15_smoking.png');
+  }
+}
+console.log('CT saw:', seen.map(m => m.t + (m.hp != null ? ' hp ' + m.hp : '') + (m.text ? ': ' + m.text : '')).join(' | '));
 console.log('pilot got:', pilot.got('droneEnd').map(m => m.why).join(','), '| msgs:', pilot.got('msg').map(m => m.text).slice(-6).join(' | '), '| inv', JSON.stringify(pilot.me?.inv?.drone), 'alive', pilot.me?.alive);
 await shot('g15_shotdown.png');
 console.log('errors (watcher):', errors.length ? errors.slice(0, 5).join('\n') : 'none');

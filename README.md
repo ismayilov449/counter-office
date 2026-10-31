@@ -336,7 +336,9 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   - The battery lasts 40 seconds. The signal weakens beyond 60 m and is lost at 80 m, and a wall between you and the drone
     counts the distance half as much again. A signal jammer brings it down — any jammer, the Terrorists' own too. Out of
     signal or battery, it falls.
-  - One bullet brings it down (so does a blast nearby), and it buzzes loudly, so it's heard coming.
+  - It takes **4 bullets** to bring it down (a shotgun's blast counts as one); a blast nearby does it at once. Each hit
+    sparks, and a hit drone trails smoke (more with each hit); its pilot sees the picture jump and a HULL bar go down.
+    A damaged drone packed back into the bag stays damaged. It buzzes loudly, so it's heard coming.
   - What its camera sees counts for your team's radar red dots. Bots don't use it.
 - **Ghillie camo** (buy menu → 7 Mines & camo, $1000): press **H** to switch it on and off. While it's on, enemies see only a faint
   shimmer of you (bots can't make you out beyond 4 m); each shot shows you for 1.5 seconds. Teammates always see you.

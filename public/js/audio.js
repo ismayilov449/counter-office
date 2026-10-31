@@ -189,7 +189,7 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
+const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -781,6 +781,12 @@ export const audio = {
         // the motors screaming into a dive
         tone(out, t, { freq: 300, freqEnd: 900, dur: 0.8, type: 'sawtooth', gain: 0.14 });
         tone(out, t, { freq: 450, freqEnd: 1350, dur: 0.8, type: 'square', gain: 0.05 });
+        break;
+      }
+      case 'dronehit': {
+        // a bullet through a drone's plastic shell: a sharp clack and a short rattle
+        burst(out, t, { dur: 0.05, type: 'bandpass', freq: 3200, q: 2, gain: 0.7 });
+        burst(out, t + 0.04, { dur: 0.06, type: 'bandpass', freq: 1500 + Math.random() * 800, q: 4, gain: 0.3 });
         break;
       }
       case 'dronedown': {

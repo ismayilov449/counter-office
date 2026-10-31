@@ -753,7 +753,7 @@ function launchDrone(now) {
   const eye = eyePos(), f = [-Math.sin(me.yaw), 0, -Math.cos(me.yaw)];
   let start = [eye[0] + f[0] * 0.6, eye[1] + 0.1, eye[2] + f[2] * 0.6];
   if (coll.raycast(eye, f, 0.9, 'move')) start = [eye[0], eye[1] + 0.35, eye[2]];
-  me.drone = { id: null, p: start, v: [0, 2.5, 0], yaw: me.yaw, pitch: -0.15, roll: 0, state: 'fly', bomb: true, until: now + DRONE.battery * 1000, t: 0, sentAt: 0, sig: 1, sigAt: 0, jam: false };
+  me.drone = { id: null, p: start, v: [0, 2.5, 0], yaw: me.yaw, pitch: -0.15, roll: 0, state: 'fly', bomb: true, hp: DRONE.hits, hitAt: 0, until: now + DRONE.battery * 1000, t: 0, sentAt: 0, sig: 1, sigAt: 0, jam: false };
   me.inv.drone = 0;
   stopEmote();
   net.send({ t: 'drone', launch: 1, p: start.map(v => Math.round(v * 1000) / 1000), yaw: me.yaw });
@@ -882,12 +882,14 @@ function updateDroneHud(now) {
   const o = droneOverlay();
   o.el.style.display = '';
   o.noise.style.backgroundPosition = `${(Math.random() * 128) | 0}px ${(Math.random() * 128) | 0}px`;
-  o.noise.style.opacity = d.jam ? 0.85 : (0.14 + (1 - d.sig) * 0.6).toFixed(2);
-  if (now - o.at < 100) return;
+  const hit = now - (d.hitAt || 0) < 250; // just hit: the picture breaks up for a moment
+  o.noise.style.opacity = d.jam || hit ? 0.85 : (0.14 + (1 - d.sig) * 0.6).toFixed(2);
+  if (now - o.at < 100 && !hit) return;
   o.at = now;
-  const bars = d.jam ? 0 : Math.ceil(d.sig * 5), left = Math.max(0, (d.until - now) / 1000);
+  const bars = d.jam ? 0 : Math.ceil(d.sig * 5), left = Math.max(0, (d.until - now) / 1000), hp = d.hp ?? DRONE.hits;
   const ground = coll.raycast(d.p, [0, -1, 0], 60, 'move');
-  o.tl.innerHTML = `<span style="color:#ff4a3a">●</span> REC<br>SIG ${'▮'.repeat(bars)}${'▯'.repeat(5 - bars)}<br>BAT ${Math.round((left / DRONE.battery) * 100)}% (${Math.ceil(left)} s)`;
+  o.tl.innerHTML = `<span style="color:#ff4a3a">●</span> REC<br>SIG ${'▮'.repeat(bars)}${'▯'.repeat(5 - bars)}<br>BAT ${Math.round((left / DRONE.battery) * 100)}% (${Math.ceil(left)} s)` +
+    `<br><span style="color:${hp < DRONE.hits ? '#ff7a4a' : 'inherit'}">HULL ${'▮'.repeat(hp)}${'▯'.repeat(DRONE.hits - hp)}</span>`;
   o.tr.innerHTML = `${d.bomb ? 'BOMB READY' : 'BOMB DROPPED'}<br>ALT ${ground ? ground.t.toFixed(1) : '--'} m${d.state === 'dive' ? '<br><span style="color:#ff4a3a">DIVE</span>' : ''}`;
   o.mid.style.display = d.jam || d.sig < 0.25 || left < 6 ? '' : 'none';
   o.mid.textContent = d.jam ? 'SIGNAL JAMMED' : d.sig < 0.25 ? 'WEAK SIGNAL — TURN BACK' : 'BATTERY LOW';
@@ -898,15 +900,16 @@ function updateDroneHud(now) {
 const droneModels = new Map(); // id -> { obj, buf, owner, state, bomb }
 function onDroneSnapshot(list, time) {
   const seen = new Set();
-  for (const [id, owner, x, y, z, yaw, state, bomb] of list || []) {
+  for (const [id, owner, x, y, z, yaw, state, bomb, hp = DRONE.hits] of list || []) {
     seen.add(id);
     let e = droneModels.get(id);
     if (!e) {
-      e = { obj: buildDrone(), buf: [] };
+      e = { obj: buildDrone(), buf: [], smokeAt: 0 };
       scene.add(e.obj);
       droneModels.set(id, e);
     }
-    Object.assign(e, { owner, state, bomb });
+    Object.assign(e, { owner, state, bomb, hp });
+    if (owner === me.id && me.drone) me.drone.hp = hp;
     e.buf.push({ t: time, p: [x, y, z], yaw });
     if (e.buf.length > 20) e.buf.shift();
   }
@@ -933,6 +936,11 @@ function updateDroneModels(dt, now) {
     if (e.state !== 2) for (const pr of e.obj.userData.props) pr.rotation.y += dt * 90;
     e.obj.userData.bomb.visible = !!e.bomb;
     e.obj.userData.led.visible = Math.floor(now / 250) % 2 === 0;
+    // hit but still flying: it trails smoke, thicker the closer it is to coming down
+    if (e.hp < DRONE.hits && e.state !== 2 && now - e.smokeAt > 280 - (DRONE.hits - e.hp) * 60) {
+      e.smokeAt = now;
+      fx.puff(p, 0x2e2c2a, 0.5 + (DRONE.hits - e.hp) * 0.2, 1.1, 0.25);
+    }
     audio.buzz(id, e.state === 2 ? null : p, e.state === 1);
   }
 }
@@ -2899,6 +2907,12 @@ const net = new Net({
   },
   droneEnd(m) {
     endDrone(m.why);
+  },
+  droneHit(m) {
+    // a bullet that didn't bring it down yet: sparks and a clack; its pilot's picture jumps
+    fx.sparks(m.p, [0, 1, 0]);
+    audio.play('dronehit', m.p);
+    if (me.drone && me.drone.id === m.id) { me.drone.hp = m.hp; me.drone.hitAt = performance.now(); }
   },
   droneDown(m) {
     // shot down, caught in a blast or fallen: sparks, bits and a crack

@@ -2098,7 +2098,7 @@ function onShoot(p, m) {
   for (const j of jamHits) if (--j.hp <= 0) destroyJammer(j, p);
   breakPieces(chipped);
   for (const s of shotSatchels) explodeSatchel(s);
-  for (const dr of shotDrones) downDrone(dr, p);
+  for (const dr of shotDrones) hitDrone(dr, p);
 
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
   if (!hits.length) return;
@@ -2524,8 +2524,8 @@ function onDrone(p, m, t) {
     if (!pos || !p.alive || !(p.inv.drone > 0) || d || game.phase === 'freeze' || game.phase === 'end' || dist3(pos, eyeOf(p)) > 1.5) return send(p, { t: 'droneEnd', why: 'nolaunch' });
     p.inv.drone--;
     const left = p.droneLeft ?? DRONE.battery * 1000;
-    const nd = { id: game.nextMineId++, owner: p.id, team: p.team, p: pos, yaw: isNum(m.yaw) ? m.yaw : p.yaw, pitch: 0, state: 'fly', bomb: p.droneBomb ?? true, until: t + left, at: t, vy: 0 };
-    p.droneLeft = null; p.droneBomb = null;
+    const nd = { id: game.nextMineId++, owner: p.id, team: p.team, p: pos, yaw: isNum(m.yaw) ? m.yaw : p.yaw, pitch: 0, state: 'fly', bomb: p.droneBomb ?? true, hp: p.droneHp ?? DRONE.hits, until: t + left, at: t, vy: 0 };
+    p.droneLeft = null; p.droneBomb = null; p.droneHp = null;
     game.drones.push(nd);
     p.piloting = nd.id;
     p.act = null;
@@ -2559,6 +2559,7 @@ function onDrone(p, m, t) {
       p.inv.drone = 1;
       p.droneLeft = Math.max(0, d.until - t);
       p.droneBomb = d.bomb;
+      p.droneHp = d.hp;
       endPiloting(p, 'recovered');
     } else endPiloting(p, 'landed');
     sendMe(p);
@@ -2590,6 +2591,12 @@ function downDrone(d, by, why = 'shot') {
   endPiloting(players.get(d.owner), why);
   broadcast({ t: 'droneDown', p: d.p.map(r2) });
   if (by && by.id !== d.owner) send(by, { t: 'msg', text: 'Drone shot down.' });
+}
+
+// A bullet: it takes DRONE.hits of them; until then each one sparks, and the drone smokes (hp in the snapshot).
+function hitDrone(d, by) {
+  if (--d.hp <= 0) return downDrone(d, by);
+  broadcast({ t: 'droneHit', id: d.id, p: d.p.map(r2), hp: d.hp });
 }
 
 function blastDrones(at, r) {
@@ -2662,7 +2669,7 @@ function updateDrones(t) {
 function clearDrones() {
   for (const d of game.drones) endPiloting(players.get(d.owner), 'round');
   game.drones = [];
-  for (const p of players.values()) { p.piloting = null; p.droneLeft = null; p.droneBomb = null; }
+  for (const p of players.values()) { p.piloting = null; p.droneLeft = null; p.droneBomb = null; p.droneHp = null; }
 }
 
 // Ghillie camouflage: switched on (H), you're hidden from enemies, except for a moment after each shot (see CAMO).
@@ -3617,8 +3624,8 @@ function tick() {
     tl: game.phase === 'warmup' || (isGG() && game.phase === 'live') ? -1 : Math.max(0, (game.phaseEnd - t) / 1000),
     el: Math.max(0, (t - game.roundStartAt) / 1000),
     pl,
-    // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb]
-    ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0]) } : {}),
+    // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb, hits it can still take]
+    ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0, d.hp]) } : {}),
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

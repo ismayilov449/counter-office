@@ -106,11 +106,11 @@ export const JAMMER = { radius: 15, hits: 3, blast: 4 };
 // across, climb m/s up and down; battery seconds in the air. The signal weakens from weak metres and is lost at range
 // (with a wall between the pilot and the drone, distances count half as much again: droneSignal). It carries one bomb
 // (dropped straight down: an HE grenade's blast where it lands); the kamikaze dive (dive m/s) goes off on impact:
-// damage within radius metres (more than an HE), car damage to cars. One bullet brings it down (hit: its radius), so
-// does a blast within blast metres, and it crashes inside a signal jammer's area. Landed within pickup metres of the
-// pilot it goes back into the bag (with what's left of its battery and its bomb); landed anywhere else it's lost.
-// fov: how far to each side its camera spots enemies for the radar (radians).
-export const DRONE = { speed: 9, climb: 4, battery: 40, weak: 60, range: 80, dive: 24, damage: 140, radius: 7, car: 600, blast: 2.5, hit: 0.4, pickup: 4, fov: 0.9 };
+// damage within radius metres (more than an HE), car damage to cars. hits bullets bring it down (a shotgun's blast
+// counts once; hit: its radius), a blast within blast metres does at once, and it crashes inside a signal jammer's area.
+// Landed within pickup metres of the pilot it goes back into the bag (with what's left of its battery, its bomb and its
+// damage); landed anywhere else it's lost. fov: how far to each side its camera spots enemies for the radar (radians).
+export const DRONE = { speed: 9, climb: 4, battery: 40, weak: 60, range: 80, dive: 24, damage: 140, radius: 7, car: 600, blast: 2.5, hit: 0.4, hits: 4, pickup: 4, fov: 0.9 };
 // The drone's signal, 1 (full) to 0 (lost): dist from the pilot, through a wall or not.
 export const droneSignal = (dist, blocked) => { const d = dist * (blocked ? 1.5 : 1); return d <= DRONE.weak ? 1 : Math.max(0, 1 - (d - DRONE.weak) / (DRONE.range - DRONE.weak)); };
 
