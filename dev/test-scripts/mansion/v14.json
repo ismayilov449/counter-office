@@ -1,0 +1,10 @@
+[["nt_ctspawn", "view([26.5, 1.7, -8.0], 1.5708, 0.05)"],
+ ["nt_street", "view([26.5, 1.7, 18], 0, 0.05)"],
+ ["nt_plaza", "view([16, 1.7, -1], 1.5708, 0.08)"],
+ ["nt_porch", "view([-3, 1.7, -2], 1.5708, 0.1)"],
+ ["nt_tspawn", "view([-14.6, 5.97, -2.5], -1.5708, -0.05)"],
+ ["nt_hall", "view([-10, 2.5, -6], 3.14, 0)"],
+ ["nt_dark", "view([-10, 2.5, -6], 3.14, 0, { lights: { power: false, lampa6: false, lampa4: false, lampa5: false, lampa7: false, lampa8: false, lampa2: false, lampa9: false, lampa3: false, lampa10: false, lampa11: false, lampa1: false, cellar: false, garage: false } })"],
+ ["nt_garden", "view([-31.0, 1.7, 3.0], 1.3, 0.1)"],
+ ["nt_neighbour", "view([33.3, 4.9, -7.0], 1.5708, -0.05)"],
+ ["nt_sky", "view([0, 1.7, 0], 0.6, 0.6)"]]

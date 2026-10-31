@@ -9,7 +9,7 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 
 ---
 
-## 1. Where things stand (13 of 15 steps done)
+## 1. Where things stand (14 of 15 steps done)
 
 | # | Step | Status | Commit(s) |
 |---|------|--------|-----------|
@@ -25,8 +25,8 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 | 10 | Mansion: roof terrace + drainpipe ladder | ✅ done | `971813a` |
 | 11 | Mansion: garage | ✅ done | `f56ff90` (test scripts fixed in `07c7d96`) |
 | 12 | Mansion: neighbour's house | ✅ done | `eb58669` |
-| 13 | Mansion: back garden | ✅ done | see `git log` ("Mansion: back garden ...") |
-| 14 | Mansion at night | ⬜ not started | |
+| 13 | Mansion: back garden | ✅ done | `6f11419` |
+| 14 | Mansion at night | ✅ done | see `git log` ("Mansion at night ...") |
 | 15 | FPV drone (T) | ⬜ not started (do it last) | |
 
 Merge commits on this branch: `5d335cd` (feature/mansion) and `34e90ed` (feature/t-weapons; the jammer/satchel
@@ -205,6 +205,29 @@ firing the RPG-26. Both work.
   triangles +0.2k…+1.1k (<1%), frame time within the noise. Facing it: through the gateway from the back lawn 49 → 60
   calls, 113.0k → 115.2k triangles, 102 → 115 ms (+12%); from the T spawn's west window 54 → 63 calls, 236 → 241 ms (+2%);
   in the garden itself 35 calls and 11.8k triangles.
+
+### 14. Mansion at night
+- **How it's chosen:** a separate map id, `cs_mansion_night` ("Mansion at night", `shared/maps/mansion_night.js`): the
+  Mansion's map object spread with a night theme and extra decor, so every Mansion feature works the same. It's in
+  `MAPS`, so it's in the rotation (after cs_assault), the end-of-match vote, the Esc-menu vote and the admin panel, and
+  `MAP=cs_mansion_night` starts on it. (The bots build a second nav grid for it in the background.)
+- **Theme:** dark sky, the sun is a pale moon (its shadows stay), dim blue hemisphere light, dark fog, fireflies,
+  `stars: true` (600 points on the sky, one draw call), `roomGlow`, `litGlass`, `viewmodel` (see below).
+- **Lamps:** new decor types in world.js: `streetlight` (an iron post with an arm, or with `wall` a lantern on a bracket;
+  shared materials so they merge) and `glows` (one Points draw call for a list of lamp glows). Their light is ordinary
+  `light` decor (only the q.lamps nearest really shine). The estate's lamps are in light group `estate`, added to the
+  night map's fuse-box groups: the blackout puts them out (their glows hide, their heads' shared material turns grey).
+- **Lit rooms:** roomlight.js got `setGlow(k, groups)`: on a night map a room whose lights are on (and whose group has a
+  switch) adds a warm light of strength k everywhere in it. It's encoded in the room's existing ambient value (2 + k), so
+  the per-pixel room loop is unchanged — a second uniform array in that loop cost ~8–10% of a frame on swiftshader.
+  Window glass of lit rooms gets the theme's `litGlass` colour. The first-person weapon's lights scale with
+  `viewmodel` outdoors and with the room's glow indoors.
+- **Night skyline:** `skyline` decor with `night` lights more windows, brighter, and ignores the fog.
+- **Verified:** fixed views `v14.json` (+ blackout and moon views) looked at; browser test `g14.mjs` on the night map
+  (spawn, lawn, flashlight, nightvision, a Terrorist cuts the power: house and estate lamps go out; no page errors).
+- **Frame cost** (night vs day, same build, swiftshader, `vcost.json`): draw calls +7…+26 per view, triangles +0.2k…+0.9k,
+  frame time +0…+10% (the most in views with many lamps and the sky in them).
+- **Not verified:** how dark it feels on the players' screens (the headless renderer's colours are close, but not the same).
 
 ### Known problems to watch
 - **Mansion load time** (measured 2026-10-31 on the new PC, i9-13980HX, 5 runs each): building cs_mansion (importing

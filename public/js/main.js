@@ -9,7 +9,7 @@ import { CAR, seatPos, stepCar } from '/shared/vehicles.js';
 import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
-import { setRooms, ambientAt } from './roomlight.js';
+import { setRooms, setGlow, ambientAt, glowAt } from './roomlight.js';
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
@@ -109,6 +109,7 @@ function loadMap(id) {
   game.broken = [];
   game.brk = new Set();
   game.doors = [];
+  setGlow(map.theme.roomGlow, new Set((map.switches || []).map(s => s.group)));
   setRooms(map.rooms, game.lights);
   buildCars();
   clearHostages();
@@ -3134,9 +3135,10 @@ function updateCamera(dt, now) {
 function updateViewModel(dt, now) {
   if (!vm) return;
   vm.visible = me.alive && me.driving == null && !(me.scope && WEAPONS[current()].sniper);
-  const amb = ambientAt(camera.position);
-  vmHemi.intensity = 2.2 * Math.max(0.12, amb);
-  vmSun.intensity = amb < 1 ? 0.15 : 1.6;
+  // (dimmer on a night map outdoors, map.theme.viewmodel; lit by a room's glow indoors)
+  const amb = ambientAt(camera.position), k = map.theme.viewmodel ?? 1, glow = glowAt(camera.position);
+  vmHemi.intensity = 2.2 * Math.max(0.12, amb) * Math.max(k, Math.min(1, glow * 0.7));
+  vmSun.intensity = amb < 1 ? 0.15 : 1.6 * k;
   if (!vm.visible) return;
   const u = vm.userData;
   const hs = Math.hypot(me.v[0], me.v[2]);

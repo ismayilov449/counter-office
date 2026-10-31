@@ -8,7 +8,7 @@
   const THREE = await import('three');
   const { buildWorld } = await import('/js/world.js');
   const { MAPS } = await import('/shared/maps/index.js');
-  const { setRooms } = await import('/js/roomlight.js');
+  const { setRooms, setGlow } = { setGlow: () => {}, ...(await import('/js/roomlight.js')) }; // (older builds have no setGlow)
   const map = MAPS[window.VIEW_MAP || 'cs_mansion'];
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:99999';
@@ -25,6 +25,7 @@
   const t0 = performance.now();
   const world = buildWorld(scene, map, window.VIEW_Q || 'medium');
   window.buildMs = performance.now() - t0;
+  setGlow(map.theme.roomGlow, new Set((map.switches || []).map(s => s.group)));
   setRooms(map.rooms, {});
   window.viewWorld = world;
   let cam = camera;

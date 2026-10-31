@@ -786,6 +786,20 @@ function createSky(theme) {
   const sky = new THREE.Mesh(geo, mat);
   sky.renderOrder = -1;
   sky.frustumCulled = false;
+  if (theme.stars) {
+    // night maps: a few hundred stars above the horizon, one draw call, moving with the sky
+    const r = rng(11), n = 600, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const a = r() * Math.PI * 2, y = 0.06 + 0.94 * Math.sqrt(r()), k = Math.sqrt(1 - y * y) * 380;
+      pos.set([Math.cos(a) * k, y * 380, Math.sin(a) * k], i * 3);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdfe6ff, size: 1.7, sizeAttenuation: false, fog: false }));
+    stars.frustumCulled = false;
+    stars.renderOrder = -1;
+    sky.add(stars);
+  }
   return sky;
 }
 
@@ -1226,10 +1240,10 @@ function buildDecor(d, ctx) {
       obj = new THREE.Group();
       const r = rng(d.seed || 1);
       const winTex = canvasTexture(128, (g, s) => {
-        g.fillStyle = '#1e201c';
+        g.fillStyle = d.night ? '#0c0e14' : '#1e201c';
         g.fillRect(0, 0, s, s);
         for (let y = 4; y < s; y += 8) for (let x = 4; x < s; x += 8) {
-          if (Math.random() < 0.07) { g.fillStyle = Math.random() < 0.5 ? '#8a8460' : '#6a7480'; g.fillRect(x, y, 4, 4); }
+          if (Math.random() < (d.night ? 0.2 : 0.07)) { g.fillStyle = d.night ? (Math.random() < 0.65 ? '#ffd890' : '#b8cce8') : Math.random() < 0.5 ? '#8a8460' : '#6a7480'; g.fillRect(x, y, 4, 4); }
         }
       });
       for (let i = 0; i < 34; i++) {
@@ -1239,7 +1253,7 @@ function buildDecor(d, ctx) {
         const t = winTex.clone();
         t.needsUpdate = true;
         t.repeat.set(w / 12, h / 12);
-        const b = mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshBasicMaterial({ map: t, color: 0x5a5c56 }), Math.cos(ang) * dist, h / 2 - 2, Math.sin(ang) * dist, false);
+        const b = mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshBasicMaterial({ map: t, color: d.night ? 0xb0b0b0 : 0x5a5c56, fog: !d.night }), Math.cos(ang) * dist, h / 2 - 2, Math.sin(ang) * dist, false);
         b.rotation.y = r() * Math.PI;
         obj.add(b);
       }
@@ -1467,6 +1481,36 @@ function buildDecor(d, ctx) {
       obj.renderOrder = -1;
       break;
     }
+    case 'streetlight': {
+      // Night maps: an iron lamp post with an arm (or, with d.wall, a lantern on a bracket out of a wall), reaching out
+      // along +z turned by d.rot. Its glow is in a 'glows' decor and its light a 'light' one. The materials are shared,
+      // so all the posts merge into a mesh or two.
+      obj = new THREE.Group();
+      obj.position.set(...d.p);
+      obj.rotation.y = d.rot || 0;
+      const iron = ctx.lamOf(0x24272b), lit = d.group ? ctx.headOf(d.group) : ctx.basicOf(0xffe0a0);
+      if (d.wall) {
+        obj.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.36), iron, 0, 0, 0.18, false));
+        obj.add(mesh(new THREE.BoxGeometry(0.24, 0.05, 0.24), iron, 0, 0.06, 0.38, false));
+        obj.add(mesh(new THREE.BoxGeometry(0.18, 0.26, 0.18), lit, 0, -0.1, 0.38, false));
+      } else {
+        const h = d.h || 4;
+        obj.add(mesh(new THREE.CylinderGeometry(0.06, 0.1, h, 6), iron, 0, h / 2, 0));
+        obj.add(mesh(new THREE.BoxGeometry(0.06, 0.06, 0.8), iron, 0, h - 0.04, 0.42));
+        obj.add(mesh(new THREE.BoxGeometry(0.32, 0.1, 0.46), iron, 0, h - 0.06, 0.85));
+        obj.add(mesh(new THREE.BoxGeometry(0.26, 0.04, 0.38), lit, 0, h - 0.13, 0.85, false));
+      }
+      break;
+    }
+    case 'glows': {
+      // the glow round each lamp of a list, all in one draw call
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(d.points.flat()), 3));
+      obj = new THREE.Points(geo, new THREE.PointsMaterial({ map: glowTexture(), color: d.color || 0xffd8a0, size: d.size || 2, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      obj.frustumCulled = false;
+      if (d.group) ctx.groupOf(d.group).glows.push(obj);
+      break;
+    }
     case 'light':
       if (quality === 'low') return;
       obj = new THREE.PointLight(new THREE.Color(d.color), d.intensity, d.distance, 2);
@@ -1598,7 +1642,11 @@ export function buildWorld(scene, map, qualityName) {
   const byGroup = {};
   const lamCache = new Map();
   const ctx = { group, animated, lights, quality: qualityName, levers: [], groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }),
-    lamOf: hex => lamCache.get(hex) || lamCache.set(hex, lam(hex)).get(hex) };
+    lamOf: hex => lamCache.get(hex) || lamCache.set(hex, lam(hex)).get(hex),
+    basicOf: hex => lamCache.get('b' + hex) || lamCache.set('b' + hex, new THREE.MeshBasicMaterial({ color: hex })).get('b' + hex),
+    // a lamp head's material for a light group: one per group, so its lamps can be put out (dimmed) together even
+    // when they're merged into one mesh
+    headOf: g => lamCache.get('h' + g) || lamCache.set('h' + g, (ctx.groupOf(g).heads ||= [], ctx.groupOf(g).heads[0] = new THREE.MeshBasicMaterial({ color: 0xffe0a0 }))).get('h' + g) };
   // Window frames, ceiling lamps (and their light) and light switches hang on breakable walls and ceilings: they
   // come down with them (see setBrokenPieces).
   const fixtures = [];
@@ -1800,8 +1848,9 @@ export function buildWorld(scene, map, qualityName) {
       const on = state?.[name] !== false;
       for (const l of g.lights) l.intensity = on ? l.userData.on : 0;
       for (const s of g.glows) s.visible = on;
-      for (const m of g.glassMats) m.emissive.setHex(on ? 0x6a4c1c : 0x000000);
+      for (const m of g.glassMats) m.emissive.set(on ? theme.litGlass || 0x6a4c1c : 0x000000);
       for (const lv of g.switches) lv.position.y = on ? 0.03 : -0.03;
+      for (const m of g.heads || []) m.color.setHex(on ? 0xffe0a0 : 0x3a3a36);
     }
     for (const lv of ctx.levers) lv.rotation.x = state?.power === false ? 1.1 : -1.1;
   }
