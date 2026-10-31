@@ -357,9 +357,10 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   is empty; press **E** while standing on one to swap it for the gun you carry.
 - **Buy menu** (CS2-style, **B**): the whole shop at once in columns, in the old menu's order and numbers —
   1 Pistols, 2 Shotguns, 3 SMGs, 4 Rifles, 5 Heavy, 6 Equipment, 7 Mines & camo — with shaded gold pictures made from
-  the game's own models; it fits any window (the columns wrap on a small one). Click to buy, or press
-  the column's number then the item's (**0** for a 10th); point at an item for its damage, fire rate, magazine,
-  armour penetration, speed and kill reward. Items for the other team are greyed ("CT only"), owned ones ticked,
+  the game's own models; all seven columns sit in one row on any laptop screen (they wrap only in a window under about
+  1000 px wide). Click to buy, or press the column's number then the item's (**0** for a 10th); point at an item for
+  its damage, fire rate, magazine, armour penetration, speed and kill reward, shown in a strip of fixed size under the
+  columns, so nothing moves while you point. Items for the other team are greyed ("CT only"), owned ones ticked,
   ones you can't afford dimmed with the price in red. **Right-click** sells back something you bought this round
   (full price, while you can still buy; a gun you had before comes back if it's still on the ground). The bottom row:
   ammo (**,** **.**), auto-buy (**F1**), re-buy (**F2**), close (**B** / **Esc**). The mouse is free while it's open.

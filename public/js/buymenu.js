@@ -113,7 +113,7 @@ export class BuyMenu {
     }).join('');
     const ammo = a => c.ammo(a);
     const html = `<div class="bm-head"><span class="bm-title">BUY MENU</span><span class="bm-reason">${esc(blocked)}</span><span class="bm-money">$${c.money()}</span></div>
-      <div class="bm-cols${blocked ? ' blocked' : ''}">${cols}</div>
+      <div class="bm-cols${blocked ? ' blocked' : ''}" style="--n: ${BUY_COLUMNS.length}">${cols}</div>
       <div class="bm-info"></div>
       <div class="bm-foot">
         <span data-act="ammo1"><b>,</b> Primary ammo <i>${ammo('ammo1')}</i></span>
@@ -128,7 +128,8 @@ export class BuyMenu {
     this.renderInfo();
   }
 
-  // The details of the item under the mouse.
+  // The details of the item under the mouse, in a box of fixed size: if it grew, the columns would shrink or move
+  // and the item could slip out from under the mouse (the bottom ones could never be clicked).
   renderInfo() {
     const box = this.root.querySelector('.bm-info');
     if (!box) return;
@@ -145,7 +146,7 @@ export class BuyMenu {
     }
     if (w) stats += stat('Kill reward', `$${w.killReward ?? 300}`);
     const refund = c.refundable(id) ? '<div class="bm-refund">Right-click to sell it back</div>' : '';
-    box.innerHTML = `<div class="bm-info-head"><img src="${buyIcon(id)}" alt=""><div><b>${esc(info.name)}</b><span>$${c.price(id)}</span></div></div>
-      ${ABOUT[id] ? `<p>${esc(ABOUT[id])}</p>` : ''}<div class="bm-stats">${stats}</div>${refund}`;
+    box.innerHTML = `<div class="bm-info-head"><img src="${buyIcon(id)}" alt=""><div><b>${esc(info.name)}</b><span>$${c.price(id)}</span>${refund}</div></div>
+      <div class="bm-info-body">${ABOUT[id] ? `<p>${esc(ABOUT[id])}</p>` : ''}<div class="bm-stats">${stats}</div></div>`;
   }
 }

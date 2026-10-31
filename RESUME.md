@@ -379,6 +379,9 @@ For every step:
     keys, clicks, screenshots, page errors). `mansion/loadmap.mjs`: load whatever map runs and screenshot it.
   - `mansion/walls.mjs`: no server needed; samples every wall, floor and ceiling of the dug-out rooms (cellar, tunnels,
     drain, shafts, pool) and lists spots with no face (holes you'd see out of) or two faces. Add new rooms to its list.
+  - `mansion/buyhover.mjs`: points the mouse at every buy-menu item at 11 laptop window sizes and checks it stays put
+    under the mouse. (Until 2026-10-31 the details box grew on hover and shifted or re-wrapped the columns, and on a
+    1080p window Mines & camo wrapped to a cut-off bottom row: the satchel couldn't be bought. 900x560 still scrolls.)
   - `mansion/views.mjs` + `viewer.js`: fixed views (and `viewTop` plans) with draw calls and triangles; `BENCH=n` times frames.
     `vcost.json` is the fixed set for frame cost. `meshes.mjs` lists the world's meshes (diff two runs).
   - `mansion/botsoak.mjs`: one scripted player for N seconds, so the bots play.
