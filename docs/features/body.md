@@ -29,19 +29,46 @@
   server errors, tick avg 0.7–2.3 ms, max 5.1 ms), the server starts on all 7 maps (with bots) without errors. Not
   re-run (the user asked for Mansion-only testing): `obj.mjs` (bomb, de_dust2 — no code it touches changed in the
   merge) and the de_dust2 / cs_assault soaks.
-- **Browser checks still to do:** `g1.mjs` is ready but **not run** (de_dust2; see "Browser checks still to do"), plus
-  the gadget checks by hand listed there.
-- **Browser run 1 (2026-11-01, paused partway; the user's PC was overloaded, so browser tests now go one agent at a
-  time):** `g1.mjs` now plays on cs_mansion (and cs_mansion_night; `MAP=`, default cs_mansion): the same layout as
-  `t1.mjs`, moved onto the back garden's lawn by `P()`. One run on cs_mansion: 22 of 24 checks OK, no page errors.
-  Looked at: going down (red edges, "YOU'RE DOWN", bleed bar counting, low camera, Glock only, 1 doesn't take the AK),
-  being revived (green bar, "Mate is reviving you"), revived (30 HP, all gone), reviving a teammate (hint, then
-  "Reviving Mate..."), play dead (eyes half closed, view from the floor, AK and Glock lying in front, knife only in the
-  list), getting up with W, the CT's fake kill (feed "[world] Mate", scoreboard dead). The two FAILs, not yet looked
-  into: the crawl measured 0.75 m in 2 s (likely the headless SwiftShader frame rate, to check) and the CT's
-  "Mate was playing dead!" text wasn't found. Seen and still to fix or check: up close, the downed teammate's name tag
-  is huge and covers the "Hold E to revive" hint; two name tags ("Mate" twice) over a downed teammate; no side-view
-  shot of the crawl pose yet. Not run yet: cs_mansion_night, the zip line / CCTV desk / K mid-air checks.
+- **Browser-verified (2026-11-01, headless Edge 960x540, cs_mansion and cs_mansion_night; no page errors anywhere).**
+  - `g1.mjs` (now on the back garden's lawn: `t1.mjs`'s layout moved by `P()`; `MAP=`, default cs_mansion): all 28
+    checks pass on both maps. In the screenshots: a downed teammate crawling on his belly, head up, pistol forward,
+    his name tag over him from a distance, the radar cross; "Hold E to revive Mate (5 s)" then "Reviving Mate...";
+    down yourself: red edges, "YOU'RE DOWN", the bleed bar counting down, the low camera, the Glock only (1 doesn't
+    take the AK), a crawl of 1.00–1.01 m/s, "Mate is reviving you" with the green bar, then 30 HP and all gone; play
+    dead: eyes half closed, the view from the floor with the AK and Glock lying in front, no gun in hand, getting up
+    over a second (the eyes overlay fades 0.85 → 0.05); a teammate playing dead looks like a corpse with his tag;
+    as a CT: a corpse, "[world] Mate" in the feed, Mate dead on the scoreboard, the corpse getting up, "Mate was
+    playing dead!".
+  - New `g2.mjs` (the Mansion's gadgets in the browser, the hand checks below): all pass on both maps. K while jumping
+    and on a ladder: "Stand on the ground to play dead". Shot down just after hooking on to the zip line: off the
+    cable first ('letgo'), no trolley over your head, down on the deck, no hint, E does nothing; to the others he lies
+    there (pose 0), not hanging. K on the zip line: off the cable, the view falls with you (eyes half closed) — over
+    the deck, and 1.4 s down the cable, where the body flies on and lands on the lower roof (a 3.6 m fall, still a
+    corpse, the view on that roof's floor), K gets you up. K at the CCTV desk: the camera picture closes ('left'), you
+    lie on the floor by the chair, no hint, E does nothing, K gets you up. Downed at the desk: up first ('hurt'), down
+    on the floor, the empty chair beside you, no hint, E does nothing. As a Terrorist: a CT playing dead on the cable
+    falls as a corpse onto the lower roof, his pistol appears by the body (0.45 m) only after he lands, then he gets up
+    ("C1 was playing dead!"); a CT shot down on the cable lies on the deck crawling, not hanging.
+  - Fixes (d86e40e): (1) up close a downed teammate's name tag (it hangs low, right where you look) filled the view and
+    covered the "Hold E to revive" hint: it now fades out from 3 m to 1.5 m (the hint names him anyway); (2) his name
+    showed twice (the tag and main.js's name under the crosshair): while his tag shows, the crosshair name is left out;
+    (3) main.js's aim tests (the crosshair name, the local hit feedback) used the standing hitbox, so aiming above a
+    body on the floor showed his name and aiming at it didn't: they now use the lying hitboxes, as the server does
+    (two marked hook lines in main.js, `body.lying(r) ? body.ray(...) : rayPlayer(...)`). Up close (under 1.5 m),
+    aiming at him shows the crosshair name again.
+  - The two failed checks of the first run were test faults (40f2e44): headless, the page drew a few frames a second
+    and main.js caps a frame's step at 0.05 s, so the game ran slower than the clock (the crawl is measured against
+    the game's own time now: 1.00 m/s); "Mate was playing dead!" shows for 3 s and was read after a slow screenshot
+    (it's read first now). Also in the tests: the team buttons are clicked again until the join goes through (a cold
+    page had them disabled), the page's connection is closed before rejoining in the same tab (otherwise the old
+    player stayed on the server and auto-balance moved the new one to the other team), and a 960x540 page.
+  - Server tests after the fixes (all pass): `t1.mjs` on cs_mansion (57 checks), `gadgets.mjs` on cs_mansion and
+    cs_mansion_night (38 each). The server lists all 7 maps at start. No server code changed in this round.
+- **Left:** by ear (not checked): the downed "hurt" and play-dead "death" sounds. By hand at a real frame rate: how the
+  crawl reads, whether the downed camera sway is annoying, the revive/bleed text on a small laptop screen. Seen in
+  passing, not this feature's: hud's `#small-msg` (top 76px) sits on top of the team bar's money line (`body.teambar`
+  moves the kill feed down but not that message) — e.g. "Playing dead — K, moving or shooting gets you up" over the
+  cards. Spectating a teammate who is down or playing dead still puts the camera at crouch height (see the gaps).
 
 ## (a) README
 
@@ -99,7 +126,8 @@ revives a downed teammate).
   or `MAP=cs_mansion` / `cs_mansion_night` moves the same layout onto the back garden's lawn), `gadgets.mjs` (server,
   Mansion: the zip line and the CCTV desk), `hostage.mjs` (server, Mansion: a downed CT can't lead a hostage; leading
   every hostage to the street), `obj.mjs` (server, de_dust2: the bomb with a downed carrier), `bots.mjs` (bots soak),
-  `g1.mjs` (browser, de_dust2).
+  `g1.mjs` (browser, Mansion lawn: down, revive, play dead), `g2.mjs` (browser, Mansion: the zip line, the CCTV desk,
+  K mid-air).
 
 ### State (the shared contract)
 - `p.downed` (boolean) and `p.playingDead` (boolean), owned here. Everything else this feature keeps on a player starts
@@ -145,8 +173,11 @@ revives a downed teammate).
     `body.eye(dt)` after the eye-height line, `&& !body.frozen()` on `canFire`.
   - `frame`: `body.frame(dt, now)` after `updateRemotes` and main's `gadgets.update(dt, now)`, `body.camera(camera)` after `updateCamera`,
     `if (vm && body.frozen()) vm.visible = false;` after `updateViewModel`.
+  - `localTrace` and the crosshair-name loop in `frame`: `body.lying(r) ? body.ray(r, o, d, t) : rayPlayer(...)` (a
+    body on the floor is aimed at where it lies, as the server's hit test does).
 - `public/js/body.js` wraps (no edits there): net handlers `s`, `kill`, `roster`, `bar`, `spawn`; hud methods `hint`,
-  `progress`, `radar` (and `killfeed` only for the length of one `kill` handler call).
+  `progress`, `radar`, `targetName` (no crosshair name for a lying teammate whose name tag shows) (and `killfeed` only
+  for the length of one `kill` handler call).
 
 ### Protocol
 - Server → all: `bodyDown {v, k, w}` (k: who downed them or null); `bodyUp {v, by}` (revived by `by`) or
@@ -236,10 +267,12 @@ revives a downed teammate).
   kill, the eyes overlay went to full opacity, pressing W got the player up (bodyUp), a teammate playing dead was shown;
   no page errors.
 
-### Browser checks still to do (the architect's run)
-`g1.mjs` is ready and has **not been run** since the shooter positions were fixed. It plays on de_dust2 (written
-before the Mansion-only rule; its positions are de_dust2's). Run `GAME_PORT=4010 CDP_PORT=<edge> OUT=<dir> node dev/test-scripts/body/g1.mjs` against `srv.sh MAP=de_dust2 BOTS=0
-START_MONEY=16000 MAP_ROTATION=0` (it takes ~5 minutes) and look at the screenshots:
+### Browser checks (done 2026-11-01, see STATUS; how to run them again)
+Each script needs a **fresh** test server (a player left over from an earlier run makes auto-balance put the browser
+on the other team): `MAP=cs_mansion` or `cs_mansion_night`, `BOTS=0 START_MONEY=16000 MAP_ROTATION=0` (and
+`ROUND_TIME=600` for `g2.mjs`), then `GAME_PORT=4010 CDP_PORT=<edge> MAP=<same> OUT=<dir> node
+dev/test-scripts/body/g1.mjs` (~4 minutes) or `g2.mjs` (~5 minutes; screenshots `g2_*.png`). `VIEW=WxH` sets the page
+size (default 960x540). What the `g1` screenshots should show:
 - `g1_mate_down.png`: a downed teammate lies on his belly, head up, pistol forward, his name tag above him; the red
   pulsing cross on the radar.
 - `g1_revive_hint.png` / `g1_reviving.png`: "Hold E to revive Mate (5 s)", then the progress bar "Reviving Mate...".
@@ -254,7 +287,7 @@ START_MONEY=16000 MAP_ROTATION=0` (it takes ~5 minutes) and look at the screensh
 - No page errors (printed at the end of each part).
 - By hand, worth a look: how the crawl reads at full frame rate; that the downed camera sway isn't annoying; the
   revive/bleed text on a small laptop screen.
-- By hand on cs_mansion (no script for these yet; the server side is covered by `gadgets.mjs`):
+- On cs_mansion (now scripted in `g2.mjs`; the server side is covered by `gadgets.mjs`):
   - shot down on the zip line: you drop off the cable (no trolley over your head any more), fall, and either die on
     landing or crawl on; others see you fall and lie on the floor, not hanging;
   - K on the zip line: the view falls with you (eyes half closed) and ends on the floor where the corpse lies; to
@@ -264,7 +297,7 @@ START_MONEY=16000 MAP_ROTATION=0` (it takes ~5 minutes) and look at the screensh
   - K while jumping or on a ladder: "Stand on the ground to play dead".
 
 ### Not verified / known gaps
-- Nothing in the browser after browser tests were stopped (see above).
+- In the browser: only headless (SwiftShader, a few to ~25 frames a second) and no sound; see STATUS "Left".
 - Hostage rescue end to end: no scripted rescue on cs_mansion (on main either — see STATUS; a fault in
   `lib/hostages.js`, not here), and bots rescued none in 180 s (on main either).
 - A real death on the zip line (main's code): `killPlayer` takes you off the cable without moving you, so a dead
