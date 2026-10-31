@@ -23,6 +23,7 @@ import { CollisionWorld } from './shared/collision.js';
 import { skyOf } from './shared/maps/sky.js';
 import { doorBox, doorCenter, doorReach, openingSide, GONE } from './shared/doors.js';
 import { ZIP, zipFeet, zipPoint, zipDir, zipRide, fallDamage, CCTV, camView, camHalfFov } from './shared/gadgets.js';
+import { createElevator } from './lib/elevator.js'; // elevator
 import { Stats, rating } from './lib/stats.js';
 import { rankIndex } from './shared/ranks.js';
 import { ACHIEVEMENTS } from './shared/achievements.js';
@@ -547,6 +548,7 @@ function resetWorld() {
   game.camDownAt = {};
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
   sendGadgets();
+  elevator.reset(); // elevator: the cabin back on the ground floor, doors shut
 }
 
 // ---- Breakable walls and furniture (maps with `breakables`: cs_mansion). Explosions and heavy guns wear the
@@ -899,6 +901,7 @@ function shootDoor(i, dmg) {
 function mansionTick(t) {
   if (MAP.zip) zipTick(t);
   if (MAP.cctv) cctvTick(t);
+  if (MAP.elevator) elevator.tick(t); // elevator
   for (const [i, o] of Object.entries(game.doorOpening || {})) {
     if (t < o.at) continue;
     delete game.doorOpening[i];
@@ -1071,6 +1074,14 @@ function cctvTick(t) {
   for (const i of back) game.camsDown.delete(i);
   sendGadgets();
 }
+
+// elevator: the lift in the Mansion (lib/elevator.js). motorStart is the gas system's hook: when it's merged, it becomes
+// (pos, by) => sparkAt(pos, 'motor', by) — the motor sparks each time it starts.
+const elevator = createElevator({
+  map: () => MAP, world: () => world, now, players, game, send, broadcast, sendMines, sendSatchels,
+  power: () => game.lights?.power !== false,
+  motorStart: (pos, by) => {}, // elevator → gas: sparkAt(pos, 'motor', by)
+});
 
 function nearestSwitch(p) {
   let best = null, bd = 1.8;
@@ -2012,6 +2023,7 @@ function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
+    if (a.type === 'elevforce') { elevator.act(p, a, t); continue; } // elevator: prying the lift's doors (any phase)
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
@@ -2075,6 +2087,7 @@ function onUse(p, m, t) {
   if (p.zip) { zipOff(p, t, 'letgo'); return; }
   if (p.cctv) { cctvOff(p, 'left'); return; }
   if (p.driving != null || p.riding != null) { exitCar(p); return; }
+  if (MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at)
   if (game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p)) {
     p.act = { type: 'plant', start: t, pos: p.p.slice(), dur: CFG.plantTime * 1000 };
     return;
@@ -2583,6 +2596,7 @@ function onSatchel(p, m) {
       s.local = toCar(car, hit.at);
       s.ln = toCar({ p: [0, 0, 0], yaw: car.yaw }, hit.n);
     }
+    if (MAP.elevator) elevator.stick(s, hit, flight); // elevator: stuck to the cabin, it rides along
     const own = game.satchels.filter(x => x.owner === p.id);
     if (own.length >= SATCHEL.perPlayer) game.satchels.splice(game.satchels.indexOf(own[0]), 1);
     game.satchels.push(s);
@@ -3496,6 +3510,7 @@ function handleAdmin(req, res) {
 
 function handle(p, m) {
   const t = now();
+  if (m.t.startsWith('elev')) { elevator.message(p, m); return; } // elevator
   switch (m.t) {
     case 'join': {
       if (p.joined) break;
@@ -3535,6 +3550,7 @@ function handle(p, m) {
       if (p.cctv) { p.p = MAP.cctv.seat.slice(); p.yaw = MAP.cctv.yaw; p.pitch = -0.3; p.c = 1; p.history.push({ t, p: p.p, c: 1 }); while (p.history[0].t < t - 1000) p.history.shift(); break; }
       if (p.zipFall) zipLanding(p, pos, t);
       if (!p.alive) break;
+      if (MAP.elevator) elevator.fixRider(pos); // elevator: in the cabin means on its floor now
       p.p = pos;
       p.yaw = m.yaw;
       p.pitch = m.pitch;
@@ -3935,6 +3951,7 @@ wss.on('connection', ws => {
   sendJammers(p);
   sendSatchels(p);
   sendGadgets(p);
+  elevator.send(p); // elevator
   sendRoster();
   ws.on('message', data => {
     let m;
