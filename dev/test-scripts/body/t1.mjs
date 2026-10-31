@@ -1,6 +1,6 @@
-// "Downed, not dead" + "Play dead", server side (de_dust2, GAME_PORT test server with BOTS=0 START_MONEY=16000, e.g.
-// GAME_PORT=4010 MAP=de_dust2 BOTS=0 START_MONEY=16000 via srv.sh). Two Terrorists and two CTs, scripted, in the
-// open CT spawn. Seven rounds:
+// "Downed, not dead" + "Play dead", server side (de_dust2 or cs_mansion, GAME_PORT test server with BOTS=0
+// START_MONEY=16000, e.g. GAME_PORT=4010 via `srv.sh MAP=cs_mansion BOTS=0 START_MONEY=16000 MAP_ROTATION=0`; run the
+// test with the same MAP=). Two Terrorists and two CTs, scripted, in the open (see OFF below). Seven rounds:
 //  1 a headshot kills outright; the last one standing dies outright too (nobody to revive him)
 //  2 down (feed, snapshot, the lying hitbox), revive (5 s, the reviver can't shoot, 30 HP), down again, finished
 //  3 bleeding out after 30 s (the kill goes to whoever downed him)
@@ -10,6 +10,10 @@
 //  6 the last one standing can't play dead
 //  7 playing dead ends after 10 s; only once a round
 import { player, sleep } from '../mansion/client.mjs';
+// The open ground the test plays on: de_dust2's CT spawn, or (MAP=cs_mansion / cs_mansion_night, the same as the
+// server's) the same layout moved onto the flat lawn of the back garden. P() moves a de_dust2 position there.
+const OFF = { cs_mansion: [-53, 27], cs_mansion_night: [-53, 27] }[process.env.MAP] || [0, 0];
+const P = (x, y, z) => [x + OFF[0], y, z + OFF[1]];
 const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if (!cond) process.exitCode = 1; };
 // (joined in turns: auto team balance won't let a team get two ahead)
 const T1 = await player('Tango', 'T'), C1 = await player('Charlie', 'CT'), T2 = await player('Toby', 'T'), C2 = await player('Cathy', 'CT');
@@ -43,7 +47,7 @@ for (const c of all) c.w = c === T1 || c === T2 ? 'glock' : 'usp';
 
 // ---------------------------------------------------------------- round 1
 await nextRound();
-T1.at([20, 0, -30], 0); T2.at([20, 0, -33], 0); C1.at([14, 0, -30], -Math.PI / 2); C2.at([14, 0, -24], -Math.PI / 2);
+T1.at(P(20, 0, -30), 0); T2.at(P(20, 0, -33), 0); C1.at(P(14, 0, -30), -Math.PI / 2); C2.at(P(14, 0, -24), -Math.PI / 2);
 await sleep(600);
 await shoot(C1, head(T2), 'usp', 500);
 ok('a headshot kills outright (no bodyDown)', T2.got('kill').some(m => m.v === ids.T2 && m.hs) && !C2.got('bodyDown').length);
@@ -53,7 +57,7 @@ ok('round 1 over', await until(() => T1.got('roundEnd').length > 0, 2000));
 
 // ---------------------------------------------------------------- round 2
 await nextRound();
-T1.at([20, 0, -30], 0); T2.at([20, 0, -33], 0); C1.at([14, 0, -30], -Math.PI / 2); C2.at([14, 0, -24], -Math.PI / 2);
+T1.at(P(20, 0, -30), 0); T2.at(P(20, 0, -33), 0); C1.at(P(14, 0, -30), -Math.PI / 2); C2.at(P(14, 0, -24), -Math.PI / 2);
 await sleep(600);
 await drop(C1, T1);
 const dn = C2.got('bodyDown')[0];
@@ -69,11 +73,11 @@ T1.clear();
 await shoot(C1, chest(T1), 'usp', 450);
 ok('a shot at standing chest height misses someone crawling', !T1.got('dmg').length && !T1.got('kill').length);
 // T2 can't revive from 3 m away; from 0.6 m, facing him, he can
-T2.at([20.6, 0, -30], Math.PI / 2); await sleep(400);
+T2.at(P(20.6, 0, -30), Math.PI / 2); await sleep(400);
 T2.use(true); await sleep(400);
 ok(`T2 reviving (act ${T2.snap?.me?.a})`, T2.snap?.me?.a === 'bodyRevive');
 C1.clear();
-T2.send({ t: 'shoot', o: [20.6, EYE, -30], d: [0, 0, -1], w: 'glock', rt: 0 }); await sleep(300);
+T2.send({ t: 'shoot', o: P(20.6, EYE, -30), d: [0, 0, -1], w: 'glock', rt: 0 }); await sleep(300);
 ok("the reviver can't shoot", !C1.got('shot').length);
 await sleep(1500);
 ok(`the bleeding stops while reviving (${T2.snap?.bd?.d?.find(e => e[0] === ids.T1)?.[1]}), revive ${T2.snap?.bd?.d?.find(e => e[0] === ids.T1)?.[2]}`, (T2.snap?.bd?.d?.find(e => e[0] === ids.T1)?.[1] ?? 0) > 0.85);
@@ -81,12 +85,12 @@ ok('revived after 5 s (bodyUp by T2)', await until(() => C2.got('bodyUp').some(m
 T2.use(false);
 await sleep(200);
 ok(`T1 up with 30 HP (${T1.me?.hp})`, T1.me?.hp === 30 && !T2.snap?.bd);
-T2.at([20, 0, -33], 0); await sleep(500);
+T2.at(P(20, 0, -33), 0); await sleep(500);
 T1.clear(); C2.clear();
 await drop(C1, T1);
 ok('down again', C2.got('bodyDown').some(m => m.v === ids.T1));
 await sleep(450);
-await shoot(C1, [20, 0.2, -30], 'usp', 500);
+await shoot(C1, P(20, 0.2, -30), 'usp', 500);
 const fin = C2.got('bodyKill').find(m => m.v === ids.T1), kill = C2.got('kill').find(m => m.v === ids.T1);
 ok(`finished by a shot at the body on the floor (bodyKill ${fin?.how}; kill k ${kill?.k}, hs ${kill?.hs})`, fin?.how === 'finished' && kill?.k === ids.C1 && kill.hs === false);
 await sleep(300);
@@ -96,7 +100,7 @@ ok('round 2 over', await until(() => T1.got('roundEnd').length > 0, 2000));
 
 // ---------------------------------------------------------------- round 3: bleeding out
 await nextRound();
-T1.at([20, 0, -30], 0); T2.at([20, 0, -33], 0); C1.at([14, 0, -30], -Math.PI / 2); C2.at([14, 0, -24], -Math.PI / 2);
+T1.at(P(20, 0, -30), 0); T2.at(P(20, 0, -33), 0); C1.at(P(14, 0, -30), -Math.PI / 2); C2.at(P(14, 0, -24), -Math.PI / 2);
 await sleep(600);
 await drop(C1, T1);
 ok('T1 down', C2.got('bodyDown').some(m => m.v === ids.T1));
@@ -109,7 +113,7 @@ await until(() => T1.got('roundEnd').length > 0, 2000);
 
 // ---------------------------------------------------------------- round 4: the last one standing dies
 await nextRound();
-T1.at([20, 0, -30], 0); T2.at([20, 0, -33], 0); C1.at([14, 0, -30], -Math.PI / 2); C2.at([14, 0, -24], -Math.PI / 2);
+T1.at(P(20, 0, -30), 0); T2.at(P(20, 0, -33), 0); C1.at(P(14, 0, -30), -Math.PI / 2); C2.at(P(14, 0, -24), -Math.PI / 2);
 await sleep(600);
 await drop(C1, T1);
 ok('T1 down', C2.got('bodyDown').some(m => m.v === ids.T1));
@@ -122,11 +126,11 @@ ok(`and the round ends (${T1.got('roundEnd')[0]?.reason})`, re && /Terrorists el
 await nextRound();
 T2.send({ t: 'buy', item: 'ak47' }); await sleep(300);
 ok('T2 bought an AK-47', T2.me?.inv?.primary?.id === 'ak47');
-T1.at([20, 0, -33], 0); T2.at([20, 0, -26], 0); C1.at([14, 0, -25], -Math.PI / 2); C2.at([14, 0, -26], -Math.PI / 2);
+T1.at(P(20, 0, -33), 0); T2.at(P(20, 0, -26), 0); C1.at(P(14, 0, -25), -Math.PI / 2); C2.at(P(14, 0, -26), -Math.PI / 2);
 T2.w = 'ak47';
 await sleep(1200);
 ok(`before: CT2 spots T2 on the radar (sp ${JSON.stringify(C2.snap?.sp)})`, C2.snap?.sp?.some(e => e[0] === ids.T2));
-await shoot(C1, [20, 0.4, -26], 'usp', 300); // a leg shot: C1 will be the one who "killed" him
+await shoot(C1, P(20, 0.4, -26), 'usp', 300); // a leg shot: C1 will be the one who "killed" him
 ok(`T2 hit in the leg (hp ${T2.hp})`, T2.hp < 100 && T2.hp > 50);
 const hpBefore = T2.hp;
 for (const c of all) c.clear();
@@ -145,25 +149,25 @@ await sleep(300);
 ok(`team bar: dead (${JSON.stringify(C2.bar?.find(r => r[0] === ids.T2))})`, C2.bar?.find(r => r[0] === ids.T2)?.[1] === 0);
 const drops = C2.slow.dr || [];
 ok(`his weapons fell out of his hands (drops ${JSON.stringify(drops.map(d => d[1]))}), his hands are empty`, drops.some(d => d[1] === 'ak47') && drops.some(d => d[1] === 'glock') && !T2.me?.inv?.primary && !T2.me?.inv?.secondary);
-T2.at([21, 0, -26], 0); await sleep(300);
-ok(`a "corpse" doesn't move (x ${row(C2, ids.T2)?.[1]})`, row(C2, ids.T2)?.[1] === 20);
-T2.at([20, 0, -26], 0);
-T2.send({ t: 'shoot', o: [20, EYE, -26], d: [-1, 0, 0], w: 'knife', rt: 0 }); await sleep(250);
+T2.at(P(21, 0, -26), 0); await sleep(300);
+ok(`a "corpse" doesn't move (x ${row(C2, ids.T2)?.[1]})`, row(C2, ids.T2)?.[1] === P(20, 0, 0)[0]);
+T2.at(P(20, 0, -26), 0);
+T2.send({ t: 'shoot', o: P(20, EYE, -26), d: [-1, 0, 0], w: 'knife', rt: 0 }); await sleep(250);
 ok("a \"corpse\" can't shoot (or knife)", !C1.got('shot').length);
 T2.send({ t: 'chat', text: 'boo' }); await sleep(200);
 ok('no all-chat from a "corpse"', !C1.got('chat').length);
 await sleep(500);
-await shoot(C1, [20, 0.12, -25.1], 'usp', 400);
+await shoot(C1, P(20, 0.12, -25.1), 'usp', 400);
 const up = C2.got('bodyUp').find(m => m.v === ids.T2);
 ok(`a shot at the "corpse" wakes him (bodyUp pd ${up?.pd} why ${up?.why}) and hurts (hp ${hpBefore} -> ${T2.hp})`, up?.pd === 1 && up.why === 'hit' && T2.hp < hpBefore);
 ok('his weapons are back', T2.me?.inv?.primary?.id === 'ak47' && T2.me?.inv?.secondary?.id === 'glock');
 await sleep(200);
 ok('alive again in the CTs\' snapshot and roster', row(C2, ids.T2)?.[8] === 1 && C2.roster?.find(e => e.id === ids.T2)?.alive === true && C2.roster?.find(e => e.id === ids.C1)?.k === 8);
 C1.clear();
-T2.send({ t: 'shoot', o: [20, EYE, -26], d: [-1, 0, 0], w: 'ak47', rt: 0 }); await sleep(200);
+T2.send({ t: 'shoot', o: P(20, EYE, -26), d: [-1, 0, 0], w: 'ak47', rt: 0 }); await sleep(200);
 ok("getting up (1 s): can't shoot yet", !C1.got('shot').length);
 await sleep(1000);
-T2.send({ t: 'shoot', o: [20, EYE, -26], d: [-1, 0, 0.3], w: 'ak47', rt: 0 }); await sleep(250);
+T2.send({ t: 'shoot', o: P(20, EYE, -26), d: [-1, 0, 0.3], w: 'ak47', rt: 0 }); await sleep(250);
 ok('then he can', C1.got('shot').length === 1);
 T2.clear();
 T2.send({ t: 'bodyPlayDead' }); await sleep(300);
@@ -174,7 +178,7 @@ await until(() => T1.got('roundEnd').length > 0, 2000);
 
 // ---------------------------------------------------------------- round 6: the last one standing can't play dead
 await nextRound();
-T1.at([20, 0, -33], 0); T2.at([20, 0, -26], 0); C1.at([14, 0, -25], -Math.PI / 2); C2.at([14, 0, -26], -Math.PI / 2);
+T1.at(P(20, 0, -33), 0); T2.at(P(20, 0, -26), 0); C1.at(P(14, 0, -25), -Math.PI / 2); C2.at(P(14, 0, -26), -Math.PI / 2);
 await sleep(600);
 await shoot(C1, head(T1), 'usp', 400);
 T2.clear();
@@ -185,7 +189,7 @@ await until(() => T1.got('roundEnd').length > 0, 2000);
 
 // ---------------------------------------------------------------- round 7: 10 s at most
 await nextRound();
-T1.at([20, 0, -33], 0); T2.at([20, 0, -26], 0); C1.at([14, 0, -25], -Math.PI / 2); C2.at([14, 0, -26], -Math.PI / 2);
+T1.at(P(20, 0, -33), 0); T2.at(P(20, 0, -26), 0); C1.at(P(14, 0, -25), -Math.PI / 2); C2.at(P(14, 0, -26), -Math.PI / 2);
 await sleep(600);
 T2.send({ t: 'bodyPlayDead' }); await sleep(300);
 ok('playing dead again in a new round', T2.got('bodyPlayDead').length === 1);
