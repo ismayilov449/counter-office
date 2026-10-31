@@ -10,6 +10,7 @@ import { BLOOD, BL_BANDAGING, BL_NODROPS } from '/shared/blood.js';
 import { inWater } from '/shared/physics.js';
 
 const MAX = BLOOD.max;
+const LOWER = 600; // main.js lowers the gun by (me.drawUntil - now) / 600: at most this far ahead, or it swings round
 const CELL = 2; // the floor index's grid (m)
 const UP = [0, 1, 0];
 const _o = new THREE.Object3D();
@@ -274,7 +275,11 @@ export class BloodTrails {
     // all faded: stop drawing them
     if (this.count && now / 1000 - this.lastBorn > BLOOD.life) this.clear();
     if (this.bandaging && (!me.alive || now > this.bandaging.until + 1500)) this.bandaging = null;
-    if (this.bandaging) me.nextShot = Math.max(me.nextShot, this.bandaging.until);
+    if (this.bandaging) {
+      me.nextShot = Math.max(me.nextShot, this.bandaging.until);
+      // the gun stays down, and comes back up over the last 0.6 s
+      me.drawUntil = Math.max(me.drawUntil, Math.min(this.bandaging.until, now + LOWER));
+    }
     this.updateHud(now);
   }
 
@@ -301,7 +306,7 @@ export class BloodTrails {
       this.bandaging = { start: now, until: now + m.dur };
       // no shooting, and the gun goes down (it comes back up over the last 0.6 s)
       me.nextShot = Math.max(me.nextShot, this.bandaging.until);
-      me.drawUntil = this.bandaging.until;
+      me.drawUntil = Math.max(me.drawUntil, Math.min(this.bandaging.until, now + LOWER));
       me.scope = 0;
       me.nadeHold = null;
       audio.play('pickup');

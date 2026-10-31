@@ -2,33 +2,39 @@
 
 ## STATUS
 - **Done:** server, client and shared code; all hooks; `origin/main` (zip line, CCTV) merged in. Server-side and
-  Node tests pass: `unit.mjs` (35 checks), `clientsmoke.mjs` (44 checks), `tblood.mjs` (33 checks, run twice),
+  Node tests pass: `unit.mjs` (35 checks), `clientsmoke.mjs` (46 checks), `tblood.mjs` (33 checks, run twice),
   `floorindex.mjs`, `soak.mjs` with `BOTS=4` for 60 s on cs_mansion and on cs_mansion_night (no server errors), and
   the server starts on all 7 maps.
 - **Tested on the Mansion only** (cs_mansion and cs_mansion_night), as the user asked. On the other maps the same code
   runs (the drops find the floor the same way), but nothing was tuned or checked there beyond the server starting.
-- **Browser test, first run (paused, cs_mansion + cs_mansion_night, ports 4020/9420):** `gblood.mjs` ran once: all
-  checks pass except the draw-call one (+6.1 measured; too noisy at 7.5 fps on swiftshader, the measurement needs
-  fixing, not the drops: they are one `InstancedMesh`). No page errors. Screenshots looked at: the cap (600 drops on
-  the street, read as blood), the street trail (visible, small), the BLEEDING badge and the "press P" message. Being
-  looked into: in `gb_stairs.png` the drops on the cellar steps are not visible (their positions are on the steps).
-  Still to look at: the bandaging bar, the own trail, the night roof and street, the Esc menu's P line, the first
-  drop freeze, frame time with many drops (`views.mjs`).
-- **Next steps (architect):**
-  1. Start the server: `GAME_PORT=4020 bash dev/test-scripts/blood/up.sh MAP=cs_mansion BOTS=0`, a headless Edge on
-     9420, then `GAME_PORT=4020 CDP_PORT=9420 node dev/test-scripts/blood/gblood.mjs`. Look at `gb_*.png` in `OUT`.
-  2. Browser checks still to do (by eye, in those screenshots or in a real game):
-     - the drops look like blood (dark red blobs with small splashes), the right size, lying flat on the street,
-       on each cellar step, tilted on the house's sloped roof; no flicker or z-fighting, no drop floating or sunk;
-     - they darken over about 15 s and fade out between 30 and 40 s; the cap (600) and **one extra draw call** for all
-       of them (`gblood.mjs` measures it);
-     - at night (cs_mansion_night): lit like the floor around them (the room lighting patch), not glowing, not black;
-     - no freeze at the first drop of a map (the shader is compiled in `prewarm`);
-     - the BLEEDING badge next to HP/AP, the "Bandaging..." bar, P, slow walking, the gun lowered and back up, no
-       shooting meanwhile, the messages;
-     - the "P bandage (when bleeding)" line at the end of the Esc menu's controls list (added from `blood.js`);
-     - frame time on a laptop with 600 drops on screen; no page errors.
-  3. Merge order and links with other features: see "Interactions for integration" below.
+- **Browser-verified** (headless Edge + swiftshader, cs_mansion and cs_mansion_night, ports 4020/9420): `gblood.mjs`
+  passes every check, no page errors; every screenshot looked at:
+  - the drops read as blood (red blobs with splashes), flat on the street, on the cellar steps (a drop whose middle is
+    on a step's edge lies on the lower step, half under the riser), tilted on the house's sloped roof; nothing draws
+    through things standing on them (the grate's lid);
+  - fresh red, dark brown-red after 20 s (`gb_cap_dry.png`), half faded at 35 s (`gb_cap_fading.png`), all gone and
+    the mesh hidden after 40 s; the cap (600);
+  - **draw calls:** the drops' own mesh makes exactly 1.00 draw call a frame (600 shown), 0 hidden; the frame's median
+    goes 104 -> 105. (The first run's "+6.1" was the mean over frames, which swings by ~40 with the passes made only
+    now and then: the test now uses the median and counts the mesh's own calls.) `views.mjs` with 600 drops in view:
+    +1 call, +1,200 triangles, frame time within swiftshader's noise (day 232-244 ms against 233 hidden; night
+    267-274 against 258, 1280x720);
+  - at night: the roof's and the street's drops are lit like the floor under them (dim, reddish; not glowing, not
+    black), and red under a street lamp;
+  - no freeze at a map's first drop: no shader program is linked when it appears (prewarm compiled it);
+  - the BLEEDING badge and its message, P: the "Bandaging..." bar, slow walking, the gun down then back up, "Bandaged"
+    message, the badge gone; the "P bandage (when bleeding)" line last in the Esc menu (`gb_esc.png` shows the menu).
+- **Fixed in the browser pass:** while bandaging, `me.drawUntil` was set 2 s ahead, but main.js lowers the gun by
+  `(drawUntil - now) / 600` with no cap (a weapon switch never goes past 1), so the gun swung ~2 rad and 0.8 m down;
+  now it is held at most 600 ms ahead every frame (gun fully down, back up over the last 0.6 s). `clientsmoke.mjs`
+  checks it (46 checks). Tests re-run: `unit.mjs`, `clientsmoke.mjs`, `tblood.mjs` twice, `floorindex.mjs`: all pass.
+- **Left (by eye / taste, not blocking):** sounds (by ear); frame cost on a real laptop with 600 drops; the trail is
+  faint at a distance on the grass and on the cellar's dark wood steps (dark red on dark red-brown) and at night: a
+  size/colour tuning call for the user. Seen, not this feature's: `hud.small` messages ("You are bleeding — press P")
+  are drawn over the team bar's money row.
+- **Next steps (architect):** merge (see "Interactions for integration" below). To re-run the browser test:
+  `GAME_PORT=4020 bash dev/test-scripts/blood/up.sh MAP=cs_mansion BOTS=0`, a headless Edge on 9420, then
+  `SIZE=960x540 GAME_PORT=4020 CDP_PORT=9420 node dev/test-scripts/blood/gblood.mjs`; screenshots `gb_*.png` in `OUT`.
 - **Tests** (`dev/test-scripts/blood/`):
   - `unit.mjs`: `node dev/test-scripts/blood/unit.mjs` (lib/blood.js with fake players, no server);
   - `clientsmoke.mjs`: `node --import ./dev/test-scripts/blood/register.mjs dev/test-scripts/blood/clientsmoke.mjs`
@@ -142,7 +148,7 @@
 - The server starts on all 7 maps and serves `/js/blood.js` and `/shared/blood.js`.
 
 ### Not verified / known gaps
-- Nothing in a browser (see STATUS). The drops' look, lighting and frame cost are unchecked.
+- Browser-checked in headless Edge with swiftshader only (see STATUS): the frame cost on a real laptop is not measured.
 - Dust II, Inferno, Assault, de_dusty, aim_map: only that the server starts (the user said not to spend effort there).
 - `p.downed` / `p.playingDead` only in `unit.mjs` (the body feature isn't on this branch).
 - Each browser places its own drops (same path, different scatter); someone who joins late doesn't see older drops.

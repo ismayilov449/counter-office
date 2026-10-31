@@ -224,7 +224,8 @@ bt.bandage();
 ok('P sends bloodBandage', sent.at(-1)?.t === 'bloodBandage');
 net.handlers.bloodBandage({ t: 'bloodBandage', s: 'start', dur: BLOOD.bandage * 1000, left: BLOOD.bandages - 1 });
 const until = T + BLOOD.bandage * 1000;
-ok(`bandaging: slow (x${bt.speedMul()}), no shooting, the gun down, no scope, no grenade in hand, a sound`, bt.speedMul() === BLOOD.slow && me.nextShot >= until && me.drawUntil >= until && me.scope === 0 && me.nadeHold === null && sounds.includes('pickup'));
+// (the gun goes down: main.js lowers it by (drawUntil - now) / 600, so more than 600 ms ahead swings it round)
+ok(`bandaging: slow (x${bt.speedMul()}), no shooting, the gun down (${me.drawUntil - T} ms ahead), no scope, no grenade in hand, a sound`, bt.speedMul() === BLOOD.slow && me.nextShot >= until && me.drawUntil - T === 600 && me.scope === 0 && me.nadeHold === null && sounds.includes('pickup'));
 sent.length = 0;
 bt.bandage();
 ok('P again while bandaging: nothing sent', !sent.length);
@@ -232,6 +233,10 @@ bt.onSnapshot([[1, 2, BL_BANDAGING]]); step();
 me.nextShot = 0; // (a weapon switch can't let you shoot either)
 T += 1000; bt.onSnapshot([[1, 2, BL_BANDAGING]]); step();
 ok(`half way: the bar at ${bt.fill.style.width}, the badge hidden, still no shooting`, !bt.bar.classList.contains('hidden') && bt.badge.classList.contains('hidden') && /^(4\d|5\d)%$/.test(bt.fill.style.width) && me.nextShot >= until);
+ok(`half way: the gun still down (${me.drawUntil - T} ms ahead)`, me.drawUntil - T === 600);
+T += 600; step();
+ok(`the last 0.4 s: the gun comes back up (${Math.round(until - T)} ms left, down until the end: ${me.drawUntil === until})`, me.drawUntil === until);
+T -= 600 + 1000 / 60;
 T += 1000;
 net.handlers.bloodBandage({ t: 'bloodBandage', s: 'done', left: BLOOD.bandages - 1 });
 bt.onSnapshot(undefined); step();

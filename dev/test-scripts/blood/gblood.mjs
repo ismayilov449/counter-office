@@ -15,25 +15,35 @@ const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if 
 
 const g = await open('CT', 'Watcher', ['msg', 'bloodBandage', 'bloodKit']);
 const { tp, shot, ev, errors, key, msgs } = g;
+// SIZE=960x540: a smaller page than open()'s 1280x720 (lighter on the PC)
+if (process.env.SIZE) { const [w, h] = process.env.SIZE.split('x').map(Number); await g.cmd('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false }); }
 // a draw-call counter on the game's WebGL context, and a handle on the blood module's instance
 const hook = async () => ev(`(async () => {
   const gl = document.querySelector('#game canvas').getContext('webgl2');
-  window.__dc = 0; window.__fr = 0;
+  window.__dc = 0; window.__fr = 0; window.__bdc = 0; window.__inBlood = false; window.__per = [];
   if (!gl.__counted) {
     gl.__counted = true;
-    for (const k of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced']) { const f = gl[k].bind(gl); gl[k] = (...a) => { window.__dc++; return f(...a); }; }
-    (function loop() { window.__fr++; requestAnimationFrame(loop); })();
+    // every draw call, and those made while the blood mesh is being drawn (its onBeforeRender / onAfterRender)
+    for (const k of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced']) { const f = gl[k].bind(gl); gl[k] = (...a) => { window.__dc++; if (window.__inBlood) window.__bdc++; return f(...a); }; }
+    // shader programs linked (a link mid-game is a freeze)
+    window.__links = 0; const link = gl.linkProgram.bind(gl); gl.linkProgram = p => { window.__links++; return link(p); };
+    // (the draw calls of each frame: a frame's count varies with passes made only now and then, so the median is used)
+    let last = 0;
+    (function loop() { window.__fr++; if (window.__dc > last) { window.__per.push(window.__dc - last); if (window.__per.length > 400) window.__per.shift(); } last = window.__dc; requestAnimationFrame(loop); })();
   }
   const { BloodTrails } = await import('/js/blood.js');
   if (!BloodTrails.__hooked) { BloodTrails.__hooked = true; const up = BloodTrails.prototype.update; BloodTrails.prototype.update = function (...a) { window.__bleed = this; return up.apply(this, a); }; }
   return 'ok';
 })()`);
 console.log('hooks:', await hook());
+// draw calls a frame (the median), the blood mesh's own draw calls a frame (exact), fps
 const dcPerFrame = async (ms = 4000) => {
-  const a = JSON.parse(await ev('JSON.stringify([__dc, __fr])'));
+  await ev(`(() => { const m = __bleed.mesh; m.onBeforeRender = () => { window.__inBlood = true; }; m.onAfterRender = () => { window.__inBlood = false; }; __per.length = 0; return 1; })()`);
+  const a = JSON.parse(await ev('JSON.stringify([__dc, __fr, __bdc])'));
   await sleep(ms);
-  const b = JSON.parse(await ev('JSON.stringify([__dc, __fr])'));
-  return { dc: (b[0] - a[0]) / (b[1] - a[1]), fps: (b[1] - a[1]) / (ms / 1000) };
+  const b = JSON.parse(await ev('JSON.stringify([__dc, __fr, __bdc, __per.slice().sort((x, y) => x - y)])'));
+  const per = b[3], frames = b[1] - a[1];
+  return { dc: per.length ? per[per.length >> 1] : 0, mean: (b[0] - a[0]) / frames, own: (b[2] - a[2]) / frames, fps: frames / (ms / 1000) };
 };
 const drops = () => ev('__bleed ? __bleed.count : -1');
 
@@ -88,7 +98,15 @@ const hidden = await dcPerFrame();
 await ev('__bleed.mesh.visible = true, 1');
 const shown2 = await dcPerFrame();
 const extra = (shown1.dc + shown2.dc) / 2 - hidden.dc;
-ok(`draw calls: ${hidden.dc.toFixed(2)} without the drops, ${shown1.dc.toFixed(2)} / ${shown2.dc.toFixed(2)} with ${nCap} of them: +${extra.toFixed(2)} (fps ${hidden.fps.toFixed(1)})`, extra > 0.5 && extra < 1.5);
+console.log(`     draw calls a frame (median; mean): ${hidden.dc} (${hidden.mean.toFixed(1)}) without the drops, ${shown1.dc} (${shown1.mean.toFixed(1)}) / ${shown2.dc} (${shown2.mean.toFixed(1)}) with ${nCap} of them: +${extra.toFixed(1)} (fps ${hidden.fps.toFixed(1)})`);
+ok(`the drops' own draw calls a frame: ${shown1.own.toFixed(2)} / ${shown2.own.toFixed(2)} with ${nCap} of them, ${hidden.own.toFixed(2)} hidden`, Math.abs(shown1.own - 1) < 0.1 && Math.abs(shown2.own - 1) < 0.1 && hidden.own === 0);
+// drying and fading: every drop made older (the shader works from each drop's birth time)
+const age = s => ev(`(() => { const t = performance.now() / 1000 - ${s}; __bleed.born.array.fill(t); __bleed.born.needsUpdate = true; __bleed.lastBorn = t; return 1; })()`);
+await age(20); await sleep(800); await shot('gb_cap_dry.png');
+await age(BLOOD.life - BLOOD.fade / 2); await sleep(800); await shot('gb_cap_fading.png');
+await age(BLOOD.life + 1); await sleep(800);
+const goneN = await drops(), goneV = await ev('__bleed.mesh.visible');
+ok(`all faded after ${BLOOD.life} s: ${goneN} drops, mesh visible ${goneV}`, goneN === 0 && goneV === false);
 await ev('__bleed.clear(), 1');
 
 // ---- 2. the runner's trail along the street, then down the cellar stairs
@@ -116,7 +134,8 @@ const nStairs = (await drops()) - nStreet;
 ok(`drops down the stairs: ${nStairs} (runner ended at y ${yEnd})`, nStairs >= 6);
 await shot('gb_stairs.png');
 const onSteps = await matrices(nStreet);
-const bad = onSteps.filter(([x, y, z]) => Math.abs(floorY(x, z, y + 0.1) + 0.01 - y) > 0.05);
+// (a drop whose middle is on a step's edge, within the positions' rounding, lies on the lower step: also checked 2 cm off)
+const bad = onSteps.filter(([x, y, z]) => [0, 0.02, -0.02].every(dz => Math.abs(floorY(x, z + dz, y + 0.1) + 0.01 - y) > 0.05));
 ok(`stair drops lie on the steps (${onSteps.length} checked, ${bad.length} off by > 5 cm${bad.length ? ': ' + JSON.stringify(bad.slice(0, 3)) : ''})`, onSteps.length > 0 && bad.length === 0);
 
 // ---- 3. the watcher bleeds: badge, own drops, P bandages
@@ -143,14 +162,25 @@ const bar = await ev("[...document.querySelectorAll('#hud > div')].some(d => !d.
 const mul = await ev('__bleed.speedMul()');
 const got = await msgs(false);
 ok(`P: bandaging (bar ${bar}, walking speed x${mul}, ${JSON.stringify(got.filter(m => m.t === 'bloodBandage'))})`, bar && mul === BLOOD.slow && got.some(m => m.t === 'bloodBandage' && m.s === 'start'));
+// the gun down (main.js lowers it by (drawUntil - now) / 600: more than 600 ms ahead swings it round into view)
+const lead = await ev('__bleed.ctx.me.drawUntil - performance.now()');
+ok(`the gun down while bandaging (${Math.round(lead)} ms ahead)`, lead > 0 && lead <= 600);
 await shot('gb_bandaging.png');
-await sleep(BLOOD.bandage * 1000 + 600);
+await sleep(1150);
+await shot('gb_bandaging_end.png'); // (the gun coming back up)
+await sleep(BLOOD.bandage * 1000 + 600 - 1150);
 const after = await ev("(() => { const b = document.getElementById('bleed-badge'); return b.classList.contains('hidden') ? 'hidden' : b.textContent; })()");
 const mul2 = await ev('__bleed.speedMul()');
 ok(`bandaged: badge ${after}, speed x${mul2}`, after === 'hidden' && mul2 === 1);
 await tp([27, 0, 4], 0, -0.35);
 await sleep(800);
 await shot('gb_ownTrail.png');
+// the P line at the end of the Esc menu's controls list
+const pLine = await ev("[...document.querySelectorAll('#paused .controls > div')].at(-1)?.textContent");
+await ev("document.getElementById('paused').classList.remove('hidden'), 1"); await sleep(400);
+await shot('gb_esc.png');
+await ev("document.getElementById('paused').classList.add('hidden'), 1");
+ok(`the Esc menu's last control: "${pLine}"`, /^P bandage \(when bleeding\)$/.test(pLine || ''));
 
 // ---- 4. Mansion at night: a new map clears the drops; a trail over the house's sloped roof, the drops tilted with it
 await admin({ action: 'map', map: 'cs_mansion_night' });
@@ -160,6 +190,13 @@ await sleep(4000);
 await live();
 await hook();
 ok(`a new map: no drops (${await drops()})`, (await drops()) === 0);
+// the map's first drop: its shader was compiled while the map loaded (prewarm), so no program is linked now
+await tp([27, 0, 1], 0, -0.3); await sleep(1500);
+const l0 = await ev('__links');
+await ev('__bleed.drip([27, 0, -3], 2), 1'); await sleep(1000);
+const l1 = await ev('__links');
+ok(`the map's first drop links no shader program (${l1 - l0} linked, ${await drops()} drop)`, l1 === l0 && (await drops()) === 1);
+await ev('__bleed.clear(), 1');
 const y0 = floorY(-22.5, -8, 8.5);
 runner.at([-22.5, y0, -8], Math.PI / 2); await sleep(700);
 const hpN = await wound();
