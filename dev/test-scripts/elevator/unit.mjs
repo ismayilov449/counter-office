@@ -8,7 +8,7 @@ const { MAPS } = await import(G + 'shared/maps/index.js');
 const { CollisionWorld } = await import(G + 'shared/collision.js');
 const { movePlayer, overlapsAny, ladderAt, ladderPull, PLAYER } = await import(G + 'shared/physics.js');
 const L = await import(G + 'shared/elevator.js');
-const { ELEV, motionAt, tripTime, doorAt, makeBoxes, placeCabin, placeDoor, inCabin, onRoof, makeLadders, placeLadders, roofSpot, cabinSpot, roofAt, aimAt, nearestStop } = L;
+const { ELEV, motionAt, tripTime, doorAt, makeBoxes, placeCabin, placeDoor, inCabin, onRoof, makeLadders, placeLadders, roofSpot, cabinSpot, roofAt, aimAt, nearestStop, doorway, touches, panelZ } = L;
 
 let fails = 0, checks = 0;
 const ok = (cond, what) => { checks++; if (!cond) { fails++; console.log('FAIL', what); } };
@@ -183,5 +183,11 @@ for (const y of [S[0], S[1], S[2]]) {
   ok(nearestStop(E, 3.5).s === 2 && near(nearestStop(E, 3.5).d, S[2] - 3.5), 'nearest stop');
 }
 
+// the doors' light curtain: someone in the doorway holds them; someone waiting outside, or inside near them, doesn't
+for (let k = 0; k < 4; k++) {
+  const y = k ? S[k - 1] : S[1], b = doorway(E, k, y), x = (E.door.x1 + E.door.x2) / 2;
+  ok(touches(b, [x, y, E.cabin.z2 + 0.03]), `doors ${k}: someone on the threshold holds them`);
+  ok(!touches(b, [x, y, E.out.z2 + PLAYER.radius + 0.001]) && !touches(b, [x, y, panelZ(E, 0)[0] - PLAYER.radius - 0.001]), `doors ${k}: not someone just outside, or just inside`);
+}
 console.log(`\n${checks - fails}/${checks} checks passed`);
 process.exit(fails ? 1 : 0);

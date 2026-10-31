@@ -108,7 +108,7 @@ export function createElevator(ctx) {
     yPrev = y;
     y = motionAt(motion(), t).y;
     dy = y - yPrev;
-    if (Math.abs(dy) > 0.15) dy = 0; // (a jump, not a ride: a new round put it back on the ground floor)
+    if (Math.abs(dy) > 0.5) dy = 0; // (a jump, not a ride: a new round put it back on the ground floor)
     if (dy) {
       for (const id of st.rm) { const e = ctx.mines.get(id); if (e) { e.obj.position.y += dy; if (e.m) e.m.p[1] += dy; } }
       for (const id of st.rs) { const e = ctx.satchels.get(id); if (e && e.obj.parent === scene) e.obj.position.y += dy; }

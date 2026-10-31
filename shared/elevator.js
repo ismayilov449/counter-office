@@ -114,10 +114,11 @@ export function placeDoor(E, B, k, y, o) {
   put(ra, C + half * o, y0, ia, C + pw + half * o, y1, ib);
   put(rb, D.x2 - pw + pw * o, y0, oa, D.x2 + pw * o, y1, ob);
 }
-// The doorway in front of door set k: whoever stands in it keeps the doors from shutting.
+// The doorway in front of door set k (from the cabin's door panels to the landing's): whoever stands in the doors' way
+// keeps them from shutting (not someone waiting just outside, or inside near them).
 export function doorway(E, k, y) {
   const D = E.door, y0 = k === 0 ? y : E.stops[k - 1];
-  return { min: [D.x1 - 0.02, y0, E.cabin.z2 - E.cabin.wall - 0.08], max: [D.x2 + 0.02, y0 + D.h, E.out.z2 + 0.02] };
+  return { min: [D.x1 - 0.02, y0, panelZ(E, 0)[0] + 0.005], max: [D.x2 + 0.02, y0 + D.h, E.out.z2 - 0.04] };
 }
 // The shaft's ladder (drawn the whole way up) is climbable only where the cabin isn't: under its floor and over its roof
 // — two ladders that move with it. Only the browsers have them (in map.ladders); bots never go into the shaft.
