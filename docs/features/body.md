@@ -1,5 +1,20 @@
 # "Downed, not dead" + "Play dead" (feature "body", branch `feature/body`)
 
+## STATUS
+- **Done:** server (`lib/body.js`), browser (`public/js/body.js`), shared numbers/hitboxes (`shared/body.js`), hooks in
+  server.js, lib/bots.js, main.js; this doc.
+- **Tests that exist and pass (server only):** `t1.mjs` (7 rounds, everything below), `obj.mjs` (bomb: downed carrier
+  can't plant, revive, plant, defuse), `bots.mjs` (soaks: dust2 90 s, Mansion 180 s, cs_assault 200 s — no server
+  errors, bots go down, crawl with the pistol and finish downed enemies).
+- **Half-done:** `hostage.mjs` — the feature parts pass (a downed CT can't lead a hostage; E on a hostage still makes it
+  follow), but the scripted walk to the rescue zone loses the hostage ("lost track of you") — a test-walking problem
+  (the hostage code is untouched); hostage rescue end-to-end is not verified. Next step: walk slower / check where the
+  hostage gets stuck, or watch bots rescue on cs_assault with normal bots.
+- **Browser checks still to do:** run `g1.mjs` (see "Browser checks still to do" below); no browser test was run
+  after the shooter positions were fixed.
+- **Integration:** `main` gained the zip line / CCTV after this branch: on going down, release `p.zip` / `p.cctv`
+  (main's applyDamage only leaves the CCTV desk when hp > 0) — e.g. via `body.onDown(...)`. See "For integration".
+
 ## (a) README
 
 Put under **Gameplay**, after the radar red dots (and add the keys to the controls table: **K** play dead; **E** also
@@ -132,7 +147,58 @@ revives a downed teammate).
   a shot at the corpse wakes him (bodyUp why hit), the damage counts, weapons back, alive again everywhere, 1 s before
   he can shoot, only once a round; the last one standing can't play dead; 10 s limit with no fake killer (k null,
   w world).
-- See the notes below for the browser, bots and regression runs.
+- `obj.mjs` (server, de_dust2, 2 v 2 on site A, all OK): the bomb carrier downed on the site can't plant (E does
+  nothing from the floor); his teammate revives him; he plants (3 s); a CT defuses (10 s) and the round ends "Bomb has
+  been defused".
+- `bots.mjs` (one scripted player parked outside the map so the bots fight each other; no server errors in any run):
+  de_dust2 BOTS=4 for 90 s — 1 down, it bled out, the downed bot crawled 2.7 m in 4 s crouched with its Glock; Mansion
+  BOTS=5 for 180 s — 3 downs, 2 finished by bots, a downed bot crawled 4.6 m in 4 s with its Glock, rounds ended
+  normally (time), tick avg 1.5–3.9 ms (max ~16 ms); cs_assault BOTS=4 (easy, 170 s rounds) for 200 s — 3 downs,
+  1 finished by a bot, 2 bled out, round ended "All Terrorists eliminated" (no hostage rescued by the bots in that time).
+- The server starts with all 7 maps (and builds the bots' nav for each in the background) with no errors.
+- One browser run of `g1.mjs` happened before browser tests were stopped (an earlier version with a shooter standing
+  inside a wall, so the "down" half didn't happen): playing dead worked in the real game — K sent it, the CTs got the
+  kill, the eyes overlay went to full opacity, pressing W got the player up (bodyUp), a teammate playing dead was shown;
+  no page errors.
+
+### Browser checks still to do (the architect's run)
+Run `GAME_PORT=4010 CDP_PORT=<edge> OUT=<dir> node dev/test-scripts/body/g1.mjs` against `srv.sh MAP=de_dust2 BOTS=0
+START_MONEY=16000 MAP_ROTATION=0` (it takes ~5 minutes) and look at the screenshots:
+- `g1_mate_down.png`: a downed teammate lies on his belly, head up, pistol forward, his name tag above him; the red
+  pulsing cross on the radar.
+- `g1_revive_hint.png` / `g1_reviving.png`: "Hold E to revive Mate (5 s)", then the progress bar "Reviving Mate...".
+- `g1_down.png` / `g1_crawled.png` / `g1_being_revived.png`: the red edges, "YOU'RE DOWN", the bleed bar counting down,
+  the low camera, the pistol in hand (1 doesn't take out the AK), crawling at about 1 m/s, "Mate is reviving you" with
+  the green bar; `g1_revived.png`: all gone.
+- `g1_playdead.png` / `g1_rising.png` / `g1_up.png`: eyes half closed, the view from the floor (no gun in hand), then
+  getting up over a second.
+- `g1_mate_playdead.png`: a teammate playing dead looks like a corpse with his name tag.
+- Part 2 (the browser as a CT): `g1_ct_fake_corpse.png` (a corpse, a kill in the feed), `g1_ct_scoreboard.png` (Mate
+  dead), `g1_ct_rising.png` / `g1_ct_up.png` (the corpse getting up, "Mate was playing dead!").
+- No page errors (printed at the end of each part).
+- By hand, worth a look: how the crawl reads at full frame rate; that the downed camera sway isn't annoying; the
+  revive/bleed text on a small laptop screen.
 
 ### Not verified / known gaps
-- See the end of this file (filled in after the browser and bots runs).
+- Nothing in the browser after browser tests were stopped (see above).
+- The kill feed's "(down)", "(finished)", "(bled out)" and "[revived]" are made by decorating the existing kill feed
+  (the victim's name / the weapon text); there's no icon.
+- Spectating a teammate who is down or playing dead puts the camera at crouch height above his position, not on the
+  floor.
+- Blasts measure line of sight to a point 1 m up, as for anyone; someone lying behind a low wall can still be hurt.
+- The rewind for lag compensation uses the downed player's current yaw (positions are rewound, the facing isn't).
+- Clutch achievement: a teammate still down (alive) when the round is won means it isn't counted as a clutch.
+- Playing dead as the last one alive is refused (it would fool nobody: the round wouldn't end); a sharp player might
+  notice the missing money for a "kill" the fake gave him, or that no first-blood call came.
+- Bots don't revive and don't play dead; they ignore anyone playing dead (they take the body for dead).
+
+### For integration (other agents' features)
+- Human shield (`p.shield`): call `body.onDown(p => { /* let go of p.shield */ })` from server.js after `body.init`,
+  or check `p.downed` in that feature's tick.
+- Blood trails (`p.bleeding`): someone down should bleed — either that feature treats `p.downed` as bleeding, or set
+  `p.bleeding` in an `onDown` hook and clear it in `body.reset`/revive.
+- Disguise (uniform from a really dead body, hold E 3 s): a body playing dead is `alive`, so the server must refuse
+  it — but quietly, the same way it refuses any non-body (the prompt and the refusal must not tell an enemy that the
+  "corpse" is alive). Downed players are alive too.
+- E is shared: revive comes first in `onUse` (right after the `!m.on` line) and only when a downed teammate is within
+  1.6 m and in front (or under you); the uniform, hostage grab and floodgate valve hooks should come after it.
