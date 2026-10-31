@@ -125,8 +125,15 @@ For the file list at the end of the README:
 - `dev/test-scripts/gas/client_smoke.mjs` (`node --import ./dev/test-scripts/gas/register.mjs …`): the browser module
   in Node with a stubbed page: pipes build on both Mansion maps (4 + 6 meshes), leak → sparks, vapour, shimmer,
   HUD lines at the three levels, valve hint, shut, blast effects, wrecked pipe hidden, round reset, other maps empty.
-- See the final run's results in the commit/report: all 7 maps start, BOTS=4 for 60 s without server errors, t5/t7
-  (doors, blackout) still pass.
+- `t_gas.mjs` parts 2 and 4 also pass on a server started with `MAP=cs_mansion_night`.
+- `dev/test-scripts/gas/maps.mjs`: the admin switches through all 7 maps with a player on, a shot on each: every map
+  loads, no `gs` anywhere, no server errors.
+- `dev/test-scripts/gas/botgas.mjs` on a `BOTS=4 DEBUG_TICK=1` server (normal leak rate): both pipes holed, 75 s with 4
+  bots a side playing while the gas spread (kitchen 0.48, cellar 0.45 at the end): no server errors, tick 0.5–2.1 ms
+  on average (max 7.8 ms).
+- The old Mansion tests `mansion/t5.mjs` (the back door creaks open, closes, is shot out) and `mansion/t7.mjs` (the
+  blackout: cut, dead switch, restored) still pass on this branch.
+- Graph build: 144–180 ms per Mansion map object (once, at start-up / map change).
 
 ### Not verified (browser checks still to do)
 - How it looks: the pipe and meter (one early screenshot looked right: yellow pipe, grey meter with "GAS" dial, red
