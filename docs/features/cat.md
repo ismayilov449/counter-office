@@ -8,40 +8,58 @@
     wall. All 14 spots are reached (doors open). It never stood still with a path.
   - `ai.mjs`: 38 checks, 40 runs in a row.
   - `t1.mjs`: live server, 32 checks.
-  - `clientsmoke.mjs`: 31 checks.
+  - `clientsmoke.mjs`: 34 checks (now with no paw through the floor and planted paws at the walk and trot).
   - `soak.mjs`: 60 s with `BOTS=4`, no server errors; ticks about 1 ms on average.
   - `maps.mjs`: all 7 maps start.
-- **Browser, part 1 (`catview.mjs`, headless Edge, both Mansion maps; paused before `g1.mjs`):**
-  - Seen in the screenshots: every pose (sit, walk, trot, run, wash, stretch, hide, air, sleep, loaf) reads clearly.
-    The size next to the sofa is right (a sitting cat's head is about at seat height). The tail curls when it sits
-    and loafs. The paws rest on the floor in the standing poses. The loaf on the sofa seat and the bowl in the
-    kitchen look right. At night the eyes are two small yellow-green dots, they glow in the dark living room, and
-    they are shut when it sleeps. No page errors on either map.
-  - Draw calls: by day about 1 for each cat in view. At night about 1.75 (its shadow and the eyes). Basket and bowl
-    are 1 each. The eyes have `frustumCulled = false`, so at night they cost 1 call even when the cat is off screen
-    (minor).
-  - Test fix: `catview.mjs`'s `basket` view looked past the basket (yaw `+0.55` changed to `-0.55`). Not re-run yet.
-  - Still to check: whether the hide and loaf tail tips dip below the floor (from the side they look slightly
-    low). Then all of `g1.mjs` on both maps (the basket at round start, following, foot sliding, hops, bolting,
-    the eyes in the game).
-- **Browser checks still to do (architect):**
-  - **`catview.mjs`** (posed cats, no game; on `cs_mansion` and `cs_mansion_night`):
-    - its size next to the sofa;
-    - every pose sits on the floor (not floating, not sunk);
-    - the tail curls;
-    - two small eye dots at night, shut asleep;
-    - the draw calls with and without the cats (it should add about 2 for the cat and 2 for the basket and bowl);
-    - no page errors.
-  - **`g1.mjs`** (the real game; run it once per Mansion map):
+  - Re-run after the browser fixes: `sim.mjs` (20 min on `cs_mansion`, 10 on `cs_mansion_night`: 0 bad ticks),
+    `ai.mjs`, `clientsmoke.mjs`, `t1.mjs` (`WANDER=40`) and `maps.mjs` all pass, with 0 server errors.
+- **Browser-verified (headless Edge, swiftshader, both Mansion maps; `catview.mjs` and `g1.mjs`):**
+  - **`catview.mjs` (posed cats):** every pose reads clearly. The size next to the sofa is right (a sitting cat's
+    head is about at seat height). The tail curls when it sits and loafs. The loaf on the sofa seat, the sleep in the
+    basket and the bowl in the kitchen look right. At night the eyes are two small yellow-green dots, they glow in
+    the dark living room, and they are shut when it sleeps. No page errors.
+  - **`g1.mjs` (the real game), all 30 checks pass on `cs_mansion`:**
     - asleep in its basket at round start;
-    - it comes over and sits when you stand still;
-    - no foot sliding when it walks, trots or runs;
-    - hops onto the sofa or a sill without cutting the edge;
-    - it bolts at gunfire;
-    - glowing eyes in the dark living room at night;
+    - it follows a player who stands still by it ("mrrp"), sits at his feet looking up, and walks after him;
+    - a team mate's PMN under it goes off: thrown (screech), it lands on a floor, runs, hides, never dies;
+    - a shot into the air makes it hiss and bolt;
+    - a bullet throws it, unhurt;
+    - it goes up to a crouched player in ghillie camo and meows;
+    - left alone it wanders (28 to 65 m in 90 s over the runs), up onto the sofa and the kitchen window sill,
+      0 snapshots off a floor;
     - no page errors.
+  - **`g1.mjs` on `cs_mansion_night`:** all the same checks pass (the follow and the mine in the cellar). With the
+    living room's lights switched off, the awake cat's eyes glow, two yellow dots looking up from the basket, and a
+    small dot from across the room. Up on the sofa, not cutting its edge. No page errors.
+  - **Fixes from the browser checks** (`public/js/cat.js`):
+    - **Foot sliding:** the old walk and trot swung the legs as pendulums that never lifted, with a stride that
+      didn't match the swing. The paws slid about 34 cm a step cycle, and in the game the 9/s blend damped the
+      swing to a third or a half of that. Now a paw that is down stays put (an IK leg, see the animation below),
+      and it comes forward lifted: 1.4 cm of slide a cycle at the walk and trot, 3.5 cm at the gallop
+      (`clientsmoke.mjs` checks it).
+    - **Paws through the floor:** the gallop sank them up to 3 cm mid-stride and the stretch 6.6 cm. `pawLift`
+      keeps every paw at or above the floor, and the stretch is now a play bow with the front paws flat.
+    - **Blending:** a new state crossfades in from the pose it had (0.3 s), then follows its target exactly. The
+      old per-frame lerp damped every quick movement (steps, licking, trembling).
+    - **Draw calls:** the eyes are frustum-culled (they used to cost a call at night even off screen). Its shadow
+      is only drawn within 12 m of the camera, like the players' 30 m rule, since a room lamp's cube shadow draws
+      it up to 6 times.
+    - **Tests:** `catview.mjs`'s basket view looked past the basket. `g1.mjs` now goes to the cat wherever it is,
+      lays the mine only under a sitting cat, keeps the watching player beyond following range, keeps the shooter
+      and Tom out of the picture, and adds the mine, bullet, camo and wander steps, the perch pictures and the draw
+      calls. `clientsmoke.mjs` now checks the floor and the planted paws.
+  - **Draw cost against `main`** (the in-game WebGL draws per frame, with the cat, basket and bowl switched off by
+    layer: that is everything this branch adds to a frame):
+    - +2.5 looking at the basket with the cat in it (the cat, the basket, part of the bowl);
+    - +0 looking away while the cat is in its basket;
+    - +13.7 looking away while the cat walks under the living room's shadow-casting lamp right behind the camera
+      (its shadow in the lamps' cube shadow maps; the 12 m rule doesn't help this close);
+    - night: +3.3 looking at the basket, +0.3 and +0.7 looking away (the eyes no longer cost a call off screen).
+- **What's left:**
   - **By ear, in a real browser:** the meow, mrrp, screech and hiss, and the purr right next to it (volume, and that
     the sounds come from where the cat is).
+  - **Watching the walk in motion on a real GPU:** swiftshader runs at a few frames a second, so the planted paws
+    were checked numerically (`clientsmoke.mjs`) and in still frames, not as smooth motion.
 - **Tests:** `dev/test-scripts/cat/`. The plain node ones need no server: `sim.mjs`, `ai.mjs`, and `clientsmoke.mjs`
   (run with `node --import ./dev/test-scripts/cat/register.mjs`). The others need a server started by `srv.sh` on
   4060, with fresh data in `$TEMP/co-cat/testdata`:
@@ -49,7 +67,8 @@
     left alone, 150 by default);
   - `soak.mjs`: `MAP=cs_mansion BOTS=4 DEBUG_TICK=1`;
   - `maps.mjs`: any map.
-  - Browser (not run): `catview.mjs` and `g1.mjs`, with the headless Edge on `CDP_PORT=9460`.
+  - Browser: `catview.mjs` (any server on 4060), and `g1.mjs` (`MAP=cs_mansion` or `cs_mansion_night`, `BOTS=0
+    ROUND_TIME=600 START_MONEY=16000`, a fresh server for each run), with one headless Edge on `CDP_PORT=9460`.
 
 ## (a) README
 
@@ -112,12 +131,21 @@
   - **The model:** one `SkinnedMesh`. 27 boxes, 324 triangles, colours in the vertices, 10 bones (body, head, four
     legs, three tail bones). The geometry and the Lambert material are shared. One draw call, plus one for its shadow.
   - **The eyes:** a 2-point `Points` with a tiny shader, at least 2.5 px, shown only on the night map and not asleep.
+    Frustum-culled like everything else (no draw call when the cat is off screen).
   - **The basket and bowl:** one baked mesh each.
   - **Smoothing:** it interpolates between snapshots on `renderTime()`. A step up is eased (about 0.1 s), and a jump
     of more than 3 m (a new round) snaps.
-  - **The animation:** procedural, a target pose per state blended in. Walking, trotting and galloping legs keyed to
-    the distance moved (no sliding); sit with a tail curl; wash (licks a paw, rubs its face); loaf; sleep (curled,
-    breathing); hide (flat, trembling); stretch; air (tumbling); the head goes up when it meows.
+  - **The animation:** procedural, a target pose per state.
+    - A new state crossfades in over 0.3 s (0.1 s into `air`) from the pose it had when the state changed. After that
+      the pose is the target itself, so the steps and quick movements (licking, trembling) aren't damped.
+    - Walk, trot and gallop (`GAIT`: stride 0.36 / 0.48 / 0.95 m a cycle) are keyed to the distance moved. A paw that
+      is down stays put: each leg's angle and length are worked out from where its paw is (a one-bone leg that
+      stretches up to about 20 %). It goes back exactly as fast as the floor goes by, then comes forward lifted.
+      Walk and trot move in diagonal pairs, half the cycle down. The gallop moves the front pair, then the back,
+      a quarter of the cycle down, with the back arching.
+    - `pawLift` raises the body whenever a paw would go below the floor (a stretch, a blend between two poses).
+    - The rest: sit with a tail curl; wash (licks a paw, rubs its face); loaf; sleep (curled, breathing); hide (flat,
+      trembling); stretch (a play bow, front paws on the floor); air (tumbling); the head goes up when it meows.
   - **The sounds:** made on the fly through `audio.out(pos)`, so they're positional. A sawtooth through two sliding
     formant filters for meow and mrrp, plus noise for the screech and hiss; the purr is a 27 Hz rattle while the
     camera is within 7 m.
