@@ -1,19 +1,36 @@
 # "Downed, not dead" + "Play dead" (feature "body", branch `feature/body`)
 
 ## STATUS
-- **Done:** server (`lib/body.js`), browser (`public/js/body.js`), shared numbers/hitboxes (`shared/body.js`), hooks in
-  server.js, lib/bots.js, main.js; this doc.
-- **Tests that exist and pass (server only):** `t1.mjs` (7 rounds, everything below), `obj.mjs` (bomb: downed carrier
-  can't plant, revive, plant, defuse), `bots.mjs` (soaks: dust2 90 s, Mansion 180 s, cs_assault 200 s — no server
-  errors, bots go down, crawl with the pistol and finish downed enemies).
-- **Half-done:** `hostage.mjs` — the feature parts pass (a downed CT can't lead a hostage; E on a hostage still makes it
-  follow), but the scripted walk to the rescue zone loses the hostage ("lost track of you") — a test-walking problem
-  (the hostage code is untouched); hostage rescue end-to-end is not verified. Next step: walk slower / check where the
-  hostage gets stuck, or watch bots rescue on cs_assault with normal bots.
-- **Browser checks still to do:** run `g1.mjs` (see "Browser checks still to do" below); no browser test was run
-  after the shooter positions were fixed.
-- **Integration:** `main` gained the zip line / CCTV after this branch: on going down, release `p.zip` / `p.cctv`
-  (main's applyDamage only leaves the CCTV desk when hp > 0) — e.g. via `body.onDown(...)`. See "For integration".
+- **Finished (server side).** Server (`lib/body.js`), browser (`public/js/body.js`), shared numbers/hitboxes
+  (`shared/body.js`), hooks in server.js, lib/bots.js, main.js; this doc. `main` (zip line, CCTV) is merged in
+  (7fe11e5; the only conflicts were hook lines next to main's new `busy(p)` checks and imports: both kept).
+- **The Mansion's gadgets (done 2026-10-31):** going down or playing dead takes you off the zip line (you let go and
+  fall: the landing's fall damage finishes someone down, wakes someone playing dead) and up from the CCTV desk (back
+  where you stood). From the floor (down, playing dead, getting up) E doesn't hook on, cut the cable or sit down. On a
+  gadget, E works the gadget before a revive. A "corpse" falling off the zip line keeps its weapons until it lands,
+  then they fall where it lies, and the server pins it there. K in mid-air (jumping, on a ladder, swimming) is refused
+  in the browser ("Stand on the ground to play dead"). Server test `gadgets.mjs` (38 checks) passes on cs_mansion and
+  cs_mansion_night.
+- **Hostage rescue — verdict: not a regression of this feature.** `lib/hostages.js` and the hostage part of `onUse`
+  are untouched (a CT's E only goes to a revive when a downed teammate lies within 1.6 m in front of him), and the
+  same scripted walk (`hostage.mjs`, cs_mansion, all 4 hostages, doors opened first, a hostage-walkable path) gives
+  exactly the same result on a server run from `main`'s code (a temporary worktree of origin/main, port 4012): no
+  hostage reaches the street; each one loses track at the same spot — the front door's jamb (-6.8, 0.8, -2.3) for the
+  two downstairs, an upstairs doorway's corner (-13.7, 4.3, 8.2) for the two upstairs. Cause (main's code):
+  `updateHostages` drops a breadcrumb as soon as the hostage is within 0.7 m of it and then walks straight at the next
+  one, so it cuts the corner when the leader turns right after a doorway and gets caught on the jamb. Bots: 180 s soaks
+  with 5 bots a side on cs_mansion rescued none, on this branch and on main alike (both rounds ran out of time). The
+  first try failed for test reasons too (the bots' grid has ladders and false drops through the Mansion's roofs, and a
+  scripted CT walks through closed doors), fixed in the test. A fix, if wanted, belongs in `lib/hostages.js` (e.g.
+  drop a crumb only within ~0.3 m, or skip to a later crumb only when it's in line of sight) — not this feature's file.
+- **Server tests after the merge (all pass):** `t1.mjs` on cs_mansion (7 rounds; it now takes `MAP=`), `gadgets.mjs`
+  on cs_mansion and cs_mansion_night, main's `t16zip.mjs` and `t17cctv.mjs`, `hostage.mjs` part 1 (a downed CT can't
+  lead a hostage), bot soaks (cs_mansion 5 bots 180 s, cs_mansion 4 bots 60 s, cs_mansion_night 4 bots 120 s: no
+  server errors, tick avg 0.7–2.3 ms, max 5.1 ms), the server starts on all 7 maps (with bots) without errors. Not
+  re-run (the user asked for Mansion-only testing): `obj.mjs` (bomb, de_dust2 — no code it touches changed in the
+  merge) and the de_dust2 / cs_assault soaks.
+- **Browser checks still to do:** `g1.mjs` is ready but **not run** (de_dust2; see "Browser checks still to do"), plus
+  the gadget checks by hand listed there.
 
 ## (a) README
 
@@ -49,6 +66,10 @@ revives a downed teammate).
     you up (1 second); so does a hit — the damage counts — the end of the round, or the 10 seconds running out.
   - Not as the last one standing on your team (the round wouldn't end, so it would fool nobody); if your teammates all
     fall while you're playing dead, you get up. Only team chat while playing dead.
+  - Only with your feet on the ground (not in mid-air, on a ladder or swimming).
+- **The Mansion's zip line and security desk:** going down or playing dead there lets go of the zip line — you fall,
+  and a fall that hurts finishes you if you're down, or gets you up if you're playing dead — or gets you up from the
+  security desk. You can't hook on, cut the cable or sit down from the floor.
 
 ## (b) RESUME notes
 
@@ -58,31 +79,41 @@ revives a downed teammate).
   back, feet where the player stood, head behind — matching main.js's corpse, which tips over backwards about its feet;
   `deadLow` for someone who was crouching).
 - `lib/body.js` — all the server logic. `init(api)` gets what it needs from server.js; `onDown(fn)` lets other
-  features react when someone goes down.
+  features react when someone goes down, `onPlayDead(fn)` when someone starts playing dead (both called before anyone
+  is told, so they can still move the player).
 - `public/js/body.js` — all the browser logic: `initBody(api)` (wraps net handlers and hud methods) and the `body`
   object of hooks.
-- Tests: `dev/test-scripts/body/` — `srv.sh` (test server on 4010/4011, fresh data in `$SP/testdata`), `t1.mjs`
-  (server, 7 rounds), `g1.mjs` (browser), `bots.mjs` (bots soak), `obj.mjs` (bomb and hostage regressions).
+- Tests: `dev/test-scripts/body/` — `srv.sh` (test server on 4010/4011, fresh data in `$SP/testdata`; extra args are
+  env vars, e.g. `srv.sh MAP=cs_mansion BOTS=0 START_MONEY=16000 MAP_ROTATION=0`), `t1.mjs` (server, 7 rounds; de_dust2,
+  or `MAP=cs_mansion` / `cs_mansion_night` moves the same layout onto the back garden's lawn), `gadgets.mjs` (server,
+  Mansion: the zip line and the CCTV desk), `hostage.mjs` (server, Mansion: a downed CT can't lead a hostage; leading
+  every hostage to the street), `obj.mjs` (server, de_dust2: the bomb with a downed carrier), `bots.mjs` (bots soak),
+  `g1.mjs` (browser, de_dust2).
 
 ### State (the shared contract)
 - `p.downed` (boolean) and `p.playingDead` (boolean), owned here. Everything else this feature keeps on a player starts
   with `body` (`bodyBleedEnd`, `bodyBy`, `bodyWeapon`, `bodyHit`, `bodyPdUsed`, `bodyPdEnd`, `bodyRiseUntil`,
-  `bodyDrops`, `bodyFakeBy`, `bodyRevive`, `bodyReviver`, …).
+  `bodyDrops`, `bodyFakeBy`, `bodyRevive`, `bodyReviver`, `bodyPdYaw`/`bodyPdC` (the corpse's facing and crouch),
+  `bodyDropLater` (falling off the zip line: the weapons fall on landing), …).
 - Downed players are `alive` (so bullets, spotting, bots and the drone/car code all still see them) with `hp` 0.
   Someone playing dead is `alive` too; only what the other team is told says otherwise.
 
 ### Hooks in existing files (each marked `// body:`)
 - `server.js`
-  - imports `./lib/body.js`; `body.init({...})` right after the `BotManager` is created.
+  - imports `./lib/body.js`; `body.init({...})` right after the `BotManager` is created (it gets main's gadget
+    `busy` and `falling: p => !!p.zipFall`), then two lines: `body.onDown(...)` and `body.onPlayDead(...)` call the
+    gadgets' own `zipOff(p, now(), 'letgo')` and `cctvOff(p, 'hurt' | 'left')` (main's `applyDamage` only gets you up
+    from the desk while hp > 0, and `killPlayer`'s release doesn't run for someone who only goes down).
   - `applyDamage`: `body.hurt(v, attacker, weapon)` after the spawn-protection line (remembers the last enemy hit, a hit
     wakes someone playing dead); `const killed = v.hp <= 0 && !body.tryDown(...)` (the only change to the damage flow).
   - `killPlayer`: first line after `if (!v.alive) return;`: for someone down or playing dead, `body.died(...)` clears
     the state and returns who gets the kill (`killer`, `weapon`, `hs` are reassigned).
   - `spawnPlayer`: `body.reset(p)` first.
   - `handle`: `if (body.handle(p, m)) return;` before the switch (the `bodyPlayDead` message; swallows a "corpse"'s
-    `state`, emotes, and all-chat).
-  - `onUse`: `if (body.use(p, t)) return;` after the `!m.on` line (revive; nothing to use from the floor).
-  - `onShoot`: `if (body.noFire(p, m.w)) return;` after the first check; and the two player hit tests use
+    `state` — except while it's still falling off the zip line — emotes, and all-chat).
+  - `onUse`: `if (body.use(p, t)) return;` after the `!m.on` line (revive; nothing to use from the floor — so no
+    hooking on, cutting the cable or sitting at the desk; on a gadget it returns false, so E lets go / gets you up).
+  - `onShoot`: `if (body.noFire(p, m.w)) return;` after the first check (main's line ending in `busy(p)`); and the two player hit tests use
     `body.lying(q) ? body.rayBody(...) : rayPlayer(...)`.
   - `onNade`: `if (body.noFire(p, k)) return;`.
   - `canBuy`: `if (body.noBuy(p)) return body.noBuy(p);`.
@@ -95,12 +126,13 @@ revives a downed teammate).
 - `lib/bots.js`: `weapon()` — a downed bot holds the pistol (or the knife); `fight()` — aims at 0.25 m on someone
   down; `move()` — a downed bot crawls (speed ≤ 1, crouched, no jumps or ladders).
 - `public/js/main.js`
-  - import of `./body.js`; `initBody({...})` right after `const net = new Net({...})`.
+  - import of `./body.js` (after main's `createGadgets` import); `initBody({...})` right after
+    `const net = new Net({...})`.
   - `switchSlot`: `if (body.blocksSlot(slot)) return;`.
   - keydown switch: `case 'KeyK': body.key(); break;`.
   - `updateLocal`: `|| body.frozen()` on `frozen`, `|| body.crouched()` on `wantCrouch`, `speed = body.move(speed)`,
     `body.eye(dt)` after the eye-height line, `&& !body.frozen()` on `canFire`.
-  - `frame`: `body.frame(dt, now)` after `updateRemotes`, `body.camera(camera)` after `updateCamera`,
+  - `frame`: `body.frame(dt, now)` after `updateRemotes` and main's `gadgets.update(dt, now)`, `body.camera(camera)` after `updateCamera`,
     `if (vm && body.frozen()) vm.visible = false;` after `updateViewModel`.
 - `public/js/body.js` wraps (no edits there): net handlers `s`, `kill`, `roster`, `bar`, `spawn`; hud methods `hint`,
   `progress`, `radar` (and `killfeed` only for the length of one `kill` handler call).
@@ -133,9 +165,41 @@ revives a downed teammate).
 - The fake death: real drops (primary, pistol, the bomb) so the body looks like a real one; the body's position, yaw
   and crouch are frozen on the server (it ignores the player's `state`), so the corpse can't turn as you look around.
   The corpse's server hitbox is the lying `dead` one, so shooting a suspicious body hits it.
+- K only with the feet on the ground (the browser refuses it in mid-air, on a ladder or swimming: a corpse can't
+  hang in the air) — except on the zip line.
+- The Mansion's gadgets: going down on the zip line lets go of it (`zipOff … 'letgo'`: you fall with the cable's
+  speed, and the landing's fall damage, like any damage while down, finishes you — the kill to whoever downed you);
+  at the CCTV desk you get up first (`cctvOff … 'hurt'`, back where you stood, "Hit! You jumped up…"), then lie
+  there. Playing dead does the same (`'letgo'`; `'left'` at the desk, no message); a "corpse" falling off the zip line
+  keeps its weapons until it lands (`falling` = main's `p.zipFall`, cleared on landing), the server takes its
+  positions until then (and the landing's fall damage wakes it: you can't dodge fall damage by playing dead), then
+  pins it where it landed and drops its weapons there; its facing stays the one it had when K was pressed. From the
+  floor (down, playing dead, getting up) E does nothing, so no hooking on, cutting or sitting down. On a gadget,
+  `body.use` leaves E to the gadget (otherwise E at the desk with a downed teammate at your feet would start a revive
+  instead of getting you up).
 
 ### Verified
-- `t1.mjs` (server, de_dust2, 2 v 2 scripted, 7 rounds, all OK): a headshot kills outright; the last one standing
+- After merging main (2026-10-31), on cs_mansion (the user asked for Mansion-only testing from then on):
+  - `t1.mjs` with `MAP=cs_mansion`: all 7 rounds OK (everything listed for de_dust2 below).
+  - `gadgets.mjs` (cs_mansion and cs_mansion_night, 3 v 3 scripted, 38 checks, all OK): a CT shot down on the zip
+    line over the street gets `zipEnd` ('letgo') before `bodyDown`, isn't hanging any more in the snapshot (pose 0),
+    falls 6.8 m and the landing (16 fall damage) finishes him, the kill to the shooter (AK-47, bodyKill 'bled'); a CT
+    downed while sitting at the desk gets `cctv off` ('hurt') before `bodyDown`, back where he stood, pose 0; downed,
+    E at the desk, the terrace and the deck does nothing; a CT at the desk with a downed teammate at his feet: E gets
+    him up (no revive); a T plays dead at the desk: `cctv off` ('left') before `bodyPlayDead`, the CTs get the kill
+    and see a corpse where he stood (alive 0, pose 0), E does nothing; a CT plays dead on the zip line over the
+    neighbour's roof: off the cable first, the Ts get the kill, his pistol stays with him while he falls, a 1.1 m
+    drop does no damage, then the pistol lies 0.45 m from him and the server keeps the corpse where it landed (a
+    position 3 m away is ignored), K gets him up with the pistol back; playing dead over the street: the 6.8 m fall
+    does 16 damage and gets him up ('hit'), nothing dropped.
+  - main's `t16zip.mjs` (14 checks) and `t17cctv.mjs` (17 checks): all OK on this branch.
+  - `hostage.mjs` part 1 OK; part 2 (rescues) fails the same way on main — see STATUS.
+  - Bot soaks (`bots.mjs`): cs_mansion 5 bots a side 180 s (2 downs, both finished by bots; round ended by time),
+    cs_mansion 4 bots 60 s (1 down, finished by a bot), cs_mansion_night 4 bots 120 s (few fights in the dark): no
+    server errors, tick avg 0.7–2.3 ms, max 5.1 ms. No downed bot lived 4 s in these runs (the crawl was seen in the
+    earlier runs below).
+  - The server starts on each of the 7 maps (with 2 bots a side, nav built) with no errors.
+- Before the merge: `t1.mjs` (server, de_dust2, 2 v 2 scripted, 7 rounds, all OK): a headshot kills outright; the last one standing
   dies outright; down (bodyDown to everyone, no kill, alive with 0 HP, `bd` with bleeding for the team and only the id
   for the enemy); a shot at standing chest height misses someone down; revive (act, the reviver can't shoot, the
   bleeding pauses, up after 5 s with 30 HP); down again and finished by a shot at the body on the floor (bodyKill
@@ -162,7 +226,8 @@ revives a downed teammate).
   no page errors.
 
 ### Browser checks still to do (the architect's run)
-Run `GAME_PORT=4010 CDP_PORT=<edge> OUT=<dir> node dev/test-scripts/body/g1.mjs` against `srv.sh MAP=de_dust2 BOTS=0
+`g1.mjs` is ready and has **not been run** since the shooter positions were fixed. It plays on de_dust2 (written
+before the Mansion-only rule; its positions are de_dust2's). Run `GAME_PORT=4010 CDP_PORT=<edge> OUT=<dir> node dev/test-scripts/body/g1.mjs` against `srv.sh MAP=de_dust2 BOTS=0
 START_MONEY=16000 MAP_ROTATION=0` (it takes ~5 minutes) and look at the screenshots:
 - `g1_mate_down.png`: a downed teammate lies on his belly, head up, pistol forward, his name tag above him; the red
   pulsing cross on the radar.
@@ -178,9 +243,22 @@ START_MONEY=16000 MAP_ROTATION=0` (it takes ~5 minutes) and look at the screensh
 - No page errors (printed at the end of each part).
 - By hand, worth a look: how the crawl reads at full frame rate; that the downed camera sway isn't annoying; the
   revive/bleed text on a small laptop screen.
+- By hand on cs_mansion (no script for these yet; the server side is covered by `gadgets.mjs`):
+  - shot down on the zip line: you drop off the cable (no trolley over your head any more), fall, and either die on
+    landing or crawl on; others see you fall and lie on the floor, not hanging;
+  - K on the zip line: the view falls with you (eyes half closed) and ends on the floor where the corpse lies; to
+    the other team a corpse falls from the cable; the weapons appear by the body only after it lands;
+  - K or going down at the CCTV desk: the camera picture closes (back to your own eyes), you're on the floor next to
+    the chair, not sitting; the hint "Press E to sit down…" doesn't show while you're down;
+  - K while jumping or on a ladder: "Stand on the ground to play dead".
 
 ### Not verified / known gaps
 - Nothing in the browser after browser tests were stopped (see above).
+- Hostage rescue end to end: no scripted rescue on cs_mansion (on main either — see STATUS; a fault in
+  `lib/hostages.js`, not here), and bots rescued none in 180 s (on main either).
+- A real death on the zip line (main's code): `killPlayer` takes you off the cable without moving you, so a dead
+  rider's body stays at cable height in the air. A play-dead "corpse" falls to the ground instead, so the two differ
+  there; if main's corpse is fixed to fall, nothing changes here.
 - The kill feed's "(down)", "(finished)", "(bled out)" and "[revived]" are made by decorating the existing kill feed
   (the victim's name / the weapon text); there's no icon.
 - Spectating a teammate who is down or playing dead puts the camera at crouch height above his position, not on the
@@ -193,12 +271,25 @@ START_MONEY=16000 MAP_ROTATION=0` (it takes ~5 minutes) and look at the screensh
 - Bots don't revive and don't play dead; they ignore anyone playing dead (they take the body for dead).
 
 ### For integration (other agents' features)
-- Human shield (`p.shield`): call `body.onDown(p => { /* let go of p.shield */ })` from server.js after `body.init`,
-  or check `p.downed` in that feature's tick.
+- Human shield (`p.shield`): call `body.onDown(p => { /* let go of p.shield */ })` from server.js after `body.init`
+  (and `body.onPlayDead` too: a corpse can't hold a hostage), or check `p.downed` / `p.playingDead` in that feature's
+  tick.
 - Blood trails (`p.bleeding`): someone down should bleed — either that feature treats `p.downed` as bleeding, or set
   `p.bleeding` in an `onDown` hook and clear it in `body.reset`/revive.
 - Disguise (uniform from a really dead body, hold E 3 s): a body playing dead is `alive`, so the server must refuse
   it — but quietly, the same way it refuses any non-body (the prompt and the refusal must not tell an enemy that the
   "corpse" is alive). Downed players are alive too.
+- The zip line and the CCTV desk are wired already (see Hooks / Rules); a new gadget that holds the player should be
+  released in the same two lines after `body.init` (`body.onDown` / `body.onPlayDead`) and counted in `busy(p)`.
+- Bet (`lib/bet.js`): someone down at the round's end is `alive` (he survives and keeps his weapons), so "survive"
+  counts him unless the user decides otherwise (open question in RESUME). Kills: `killPlayer` gets the killer already
+  reassigned by `body.died` (the finisher, or the downer after a bleed-out), so a bet hook placed after that line sees
+  the right one; playing dead never calls `killPlayer` (its kill is only a message to the other team), so it's no kill
+  for bets as long as bets count server kills, not `kill` messages.
+- Flood: a downed swimmer drowning faster can read `p.downed`. Cat: meow at `p.playingDead` (to everyone it's an
+  ordinary alive player server-side; only messages to the other team say otherwise).
+- Elevator: the server pins a "corpse" where it lay down (it ignores its `state`), so someone playing dead in a moving
+  cab would stay behind in the air. Either move `p.playingDead` riders' `p.p` with the cab in the elevator's tick, or
+  count the cab ride in `falling` (server.js's `body.init` line) so the browser's positions go through while it moves.
 - E is shared: revive comes first in `onUse` (right after the `!m.on` line) and only when a downed teammate is within
   1.6 m and in front (or under you); the uniform, hostage grab and floodgate valve hooks should come after it.
