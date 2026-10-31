@@ -22,6 +22,7 @@ import { CAR, carBoxes, seatPos, exitSpots } from './shared/vehicles.js';
 import { CollisionWorld } from './shared/collision.js';
 import { skyOf } from './shared/maps/sky.js';
 import { doorBox, doorCenter, doorReach, openingSide, GONE } from './shared/doors.js';
+import { ZIP, zipFeet, zipPoint, zipDir, zipRide, fallDamage, CCTV, camView, camHalfFov } from './shared/gadgets.js';
 import { Stats, rating } from './lib/stats.js';
 import { rankIndex } from './shared/ranks.js';
 import { ACHIEVEMENTS } from './shared/achievements.js';
@@ -289,6 +290,8 @@ const game = {
   drones: [],
   nextMineId: 1,
   satchels: [],
+  camsDown: new Set(), // broken CCTV cameras (Mansion), and when each broke
+  camDownAt: {},
   endVote: null,
   sprays: new Map(),
   nextDropId: 1,
@@ -400,6 +403,9 @@ function randomSpot(p) {
 function spawnPlayer(p) {
   p.burnUntil = 0;
   p.piloting = null;
+  p.zip = null;
+  p.zipFall = null;
+  p.cctv = null;
   p.buys = []; // what can be sold back (onSell): this life's purchases
   // Zombie mode: humans spread over both spawn areas, zombies come back at the T spawn.
   const spots = (isZM() && p.team === 'CT' ? [...MAP.spawns.CT, ...MAP.spawns.T] : MAP.spawns[p.team]).slice().sort(() => Math.random() - 0.5);
@@ -537,7 +543,11 @@ function resetWorld() {
   world.setDoors([]);
   game.hostages = isHostageMap() && CFG.gameMode === 'classic' ? createHostages(MAP) : [];
   clearMines();
+  game.zipCut = false;
+  game.camsDown = new Set();
+  game.camDownAt = {};
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
+  sendGadgets();
 }
 
 // ---- Breakable walls and furniture (maps with `breakables`: cs_mansion). Explosions and heavy guns wear the
@@ -886,8 +896,10 @@ function shootDoor(i, dmg) {
   if (game.doorHp[i] >= 260) blowDoor(i);
 }
 
-// Every tick on Mansion: doors that have creaked open.
+// Every tick on Mansion: doors that have creaked open, the gadgets.
 function mansionTick(t) {
+  if (MAP.zip) zipTick(t);
+  if (MAP.cctv) cctvTick(t);
   for (const [i, o] of Object.entries(game.doorOpening || {})) {
     if (t < o.at) continue;
     delete game.doorOpening[i];
@@ -916,6 +928,149 @@ function setPower(on, by) {
   for (const g of MAP.fusebox.groups) game.lights[g] = on;
   broadcast({ t: 'lights', lights: game.lights, power: on ? 'on' : 'off', p: MAP.fusebox.p });
   notify(on ? `${by.name} brought the power back on` : `${by.name} cut the power — the house is dark`);
+}
+
+// ---- The Mansion's gadgets (see shared/gadgets.js). Their state goes to everyone in a 'gadgets' message whenever it
+// changes (and to whoever joins).
+function gadgetState() {
+  return { t: 'gadgets', zipCut: game.zipCut ? 1 : 0, cams: [...(game.camsDown || [])] };
+}
+const sendGadgets = (to = null) => { if (!MAP.mansion2) return; if (to) send(to, gadgetState()); else broadcast(gadgetState()); };
+// Someone on a gadget can't shoot, throw or use their items.
+const busy = p => !!p.zip || !!p.cctv;
+
+// ---- Zip line: E at either end hooks you on; the server moves you along the cable (your browser works out the same
+// from the start time, see zipRide) and the snapshot shows you hanging there. E or Space lets go (CS 1.6's fall damage
+// when you land: fallDamage); at the end you drop off. A Terrorist at the terrace end holds E to cut it: whoever is on
+// it falls. It's back every round (without rounds, after ZIP.mend seconds).
+function zipStand(p) {
+  const z = MAP.zip;
+  if (!z || game.zipCut) return null;
+  return z.stands.find(st => Math.hypot(p.p[0] - st.p[0], p.p[2] - st.p[2]) < ZIP.reach && Math.abs(p.p[1] - st.p[1]) < 0.7) || null;
+}
+const atZipCut = p => !!MAP.zip && !game.zipCut && Math.hypot(p.p[0] - MAP.zip.cut[0], p.p[2] - MAP.zip.cut[2]) < ZIP.cutReach && Math.abs(p.p[1] - MAP.zip.floor) < 0.7;
+const zipNow = (p, t) => zipRide(MAP.zip, p.zip.s0, p.zip.dir, Math.max(0, t - p.zip.at) / 1000);
+
+function zipOn(p, st, t) {
+  // (not on top of someone who has just hooked on there)
+  if ([...players.values()].some(q => q.zip && q.zip.dir === st.dir && Math.abs(zipNow(q, t).s - st.s) < 1.5)) return send(p, { t: 'msg', text: 'Someone is on the zip line right there — wait a moment.' });
+  p.zip = { s0: st.s, dir: st.dir, at: t };
+  p.zipFall = null;
+  p.act = null;
+  p.p = zipFeet(MAP.zip, st.s);
+  p.history = [];
+  send(p, { t: 'zip', s0: st.s, dir: st.dir, at: t });
+  broadcast({ t: 'sfx', s: 'zipclip', p: zipPoint(MAP.zip, st.s).map(r2) });
+}
+
+// Off the cable: at the end (dropping off), letting go, the cable cut, or death (no message then).
+function zipOff(p, t, why) {
+  if (!p.zip) return;
+  const r = zipNow(p, t), pos = zipFeet(MAP.zip, r.s), v = why === 'end' ? [0, 0, 0] : zipDir(MAP.zip).map(c => c * r.v);
+  p.zip = null;
+  if (why === 'dead') return;
+  p.p = pos;
+  p.history = [];
+  if (why !== 'end') p.zipFall = { top: pos[1], y: pos[1], at: t };
+  const r3 = c => Math.round(c * 1000) / 1000;
+  send(p, { t: 'zipEnd', p: pos.map(r3), v: v.map(r3), why });
+}
+
+// Landing after a fall off the zip line (from the positions the browser sends): the fall damage.
+function zipLanding(p, pos, t) {
+  const f = p.zipFall;
+  if (t - f.at > 8000) { p.zipFall = null; return; }
+  f.top = Math.max(f.top, pos[1]);
+  if (pos[1] < f.y - 1e-3 || pos[1] > f.y + 1e-3) { f.y = pos[1]; f.moved = t; return; }
+  // (landed: no lower for a moment)
+  if (t - (f.moved || f.at + 150) > 150) {
+    p.zipFall = null;
+    const dmg = fallDamage(f.top - pos[1], PLAYER.gravity);
+    if (dmg > 0) { applyDamage(p, null, dmg, 'fall', 'fall', 1, null); broadcast({ t: 'sfx', s: 'land', p: pos.map(r2) }); }
+  }
+}
+
+function cutZip(by) {
+  const t = now();
+  game.zipCut = true;
+  game.zipCutAt = t;
+  for (const q of players.values()) if (q.zip) zipOff(q, t, 'cut');
+  sendGadgets();
+  broadcast({ t: 'sfx', s: 'zipsnap', p: MAP.zip.cut });
+  notify(`${by.name} cut the zip line`, false);
+}
+
+// Every tick: the riders move along (and drop off at the end); without rounds a cut cable is mended after a while.
+function zipTick(t) {
+  for (const p of players.values()) {
+    if (!p.zip) continue;
+    if (!p.alive) { p.zip = null; continue; }
+    const r = zipNow(p, t);
+    p.p = zipFeet(MAP.zip, r.s);
+    if (r.done) zipOff(p, t, 'end');
+  }
+  if (game.zipCut && (game.phase === 'warmup' || isDM() || isGG()) && t - game.zipCutAt > ZIP.mend * 1000) { game.zipCut = false; sendGadgets(); }
+}
+
+// ---- CCTV: E at the security desk sits you down to watch the cameras (your browser draws the picture from them; 1-4
+// or the mouse buttons switch, the mouse turns it). The server knows which camera you watch and where it's turned, so
+// the enemies it sees go on your team's radar. E (or Esc in the browser) gets you up; so does being hurt. A camera
+// breaks to one bullet or a blast (back each round, without rounds after CCTV.mend s); a jammer near one blinds it;
+// the blackout turns them all off.
+const camLive = i => game.lights.power !== false && !game.camsDown.has(i) && !jammedAt(MAP.cctv.cams[i].p);
+const atDesk = p => !!MAP.cctv && Math.hypot(p.p[0] - MAP.cctv.seat[0], p.p[2] - MAP.cctv.seat[2]) < CCTV.reach && Math.abs(p.p[1] - MAP.cctv.floor) < 0.7;
+
+function cctvOn(p) {
+  if ([...players.values()].some(q => q !== p && q.cctv)) return send(p, { t: 'msg', text: 'Someone is already watching the cameras.' });
+  p.cctv = { cam: 0, yaw: 0, pitch: 0, from: p.p.slice() };
+  p.act = null;
+  p.p = MAP.cctv.seat.slice();
+  p.c = 1;
+  p.history = [];
+  send(p, { t: 'cctv', on: 1, cam: 0, p: p.p });
+  broadcast({ t: 'sfx', s: 'cctvon', p: MAP.cctv.seat });
+}
+
+// Up from the desk (back where you stood when you sat down), or dead (no message then).
+function cctvOff(p, why) {
+  if (!p.cctv) return;
+  const from = p.cctv.from;
+  p.cctv = null;
+  if (why === 'dead') return;
+  p.p = from;
+  p.c = 0;
+  p.history = [];
+  send(p, { t: 'cctv', off: 1, p: from, why });
+}
+
+// The watcher's browser: which camera, where it's turned (or 'off': Esc).
+function onCctv(p, m) {
+  if (!p.cctv) return;
+  if (m.off) return cctvOff(p, 'left');
+  if (Number.isInteger(m.cam) && m.cam >= 0 && m.cam < MAP.cctv.cams.length) p.cctv.cam = m.cam;
+  if (isNum(m.yaw)) p.cctv.yaw = Math.max(-CCTV.pan, Math.min(CCTV.pan, m.yaw));
+  if (isNum(m.pitch)) p.cctv.pitch = Math.max(-CCTV.tilt, Math.min(CCTV.tilt, m.pitch));
+}
+
+function breakCam(i, by) {
+  if (game.camsDown.has(i)) return;
+  game.camsDown.add(i);
+  game.camDownAt[i] = now();
+  sendGadgets();
+  broadcast({ t: 'sfx', s: 'cambreak', p: MAP.cctv.cams[i].p });
+  if (by) send(by, { t: 'msg', text: `Camera destroyed (${MAP.cctv.cams[i].name.toLowerCase()}).` });
+}
+function blastCams(at, r) {
+  MAP.cctv?.cams.forEach((c, i) => { if (!game.camsDown.has(i) && dist3(c.p, at) < r && lineOfSight(at, c.p)) breakCam(i, null); });
+}
+
+// Every tick (Mansion): without rounds, broken cameras come back after a while.
+function cctvTick(t) {
+  if (!game.camsDown.size || !(game.phase === 'warmup' || isDM() || isGG())) return;
+  const back = [...game.camsDown].filter(i => t - game.camDownAt[i] > CCTV.mend * 1000);
+  if (!back.length) return;
+  for (const i of back) game.camsDown.delete(i);
+  sendGadgets();
 }
 
 function nearestSwitch(p) {
@@ -1658,6 +1813,9 @@ function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
   v.fl = 0;
   v.deathAt = now();
   if (v.driving != null || v.riding != null) releaseCar(v);
+  if (v.zip) zipOff(v, now(), 'dead');
+  v.zipFall = null;
+  if (v.cctv) cctvOff(v, 'dead');
   if (!silent) v.deaths++;
 
   // Everything worth taking is left on the ground (Gun Game hands out weapons by level instead).
@@ -1736,6 +1894,7 @@ function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo, from = null) 
     record(attacker, 'damage', dealt);
   }
   v.hp -= d;
+  if (v.cctv && v.hp > 0) cctvOff(v, 'hurt'); // (hurt at the desk: you jump up)
   if (v.bot) bots.hurt(v, attacker);
   send(v, { t: 'dmg', hp: Math.max(0, v.hp), armor: Math.round(v.armor), from: attacker && attacker !== v ? attacker.p : null, d });
   const killed = v.hp <= 0;
@@ -1856,9 +2015,14 @@ function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
-    if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
+    if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
+      continue;
+    }
+    if (a.type === 'cut') {
+      if (game.zipCut) p.act = null;
+      else if (t - a.start >= a.dur) { p.act = null; cutZip(p); }
       continue;
     }
     if (a.type === 'satchel') {
@@ -1911,6 +2075,8 @@ function onUse(p, m, t) {
   if (!m.on) { p.act = null; return; }
   if (p.piloting != null) { const d = game.drones.find(x => x.id === p.piloting); if (d) loseDrone(d, 'released'); else p.piloting = null; return; }
   if (!p.alive || p.act) return;
+  if (p.zip) { zipOff(p, t, 'letgo'); return; }
+  if (p.cctv) { cctvOff(p, 'left'); return; }
   if (p.driving != null || p.riding != null) { exitCar(p); return; }
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   if (game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p)) {
@@ -1962,6 +2128,17 @@ function onUse(p, m, t) {
     send(p, { t: 'msg', text: off ? 'The power is already off.' : 'The power is on. Only the Terrorists would cut it.' });
     return;
   }
+  // the zip line: a Terrorist at the tensioner cuts it (3 s), anyone at either end hooks on (not bots)
+  if (MAP.zip && !p.bot && game.phase !== 'freeze') {
+    if (p.team === 'T' && atZipCut(p) && (game.phase === 'live' || game.phase === 'warmup')) {
+      p.act = { type: 'cut', start: t, pos: p.p.slice(), dur: ZIP.cut * 1000 };
+      broadcast({ t: 'sfx', s: 'zipsaw', p: MAP.zip.cut });
+      return;
+    }
+    const st = zipStand(p);
+    if (st) { zipOn(p, st, t); return; }
+  }
+  if (MAP.cctv && !p.bot && atDesk(p)) { cctvOn(p); return; }
   const sw = nearestSwitch(p), door = nearestDoor(p);
   if (door && (!sw || door.dist < dist2(p.p, sw.p))) { useDoor(p, door.i); return; }
   if (sw && game.lights.power === false && MAP.fusebox.groups.includes(sw.group)) {
@@ -2000,7 +2177,7 @@ function rewind(q, rt) {
 
 function onShoot(p, m) {
   const t = now();
-  if (!p.alive || game.phase === 'freeze' || p.piloting != null) return;
+  if (!p.alive || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
   p.protectUntil = 0;
   const w = m.w, def = WEAPONS[w];
   if (!def || def.grenade || def.mortar || w === 'c4') return; // (the mortar fires with a 'mortar' message)
@@ -2043,7 +2220,7 @@ function onShoot(p, m) {
   const traces = [];
   const hits = [];
   const ownCar = carOf(p)?.id ?? null;
-  const shattered = [], chipped = [], jamHits = [], shotSatchels = [], shotDrones = [];
+  const shattered = [], chipped = [], jamHits = [], shotSatchels = [], shotDrones = [], shotCams = [];
   for (const d of dirs) {
     const wall = world.raycast(o, d, range, 'bullet', ownCar);
     const wallT = wall ? wall.t : range;
@@ -2091,6 +2268,7 @@ function onShoot(p, m) {
     else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
     if (!def.melee) for (const s of game.satchels) if (!shotSatchels.includes(s) && raySatchel(o, d, s, endT + 0.1)) shotSatchels.push(s);
+    if (MAP.cctv && !def.melee) MAP.cctv.cams.forEach((c, i) => { if (!game.camsDown.has(i) && !shotCams.includes(i) && rayAABB(o, d, c.p.map(v => v - CCTV.hit), c.p.map(v => v + CCTV.hit), endT + 0.1)) shotCams.push(i); });
     for (const dr of game.drones) {
       if (shotDrones.includes(dr) || (!CFG.friendlyFire && mates(p, dr) && dr.owner !== p.id)) continue;
       if (rayAABB(o, d, dr.p.map(v => v - DRONE.hit), dr.p.map(v => v + DRONE.hit), endT + 0.1)) shotDrones.push(dr);
@@ -2105,6 +2283,7 @@ function onShoot(p, m) {
   breakPieces(chipped);
   for (const s of shotSatchels) explodeSatchel(s);
   for (const dr of shotDrones) hitDrone(dr, p);
+  for (const i of shotCams) breakCam(i, p);
 
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
   if (!hits.length) return;
@@ -2198,7 +2377,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
 // target catches the shell (so it can't reach indoors; see shared/maps/sky.js).
 function onMortar(p, m) {
   const t = now(), def = WEAPONS.mortar;
-  if (!p.alive || game.phase === 'freeze' || p.w !== 'mortar') return;
+  if (!p.alive || game.phase === 'freeze' || p.w !== 'mortar' || busy(p)) return;
   const item = ownItem(p, 'mortar');
   if (!item || item.mag <= 0 || t - p.lastShot < def.rate * 1000 * 0.9) return;
   if (!isNum(m.b) || !isNum(m.e) || m.e < def.elev[0] - 1 || m.e > def.elev[1] + 1) return;
@@ -2267,7 +2446,7 @@ function clearMines() {
 // Laying a mine: on the floor within reach in front of you, not on top of another one.
 function onMine(p, m) {
   const t = now(), k = MINES.includes(m.k) ? m.k : null, pos = vec3(m.p);
-  if (!k || !pos || !isNum(m.yaw) || !p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || game.phase === 'end') return;
+  if (!k || !pos || !isNum(m.yaw) || !p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || game.phase === 'end' || busy(p)) return;
   if (Math.hypot(pos[0] - p.p[0], pos[2] - p.p[2]) > 2.5 || Math.abs(pos[1] - p.p[1]) > 1.5) return;
   const floor = world.raycast([pos[0], pos[1] + 0.4, pos[2]], [0, -1, 0], 1, 'solid');
   if (!floor || floor.t < 0.01) return send(p, { t: 'msg', text: 'Lay the mine on the ground.' }); // (t = 0: inside something)
@@ -2376,7 +2555,7 @@ function clearSatchels() {
 
 // Mouse1 with the satchel: thrown from o at v (m.o, m.v); with the phone (m.det): set off all of ours.
 function onSatchel(p, m) {
-  if (!p.alive || !inTeam(p)) return;
+  if (!p.alive || !inTeam(p) || busy(p)) return;
   if (m.det) {
     const mine = game.satchels.filter(s => s.owner === p.id && s.seq === p.spawnSeq);
     for (const s of mine) explodeSatchel(s);
@@ -2461,6 +2640,7 @@ function explodeSatchel(s) {
     if (d < R * 0.6) damageCar(c, SATCHEL.car * (1 - d / (R * 0.6)), owner);
   }
   chainMines(at, MINE.chain);
+  if (MAP.cctv) blastCams(at, CCTV.blast);
 }
 
 // ---- Signal jammer (Terrorists; see JAMMER in shared/weapons.js): a box with a blinking antenna, put down on the
@@ -2488,7 +2668,7 @@ function clearJammers() {
 
 function onJammer(p, m) {
   const pos = vec3(m.p);
-  if (!pos || !isNum(m.yaw) || !p.alive || !(p.inv.jammer > 0) || game.phase === 'freeze' || game.phase === 'end') return;
+  if (!pos || !isNum(m.yaw) || !p.alive || !(p.inv.jammer > 0) || game.phase === 'freeze' || game.phase === 'end' || busy(p)) return;
   if (Math.hypot(pos[0] - p.p[0], pos[2] - p.p[2]) > 2.5 || Math.abs(pos[1] - p.p[1]) > 1.5) return;
   const floor = world.raycast([pos[0], pos[1] + 0.4, pos[2]], [0, -1, 0], 1, 'solid');
   if (!floor || floor.t < 0.01) return send(p, { t: 'msg', text: 'Put the jammer down on the ground.' });
@@ -2515,6 +2695,7 @@ function destroyJammer(j, by) {
 }
 
 function blastJammers(at, r) {
+  if (MAP.cctv) blastCams(at, Math.max(CCTV.blast, r * 0.5)); // (every blast passes here: the cameras too)
   for (const j of [...game.jammers]) if (dist3(j.p, at) < r && lineOfSight(at, [j.p[0], j.p[1] + 0.3, j.p[2]])) destroyJammer(j, null);
 }
 
@@ -2528,7 +2709,7 @@ function onDrone(p, m, t) {
   const d = game.drones.find(x => x.owner === p.id && (x.state === 'fly' || x.state === 'dive'));
   if (m.launch) {
     const pos = vec3(m.p);
-    if (!pos || !p.alive || !(p.inv.drone > 0) || d || game.phase === 'freeze' || game.phase === 'end' || dist3(pos, eyeOf(p)) > 1.5) return send(p, { t: 'droneEnd', why: 'nolaunch' });
+    if (!pos || !p.alive || !(p.inv.drone > 0) || d || game.phase === 'freeze' || game.phase === 'end' || busy(p) || dist3(pos, eyeOf(p)) > 1.5) return send(p, { t: 'droneEnd', why: 'nolaunch' });
     p.inv.drone--;
     const left = p.droneLeft ?? DRONE.battery * 1000;
     const nd = { id: game.nextMineId++, owner: p.id, team: p.team, p: pos, yaw: isNum(m.yaw) ? m.yaw : p.yaw, pitch: 0, state: 'fly', bomb: p.droneBomb ?? true, hp: p.droneHp ?? DRONE.hits, until: t + left, at: t, vy: 0 };
@@ -2736,6 +2917,15 @@ function updateSpotting(t) {
         if (spots(d.p, d.yaw, e, t, DRONE.fov)) (e.spotAt ||= {})[d.team] = t;
       }
     }
+    // and what the camera someone watches at the CCTV desk sees (while it works)
+    for (const v of list) {
+      if (!v.cctv || !camLive(v.cctv.cam)) continue;
+      const c = MAP.cctv.cams[v.cctv.cam], view = camView(c, v.cctv.yaw, v.cctv.pitch), fov = camHalfFov(c);
+      for (const e of list) {
+        if (e.team === v.team || (v.id * 5 + e.id + spotTick) % SPOT.every) continue;
+        if (spots(c.p, view.yaw, e, t, fov)) (e.spotAt ||= {})[v.team] = t;
+      }
+    }
     for (const e of list) {
       const team = other(e.team);
       if (t - (e.spotAt?.[team] ?? -1e9) < SPOT.keep) seen[team].push([e.id, r2(e.p[0]), r2(e.p[2])]);
@@ -2757,7 +2947,7 @@ function onPing(p, m) {
 
 function onNade(p, m) {
   const k = GRENADES.includes(m.k) ? m.k : 'he';
-  if (!p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || p.piloting != null) return;
+  if (!p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
   if (p.shield != null) return; // shield: no grenades while holding a hostage
   const o = vec3(m.o), v = vec3(m.v);
   if (!o || !v || Math.hypot(...v) > 30 || dist3(o, eyeOf(p)) > 2.5) return;
@@ -3347,6 +3537,12 @@ function handle(p, m) {
       if (!pos || !isNum(m.yaw) || !isNum(m.pitch)) break;
       // Hide and Seek: seekers stay where they are until the hiders have had their time.
       if (isHNS() && p.team === 'CT' && game.phase === 'live' && t < (game.hideUntil || 0)) { p.yaw = m.yaw; p.pitch = m.pitch; break; }
+      // On the zip line the server says where you are (hanging from the cable); after a fall off it, the landing hurts.
+      if (p.zip) { p.p = zipFeet(MAP.zip, zipNow(p, t).s); p.yaw = m.yaw; p.pitch = m.pitch; p.c = 0; p.history.push({ t, p: p.p, c: 0 }); while (p.history[0].t < t - 1000) p.history.shift(); break; }
+      // At the CCTV desk you sit on the chair facing the monitors.
+      if (p.cctv) { p.p = MAP.cctv.seat.slice(); p.yaw = MAP.cctv.yaw; p.pitch = -0.3; p.c = 1; p.history.push({ t, p: p.p, c: 1 }); while (p.history[0].t < t - 1000) p.history.shift(); break; }
+      if (p.zipFall) zipLanding(p, pos, t);
+      if (!p.alive) break;
       p.p = pos;
       p.yaw = m.yaw;
       p.pitch = m.pitch;
@@ -3414,6 +3610,12 @@ function handle(p, m) {
       break;
     case 'car':
       onCar(p, m, t);
+      break;
+    case 'zip':
+      if (m.off && p.zip) zipOff(p, t, 'letgo');
+      break;
+    case 'cctv':
+      onCctv(p, m);
       break;
     case 'horn':
       if (p.driving != null && !world.cars[p.driving]?.wrecked && t - (p.lastHorn || 0) > 400) {
@@ -3623,7 +3825,8 @@ function tick() {
   const pl = [];
   for (const p of players.values()) {
     if (!inTeam(p)) continue;
-    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo || 0, p.hidden ? 1 : 0]);
+    // (the last one: on a gadget — 1 hanging from the zip line, 2 at the CCTV desk)
+    pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo || 0, p.hidden ? 1 : 0, p.zip ? 1 : p.cctv ? 2 : 0]);
   }
   const b = game.bomb;
   const head = JSON.stringify({
@@ -3741,6 +3944,7 @@ wss.on('connection', ws => {
   sendMines(p);
   sendJammers(p);
   sendSatchels(p);
+  sendGadgets(p);
   sendRoster();
   ws.on('message', data => {
     let m;
