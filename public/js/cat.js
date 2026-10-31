@@ -94,8 +94,7 @@ export function createCatModel() {
   mesh.castShadow = true;
   mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.2, 0), 0.75); // (bent any way it still fits)
   const eyes = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(EYES.flat(), 3)), eyeMaterial());
-  eyes.frustumCulled = false;
-  eyes.visible = false;
+  eyes.visible = false; // (culled like the rest: no draw call when the cat is off screen)
   bones.head.add(eyes);
   const root = new THREE.Group();
   root.add(mesh);
@@ -195,28 +194,51 @@ export function catUpdate(dt, now, rt, camPos) {
   lastP = p;
   cat.position.set(p[0], yDisp, p[2]);
   cat.rotation.y = yaw;
+  // (its shadow only close by: a room lamp's shadow draws it 6 times, and further off it's a few pixels)
+  const shadow = !!camPos && Math.hypot(camPos.x - p[0], camPos.y - p[1], camPos.z - p[2]) < 12;
+  if (cat.userData.mesh.castShadow !== shadow) cat.userData.mesh.castShadow = shadow;
   animate(dt, now, moved);
   updatePurr(p, camPos);
 }
 
 // ---- the animation: a target pose for what it's doing, blended into smoothly
-const ZERO = { by: 0.2, bz: 0, bp: 0, roll: 0, hp: 0, hy: 0, fl: 0, fr: 0, bl: 0, br: 0, fls: 1, t1p: -0.9, t1y: 0, t2p: 0.3, t2y: 0, t3p: 0.35, t3y: 0, breathe: 0 };
-const STRIDE = { [S.walk]: 0.42, [S.trot]: 0.75, [S.run]: 1.15 }; // metres a step cycle
+// (sfl...sbr: each leg's length, 1 as built; fls: both front legs' length on top of that, for sitting)
+const ZERO = { by: 0.2, bz: 0, bp: 0, roll: 0, hp: 0, hy: 0, fl: 0, fr: 0, bl: 0, br: 0, fls: 1, sfl: 1, sfr: 1, sbl: 1, sbr: 1, t1p: -0.9, t1y: 0, t2p: 0.3, t2y: 0, t3p: 0.35, t3y: 0, breathe: 0 };
+// Each gait: [metres a step cycle, the part of the cycle a paw is down, how high a paw is lifted coming forward].
+const GAIT = { [S.walk]: [0.36, 0.5, 0.035], [S.trot]: [0.48, 0.5, 0.05], [S.run]: [0.95, 0.25, 0.07] };
+const TAU = Math.PI * 2, LEG = 0.183; // (hip to the bottom of the paw, as built)
+const LEGS = [['fl', -0.145], ['fr', -0.145], ['bl', 0.15], ['br', 0.15]]; // (each leg's hip, along the body)
+// The legs of a walk, trot or gallop (offsets: each leg's place in the cycle, fl fr bl br). A paw that is down stays
+// put: it goes back exactly as fast as the floor goes by, the leg's angle and length worked out from where the paw
+// is. Then it comes forward again, lifted.
+function gaitLegs(T, phase, offsets, [stride, duty, lift]) {
+  const R = stride * duty / 2, cb = Math.cos(T.bp), sb = Math.sin(T.bp);
+  LEGS.forEach(([k, hz], i) => {
+    let u = ((phase + offsets[i]) / TAU) % 1, z, up = 0;
+    if (u < 0) u += 1;
+    if (u < duty) z = R * (1 - 2 * u / duty); // (down: from in front of the hip to behind it)
+    else { const v = (u - duty) / (1 - duty) * Math.PI; z = -R * Math.cos(v); up = lift * Math.sin(v); }
+    const hip = T.by - 0.02 * cb - hz * sb; // (the hip's height above the floor)
+    const h = hip - up - (z > 0 ? 0.02 : 0.036) * Math.abs(z) / Math.hypot(z, hip); // (the paw's back or front edge on the floor)
+    T[k] = Math.atan2(z, h) - T.bp;
+    T['s' + k] = Math.hypot(z, h) / LEG;
+  });
+}
 // The pose for doing `state` (t: now in seconds, since: seconds in this state, phase: of the step cycle).
 function target(state, t, since, phase) {
   const T = { ...ZERO };
   const sway = Math.sin(t * 1.7);
   switch (state) {
     case S.walk: case S.trot: case S.run: {
-      const s = Math.sin(phase), A = state === S.walk ? 0.42 : state === S.trot ? 0.6 : 0.85;
       if (state === S.run) {
-        // a gallop: the front legs together, then the back ones, the back arching
-        T.fl = T.fr = A * s; T.bl = T.br = -A * s;
-        T.bp = 0.12 * Math.cos(phase); T.by = 0.19 + 0.03 * Math.abs(s);
+        // a gallop: the front paws nearly together, then the back ones, the back arching
+        T.bp = 0.12 * Math.cos(phase); T.by = 0.205;
         T.t1p = -0.15; T.t2p = 0.05; T.t3p = 0.05; T.hp = 0.1;
+        gaitLegs(T, phase, [0, 0.6, Math.PI, Math.PI + 0.6], GAIT[state]);
       } else {
-        T.fl = T.br = A * s; T.fr = T.bl = -A * s;
-        T.by = 0.2 + 0.006 * Math.abs(Math.cos(phase));
+        // diagonal pairs: the front left paw with the back right one
+        T.by = 0.2 + 0.004 * Math.abs(Math.cos(phase));
+        gaitLegs(T, phase, [0, Math.PI, Math.PI, 0], GAIT[state]);
         T.hp = 0.04 * Math.sin(phase * 2);
         T.t1p = state === S.walk ? -1.05 : -0.6; T.t1y = 0.18 * sway; T.t3p = 0.5; T.t3y = 0.3 * Math.sin(t * 2.3);
       }
@@ -248,7 +270,7 @@ function target(state, t, since, phase) {
     case S.stretch: {
       // front legs out, chest down, rear up; then back to standing
       const k = Math.sin(Math.min(1, since / 2.4) * Math.PI);
-      T.bp = -0.38 * k; T.by = 0.2 - 0.06 * k; T.fl = T.fr = 1.25 * k; T.bl = T.br = -0.35 * k;
+      T.bp = -0.38 * k; T.by = 0.2 - 0.06 * k; T.fl = T.fr = 1.7 * k; T.bl = T.br = -0.22 * k; // (paws on the floor)
       T.hp = 0.45 * k; T.t1p = -1.25; T.t2p = 0.15; T.t3p = 0.2;
       break;
     }
@@ -260,33 +282,53 @@ function target(state, t, since, phase) {
   return T;
 }
 
-function applyPose(model, P, t, spin = 0) {
+// How far the body must go up so that no paw is under the floor (a stretch, a blend between two poses): the lowest
+// corner of each paw, worked out the way the bones bend it.
+function pawLift(P) {
+  const cb = Math.cos(P.bp), sb = Math.sin(P.bp);
+  let low = 0;
+  for (const [k, hz] of LEGS) {
+    const ca = Math.cos(P[k]), sa = Math.sin(P[k]), foot = -LEG * (hz < 0 ? P.fls : 1) * P['s' + k];
+    for (const zl of [-0.036, 0.02]) {
+      const y = P.by + (-0.02 + foot * ca - zl * sa) * cb - (hz + foot * sa + zl * ca) * sb;
+      if (y < low) low = y;
+    }
+  }
+  return -low;
+}
+
+function applyPose(model, P, t, spin = 0, ground = true) {
   const B = model.userData.bones;
-  B.body.position.set(0, P.by, P.bz);
+  B.body.position.set(0, P.by + (ground ? pawLift(P) : 0), P.bz);
   B.body.rotation.set(P.bp, 0, P.roll);
   B.body.scale.y = 1 + 0.035 * P.breathe * Math.sin(t * 2.4);
   B.head.rotation.set(P.hp, P.hy, 0);
   B.fl.rotation.x = P.fl; B.fr.rotation.x = P.fr; B.bl.rotation.x = P.bl; B.br.rotation.x = P.br;
-  B.fl.scale.y = B.fr.scale.y = P.fls;
+  B.fl.scale.y = P.fls * P.sfl; B.fr.scale.y = P.fls * P.sfr; B.bl.scale.y = P.sbl; B.br.scale.y = P.sbr;
   B.t1.rotation.set(P.t1p, P.t1y, 0); B.t2.rotation.set(P.t2p, P.t2y, 0); B.t3.rotation.set(P.t3p, P.t3y, 0);
   B.root.rotation.set(0, 0, spin);
 }
 
 // (tests) a model posed as doing `state` at time t (seconds), with no blending
 export function catPoseModel(model, state, t = 1, ph = 0) {
-  applyPose(model, target(state, t, t, ph), t, state === S.air ? 1.2 : 0);
+  applyPose(model, target(state, t, t, ph), t, state === S.air ? 1.2 : 0, state !== S.air);
 }
 
+// (a new state blends in from the pose it had when it changed; after that the pose is the target itself, so the
+// steps and the quick movements aren't damped)
+let from = {}, fromState = -1;
 function animate(dt, now, moved) {
   const t = now / 1000;
-  if (STRIDE[state]) phase += (moved / STRIDE[state]) * Math.PI * 2;
+  if (GAIT[state]) phase += (moved / GAIT[state][0]) * TAU;
   airSpin = state === S.air ? airSpin + dt * 11 : 0;
-  const T = target(state, t, (now - stateAt) / 1000, phase), k = Math.min(1, dt * (state === S.air ? 20 : 9));
+  if (state !== fromState) { from = { ...pose }; fromState = state; }
+  const T = target(state, t, (now - stateAt) / 1000, phase);
+  const w = Math.min(1, (now - stateAt) / (state === S.air ? 100 : 300)), k = w * w * (3 - 2 * w);
   // meowing: the head goes up
   const m = (now - meowAt) / 700;
   if (m >= 0 && m < 1) T.hp += 0.38 * Math.sin(m * Math.PI);
-  for (const key in T) pose[key] = pose[key] === undefined ? T[key] : lerp(pose[key], T[key], k);
-  applyPose(cat, pose, t, airSpin);
+  for (const key in T) pose[key] = from[key] === undefined ? T[key] : lerp(from[key], T[key], k);
+  applyPose(cat, pose, t, airSpin, state !== S.air);
   // eyes shut asleep
   cat.userData.eyes.visible = !!map?.night && state !== S.sleep;
 }

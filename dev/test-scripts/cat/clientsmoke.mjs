@@ -70,6 +70,38 @@ ok('walking: the legs move through the step', !same(w0, w1));
 C.catPoseModel(m1, S.wash, 1); const wa = sig(m1); C.catPoseModel(m1, S.wash, 4); const wb = sig(m1);
 ok('washing: licks the paw, then rubs the face', !same(wa, wb));
 
+// ---- on the floor: no paw under it in any pose (all through a step cycle, a stretch); walking and trotting paws stay
+// put while they're down (the model moved forward a stride a cycle, as catUpdate keys the steps to the distance)
+const skin = m1.userData.mesh, vp = skin.geometry.attributes.position, vsi = skin.geometry.attributes.skinIndex, vv = new THREE.Vector3();
+const world = fn => { m1.updateMatrixWorld(true); skin.skeleton.update(); for (let i = 0; i < vp.count; i++) { skin.getVertexPosition(i, vv); vv.applyMatrix4(skin.matrixWorld); fn(vv, i); } };
+let sunk = 0, sunkAt = '';
+for (const name of ['sit', 'wash', 'walk', 'trot', 'run', 'stretch', 'hide', 'sleep', 'loaf']) {
+  for (let i = 0; i < 32; i++) {
+    C.catPoseModel(m1, S[name], name === 'stretch' ? i / 32 * 2.4 : 0.4 + i * 0.13, i / 32 * Math.PI * 2);
+    let low = 9; world(v => { low = Math.min(low, v.y); });
+    if (low < sunk) { sunk = low; sunkAt = name; }
+  }
+}
+ok(`no pose puts a paw through the floor (lowest ${(sunk * 100).toFixed(1)} cm${sunkAt ? ', ' + sunkAt : ''})`, sunk > -0.005);
+const strideOf = { walk: 0.36, trot: 0.48 }; // (GAIT in public/js/cat.js)
+for (const [name, stride] of Object.entries(strideOf)) {
+  let slip = 0; const prev = {};
+  for (let i = 0; i <= 256; i++) {
+    const ph = i / 128 * Math.PI * 2;
+    C.catPoseModel(m1, S[name], 1, ph);
+    m1.position.z = -ph / (Math.PI * 2) * stride;
+    const sole = {}, low = {};
+    world((v, j) => { const b = vsi.getX(j); if (b < 3 || b > 6) return; low[b] = Math.min(low[b] ?? 9, v.y); if (vp.getY(j) < 0) (sole[b] ||= []).push(v.z); });
+    for (const b in sole) {
+      const z = sole[b].reduce((a, c) => a + c) / sole[b].length; // (the middle of the paw's sole)
+      if (low[b] < 0.004 && prev[b] !== undefined) slip += Math.abs(z - prev[b]);
+      prev[b] = low[b] < 0.004 ? z : undefined;
+    }
+  }
+  m1.position.z = 0;
+  ok(`${name}: a paw that's down stays put (it slides ${(slip / 8 * 100).toFixed(1)} cm a step cycle, the stride is ${stride * 100} cm)`, slip / 8 < 0.03);
+}
+
 // ---- on the Mansion: added with its basket and bowl
 const scene = new THREE.Scene();
 C.catLoadMap(scene, MAPS.cs_mansion);
