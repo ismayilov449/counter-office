@@ -25,10 +25,10 @@ steps / browser checks still to do), the player-facing README text and RESUME no
 | `feature/bet` | Bet on yourself (F3 panel: 1/2/3+ kills or survive) | **Finished**; server tests pass; browser test `gbet.mjs` still to run |
 | `feature/flood` | Floodgate (storm-drain valve, rising water, drowning, electrocution at the fuse box) | **Finished**; server tests pass; browser test `g1.mjs` still to run |
 | `feature/shield` | Human shield (a T grabs a hostage with E) | Server side done (28 checks before the merge); `main` merged in (6e72bbe). Left: re-run `t-shield`/`t-rescue` on cs_mansion + cs_assault, `BOTS=4` runs, browser `g-shield.mjs` (arm clipping) |
-| `feature/body` | Downed, not dead (revive: hold E 5 s; **headshot = no revive**) + Play dead (K) | In progress (see its STATUS) |
+| `feature/body` | Downed, not dead (revive: hold E 5 s; **headshot = no revive**) + Play dead (K) | **Built** (e854d47); server tests pass (t1, obj, bot soaks on 3 maps) except a full hostage rescue (unconfirmed, `hostage.mjs`); browser `g1.mjs` still to run; after merging main: going down must take you off the zip line / CCTV desk (`body.onDown()`) |
 | `feature/gas` | Gas system (kitchen pipe + cellar boiler, spreads through open doors, any spark ignites it, valve E 2 s) | **Finished** (0246b82); server tests pass; browser test `g_gas.mjs` (server with `GAS_LEAK_X=3`) still to run, shimmer opacity to tune by eye |
 | `feature/disguise` | Disguise (crouch + hold E 3 s on a dead enemy; the fooled team's snapshot shows you as him) | **Finished** (b1541a3); server tests pass (t1 64 checks, t2, t3, 120 s soak); browser test `g1.mjs` still to run |
-| `feature/elevator` | Elevator (cellar, ground and upper floor; the blackout traps it) | Early: had just picked the shaft (see STATUS) |
+| `feature/elevator` | Elevator (cellar, ground and upper floor; the blackout traps it) | **Designed, not built** (8bf488e, main merged in): shaft at x −21.6…−19.65, z −5.49…−3.45, stops −2.2 / 0.81 / 4.27, doors face south, pit to −3.4 (move 3 cellar barrels, close an upstairs wall gap); no game code yet. Next steps in its STATUS |
 | `feature/blood` | Blood trails + bandage (P) | Written, not tested (WIP commit; no STATUS section: read the code and tests) |
 | `feature/cat` | The mansion's cat (never dies; meows at hidden players; sets off mines) | Written, not tested (WIP commit; no STATUS section) |
 
