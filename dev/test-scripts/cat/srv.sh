@@ -2,7 +2,7 @@
 # HTTPS_PORT, default 4061) with fresh test data in $SP/testdata. Never the real data/ folder. Stops only the
 # process listening on GAME_PORT.
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-SP="${SP:-$TEMP/co-test-cat}"
+SP="${SP:-$TEMP/co-cat}"
 PORT="${GAME_PORT:-4060}"
 HPORT="${HTTPS_PORT:-4061}"
 mkdir -p "$SP"
