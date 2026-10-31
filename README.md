@@ -145,6 +145,13 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     steps leads into the kitchen, whose north window looks into the garage. The walls and the flat roof break like the
     house's (a mortar set up inside blasts its way out through the roof), and you can climb onto the roof from the
     ladder next to it. The blackout switches its light off too.
+  - **The neighbour's house**, across the street on the CTs' side: a gap in the street's east wall (a few steps north
+    of the gate) leads through a small walled garden to the front door (**E**) of a two-storey brick house — a living
+    room below, a bedroom above (stairs along the back wall). The bedroom's **window**
+    looks over the street wall and the estate wall straight at the front of the mansion: a sniper's nest for the CTs.
+    It's real glass (shoot it out), and the wall it's in breaks like the mansion's; the rest of the house stays whole.
+    Its lights are its own (a switch by the front door and one upstairs), not on the mansion's fuse box. The radar
+    shows a bit more of the map now, so everything on it is a little smaller.
   - **Roof terrace** over the front porch: reached from the top floor through the opening above the front door, or
     up the **drainpipe ladder** at the porch's north-east corner. A waist-high parapet, a table, a bench and potted
     shrubs for cover; open to the sky (the mortar reaches it) and seen from three sides.

@@ -9,7 +9,7 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 
 ---
 
-## 1. Where things stand (11 of 15 steps done)
+## 1. Where things stand (12 of 15 steps done)
 
 | # | Step | Status | Commit(s) |
 |---|------|--------|-----------|
@@ -23,8 +23,8 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 | 8 | Mansion: smugglers' tunnel to the shed | ✅ done | `a6cdbda` |
 | 9 | Mansion: storm drain | ✅ done | `971813a` |
 | 10 | Mansion: roof terrace + drainpipe ladder | ✅ done | `971813a` |
-| 11 | Mansion: garage | ✅ done | see `git log` ("Mansion: garage ...") |
-| 12 | Mansion: neighbour's house | ⬜ not started | |
+| 11 | Mansion: garage | ✅ done | `f56ff90` (test scripts fixed in `07c7d96`) |
+| 12 | Mansion: neighbour's house | ✅ done | see `git log` ("Mansion: the neighbour's house ...") |
 | 13 | Mansion: back garden | ⬜ not started | |
 | 14 | Mansion at night | ⬜ not started | |
 | 15 | FPV drone (T) | ⬜ not started (do it last) | |
@@ -159,17 +159,43 @@ firing the RPG-26. Both work.
   nav builds; 60 s with BOTS=4 and no errors; de_dust2 loads.
 - **Not verified:** the rattle by ear; the roller animation at full frame rate (headless runs at a few fps).
 
+### 12. Neighbour's house
+- **Where:** a walled garden x 30.79…39.8, z −12.2…−0.8 east of the street; the house x 32.3…38.9, z −10.6…−3.4, flat roof
+  with a parapet (top 6.4 m), bedroom floor at 3.2. A 1.2 m gap through the street wall (z −7.6…−6.4) and a paved path to
+  the front door (a normal door, `doors[8]`).
+- **The window:** in the bedroom's west wall, z −8.4…−5.6, y 4.1…5.4; glass from `RM.windows` (mansion.js now takes windows
+  from mansion2.js too, with their own light group). From it you see the mansion's front over both walls; from the street
+  you can't see it (only the top 0.7 m of the house shows over the street wall).
+- **Bounds:** ±40.5 now (was ±29.2): the radar shows 81 m instead of 58.4 m. Checked: the radar draws the house at the
+  right edge, the sky grid covers it (ground floor covered by the bedroom floor, bedroom under breakable roof pieces, the
+  roof open), nav builds (26.6k nodes).
+- **Invisible walls:** the one over the street wall is cut away along the garden; new ones stand over the garden walls,
+  and two short ones stop walking along the top of the street wall past the garden. The street wall's top is now drawn in
+  its stone for its whole length (it was street-coloured where it showed, missing under the old invisible wall).
+- **Breaks:** only the west wall (with the window) — making the whole house breakable added ~730 pieces and +11k
+  triangles to every view; the west wall alone is ~150 pieces and +2.5k. Its own lights (group `neighbour`, two
+  switches); the fuse box now cuts only rooms marked `power`.
+- **Stairs:** 15 steps start a step away from the south wall (walk onto them from the south) and end on a landing; the
+  stairwell is railed upstairs. `walk.mjs` goes up and down them, through the gap and the door.
+- **Verified:** browser test `g12.mjs` (door hint, E opens it, the view from the window, one pistol shot breaks the glass, no
+  page errors); screenshots `v12.json` looked at; t5/t8/t11 still pass; nav builds; BOTS=4 for 60 s; de_dust2 loads.
+- **Not verified:** bots using the house (bot work is skipped).
+
 ### Known problems to watch
-- **Mansion load time** (measured 2026-10-31 on the new PC, i9-13980HX, 5 runs each): building cs_mansion on the server
-  (importing mansion.js) takes ~350–390 ms, the same as `main` before Mansion 2.0 (~335–380 ms); `remodel()` is ~29 ms of
-  it, `breakUp()` most of the rest. The 1.3× was the overloaded old laptop. In the browser, `buildWorld` takes ~230–260 ms
-  (swiftshader). After step 11: the same.
-- **Lighting rooms:** Mansion uses 20 of the 24 allowed in `public/js/roomlight.js`: the storm drain's three boxes and the
+- **Mansion load time** (measured 2026-10-31 on the new PC, i9-13980HX, 5 runs each): building cs_mansion (importing
+  mansion.js, which the browser does too on every page load) took ~350–390 ms, the same as `main` before Mansion 2.0
+  (~335–380 ms), so the 1.3× was the overloaded old laptop. `breakUp()` was most of it: for each piece it looked at every
+  static solid (the caps) and clipped every face of a plane against every piece on it. In step 12 both got an index /
+  quick bounds test (the output is byte-for-byte the same, checked by hashing every map), and the build now takes
+  **~260–280 ms** with steps 11–12 in it (`remodel()` ~40 ms of that). In the browser `buildWorld` takes ~240–300 ms
+  (swiftshader).
+- **Lighting rooms:** Mansion uses 21 of the 24 allowed in `public/js/roomlight.js`: the storm drain's three boxes and the
   smugglers' tunnel's two were merged into one box each (they're deep underground, nothing else is drawn in them), which
-  freed three; the garage took one.
+  freed three; the garage and the neighbour's house (one box for both floors) took one each.
 - **Frame cost** (fixed views `vcost.json`, viewer.js on swiftshader; draw calls include the shadow pass). Before step 11 →
   after: draw calls +1…+19 per view (+19 in the kitchen, which looks into the garage), triangles +3.5k…+5.8k (~+4%), frame
-  time within the noise (±4%).
+  time within the noise (±4%). Step 12: +22…+24 draw calls in views facing east (T spawn, porch, terrace, street; its
+  lamps, door, window and new materials), none elsewhere; triangles +2.5k…+3.5k (~+2%); frame time within the noise.
 - **Map bounds** are still ±29.2. Growing them (steps 12 and 13) shrinks everything on the radar and affects the mortar
   map, the sky grid and nav.
 - **Nav quirk:** false "drop through the floor" links next to walls: 97 already on main, plus 15 between the living room

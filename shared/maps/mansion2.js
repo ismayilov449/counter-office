@@ -9,6 +9,7 @@
 //   - a storm drain from a grate in the street to a grate in the cellar's floor
 //   - the roof of the front porch made a terrace, with a drainpipe ladder up to it
 //   - a garage against the house's north wall: a roller door to the lawn, a car inside, a side door to the kitchen
+//   - the neighbour's house across the street (CT side): two storeys, its bedroom window facing the mansion
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -17,7 +18,7 @@ const IN = 0.0254; // a texel, in metres
 export const NEW_TEX = {
   x_concrete: ['concrete', 64], x_wood: ['wood', 40], x_shelf: ['shelf', 64], x_metal: ['metal', 40],
   x_gravel: ['gravel', 80], x_wine: ['winerack', 40], x_earth: ['rubble', 80], x_deck: ['deck', 80], x_trim: ['trim', 40], x_stone: ['stone', 80],
-  x_tools: ['toolshelf', 64],
+  x_tools: ['toolshelf', 64], x_tanbrick: ['tanbrick', 64], x_parquet: ['parquet', 64],
 };
 
 // ---- geometry: a solid is [x1, y1, z1, x2, y2, z2]; a face is a flat array [x, y, z, u, v, ...] whose first
@@ -84,6 +85,8 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     solids = solids.flatMap(s => minusBox(s, c));
     for (const t of Object.keys(faces)) faces[t] = faces[t].flatMap(f => minusFace(f, c));
   };
+  // Take only the faces in a box away (the solids stay).
+  const unface = (...c) => { for (const t of Object.keys(faces)) faces[t] = faces[t].flatMap(f => minusFace(f, c)); };
   const face = (t, axis, sign, at, lo, hi) => (faces[t] ||= []).push(quad(axis, sign, at, lo, hi, tex[t] || [64, 64]));
   // A solid box with its faces: `t` is one texture or { top, bottom, side, x, z } (x: the faces looking along x);
   // skip: sides not drawn ('top', 'bottom', '-x', '+x', '-z', '+z'); solid: false for something only drawn.
@@ -309,13 +312,97 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
       keep.push([x - 0.31, -0.01, z - 0.31, x + 0.31, 1.06, z + 0.31]);
       decor.push({ type: 'barrel', p: [x, 0, z], color: c });
     }
-    // a strip light under the ceiling, switched by the steps
+    // a lamp under the ceiling, switched by the steps
     decor.push({ type: 'ceilinglamp', p: [-19.1, top, -17.6], group: 'garage' });
     decor.push({ type: 'light', p: [-19.1, top - 0.5, -17.6], color: '#e8eeff', intensity: 20, distance: 10, group: 'garage' });
     switches.push({ group: 'garage', p: [x1 + 0.01, 1.4, -15.2], rot: Math.PI / 2 });
     rooms.push({ group: 'garage', power: true, min: [x1, -0.1, z1], max: [x2, top, z2] });
   }
 
+  // ---------------------------------------------------------------- 12. the neighbour's house
+  // Across the street from the gate, on the CTs' side: a gap in the street's east wall leads into a small walled
+  // garden and a flat-roofed, two-storey brick house — a living room below, a bedroom above, stairs along the east
+  // wall. The bedroom's window faces the mansion over the street wall and the estate wall: glass you can shoot out,
+  // and a view of the lawn and the front of the house. The invisible wall over the street wall is gone along the
+  // garden; new ones stand over the garden walls. Its walls and roof break like the house's; it has its own lights
+  // (not on the mansion's fuse box).
+  const windows = [];
+  {
+    const [gx1, gz1, gx2, gz2] = [30.79, -12.2, 39.8, -0.8]; // the garden, inside its walls
+    const [hx1, hz1, hx2, hz2] = [32.3, -10.6, 38.9, -3.4], T = 0.25; // the house, outside its walls
+    const [ix1, iz1, ix2, iz2] = [hx1 + T, hz1 + T, hx2 - T, hz2 - T]; // inside
+    const up = 3.2, ceil = 5.8, gw = 2.2; // the bedroom's floor, the roof's underside, the garden walls' height
+    const ext = 'x_tanbrick', int = 'c1a1w1d', wall = 'c1a3wall05', gate = [-7.6, -6.4], door = [-7.5, -6.5], win = [-8.4, -5.6, 4.1, 5.4];
+    // the street wall: no invisible wall over it here (nor along its top beyond), a gap in it, a face on its garden side
+    carve(29.16, 3.45, gz1, 30.79, 17.3, gz2);
+    solids.push([28.7, 3.45, gz1 - 0.3, 29.16, 20, gz1], [28.7, 3.45, gz2, 29.16, 20, gz2 + 0.3]);
+    carve(28.7, 0, gate[0], 30.85, 2.4, gate[1]);
+    reveal(0, 28.75, 30.79, gate[0], gate[1], 0, 2.4, wall, 'c2a4_flr1');
+    face(wall, 0, 1, 30.79, [0, 0, gz1], [0, 3.45, gate[0]]);
+    face(wall, 0, 1, 30.79, [0, 0, gate[1]], [0, 3.45, gz2]);
+    face(wall, 0, 1, 30.79, [0, 2.4, gate[0]], [0, 3.45, gate[1]]);
+    // its top, seen from the bedroom now: in the wall's stone all along (it was street-coloured where it showed at all)
+    unface(28.7, 3.4, -21.2, 30.85, 3.5, 1.7);
+    face(wall, 1, 1, 3.45, [28.75, 0, -21.13], [30.79, 0, 1.63]);
+    // the ground: grass, a paved path from the gap to the front door, a wooden floor in the house
+    for (const [x1, z1, x2, z2, t] of [[gx1, gz1, hx1, gate[0]], [gx1, gate[0], hx1, gate[1], 'c2a4_flr1'], [gx1, gate[1], hx1, gz2], [hx2, gz1, gx2, gz2],
+      [hx1, gz1, hx2, hz1], [hx1, hz2, hx2, gz2], [hx1, hz1, hx2, hz2, 'x_parquet']]) {
+      brush(x1, -0.3, z1, x2, 0, z2, t || '-0out_grss1', ['bottom', '-x', '+x', '-z', '+z']);
+    }
+    // the garden walls, and invisible walls over them
+    brush(gx1, 0, gz1 - T, gx2 + T, gw, gz1, { '+z': wall, top: wall }, ['bottom', '-z', '-x', '+x']);
+    brush(gx1, 0, gz2, gx2 + T, gw, gz2 + T, { '-z': wall, top: wall }, ['bottom', '+z', '-x', '+x']);
+    brush(gx2, 0, gz1, gx2 + T, gw, gz2, { '-x': wall, top: wall }, ['bottom', '+x', '-z', '+z']);
+    solids.push([gx1, gw, gz1 - T, gx2 + T, 20, gz1], [gx1, gw, gz2, gx2 + T, 20, gz2 + T], [gx2, gw, gz1, gx2 + T, 20, gz2]);
+    // the walls, the flat roof (gravel) with a low parapet
+    brush(hx1, 0, hz1, hx2, ceil, iz1, { '-z': ext, '+z': int, '-x': ext, '+x': ext }, ['bottom', 'top']);
+    brush(hx1, 0, iz2, hx2, ceil, hz2, { '+z': ext, '-z': int, '-x': ext, '+x': ext }, ['bottom', 'top']);
+    brush(hx1, 0, iz1, ix1, ceil, iz2, { '-x': ext, '+x': int }, ['bottom', 'top', '-z', '+z']);
+    brush(ix2, 0, iz1, hx2, ceil, iz2, { '+x': ext, '-x': int }, ['bottom', 'top', '-z', '+z']);
+    brush(hx1, ceil, hz1, hx2, ceil + 0.2, hz2, { top: 'x_gravel', bottom: 'fifties_ceil5', side: ext });
+    for (const [x1, z1, x2, z2] of [[hx1, hz1, hx2, hz1 + 0.2], [hx1, hz2 - 0.2, hx2, hz2], [hx1, hz1 + 0.2, hx1 + 0.2, hz2 - 0.2], [hx2 - 0.2, hz1 + 0.2, hx2, hz2 - 0.2]]) {
+      brush(x1, ceil + 0.2, z1, x2, ceil + 0.6, z2, { side: ext, top: 'x_trim' }, ['bottom']);
+    }
+    // the front door, and the bedroom window over it
+    carve(hx1 - 0.03, 0, door[0], ix1 + 0.03, 2.2, door[1]);
+    reveal(0, hx1, ix1, door[0], door[1], 0, 2.2, int, 'x_parquet');
+    doors.push({ axis: 'z', dir: 1, len: door[1] - door[0], h: 2.18, hinge: [hx1 + T / 2, 0, door[0]], tex: 'door1' });
+    carve(hx1 - 0.03, win[2], win[0], ix1 + 0.03, win[3], win[1]);
+    reveal(0, hx1, ix1, win[0], win[1], win[2], win[3], int, 'x_trim');
+    windows.push({ axis: 'z', at: [hx1, ix1], from: win[0], to: win[1], bottom: win[2], top: win[3], group: 'neighbour' });
+    // the bedroom's floor, with the stairwell (railed) along the east wall; 15 steps up northwards, starting a step
+    // away from the south wall (room to walk onto them), a landing at the top
+    const sx = ix2 - 1.1, z0 = -4.6, o1 = z0 - 4.2, o2 = -5.1; // (o2: head room from the 6th step up)
+    for (const [x1, z1, x2, z2] of [[ix1, iz1, sx, iz2], [sx, iz1, ix2, o1], [sx, o2, ix2, iz2]]) {
+      brush(x1, up - 0.2, z1, x2, up, z2, { top: 'x_parquet', bottom: 'fifties_ceil5', side: 'x_trim' });
+      keep.push([x1 - 0.01, up - 0.21, z1 - 0.01, x2 + 0.01, up + 0.01, z2 + 0.01]);
+    }
+    for (let i = 0; i < 15; i++) {
+      const h = 0.2 * (i + 1), za = z0 - 0.28 * (i + 1), zb = z0 - 0.28 * i;
+      brush(sx, 0, za, ix2, h, zb, 'x_wood', ['bottom', '+x']);
+      keep.push([sx - 0.01, -0.01, za - 0.01, ix2 + 0.01, h + 0.01, zb + 0.01]);
+    }
+    for (const r of [[sx - 0.08, up, o1, sx, up + 0.95, o2], [sx, up, o2, ix2, up + 0.95, o2 + 0.08]]) {
+      brush(...r, 'x_wood', ['bottom']);
+      keep.push([r[0] - 0.01, r[1] - 0.01, r[2] - 0.01, r[3] + 0.01, r[4] + 0.01, r[5] + 0.01]);
+    }
+    // furniture: a sofa, a table and a cabinet below; a bed and a wardrobe above
+    brush(33.0, 0, iz1, 35.2, 0.45, iz1 + 0.9, 'fifties_cch1', ['bottom', '-z']);
+    brush(33.0, 0.45, iz1, 35.2, 0.95, iz1 + 0.25, 'fifties_cch1', ['bottom', '-z']);
+    brush(34.0, 0, -7.4, 35.4, 0.75, -6.4, 'x_wood', ['bottom']);
+    brush(ix1, 0, -5.4, ix1 + 0.5, 1.6, -4.0, 'fiftsfile1', ['bottom', '-x']);
+    brush(33.0, up, iz1, 35.0, up + 0.5, iz1 + 2.0, { top: 'fifties_cch2', side: 'x_wood' }, ['bottom', '-z']);
+    brush(33.0, up, iz2 - 0.6, 34.2, up + 2.0, iz2, 'x_wood', ['bottom', '+z']);
+    // a lamp on each floor; switches by the front door and at the top of the stairs
+    for (const y of [up - 0.2, ceil]) {
+      decor.push({ type: 'ceilinglamp', p: [35.0, y, -7.0], group: 'neighbour' });
+      decor.push({ type: 'light', p: [35.0, y - 0.5, -7.0], color: '#ffe2b0', intensity: 20, distance: 9, group: 'neighbour' });
+    }
+    switches.push({ group: 'neighbour', p: [ix1 + 0.01, 1.4, -8.1], rot: Math.PI / 2 });
+    switches.push({ group: 'neighbour', p: [37.0, up + 1.4, iz1 + 0.01], rot: 0 });
+    rooms.push({ group: 'neighbour', min: [ix1, -0.1, iz1], max: [ix2, ceil, iz2] });
+  }
+
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep };
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows };
 }

@@ -126,13 +126,13 @@ export function breakUp(solids, faces, pick, { roofFace = () => false, roofCell 
 
   // Faces: index the chunk sides by plane, then hand each face's slices to the chunks it lies on.
   const byPlane = new Map();
-  const key = (axis, sign, at) => `${axis}${sign}${Math.round(at * 100)}`;
+  const key = (axis, sign, at) => (axis * 2 + (sign > 0)) * 1e8 + Math.round(at * 100);
   for (const pc of pieces) {
     for (let axis = 0; axis < 3; axis++) {
       for (const sign of [-1, 1]) {
         const at = sign > 0 ? pc.max[axis] : pc.min[axis];
         for (const r of [-1, 0, 1]) {
-          const k = key(axis, sign, at + r / 100);
+          const k = key(axis, sign, at) + r;
           if (!byPlane.has(k)) byPlane.set(k, []);
           byPlane.get(k).push({ pc, at });
         }
@@ -154,6 +154,16 @@ export function breakUp(solids, faces, pick, { roofFace = () => false, roofCell 
         seen.add(pc);
         const next = [];
         for (const poly of rest) {
+          // (quickly: a polygon wholly beside the chunk's side stays as it is)
+          let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+          for (let n = 0; n < poly.length; n += 5) {
+            const pu = poly[n + u], pv = poly[n + v];
+            if (pu < u0) u0 = pu;
+            if (pu > u1) u1 = pu;
+            if (pv < v0) v0 = pv;
+            if (pv > v1) v1 = pv;
+          }
+          if (u1 <= pc.min[u] || u0 >= pc.max[u] || v1 <= pc.min[v] || v0 >= pc.max[v]) { next.push(poly); continue; }
           // the part inside the chunk's side
           let inside = poly;
           for (const [k, val, above] of [[u, pc.min[u], true], [u, pc.max[u], false], [v, pc.min[v], true], [v, pc.max[v], false]]) {
@@ -201,6 +211,21 @@ export function breakUp(solids, faces, pick, { roofFace = () => false, roofCell 
   // there; once the chunk is gone, a cap of rubble fills that hole. [axis, sign, lo, hi]: the cap faces into the
   // chunk and covers just where the two touch.
   const near = (a, b) => Math.abs(a - b) < EPS;
+  // the statics by the plane of each side (axis, which side, to the centimetre), so each chunk side only looks at the
+  // few that could touch it (looking at all of them made this the slowest part of building Mansion)
+  const sideKey = (axis, max, at) => (axis * 2 + max) * 1e8 + Math.round(at * 100);
+  const bySide = new Map();
+  statics.forEach((st, i) => {
+    for (let axis = 0; axis < 3; axis++) for (const max of [0, 1]) {
+      const k = sideKey(axis, max, max ? st.max[axis] : st.min[axis]);
+      (bySide.get(k) || bySide.set(k, []).get(k)).push(i);
+    }
+  });
+  const touching = (axis, max, at) => {
+    const out = [], k = sideKey(axis, max, at);
+    for (const r of [-1, 0, 1]) for (const i of bySide.get(k + r) || []) out.push(i);
+    return out.sort((a, b) => a - b).map(i => statics[i]); // (in the statics' order, as before)
+  };
   for (const pc of pieces) {
     pc.caps = [];
     if (pc.kind === 'roof') {
@@ -224,7 +249,7 @@ export function breakUp(solids, faces, pick, { roofFace = () => false, roofCell 
       const [u, v] = [0, 1, 2].filter(k => k !== axis);
       for (const sign of [-1, 1]) {
         const at = sign > 0 ? pc.max[axis] : pc.min[axis];
-        for (const s of statics) {
+        for (const s of touching(axis, sign > 0 ? 0 : 1, at)) {
           if (!near(sign > 0 ? s.min[axis] : s.max[axis], at)) continue;
           const lo = [0, 0, 0], hi = [0, 0, 0];
           lo[axis] = hi[axis] = at;

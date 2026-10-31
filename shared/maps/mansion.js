@@ -40,21 +40,24 @@ for (const f of RM.faces.out_grnd2) {
 }
 FACE_MATS.out_grnd2_wall = 'greybrick';
 
-// ---- what explosions can break: the walls, furniture and roofs of the house, the shed and the garage (a roof together with
-// the top floor's ceiling under it, so a shell through the roof drops into the room). The floors, the ceiling
+// ---- what explosions can break: the walls, furniture and roofs of the house, the shed and the garage, and the
+// neighbour's wall facing the mansion (a roof together with the top floor's ceiling under it, so a shell through the
+// roof drops into the room). The floors, the ceiling
 // between the storeys and the stairs stay, and so does the foundation under the ground floor (0.81 m), so a hole
 // is a doorway.
 const inHouse = b => b.min[0] > -24.5 && b.max[0] < -5.5 && b.min[2] > -15 && b.max[2] < 12.5;
 const inShed = b => b.min[0] > 12.5 && b.max[0] < 18.5 && b.min[2] > 14 && b.max[2] < 18.5;
 const inGarage = b => b.min[0] > -22.7 && b.max[0] < -15.5 && b.min[2] > -20.74 && b.max[2] < -14.42;
+// (of the neighbour's house only the wall facing the mansion, with the window: the rest stays whole, cheaper to draw)
+const inNeighbour = b => b.min[0] > 32.2 && b.max[0] < 32.6 && b.min[2] > -10.7 && b.max[2] < -3.3 && b.min[1] > -0.1;
 const kept = b => RM.keep.some(k => [0, 1, 2].every(i => b.min[i] >= k[i] && b.max[i] <= k[i + 3]));
 const onStairs = b => b.min[0] > -12.95 && b.max[0] < -11.4 && ((b.min[2] > -9.8 && b.max[2] < -3.4) || (b.min[2] > 0.15 && b.max[2] < 6.55));
 const FLOOR = 0.81;
 function breakable(b) {
-  const house = inHouse(b), shed = inShed(b), garage = !house && inGarage(b);
-  if ((!house && !shed && !garage) || kept(b)) return null;
+  const house = inHouse(b), shed = inShed(b), garage = !house && inGarage(b), next = inNeighbour(b);
+  if ((!house && !shed && !garage && !next) || kept(b)) return null;
   const dx = b.max[0] - b.min[0], dy = b.max[1] - b.min[1], dz = b.max[2] - b.min[2];
-  if (b.min[1] >= (house ? 6.45 : garage ? 3.29 : 2.4)) return { kind: 'roof' };
+  if (b.min[1] >= (house ? 6.45 : garage ? 3.29 : next ? 5.79 : 2.4)) return { kind: 'roof' };
   if (dx > 2.6 && dz > 2.6) return null; // floors and ceilings
   if (dy <= 0.3 && [[3.95, 4.3], [6.4, 6.95]].some(([lo, hi]) => b.min[1] >= lo && b.min[1] <= hi)) return null; // floor edges
   if (onStairs(b)) return null;
@@ -100,12 +103,12 @@ const ROOMS = [
 ];
 const roomAt = p => ROOMS.find(r => [0, 1, 2].every(k => p[k] > r.min[k] && p[k] < r.max[k]));
 
-// ---- windows: breakable glass in every window opening of the house, lit by the room behind it
-for (const w of BSP.WINDOWS) {
+// ---- windows: breakable glass in every window opening of the house (and the neighbour's), lit by the room behind it
+for (const w of [...BSP.WINDOWS, ...RM.windows]) {
   const c = (w.at[0] + w.at[1]) / 2, g = 0.03;
   const mid = (w.from + w.to) / 2, y = (w.bottom + w.top) / 2;
   const inward = w.axis === 'z' ? [c + (c < -15 ? 0.6 : -0.6), y, mid] : [mid, y, c + (c < 0 ? 0.6 : -0.6)];
-  const extra = { glass: true, id: m.boxes.filter(b => b.glass).length, group: roomAt(inward)?.group || null, depth: w.at[1] - w.at[0] };
+  const extra = { glass: true, id: m.boxes.filter(b => b.glass).length, group: w.group || roomAt(inward)?.group || null, depth: w.at[1] - w.at[0] };
   if (w.axis === 'z') m.box(c - g, w.from, c + g, w.to, w.top - w.bottom, 'glass', w.bottom, extra);
   else m.box(w.from, c - g, w.to, c + g, w.top - w.bottom, 'glass', w.bottom, extra);
 }
@@ -181,7 +184,7 @@ export default {
   pieceFaces: BRK.pieceFaces,
   faceTex: { ...RM.tex, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
   faceMats: FACE_MATS,
-  bounds: { min: -29.2, max: 29.2 },
+  bounds: { min: -40.5, max: 40.5 }, // (the neighbour's garden reaches x 40)
   zones: {
     rescue: { min: [24.1, -22.8], max: [29.2, 22.8] },
     buyCT: { min: [24.1, -22.8], max: [29.2, 22.8] },
@@ -202,7 +205,7 @@ export default {
   ],
   switches: [...SWITCHES, ...RM.switches],
   // Blackout: holding E at the fuse box in the cellar cuts (T) or restores (CT) the power of these rooms' lights.
-  fusebox: { ...RM.fusebox, groups: [...new Set([...ROOMS.map(r => r.group), ...RM.rooms.map(r => r.group).filter(g => g !== 'tunnel')])] },
+  fusebox: { ...RM.fusebox, groups: [...new Set([...ROOMS.map(r => r.group), ...RM.rooms.filter(r => r.power).map(r => r.group)])] },
   // One pickup truck with a PKT machine gun in the back, on the lawn by the left (south) door, and a car in the
   // garage, facing its roller door (y: dropped onto the ground from that height, under the garage roof).
   vehicles: [
