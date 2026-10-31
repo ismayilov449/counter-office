@@ -11,6 +11,8 @@ const CELL = 2; // small: the breakable walls and roofs are many half-metre boxe
 const cellKey = (cx, cz) => cx * 65536 + cz;
 // Query stamps, unique across every CollisionWorld (the map boxes they mark are shared between them).
 let STAMP = 0;
+// elevator: the lift's moving boxes, for a query near its shaft (or anywhere when p is null)
+const elevNear = (w, p, r) => (!p || !w.elevBound || (p[0] + r + 1 > w.elevBound.min[0] && p[0] - r - 1 < w.elevBound.max[0] && p[2] + r + 1 > w.elevBound.min[2] && p[2] - r - 1 < w.elevBound.max[2]) ? w.elev : []);
 
 export class CollisionWorld {
   constructor(map) {
@@ -78,7 +80,7 @@ export class CollisionWorld {
   }
 
   move(exceptCar = null, p = null, r = 4) {
-    return this.near(p, r).concat(this.intactGlass, this.doorBoxes, this.carBoxes(exceptCar), this.elev); // (elevator: + this.elev)
+    return this.near(p, r).concat(this.intactGlass, this.doorBoxes, this.carBoxes(exceptCar), elevNear(this, p, r)); // (elevator: + the lift)
   }
 
   // Grenades smash through windows (the server breaks the glass they cross), so they ignore glass.
@@ -97,7 +99,7 @@ export class CollisionWorld {
   // never blocks their shots (passengers shoot out of it).
   bullet(exceptCar = null, p = null, r = 4) {
     const body = this.carBoxes(exceptCar).map(b => ({ ...b, max: [b.max[0], b.min[1] + 1.0, b.max[2]] }));
-    return this.near(p, r).concat(this.doorBoxes, body, this.elev); // (elevator: + this.elev)
+    return this.near(p, r).concat(this.doorBoxes, body, elevNear(this, p, r)); // (elevator: + the lift)
   }
 
   // Nearest hit along a ray: { t, n, box } or null, walking the grid cells the ray crosses.
