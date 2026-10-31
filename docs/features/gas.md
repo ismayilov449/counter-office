@@ -4,21 +4,41 @@
 - **Done:** everything in the spec. Server: pipes, leak, spread, venting, choking, all sparks (shot, impact, grenades,
   explosions, fire, light switch, fuse box), blast, chain, valve, repair. Browser module: pipe models, vapour, shimmer,
   hiss, coughing, HUD line, blast effects. Hooks, protocol and these notes are written.
-- **Half-done:** nothing on the server. The browser side has only been checked in Node with a stubbed page. One early
-  screenshot of the pipe looked right, then browser tests were stopped.
-- **Next steps:** run the browser checks below (`dev/test-scripts/gas/g_gas.mjs` with the test server on `GAS_LEAK_X=3`);
-  if the shimmer is too strong or too faint, tune the opacity in `public/js/gas.js` (`update()`, `0.035 + 0.1 * k`).
-  For the elevator: `gas.sparkAt(motorPos, 'motor', player)`.
-- **Tests that exist** (all pass): `t_gas.mjs` (server, 6 parts), `graph.mjs` (no server), `client_smoke.mjs` (browser
-  module in Node), `maps.mjs` (all 7 maps), `botgas.mjs` (BOTS=4); the old `mansion/t5.mjs` and `t7.mjs` still pass.
-- **Browser run (paused, partial):** in headless Edge on cs_mansion the kitchen pipe and meter look right (a yellow
-  pipe, a grey meter with its dial, a red lever), and a real mouse click on the meter fired a shot that holed the pipe
-  (`gasLeak`, "You smell gas" under the crosshair). That first run is void beyond this point: the server had bots on by
-  default, so start it with `BOTS=0`. The fresh Edge profile also had extensions installed by sync, which inject pages
-  and errors, so add `--disable-extensions`. Nothing in the code was changed. Everything else below is still to do.
-- **Browser checks still to do:** pipe, vapour, shimmer (subtle, not fog; day, night, blackout), blast and HUD line by
-  eye; sounds by ear; no page errors on both Mansion maps through a leak, a blast and a round reset; frame cost with gas
-  in view; a real mouse click on the meter.
+- **Browser-verified** (headless Edge, swiftshader, on cs_mansion and cs_mansion_night, 2026-11-01): `g_gas.mjs` and
+  the new `g_gas2.mjs` pass on both maps with **no page errors** through leaks, three kinds of blast and round resets.
+  Every screenshot was looked at: the kitchen pipe, meter and lever, the cellar boiler and its pipe; a **real mouse
+  click** on each meter fires a shot that holes the pipe; the vapour jet; the valve hint; the HUD lines at all three
+  levels ("You smell gas", "… One spark and it goes up!", "The gas is choking you — get out!"); gas getting into the
+  garage once its side door is opened; the light switch (flipped by the CT) and the fuse box lever (cellar, it also
+  blacks the house out) setting it off; a shot from the living room setting off a full kitchen (the room fills with
+  flame, the wall to the living room is holed, fires and soot after); the pipe wrecked and hidden after its room went
+  off; a new round: pipes whole, no shimmer, no HUD line. The blast scales with the gas (strength → pieces broken, seen
+  in the runs): 0.46 → 254, 0.58–0.65 → 414–456, 0.72–0.83 → 442–583; 0.33 in the cellar → a cellar of flame.
+- **Fixes from the browser run:**
+  - The **shimmer was invisible** (pale sprites at 0.03–0.14 opacity vanish on the cream walls, even when choking):
+    now a yellow-green tinge, opacity `0.08 + 0.46 * k`, sprites 2.5–3.8 m. Checked with the gas forced to fixed
+    levels: hardly there at 'ignite', a faint veil (never fog) when choking; with the kitchen light off and in a
+    blackout it's nearly invisible (its colour follows the room's light).
+  - The **vapour jet** was only a faint smudge: opacity 0.3 → 0.55, grows a little more, and now dims with the room's
+    light like the shimmer (no white glow in a dark room).
+  - `g_gas.mjs` put the player inside the living room's floor (y 0.81; the floor there is 0.91): the blast's push then
+    threw them sideways out through the west wall (`movePlayer` resolves an overlap by moving to the box's edge). Not
+    a game bug (a walking player stands at 0.91); the test now uses 0.91.
+- **Draw calls** (counted in the live game, the same frames with the gas module's things shown, then hidden): the
+  kitchen pipe costs **4** in view, the shimmer + vapour **1 more** (21 sprites, 15 puffs in one instanced call); a
+  kitchen view: 191 → 192 by day, 201 → 202 at night. Real-laptop frame time not measured.
+- **Tests that exist** (all pass, re-run 2026-11-01 unless noted): `g_gas.mjs` and `g_gas2.mjs` (browser),
+  `t_gas.mjs` (server, 6 parts), `graph.mjs` (no server), `client_smoke.mjs` (browser module in Node), `maps.mjs` (all 7
+  maps); not re-run: `botgas.mjs` (BOTS=4), the old `mansion/t5.mjs` and `t7.mjs`.
+- **What's left:** the sounds by ear (hiss, rupture burst, coughing, the blast muffled through walls); the frame time
+  on a real laptop (swiftshader draws ~2–3 fps here, so no timing). Seen but not gas's: right after a round reset some
+  smoke from the last round's fires still hangs under the kitchen ceiling for a moment (effects aren't cleared at a
+  round start). For the elevator: `gas.sparkAt(motorPos, 'motor', player)`.
+- **How to run the browser tests:** test server with `BOTS=0 ROUND_TIME=600 GAS_LEAK_X=3` (the server has bots on by
+  default; they kill the tester), one headless Edge with `--disable-extensions --disable-sync` and a fresh profile (a
+  synced profile installs extensions that inject pages and errors), then `GAME_PORT=… CDP_PORT=… node
+  dev/test-scripts/gas/g_gas.mjs` and `g_gas2.mjs` (`NIGHT=1` names the shots on cs_mansion_night). `g_gas2.mjs` reads
+  the gas client's state through a conditional breakpoint in `gas.js` that never pauses.
 
 ## (a) README
 
@@ -94,9 +114,9 @@ For the file list at the end of the README:
   - A blast within 2.5 m of a pipe (in sight) tears it open; a pipe whose wall pieces are all gone is torn open.
 - `public/js/gas.js`: `createGasClient(ctx)` → `{ setMap, snapshot, handlers, update, hint, debug }`. Pipes: one
   merged mesh per material per pipe (plain Lambert, so the room lighting / blackout applies and no new shader is
-  compiled): kitchen 4 draw calls, cellar 6, only when in view. Shimmer: 3–7 soft sprites per room over `haze`
-  (1.8–2.7 m, opacity 0.03–0.14, scaled by the room's light via `ambientAt`, so it's nearly invisible in the dark),
-  plus the vapour jet at a leak — all in one `Billboards` instance (one draw call, same shader as the effects' boards,
+  compiled): kitchen 4 draw calls, cellar 6, only when in view. Shimmer: 3–7 soft yellow-green sprites per room over
+  `haze` (2.5–3.8 m, opacity 0.08–0.54, scaled by the room's light via `ambientAt`, so it's nearly invisible in the
+  dark), plus the vapour jet at a leak (also dimmed by the room's light) — all in one `Billboards` instance (one draw call, same shader as the effects' boards,
   hidden when empty; the billboard shader already fades what's right in front of the camera). Sounds are built on the
   game's audio context (`audio.out(pos).context`): a looping hiss per leaking pipe, a burst on rupture, coughing. The
   HUD line is its own `#gas-msg` div (top 57%). `gasBoom`: 2–6 `fx.explosion`s through the room, flash light,
@@ -155,14 +175,13 @@ For the file list at the end of the README:
   blackout: cut, dead switch, restored) still pass on this branch.
 - Graph build: 144–180 ms per Mansion map object (once, at start-up / map change).
 
-### Not verified (browser checks still to do)
-- How it looks: the pipe and meter (one early screenshot looked right: yellow pipe, grey meter with "GAS" dial, red
-  lever), the vapour jet, the shimmer's strength (must be subtle, not fog) by day, at night and in a blackout, the
-  room-filling blast, the HUD line's position.
+### Verified in the browser
+- See STATUS: `g_gas.mjs` and `g_gas2.mjs` on both Mansion maps (looks, real clicks, HUD lines, the three sparks,
+  round reset, no page errors, draw calls).
+
+### Not verified
 - The sounds by ear (hiss, rupture burst, coughing, the blast muffled through walls).
-- No page errors on cs_mansion and cs_mansion_night with gas, a blast, a round reset; frame cost with gas in view.
-- The real click on the meter (the scripted-client shots work; the first headless click didn't fire before the
-  browser tests were stopped).
+- The frame time on a real laptop.
 
 ### Known gaps / choices
 - Gas set off by a satchel, C4, mine, car or drone blast credits nobody (the blastMap hook has no owner); grenades,
