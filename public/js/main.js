@@ -28,6 +28,7 @@ import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
 import { createGadgets } from './gadgets.js';
+import { createElevator } from './elevator.js'; // elevator
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -122,6 +123,7 @@ function loadMap(id) {
   clearDroneModels();
   endDrone(null);
   gadgets.load(map);
+  elevator.load(map); // elevator
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
@@ -1542,6 +1544,7 @@ function updateRemotes(dt) {
   for (const r of remotes.values()) {
     if (!r.buf.length) { r.model.visible = false; continue; }
     const s = sampleRemote(r, rt);
+    elevator.remote(s.p, rt); // elevator: someone in the lift is drawn where the lift is now
     const alive = killcam ? s.alive !== 0 : r.alive;
     if (killcam && s.w && s.w !== r.model.userData.gunId) setPlayerWeapon(r.model, s.w);
     const moved = r.lastP ? Math.hypot(s.p[0] - r.lastP[0], s.p[2] - r.lastP[2]) : 0;
@@ -2805,6 +2808,7 @@ const net = new Net({
   cctv(m) {
     gadgets.onCctv(m);
   },
+  elevState(m) { elevator.onState(m); }, elevSfx(m) { elevator.onSfx(m); }, elevTo(m) { elevator.onTo(m); }, // elevator
   spawn(m) {
     if (me.driving != null || me.riding) leaveCar(null);
     gadgets.died();
@@ -3183,11 +3187,14 @@ const gadgets = createGadgets({
   scene, me, net, audio, hud, fx, remotes, serverNow, stopEmote: () => stopEmote(),
   power: () => game.lights.power !== false, jammers: () => [...jammerModels.values()].map(e => e.p),
 });
+// elevator: the lift in the Mansion (see elevator.js)
+const elevator = createElevator({ scene, me, net, audio, serverNow, coll: () => coll, mines: mineModels, satchels: satchelModels });
 
 // ---------------------------------------------------------------- per-frame updates
 
 function updateLocal(dt, now) {
   if (!me.alive) return;
+  elevator.local(dt, now); // elevator: in the lift we ride up and down with it (before we move)
   if (gadgets.local(dt, now)) return;
   if (me.drone) { updateDroneFlight(dt, now); return; }
   if (me.driving != null && me.car) { updateDriving(dt, now); return; }
@@ -3560,6 +3567,7 @@ function updateHud(now) {
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if ((gh = gadgets.hint())) hint = gh;
+    else if ((gh = elevator.hint())) hint = gh; // elevator
     else if (current() === 'jammer') hint = 'Click to put the signal jammer down — no enemy radar, pings or drones within 15 m';
     else if (jammedHere()) hint = JAM_HINT;
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
@@ -3580,6 +3588,7 @@ function updateHud(now) {
   }
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
+  else if (me.act && elevator.progress(me.act.a)) hud.progress(elevator.progress(me.act.a), me.act.pr); // elevator
   else if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
@@ -3914,6 +3923,7 @@ function frame() {
   recordSelf();
   updateRemotes(dt);
   gadgets.update(dt, now);
+  elevator.update(dt, now); // elevator
   updateCars(dt);
   updateHostageModels(dt);
   updateBomb(now);
