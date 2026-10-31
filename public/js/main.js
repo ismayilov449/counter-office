@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import { disguise } from './disguise.js'; // Disguise
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -284,7 +285,7 @@ function viewModelOf(id, look) {
 }
 function refreshViewModel() {
   const id = current();
-  const look = me.zombie ? 'Z' : me.team;
+  const look = disguise.look() || (me.zombie ? 'Z' : me.team); // Disguise: the enemy's sleeves while you wear their uniform
   if (vm && vmId === id && vmTeam === look) return;
   if (vm) vmCamera.remove(vm);
   vm = viewModelOf(id, look);
@@ -2511,6 +2512,7 @@ function radioSpeak(text) {
 
 const ROUND_START_VOICES = ['moveout', 'locknload', 'letsgo', 'go'];
 
+disguise.init({ me, game, remotes, hud, refreshViewModel: () => refreshViewModel() }); // Disguise
 const net = new Net({
   open() { $('conn-status').textContent = 'Connected. Pick a team to join.'; },
   close(e) {
@@ -2823,6 +2825,7 @@ const net = new Net({
       if (w !== r.w) { r.w = w; setPlayerWeapon(r.model, w); }
     }
     for (const r of [...remotes.values()]) if (!seen.has(r.id)) removeRemote(r);
+    disguise.onSnapshot(m.dg); // Disguise: our team's disguised players (markers, badge), used uniforms, stripped bodies
     onSpotted(m.sp);
     syncDrops(m.dr);
     syncBomb(m.b);
@@ -3153,6 +3156,7 @@ const net = new Net({
     if (r) removeRemote(r);
     fx.removeSpray(m.id);
   },
+  ...disguise.handlers, // Disguise: disguiseOn / disguiseOff / disguiseFx
 });
 
 // ---------------------------------------------------------------- per-frame updates
@@ -3316,7 +3320,7 @@ function updateLocal(dt, now) {
 }
 
 function specCandidates() {
-  return [...remotes.values()].filter(r => r.alive && r.buf.length && (me.team === 'SPEC' || isMate(r) || (isDM() && inTeamName(me.team))));
+  return [...remotes.values()].filter(r => r.alive && r.buf.length && disguise.watchable(r.id) && (me.team === 'SPEC' || isMate(r) || (isDM() && inTeamName(me.team)))); // Disguise: watchable
 }
 function cycleSpectate() {
   const list = specCandidates();
@@ -3541,10 +3545,13 @@ function updateHud(now) {
   } else if (!me.alive && me.team !== 'SPEC' && game.phase !== 'warmup') {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
+  // Disguise: crouched over a dead enemy, E takes their uniform (unless E does something that comes first here)
+  hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere() || !!mineToDefuse() || !!satchelToDefuse() || atFuseBox() || (me.team === 'CT' && !!nearestHostage()));
   hud.hint(hint);
   if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
+  if (me.act?.a === 'disguise') hud.progress(disguise.progressLabel(), me.act.pr); // Disguise
 
   let target = null;
   if (me.alive) {

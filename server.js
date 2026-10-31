@@ -28,6 +28,7 @@ import { ACHIEVEMENTS } from './shared/achievements.js';
 import { EMOTE } from './shared/emotes.js';
 import { createHostages, updateHostages, HOSTAGE_STATE } from './lib/hostages.js';
 import { BotManager, BOT_LEVELS } from './lib/bots.js';
+import { createDisguise } from './lib/disguise.js'; // Disguise
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -1346,6 +1347,8 @@ const bots = new BotManager({
   useDoor: (p, i) => useDoor(p, i), kill: p => killPlayer(p, null, 'world', false),
   doors: () => (MAP.doors || []).map((d, i) => ({ i, box: world.doorBoxes[i], open: world.doorStates[i] !== 0 })),
 });
+// Disguise: a dead enemy's uniform (lib/disguise.js)
+const disguise = createDisguise({ players, game, cfg: () => CFG, send, lineOfSight, eyeOf });
 
 function addBot(team) {
   let p = null;
@@ -1697,6 +1700,7 @@ function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
   }
   if (!silent) record(v, 'deaths');
   const gib = gibOf(weapon, hs, how);
+  disguise.onDeath(v, gib); // Disguise: the body is kept for the round; a disguise is lost
   if (!silent) broadcast({ t: 'kill', k: killer ? killer.id : null, v: v.id, w: weapon, hs: !!hs, streak, first, ace, gib: gib && { ...gib, p: v.p.map(r2), c: v.c, yaw: r2(v.yaw) } });
   if (!silent && isGG() && game.phase === 'live') ggOnKill(killer, v, weapon);
   if (!silent && isDM() && game.phase === 'live' && killer && killer !== v && killer.kills >= CFG.dmFrags) dmWin(killer);
@@ -1733,6 +1737,7 @@ function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo, from = null) 
     record(attacker, 'damage', dealt);
   }
   v.hp -= d;
+  disguise.onHurt(v, attacker); // Disguise: a hit stops the changing; a hit from the fooled team gives you away
   if (v.bot) bots.hurt(v, attacker);
   send(v, { t: 'dmg', hp: Math.max(0, v.hp), armor: Math.round(v.armor), from: attacker && attacker !== v ? attacker.p : null, d });
   const killed = v.hp <= 0;
@@ -1854,6 +1859,7 @@ function updateActions(t) {
     const a = p.act;
     if (!a) continue;
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
+    if (a.type === 'disguise') { disguise.act(p, a, t); continue; } // Disguise: changing into a dead enemy's uniform
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
       continue;
@@ -1958,6 +1964,7 @@ function onUse(p, m, t) {
     send(p, { t: 'msg', text: off ? 'The power is already off.' : 'The power is on. Only the Terrorists would cut it.' });
     return;
   }
+  if (disguise.tryStart(p, t)) return; // Disguise: crouched over a dead enemy, hold E to put on their uniform
   const sw = nearestSwitch(p), door = nearestDoor(p);
   if (door && (!sw || door.dist < dist2(p.p, sw.p))) { useDoor(p, door.i); return; }
   if (sw && game.lights.power === false && MAP.fusebox.groups.includes(sw.group)) {
@@ -2025,6 +2032,7 @@ function onShoot(p, m) {
   // Hide and Seek: the seekers wait (blind) while the hiders hide.
   if (isHNS() && p.team === 'CT' && game.phase === 'live' && t < (game.hideUntil || 0)) return;
   p.lastShot = t;
+  if (!def.melee) disguise.reveal(p, 'shot'); // Disguise: a shot gives you away
   if (!def.melee) bots.heard(p, o);
   if (item) item.mag--;
   if (def.rocket) {
@@ -2100,6 +2108,7 @@ function onShoot(p, m) {
   for (const s of shotSatchels) explodeSatchel(s);
   for (const dr of shotDrones) hitDrone(dr, p);
 
+  if (def.melee && hits.some(h => h.q)) disguise.reveal(p, 'knife'); // Disguise: so does knifing someone
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
   if (!hits.length) return;
   const info = {};
@@ -2202,6 +2211,7 @@ function onMortar(p, m) {
   if (!sky.open(p.p) && !roof) return;
   p.lastShot = t;
   p.protectUntil = 0;
+  disguise.reveal(p, 'shot'); // Disguise: firing a mortar gives you away
   item.mag--;
   sendMe(p);
   bots.heard(p, o);
@@ -2380,6 +2390,7 @@ function onSatchel(p, m) {
   if (!o || !v || Math.hypot(...v) > SATCHEL.throw + 8 || dist3(o, eyeOf(p)) > 2.5) return;
   p.inv.satchel--;
   p.protectUntil = 0;
+  disguise.reveal(p, 'nade'); // Disguise: so does throwing a satchel charge
   sendMe(p);
   // Fly it (gravity, no bounce) until it hits a wall, a door, the floor or a car body; windows it crosses break.
   const ownCar = carOf(p)?.id ?? null, dt = NADE.dt, pos = o.slice(), vel = v.slice();
@@ -2731,6 +2742,7 @@ function updateSpotting(t) {
     }
     for (const e of list) {
       const team = other(e.team);
+      if (e.disguise === team) continue; // Disguise: in their uniform you're no red dot on their radar
       if (t - (e.spotAt?.[team] ?? -1e9) < SPOT.keep) seen[team].push([e.id, r2(e.p[0]), r2(e.p[2])]);
     }
   }
@@ -2755,6 +2767,7 @@ function onNade(p, m) {
   if (!o || !v || Math.hypot(...v) > 30 || dist3(o, eyeOf(p)) > 2.5) return;
   p.inv[k]--;
   p.protectUntil = 0;
+  disguise.reveal(p, 'nade'); // Disguise: a thrown grenade gives you away
   // Gun Game HE level: a fresh grenade shortly after each throw.
   if (isGG() && GUNGAME[p.level] === 'he' && k === 'he') {
     setTimeout(() => { if (p.alive && isGG() && GUNGAME[p.level] === 'he' && !p.inv.he) { p.inv.he = 1; sendMe(p); } }, 1500);
@@ -3592,6 +3605,7 @@ function tick() {
   updateSatchels();
   if (game.drones.length) updateDrones(t);
   updateCamo(t);
+  disguise.tick(); // Disguise: breaking (3 m, plant/defuse, going down), losing it, the round's reset
   updateSpotting(t);
   // the time that really passed since the last tick: on Windows the timer fires every 31 or 47 ms rather than 33,
   // and moving by a fixed step made bots and hostages stutter on everyone's screen
@@ -3647,7 +3661,8 @@ function tick() {
     const me = p.act ? JSON.stringify({ a: p.act.type, pr: Math.min(1, (t - p.act.start) / p.act.dur) }) : 'null';
     // (the enemies the player's team has spotted: only to that team)
     const sp = inTeam(p) && spotOn() ? ',"sp":' + (p.team === 'CT' && p.alive && jammedAt(p.p) ? '[]' : spotJson[p.team]) : '';
-    p.ws.send(head + (p.gotSnap ? changed : all) + sp + ',"me":' + me + '}');
+    // Disguise: the fooled team's copy shows a disguised player as the dead one; "dg" is the wearer's own team's
+    p.ws.send(disguise.headFor(p, head, pl) + (p.gotSnap ? changed : all) + sp + disguise.snapKey(p) + ',"me":' + me + '}');
     p.gotSnap = true;
   }
 }
