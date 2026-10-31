@@ -194,11 +194,13 @@ export class BetPanel {
       const stake = Math.min(this.stake, max);
       const targets = BET.targets.map((t, i) => `<div class="bet-t${this.pick === t.id ? ' sel' : ''}${open ? '' : ' off'}" data-t="${t.id}">
         <span class="bet-key">${i + 1}</span><b>${esc(t.label)}</b><i>×${t.odds}</i></div>`).join('');
-      const stakes = [...BET.stakes.map((s, i) => [s, i + 5]), [max, 0]].map(([s, k]) => `<div class="bet-s${!k ? ' max' : ''}${this.stake === s && s <= max ? ' sel' : ''}${open && s <= max && s >= BET.minStake ? '' : ' off'}" data-s="${s}">
+      // (the Max chip lights up only when it isn't one of the others)
+      const lit = (s, k) => this.stake === s && s <= max && (k || !BET.stakes.includes(s));
+      const stakes = [...BET.stakes.map((s, i) => [s, i + 5]), [max, 0]].map(([s, k]) => `<div class="bet-s${!k ? ' max' : ''}${lit(s, k) ? ' sel' : ''}${open && s <= max && s >= BET.minStake ? '' : ' off'}" data-s="${s}">
         <span class="bet-key">${k}</span>${k ? money(s) : `Max ${s >= BET.minStake ? money(s) : ''}`}</div>`).join('');
       const t = betTarget(this.pick);
       const sum = !open ? '' : t && stake >= BET.minStake
-        ? `Bet <b>${money(stake)}</b> on <b>${esc(t.on)}</b> → it pays <b>${money(betPayout(stake, t.id))}</b>${me.money - stake + betPayout(stake, t.id) > BET.cap ? ` <span class="bet-cap">(above the ${money(BET.cap)} cap it would be lost)</span>` : ''}`
+        ? `Bet <b>${money(stake)}</b> on <b>${esc(t.on)}</b> → it pays <b>${money(betPayout(stake, t.id))}</b>${me.money - stake + betPayout(stake, t.id) > BET.cap ? ` <span class="bet-cap">(over ${money(BET.cap)} is lost)</span>` : ''}`
         : 'Pick a target (1–4) and a stake (5–9, 0 for the most you can).';
       body = `<div class="bet-sub">This round I'll get at least…</div><div class="bet-targets">${targets}</div>
         <div class="bet-sub">Stake</div><div class="bet-stakes">${stakes}</div>
@@ -231,7 +233,7 @@ export class BetPanel {
         state = m.alive ? 'alive' : 'dead';
         cls = m.alive ? '' : 'lost';
       }
-      html = `<span class="bt-k">BET</span> ${money(m.stake)} on ${esc(t.on)} · <b>${state}</b> · pays ${money(m.pay)}`;
+      html = `<span class="bt-k">BET</span> ${money(m.stake)} on ${esc(t.on)} · <b>${state}</b> · ${cls === 'lost' ? 'lost' : `pays ${money(m.pay)}`}`;
     } else if (!m && this.shown() && me.alive && !this.isOpen && (g.phase === 'freeze' || g.phase === 'live') && this.left() > 0 && me.money >= BET.minStake) {
       html = `<span class="bt-k">F3</span> Bet on yourself · ${Math.ceil(this.left())} s`;
       cls = 'hint';

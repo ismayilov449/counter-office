@@ -15,7 +15,7 @@
 .bet-t b { color: #eee; font-size: 14px; white-space: nowrap; }
 .bet-t i { color: #e7b350; font: bold 18px Arial, sans-serif; font-style: normal; }
 .bet-stakes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.bet-s { position: relative; padding: 8px 4px 6px; text-align: center; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; color: #9fd49f; font: bold 13px Arial, sans-serif; cursor: pointer; white-space: nowrap; }
+.bet-s { position: relative; padding: 8px 4px 6px 12px; text-align: center; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; color: #9fd49f; font: bold 13px Arial, sans-serif; cursor: pointer; white-space: nowrap; }
 .bet-s.max { color: #cfc6a8; }
 .bet-t:hover, .bet-s:hover { background: rgba(231, 179, 80, 0.16); border-color: rgba(231, 179, 80, 0.6); }
 .bet-t.sel, .bet-s.sel { background: rgba(231, 179, 80, 0.25); border-color: #e7b350; }
@@ -34,7 +34,7 @@
 .bet-note { padding: 6px 14px 8px; color: #8a857a; font-size: 11px; line-height: 1.35; }
 @media (max-height: 640px) {
   .bet-t { padding: 6px 6px 5px; }
-  .bet-s { padding: 6px 4px 4px; }
+  .bet-s { padding: 6px 4px 4px 12px; }
   .bet-note { display: none; }
 }
 
