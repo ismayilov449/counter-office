@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import { BloodTrails } from './blood.js'; // blood trails
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -158,6 +159,7 @@ function prewarm() {
   fx.crater(by(2, 0, -2), 1, false);
   fx.soot(by(0, 0.01, -1), [0, 1, 0], 1, null);
   fx.decal(by(0.5, 0.01, -1), [0, 1, 0]);
+  bleed.warm(by(0.8, 0.01, -1)); // blood trails
   fx.debris(by(-0.5, 0, -1), by(0.5, 1, 0), null, 4);
   fx.gib(createGibPieces('T', ['head', 'torso', 'rArm', 'lArm', 'lLeg', 'rLeg'], 4), by(0, 0, 1), 0, () => [0, 1, 0], true);
   fx.fire(-1, by(0, 0, -3), 1, 2, at[1] + 3);
@@ -2306,6 +2308,7 @@ document.addEventListener('keydown', e => {
       if (me.alive) { me.flashlight = !me.flashlight; audio.play('click'); }
       break;
     case 'KeyH': if (me.alive) toggleCamo(); break;
+    case 'KeyP': bleed.bandage(); break; // blood trails: bandage
     case 'KeyN':
       if (!me.nvg) hud.small('You do not own nightvision goggles.');
       else { me.nvgOn = !me.nvgOn; audio.play('nvg'); }
@@ -2828,6 +2831,7 @@ const net = new Net({
     syncBomb(m.b);
     onCarSnapshot(m.cars, m.time);
     onDroneSnapshot(m.dn, m.time);
+    bleed.onSnapshot(m.bl); // blood trails
     syncHostages(m.hs, m.time);
   },
   shot(m) {
@@ -3081,6 +3085,7 @@ const net = new Net({
     fx.clearDecals();
     fx.clearCraters();
     fx.clearGibs();
+    bleed.clear(); // blood trails
     me.daze = null;
     fx.clearFires();
     if (me.roundBuys.length) me.lastBuys = me.roundBuys;
@@ -3154,6 +3159,7 @@ const net = new Net({
     fx.removeSpray(m.id);
   },
 });
+const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map }); // blood trails (public/js/blood.js)
 
 // ---------------------------------------------------------------- per-frame updates
 
@@ -3216,6 +3222,7 @@ function updateLocal(dt, now) {
   const wet = inWater(map.water, me.p);
   if (wet) speed *= 0.7;
   speed *= 1 - 0.45 * Math.min(1, dazed(performance.now()));
+  speed *= bleed.speedMul(); // blood trails: slow while bandaging
   // Swim up: hold Space in water to rise to the surface and climb out over the edge.
   if (wet && keys.has('Space') && !frozen) { me.v[1] = Math.max(me.v[1], 3.2); me.onGround = false; }
 
@@ -3890,6 +3897,7 @@ function frame() {
   updateDroneHud(now);
   updateFires(dt, now);
   updateZombieGrowls(now);
+  bleed.update(dt, now, !!killcam); // blood trails
   fx.update(dt, camera);
   world?.update(dt, camera.position);
   updateViewModel(dt, now);
