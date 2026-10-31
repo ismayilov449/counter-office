@@ -151,6 +151,7 @@ export function catLoadMap(sc, m) {
   map = m;
   buf = [];
   yDisp = null;
+  lastP = null;
   stopPurr();
   if (!catMap(m)) {
     if (cat) { scene.remove(cat); scene.remove(props); }
@@ -170,6 +171,9 @@ export function catSync(data, time) {
   if (!data || !cat || !shown) { if (cat) cat.visible = false; return; }
   if (data[4] !== state) { state = data[4]; stateAt = performance.now(); }
   purr = data[5];
+  // (a jump of metres between two snapshots is a new round putting it back in its basket: no sliding there)
+  const last = buf[buf.length - 1];
+  if (last && Math.hypot(data[0] - last.p[0], data[1] - last.p[1], data[2] - last.p[2]) > 3) { buf = []; yDisp = null; lastP = null; }
   buf.push({ t: time, p: [data[0], data[1], data[2]], yaw: data[3] });
   if (buf.length > 40) buf.shift();
 }

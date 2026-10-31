@@ -125,7 +125,10 @@ function near(p, r = 5) {
   const here = nav.nodeAt(p, 3);
   for (let i = 0; i < 200; i++) {
     const n = nav.randomNear(here, p, r, 0.3);
-    if (n >= 0 && d2(nav.pos(n), p) > 3) return nav.pos(n);
+    if (n < 0 || d2(nav.pos(n), p) <= 3) continue;
+    // (in the same room: a clear line from the cat, so it can get to him)
+    const q = nav.pos(n), a = [p[0], p[1] + 0.3, p[2]], dir = [q[0] - a[0], q[1] + 0.3 - a[1], q[2] - a[2]], l = Math.hypot(...dir);
+    if (!world.raycast(a, dir.map(v => v / l), l, 'move')) return q;
   }
   return null;
 }
