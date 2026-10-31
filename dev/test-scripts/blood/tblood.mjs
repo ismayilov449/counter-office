@@ -2,8 +2,10 @@
 // 1. what bleeds (bleeds()); 2. a CT's USP shot makes a T bleed (snapshot bl), the T bandages (P: bloodBandage):
 // no shooting meanwhile, then the bleeding stops; 3. bandaging when not bleeding is refused; 4. a leg shot bleeds
 // lightly, the bandages run out (2 a life); 5. the bleeding stops by itself after BLOOD.secs; 6. a dead player isn't
-// listed, and the next round brings fresh bandages; 7. a knife stab bleeds heavily and costs HP slowly; 8. Zombie
-// mode: claws on a human's armor make him bleed, a zombie shot never bleeds.
+// listed, and the next round brings fresh bandages; 7. a knife stab bleeds heavily and costs HP slowly; 7b. P
+// pressed three times starts one bandage, no grenades while bandaging; 8. Zombie mode: claws on a human's armor make
+// him bleed, a zombie shot never bleeds; 9. Deathmatch: bleeding and bandaging, a respawn brings fresh bandages.
+// (unit.mjs tests lib/blood.js alone: downed, playing dead, cars, the refusals; clientsmoke.mjs the browser's side.)
 import { player, admin, sleep } from '../mansion/client.mjs';
 import { bleeds } from '../../../lib/blood.js';
 import { BLOOD } from '../../../shared/blood.js';
@@ -112,6 +114,25 @@ await sleep(BLOOD.drain[3] * 1000 * 2 + 400);
 const hp2 = t.me.hp;
 ok(`heavy bleeding costs HP slowly: ${hp1} -> ${hp2} in ${(BLOOD.drain[3] * 2 + 0.4).toFixed(1)} s`, hp2 === hp1 - 2);
 
+// ---- 7b. P pressed three times: one bandage; no grenades while bandaging
+t.at([-10, 0.81, 0]); await sleep(300); // (in the Terrorists' buy zone: the house)
+t.send({ t: 'buy', item: 'smoke' }); await sleep(400);
+ok(`a smoke grenade bought (${t.me?.inv?.smoke})`, t.me?.inv?.smoke === 1);
+t.clear(); ct.clear();
+for (let i = 0; i < 3; i++) t.send({ t: 'bloodBandage' });
+await sleep(250);
+ok('P three times: one bandage started', t.got('bloodBandage').filter(m => m.s === 'start').length === 1 && !t.got('msg').length);
+{
+  const eye = [-10, 0.81 + 1.62, 0];
+  t.send({ t: 'nade', k: 'smoke', o: eye, v: [0, 3, -6] });
+  await sleep(300);
+  ok('a grenade while bandaging is refused', !ct.got('nade').some(m => m.owner === myId));
+  await sleep(BLOOD.bandage * 1000);
+  t.send({ t: 'nade', k: 'smoke', o: eye, v: [0, 3, -6] });
+  await sleep(300);
+  ok('thrown once bandaged', ct.got('nade').some(m => m.owner === myId));
+}
+
 // ---- 8. Zombie mode: claws through armor bleed; zombies never bleed
 await admin({ action: 'settings', settings: { gameMode: 'zombie' } });
 t.clear(); ct.clear();
@@ -140,6 +161,24 @@ ok(`claws on the vest: the human bleeds: ${JSON.stringify(bl)}`, (bl || []).some
   await sleep(400);
 }
 ok(`a shot zombie (hp ${zombie.got('dmg').at(-1)?.hp}) doesn't bleed: ${JSON.stringify(bl)}`, zombie.got('dmg').length && !(bl || []).some(e => e[0] === zid));
+
+// ---- 9. Deathmatch: the same bleeding; a respawn brings fresh bandages
+await admin({ action: 'settings', settings: { gameMode: 'deathmatch' } });
+t.clear(); ct.clear();
+for (let i = 0; i < 100 && !(t.got('spawn').length && ct.got('spawn').length); i++) await sleep(100);
+await sleep(3500); // (spawn protection)
+t.at([2, 0, -16], -Math.PI / 2); ct.at([6, 0, -16], Math.PI / 2); await sleep(400);
+const dmGun = ct.me?.inv?.secondary?.id || 'usp'; // (the zombie round may have moved the shooter to the other team: his own pistol)
+await ctShoot(dmGun);
+await sleep(200);
+ok(`Deathmatch: a shot (hp ${t.got('dmg').at(-1)?.hp}) bleeds: ${JSON.stringify(entry(myId))}`, entry(myId)?.[1] >= 1);
+t.send({ t: 'bloodBandage' }); await sleep(300);
+ok('Deathmatch: bandaging works', t.got('bloodBandage').some(m => m.s === 'start' && m.left === BLOOD.bandages - 1));
+t.clear();
+for (let i = 0; i < 12 && !t.got('kill').length && t.me?.alive !== false; i++) await ctShoot(dmGun);
+for (let i = 0; i < 100 && !t.got('spawn').length; i++) await sleep(100);
+await sleep(300);
+ok(`Deathmatch: respawned (${t.got('spawn').length}) with fresh bandages (${JSON.stringify(t.got('bloodKit').at(-1))}), not bleeding`, t.got('spawn').length && t.got('bloodKit').at(-1)?.left === BLOOD.bandages && !entry(myId));
 await admin({ action: 'settings', settings: { gameMode: 'classic' } });
 t.close(); ct.close();
 process.exit();
