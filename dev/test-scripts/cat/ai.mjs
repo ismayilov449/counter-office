@@ -115,7 +115,11 @@ function seekTest(what, q) {
   sounds.length = 0;
   const met = run(240000, () => C().seek === q.id && heard('meow').length && d2(C().p, q.p) < 1.8);
   ok(`${what}: it goes up to him (${d2(C().p, q.p).toFixed(2)} m) and meows (${heard('meow').length})`, met);
-  const again = run(15000, () => heard('meow').length >= 2 && d2(C().p, q.p) < 1.3 && C().state === CAT_STATE.sit);
+  let trace = '';
+  const again = run(15000, () => { if (process.env.VERBOSE && Math.round(clock) % 250 < dt) trace += `  ${(clock / 1000).toFixed(2)} ${f2(C().p)} ${STATE[C().state]} then ${C().then} seek ${C().seek} path ${C().path} d ${d2(C().p, q.p).toFixed(2)}
+`; return heard('meow').length >= 2 && d2(C().p, q.p) < 1.3 && C().state === CAT_STATE.sit; });
+  if (!again && trace) console.log(`  him at ${f2(q.p)}
+` + trace);
   ok(`  and meows again, sitting at his feet (${heard('meow').length} meows, ${d2(C().p, q.p).toFixed(2)} m, ${STATE[C().state]})`, again);
   players.delete(q.id);
   run(20000, () => !C().seek);

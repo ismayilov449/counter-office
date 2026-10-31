@@ -71,5 +71,5 @@ console.log('spots reached:', JSON.stringify(Object.fromEntries(visits)));
 console.log('time in each state (s):', JSON.stringify(Object.fromEntries([...inState].map(([k, v]) => [k, Math.round(v / 1000)]))));
 console.log('sounds:', sounds.length);
 const st = cat.debug().stats;
-console.log(`setup ${st.setup.toFixed(1)} ms; ${st.plans} paths (${st.fails} failed), avg ${(st.planMs / Math.max(1, st.plans)).toFixed(2)} ms, max ${st.planMax.toFixed(1)} ms`);
+console.log(`setup ${st.setup.toFixed(1)} ms; ${st.plans} paths (${st.fails} failed), avg ${(st.planMs / Math.max(1, st.plans)).toFixed(2)} ms, max ${st.planMax.toFixed(1)} ms; stopped by a door ${st.blocks.length} times ${JSON.stringify(st.blocks.slice(0, 5))}`);
 process.exit(bad ? 1 : 0);

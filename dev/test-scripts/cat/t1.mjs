@@ -24,15 +24,18 @@ const floorUnder = p => world.raycast([p[0], p[1] + 0.15, p[2]], [0, -1, 0], 1.6
 const los = (a, b) => { const d = b.map((v, i) => v - a[i]), l = Math.hypot(...d); return !world.raycast(a, d.map(v => v / l), l, 'bullet'); };
 const CALM = ['sit', 'walk', 'trot', 'wash', 'stretch', 'loaf', 'sleep'];
 // a floor near p, between rMin and rMax metres off on the same level, optionally with a clear line to the cat
+// (and if there's none, somewhere a little nearer or further, a step up or down, in a tighter spot)
 function spotNear(p, rMin, rMax, needLos = false) {
   const here = nav.nodeAt(p, 3), at = here >= 0 ? nav.pos(here) : p; // (the floor under it: it may be on a sill)
-  for (let i = 0; i < 400; i++) {
-    const n = nav.randomNear(here, at, rMax, 0.15);
-    if (n < 0) continue;
-    const q = nav.pos(n), d = dist2(q, p);
-    if (d < rMin || nav.tight[n] || nav.low[n]) continue;
-    if (needLos && !los([q[0], q[1] + 1.6, q[2]], [p[0], p[1] + 0.15, p[2]])) continue;
-    return q;
+  for (const [k, dy, roomy] of [[1, 0.15, true], [1, 0.6, false], [1.6, 0.6, false]]) {
+    for (let i = 0; i < 400; i++) {
+      const n = nav.randomNear(here, at, rMax * k, dy);
+      if (n < 0) continue;
+      const q = nav.pos(n), d = dist2(q, p);
+      if (d < rMin / k || nav.low[n] || (roomy && nav.tight[n])) continue;
+      if (needLos && !los([q[0], q[1] + 1.6, q[2]], [p[0], p[1] + 0.15, p[2]])) continue;
+      return q;
+    }
   }
   return null;
 }
@@ -90,6 +93,7 @@ t.at(away.t, 0, 0);
 ok('it comes out of hiding', await until(() => CALM.includes(cat().state), 40000));
 await until(() => ['sit', 'loaf', 'sleep', 'wash'].includes(cat().state), 30000);
 const c4 = cat().p.slice(), gun = spotNear(c4, 3.5, 4.5);
+ok(`somewhere for the CT ${gun ? dist2(gun, c4).toFixed(1) : '-'} m from the cat (${f2(c4)})`, !!gun);
 ct.at(gun, 0, 0); await sleep(400);
 t.clear();
 ct.shoot([gun[0], gun[1] + 1.6, gun[2]], [gun[0] + 0.3, gun[1] + 9, gun[2]]); // (into the air)
@@ -118,7 +122,8 @@ ct.at(away.ct, 0, 0);
 // ---- 6. the T in camo, crouched a few metres off: it gives him away
 ok('it comes out of hiding', await until(() => CALM.includes(cat().state), 40000));
 await until(() => ['sit', 'loaf', 'sleep', 'wash'].includes(cat().state), 30000);
-const c6 = cat().p.slice(), lurk = spotNear(c6, 4, 7) || spotNear(c6, 2.5, 10);
+const c6 = cat().p.slice(), lurk = spotNear(c6, 4, 7);
+ok(`somewhere for the T ${lurk ? dist2(lurk, c6).toFixed(1) : '-'} m from the cat (${f2(c6)})`, !!lurk);
 t.send({ t: 'camo', on: true });
 t.at(lurk, 0, 1);
 await sleep(300);
