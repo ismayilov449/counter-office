@@ -1,5 +1,7 @@
-// "Downed, not dead" + "Play dead" in the browser (de_dust2, GAME_PORT/CDP_PORT, BOTS=0 START_MONEY=16000).
-// Part 1, the browser is a Terrorist with a scripted teammate (Mate) and two scripted CTs, in the open CT spawn:
+// "Downed, not dead" + "Play dead" in the browser (cs_mansion or cs_mansion_night: MAP= as the server's, default
+// cs_mansion; GAME_PORT/CDP_PORT, BOTS=0 START_MONEY=16000 MAP_ROTATION=0).
+// Part 1, the browser is a Terrorist with a scripted teammate (Mate) and two scripted CTs, on the back garden's lawn
+// (the same layout as t1.mjs: de_dust2's CT spawn positions moved there by P()):
 //   Mate goes down (crawl pose, name tag, radar cross); the browser revives him (hint, hold E, progress);
 //   the browser goes down (red overlay, bleed bar, low camera, pistol only, 1 m/s crawl), Mate revives him;
 //   the browser plays dead (K: eyes half closed, view from the floor) and gets up by moving (W);
@@ -9,6 +11,9 @@
 // Screenshots in OUT, page errors printed. It takes ~5 minutes (run it with a long timeout).
 import { open, sleep } from '../mansion/game.mjs';
 import { player } from '../mansion/client.mjs';
+// the back garden's flat lawn (y 0): P() moves a de_dust2 CT-spawn position there, as in t1.mjs
+const OFF = { cs_mansion: [-53, 27], cs_mansion_night: [-53, 27] }[process.env.MAP || 'cs_mansion'] || [0, 0];
+const P = (x, y, z) => [x + OFF[0], y, z + OFF[1]];
 const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if (!cond) process.exitCode = 1; };
 const until = async (cond, ms = 3000) => { for (let i = 0; i < ms / 50; i++) { if (await cond()) return true; await sleep(50); } return !!(await cond()); };
 const KEEP = ['msg', 'round', 'bodyDown', 'bodyUp', 'bodyKill', 'bodyPlayDead', 'kill', 'spawn'];
@@ -34,14 +39,14 @@ const has = async pred => (await pull()).some(pred);
 ok('round starts', await until(() => M.got('round').length > 0, 40000));
 await send({ t: 'buy', item: 'ak47' }); await sleep(3500);
 const me = idOf('Tester'), mate = idOf('Mate');
-M.at([20, 0, -30], 0); C1.at([20, 0, -24], Math.PI); C2.at([8, 0, -22], 0);
-await tp([16, 0, -30], -Math.PI / 2, -0.12); await sleep(800);
-for (let i = 0; i < 12 && !M.got('bodyDown').length; i++) await shoot(C1, [20, 1.2, -30]);
+M.at(P(20, 0, -30), 0); C1.at(P(20, 0, -24), Math.PI); C2.at(P(8, 0, -22), 0);
+await tp(P(16, 0, -30), -Math.PI / 2, -0.12); await sleep(800);
+for (let i = 0; i < 12 && !M.got('bodyDown').length; i++) await shoot(C1, P(20, 1.2, -30));
 ok('Mate is down', M.got('bodyDown').some(m => m.v === mate));
-for (let i = 1; i <= 8; i++) { M.at([20 + i * 0.08, 0, -30], -Math.PI / 2); await sleep(100); } // crawling towards us
+for (let i = 1; i <= 8; i++) { M.at(P(20 + i * 0.08, 0, -30), -Math.PI / 2); await sleep(100); } // crawling towards us
 await sleep(600);
 await shot('g1_mate_down.png');
-await tp([21.3, 0, -30], Math.PI / 2, -0.6); await sleep(700);
+await tp(P(21.3, 0, -30), Math.PI / 2, -0.6); await sleep(700);
 ok(`the revive hint (${await text('hint')})`, /Hold E to revive Mate/.test(await text('hint')));
 await shot('g1_revive_hint.png');
 await keyDown('KeyE'); await sleep(1800);
@@ -51,9 +56,9 @@ await sleep(4200); await keyUp('KeyE');
 ok('Mate revived by the browser', M.got('bodyUp').some(m => m.v === mate && m.by === me));
 
 // the browser goes down
-M.at([10, 0, -24], 0);
-await tp([20, 0, -30], 0, 0); await sleep(700);
-for (let i = 0; i < 12 && !(await has(m => m.t === 'bodyDown' && m.v === me)); i++) await shoot(C1, [20, 1.2, -30]);
+M.at(P(10, 0, -24), 0);
+await tp(P(20, 0, -30), 0, 0); await sleep(700);
+for (let i = 0; i < 12 && !(await has(m => m.t === 'bodyDown' && m.v === me)); i++) await shoot(C1, P(20, 1.2, -30));
 ok('the browser is down', await has(m => m.t === 'bodyDown' && m.v === me));
 await sleep(900);
 ok(`down overlay shown: "${await text('bd-panel')}"`, /YOU'RE DOWN/.test(await text('bd-panel')) && (await ev("getComputedStyle(document.getElementById('bd-down')).display")) === 'block');
@@ -78,8 +83,8 @@ ok('down overlay gone', (await ev("getComputedStyle(document.getElementById('bd-
 await shot('g1_revived.png');
 
 // the browser plays dead
-M.at([10, 0, -24], 0);
-await tp([20, 0, -30], -Math.PI / 2, 0); await sleep(600);
+M.at(P(10, 0, -24), 0);
+await tp(P(20, 0, -30), -Math.PI / 2, 0); await sleep(600);
 C2.clear();
 await key('KeyK'); await sleep(900);
 ok('playing dead (bodyPlayDead)', await has(m => m.t === 'bodyPlayDead' && m.v === me));
@@ -93,8 +98,8 @@ await sleep(1200);
 await shot('g1_up.png');
 
 // Mate plays dead in front of his teammate
-M.at([20, 0, -26], 0); await sleep(300);
-await tp([15, 0, -26], -Math.PI / 2, -0.2); await sleep(500);
+M.at(P(20, 0, -26), 0); await sleep(300);
+await tp(P(15, 0, -26), -Math.PI / 2, -0.2); await sleep(500);
 M.send({ t: 'bodyPlayDead' }); await sleep(1200);
 ok('Mate playing dead', await has(m => m.t === 'bodyPlayDead' && m.v === mate));
 await shot('g1_mate_playdead.png');
@@ -114,8 +119,8 @@ await shoot(C1, [M.p[0], M.p[1] + 1.62, M.p[2]], 'usp', 500); // end the round
 ok('next round', await until(() => M.got('round').length > 0, 15000));
 await sleep(3500);
 const mate2 = idOf('Mate');
-M.at([20, 0, -26], 0); Tom.at([20, 0, -33], 0); C1.at([10, 0, -25], 0);
-await tp([14, 0, -26], -Math.PI / 2, -0.12); await sleep(800);
+M.at(P(20, 0, -26), 0); Tom.at(P(20, 0, -33), 0); C1.at(P(10, 0, -25), 0);
+await tp(P(14, 0, -26), -Math.PI / 2, -0.12); await sleep(800);
 await shot('g1_ct_before.png');
 M.send({ t: 'bodyPlayDead' }); await sleep(1200);
 ok('the CT browser got the kill message', await has(m => m.t === 'kill' && m.v === mate2));

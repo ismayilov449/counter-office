@@ -31,6 +31,17 @@
   merge) and the de_dust2 / cs_assault soaks.
 - **Browser checks still to do:** `g1.mjs` is ready but **not run** (de_dust2; see "Browser checks still to do"), plus
   the gadget checks by hand listed there.
+- **Browser run 1 (2026-11-01, paused partway; the user's PC was overloaded, so browser tests now go one agent at a
+  time):** `g1.mjs` now plays on cs_mansion (and cs_mansion_night; `MAP=`, default cs_mansion): the same layout as
+  `t1.mjs`, moved onto the back garden's lawn by `P()`. One run on cs_mansion: 22 of 24 checks OK, no page errors.
+  Looked at: going down (red edges, "YOU'RE DOWN", bleed bar counting, low camera, Glock only, 1 doesn't take the AK),
+  being revived (green bar, "Mate is reviving you"), revived (30 HP, all gone), reviving a teammate (hint, then
+  "Reviving Mate..."), play dead (eyes half closed, view from the floor, AK and Glock lying in front, knife only in the
+  list), getting up with W, the CT's fake kill (feed "[world] Mate", scoreboard dead). The two FAILs, not yet looked
+  into: the crawl measured 0.75 m in 2 s (likely the headless SwiftShader frame rate, to check) and the CT's
+  "Mate was playing dead!" text wasn't found. Seen and still to fix or check: up close, the downed teammate's name tag
+  is huge and covers the "Hold E to revive" hint; two name tags ("Mate" twice) over a downed teammate; no side-view
+  shot of the crawl pose yet. Not run yet: cs_mansion_night, the zip line / CCTV desk / K mid-air checks.
 
 ## (a) README
 
