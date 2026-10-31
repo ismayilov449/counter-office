@@ -13,6 +13,7 @@ const MAPID = process.env.MAP || 'cs_mansion';
 const SETUP = {
   cs_mansion: { T: [-20.5, 0.81, 9.4], yaw: 0, front: [-20.5, 0.81, 5.9], side: [-25.0, 0.81, 9.4], angle: [-18.6, 0.81, 6.3], hint: [-20.5, 0.81, 7.4], walkT: [-21.5, 0.81, 8.4], walkYaw: -Math.PI / 2 },
   cs_assault: { T: [-6.909, 8.23, -38.83], yaw: Math.PI, front: [-6.909, 8.23, -35.33], side: [-10.909, 8.23, -38.83], angle: [-5.5, 8.23, -35.6], hint: [-6.909, 8.23, -37.0], walkT: [-6.909, 8.23, -38.83], walkYaw: Math.PI },
+  get cs_mansion_night() { return this.cs_mansion; }, // (the same house: t-shield.mjs picks the same spots there)
 }[MAPID];
 const look = (from, at) => { const d = [at[0] - from[0], at[1] - from[1] - 1.62, at[2] - from[2]]; return [Math.atan2(-d[0], -d[2]), Math.atan2(d[1], Math.hypot(d[0], d[2]))]; };
 const chest = [SETUP.T[0], SETUP.T[1] + 1.2, SETUP.T[2]];
