@@ -6,10 +6,10 @@
   server-side tests pass:
   - `sim.mjs`: 60 minutes of wandering, doors open and doors shut. No tick off a floor, outside the map or inside a
     wall. All 14 spots are reached (doors open). It never stood still with a path.
-  - `ai.mjs`: 38 checks, 10 runs in a row.
-  - `t1.mjs`: live server, 33 checks.
+  - `ai.mjs`: 38 checks, 40 runs in a row.
+  - `t1.mjs`: live server, 32 checks.
   - `clientsmoke.mjs`: 31 checks.
-  - `soak.mjs`: 60 s with `BOTS=4`, no server errors.
+  - `soak.mjs`: 60 s with `BOTS=4`, no server errors; ticks about 1 ms on average.
   - `maps.mjs`: all 7 maps start.
 - **Not done:** no browser test was run (the user's rule: no Edge until every agent has finished). Nobody has seen the
   cat or heard it yet.
@@ -183,7 +183,8 @@ room it's shut in.
   - `world.doorBoxes`, `world.carBoxes()`, `world.raycast`, `world.move`;
   - `map.water` (except boxes marked `flood`).
 - **Hidden** means camo on (`p.hidden`), or `p.playingDead`, or crouched inside a room whose light is off.
-- **Following** never takes a hidden player: the cat meows at them instead.
+- **Following** never takes a hidden player: the cat meows at them instead. If the player it's following hides, it
+  switches to meowing at him.
 
 ### The water hook (floodgate, `feature/flood`)
 `createCat` takes an optional `deepWater(pos)`: true where the water is too deep for a cat. When it's given:
@@ -203,8 +204,8 @@ deepWater: p => waterTop(flood.state.level, p) - p[1] > 0.12,
 
 ### What was verified
 - **`sim.mjs`:**
-  - 60 minutes with the doors open (all 14 spots reached, 93 paths, 0 failed) and 60 with them all shut (the 10
-    spots it can reach from the house; 130 paths, 31 failed, so it waited or strolled). Also 10 minutes on
+  - 60 minutes with the doors open (all 14 spots reached, 94 paths, 0 failed) and 60 with them all shut (the 10
+    spots it can reach from the house; 133 paths, 30 failed, so it waited or strolled). Also 20 minutes on
     `cs_mansion_night`.
   - 0 ticks off a floor, outside the map or inside a wall. A "graze" (its side brushing an edge for one tick) shows
     a few times an hour; that's the nav grid's nodes a few mm from a step.
@@ -212,7 +213,7 @@ deepWater: p => waterTop(flood.state.level, p) - p[1] > 0.12,
 - **`ai.mjs`:**
   - basket at the start; follows a still player, purrs at 0.8 m but not at 1.4 m, gives up when he's suddenly 25 m
     off;
-  - runs from a shot and hides at least 10 m further away for 12–22 s, then stretches;
+  - runs from a shot and hides further away (about 18 m from the gun) for 12–22 s, then stretches;
   - a bullet throws it;
   - meows at camo, at someone crouched in a dark room (and not at the same player standing up), and at
     `p.playingDead`; no meows at a player in plain sight;
@@ -234,8 +235,9 @@ deepWater: p => waterTop(flood.state.level, p) - p[1] > 0.12,
   - the four sounds through a panner; the purr starts once and stops;
   - eyes at night only (shut asleep);
   - removed from the scene on other maps.
-- **`soak.mjs` and `maps.mjs`:** 60 s with `BOTS=4` and no server errors; all 7 maps start, with the `cat` key only
-  on the two Mansions.
+- **`soak.mjs` and `maps.mjs`:** 60 s with `BOTS=4`: the cat in all 1934 snapshots, always on a floor; the bots'
+  fighting sent it running and hiding. No server errors; ticks averaged 0.8–1.6 ms (max 7 ms after the start-up
+  tick). All 7 maps start, with the `cat` key only on the two Mansions.
 
 ### What wasn't verified
 - Anything you have to see or hear (browser checks above).
