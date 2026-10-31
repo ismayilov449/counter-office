@@ -2120,6 +2120,7 @@ document.addEventListener('pointerlockchange', () => {
     stopUse('key');
     stopUse('mouse');
     if (ui.chat) closeChat();
+    gadgets.leave(); // (Esc out of the game gets you up from the CCTV desk too)
   }
   updateOverlays();
 });
@@ -2161,6 +2162,7 @@ function takeScreenshot() {
 document.addEventListener('mousemove', e => {
   if (!locked || !me.alive) return;
   const k = 0.0022 * settings.sens * (camera.fov / BASE_FOV);
+  if (gadgets.mouseMove(e.movementX, e.movementY, k)) return; // (watching a camera: it turns)
   if (me.drone) {
     me.drone.yaw = Math.atan2(Math.sin(me.drone.yaw - e.movementX * k), Math.cos(me.drone.yaw - e.movementX * k));
     me.drone.pitch = clamp(me.drone.pitch - e.movementY * k, -1.45, 0.6);
@@ -2187,7 +2189,7 @@ document.addEventListener('mousedown', e => {
     else if (e.button === 2) openMortarMap(false);
     return;
   }
-  if (gadgets.busy() && me.alive && e.button !== 1) return; // (on a gadget: no shooting or throwing)
+  if (gadgets.busy() && me.alive && e.button !== 1) { gadgets.mouseDown(e.button); return; } // (on a gadget: no shooting or throwing; at the CCTV desk the buttons switch cameras)
   if (me.drone && me.alive) {
     if (e.button === 0) droneBomb();
     else if (e.button === 2) droneDive();
@@ -2254,6 +2256,7 @@ document.addEventListener('keydown', e => {
     if (!$('match-summary').classList.contains('hidden')) $('match-summary').classList.add('hidden');
     else if (buyUI.isOpen) { if (!buyUI.back()) closeBuy(); }
     else if (menu.isOpen) menu.close();
+    else if (gadgets.watching()) gadgets.leave();
     else if (me.joined && locked) pause();
     return;
   }
@@ -2285,6 +2288,7 @@ document.addEventListener('keydown', e => {
     if (step) { aimMortar(...step); return; }
   }
   if (e.repeat) return;
+  if (me.alive && gadgets.key(e.code)) return; // (1-4 switch cameras at the CCTV desk)
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
@@ -2798,6 +2802,9 @@ const net = new Net({
   zipEnd(m) {
     gadgets.onZipEnd(m);
   },
+  cctv(m) {
+    gadgets.onCctv(m);
+  },
   spawn(m) {
     if (me.driving != null || me.riding) leaveCar(null);
     gadgets.died();
@@ -3172,7 +3179,10 @@ const net = new Net({
 });
 
 // The Mansion's gadgets: the zip line (see gadgets.js).
-const gadgets = createGadgets({ scene, me, net, audio, remotes, serverNow, stopEmote: () => stopEmote() });
+const gadgets = createGadgets({
+  scene, me, net, audio, hud, fx, remotes, serverNow, stopEmote: () => stopEmote(),
+  power: () => game.lights.power !== false, jammers: () => [...jammerModels.values()].map(e => e.p),
+});
 
 // ---------------------------------------------------------------- per-frame updates
 
@@ -3346,10 +3356,13 @@ function cycleSpectate() {
 }
 
 function updateCamera(dt, now) {
-  let fov = BASE_FOV;
+  let fov = BASE_FOV, gfov = null;
   specActive = false;
   if (killcam) {
     killcamCamera();
+    hud.spectating(null);
+  } else if (me.alive && (gfov = gadgets.camera(camera))) {
+    fov = gfov; // (watching a security camera)
     hud.spectating(null);
   } else if (me.alive && me.drone) {
     droneCamera();
@@ -3404,10 +3417,12 @@ function updateCamera(dt, now) {
   }
   camera.updateMatrixWorld();
   camera.getWorldDirection(_v);
-  audio.listener(camera.position, _v);
+  const ear = gadgets.ear(); // (at the CCTV desk we hear from our own head, not the camera)
+  if (ear) audio.listener(new THREE.Vector3(...ear.p), new THREE.Vector3(...ear.fwd));
+  else audio.listener(camera.position, _v);
 
   // Flashlight follows the view
-  flashlight.intensity = me.alive && me.flashlight ? 70 : 0;
+  flashlight.intensity = me.alive && me.flashlight && !gadgets.watching() ? 70 : 0;
   if (flashlight.intensity) {
     flashlight.position.copy(camera.position).addScaledVector(_v, 0.2);
     flashlight.position.y -= 0.1;
@@ -3492,8 +3507,9 @@ function updateViewModel(dt, now) {
 const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function updateHud(now) {
-  hud.overlays(now, me.alive && me.nvgOn);
-  const nvgFilter = me.alive && me.nvgOn ? 'brightness(2.3) contrast(1.15) grayscale(1) sepia(1) hue-rotate(50deg) saturate(3.5)' : '';
+  hud.overlays(now, me.alive && me.nvgOn && !gadgets.watching());
+  // (watching a security camera: its black and white picture instead)
+  const nvgFilter = (me.alive && gadgets.screenFilter()) || (me.alive && me.nvgOn ? 'brightness(2.3) contrast(1.15) grayscale(1) sepia(1) hue-rotate(50deg) saturate(3.5)' : '');
   if (renderer.domElement.style.filter !== nvgFilter) renderer.domElement.style.filter = nvgFilter; // only when it changes
   if (!me.joined) return;
   const id = current(), def = WEAPONS[id];
@@ -3527,7 +3543,7 @@ function updateHud(now) {
   const pxPerRad = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const sniperScoped = me.alive && me.scope > 0 && def.sniper;
   const opening = settings.chDynamic !== false ? Math.max(0, computeSpread(def) - restSpread(def)) * pxPerRad : 0;
-  hud.crosshair(settings.chGap + opening, me.alive && !def.sniper);
+  hud.crosshair(settings.chGap + opening, me.alive && !def.sniper && !gadgets.watching());
   hud.scope(sniperScoped);
 
   let hint = '', gh = null;
@@ -3921,7 +3937,7 @@ function frame() {
 
   renderer.clear();
   renderer.shadowMap.needsUpdate = ++frameNo % qlevel.shadowEvery === 0;
-  renderer.render(scene, camera);
+  if (!gadgets.skipRender()) renderer.render(scene, camera); // (a dead CCTV feed: nothing to draw)
   if (vm && vm.visible && !me.emote && me.mortar?.phase !== 'aim') {
     renderer.clearDepth();
     renderer.render(vmScene, vmCamera);

@@ -1,5 +1,5 @@
-// The Mansion's gadgets, shared by the server and the browsers (where they are: shared/maps/mansion2.js; how they're
-// used: server.js and public/js/gadgets.js).
+// The Mansion's gadgets (the zip line, CCTV), shared by the server and the browsers (where they are:
+// shared/maps/mansion2.js; how they're used: server.js and public/js/gadgets.js).
 
 // ---- Zip line: map.zip = { a, b: the cable's top and bottom ends [x, y, z]; hang: from the cable down to a rider's
 // feet; stands: where you hook on [{ p, s, dir }]; endDown, endUp: where a ride down / up stops; cut: the tensioner a
@@ -48,3 +48,17 @@ export function fallDamage(drop, gravity = 20) {
   const v = Math.sqrt(2 * gravity * Math.max(0, drop));
   return v <= 14.7 ? 0 : Math.round(((v - 14.7) * 100) / (26 - 14.7));
 }
+
+// ---- CCTV: map.cctv = { cams: [{ name, p (the lens), yaw, pitch (as a player's), fov (vertical, degrees), wall (where
+// its bracket meets the wall) }], seat (where the watcher sits), yaw (facing the monitors), floor, monitors (the screens'
+// centres), screen ([w, h]) }. You sit down within reach m of the seat. A camera turns up to pan radians either way and
+// tilts up to tilt radians; one bullet breaks it (hit: the half-size of the box round it), so does a blast within blast m;
+// without rounds broken cameras are mended after mend seconds.
+export const CCTV = { reach: 1.3, pan: 0.55, tilt: 0.25, hit: 0.16, blast: 4, mend: 30 };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// Where a camera looks, turned by the watcher (offsets, kept within the limits).
+export function camView(c, dyaw = 0, dpitch = 0) {
+  return { yaw: c.yaw + clamp(dyaw, -CCTV.pan, CCTV.pan), pitch: c.pitch + clamp(dpitch, -CCTV.tilt, CCTV.tilt) };
+}
+// Half its field of view across (radians), for a 16:9 picture: what the radar spotting uses.
+export const camHalfFov = c => Math.atan((Math.tan((c.fov * Math.PI) / 360) * 16) / 9);

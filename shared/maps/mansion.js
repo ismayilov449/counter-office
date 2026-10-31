@@ -220,6 +220,8 @@ export default {
   labels: {},
   // The zip line from the neighbour's roof to the roof terrace (see mansion2.js and shared/gadgets.js).
   zip: RM.zip,
+  // CCTV: four cameras and the security desk with their monitors (see mansion2.js and shared/gadgets.js).
+  cctv: RM.cctv,
   theme: {
     skyTop: '#3f7fc4', skyHorizon: '#cfe0ec', fog: ['#d8e2e8', 90, 300],
     sun: { color: '#fff4e2', intensity: 2.8, dir: [35, 75, 25] },
