@@ -27,7 +27,7 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 | 12 | Mansion: neighbour's house | ✅ done | `eb58669` |
 | 13 | Mansion: back garden | ✅ done | `6f11419` |
 | 14 | Mansion at night | ✅ done | `f5592d0` |
-| 15 | FPV drone (T) | ✅ done | see `git log` ("FPV drone ...") |
+| 15 | FPV drone (T) | ✅ done | `a7ff657` |
 
 Merge commits on this branch: `5d335cd` (feature/mansion) and `34e90ed` (feature/t-weapons; the jammer/satchel
 conflicts were resolved by keeping both).
@@ -267,7 +267,9 @@ firing the RPG-26. Both work.
   quick bounds test (the output is byte-for-byte the same, checked by hashing every map), and the build took
   **~260–280 ms** with steps 11–12 in it (`remodel()` ~40 ms of that). Timings on this PC drift (it got ~1.4× slower over
   the afternoon), so compare side by side: after step 13, in one sitting, the resume point built in ~500–530 ms, step 12
-  in ~355 ms and step 13 in ~360 ms (`remodel()` ~70 ms). In the browser `buildWorld` takes ~240–440 ms (swiftshader).
+  in ~355 ms and step 13 in ~360 ms (`remodel()` ~70 ms). At the end (all 15 steps, 4 runs each, alternating, the PC
+  slower again): the resume point 613–722 ms, now 454–531 ms (~0.75×; `remodel()` 56–62 → 78–101 ms, from the extra
+  carving). In the browser `buildWorld` takes ~240–440 ms (swiftshader).
 - **Lighting rooms:** Mansion uses 21 of the 24 allowed in `public/js/roomlight.js`: the storm drain's three boxes and the
   smugglers' tunnel's two were merged into one box each (they're deep underground, nothing else is drawn in them), which
   freed three; the garage and the neighbour's house (one box for both floors) took one each.
