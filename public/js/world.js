@@ -179,6 +179,42 @@ const PAINTERS = {
       }
     },
   },
+  // Mansion's garage: grey steel shelving with boxes, paint tins and toolboxes; the roller door's ribbed slats
+  toolshelf: {
+    scale: 1.3, size: 256, draw: (g, s) => {
+      g.fillStyle = '#2a2c2e';
+      g.fillRect(0, 0, s, s);
+      const rows = 4, rh = s / rows;
+      for (let r = 0; r < rows; r++) {
+        let x = 4;
+        while (x < s - 8) {
+          const kind = Math.random(), w = kind < 0.45 ? rand(22, 40) : kind < 0.8 ? rand(10, 16) : rand(26, 34);
+          const h = kind < 0.45 ? rh * rand(0.5, 0.8) : kind < 0.8 ? rh * rand(0.3, 0.45) : rh * rand(0.3, 0.4);
+          g.fillStyle = kind < 0.45 ? ['#a8865a', '#b89868', '#8e7048'][(Math.random() * 3) | 0] : kind < 0.8 ? ['#c8c8c0', '#3a5a8a', '#8a2a20', '#d8b030'][(Math.random() * 4) | 0] : '#b02a1e';
+          g.fillRect(x, r * rh + rh - h - 6, Math.min(w, s - 6 - x), h);
+          if (kind >= 0.8) { g.fillStyle = '#1a1a1a'; g.fillRect(x + w * 0.3, r * rh + rh - h - 9, w * 0.4, 3); }
+          x += w + rand(2, 8);
+        }
+        g.fillStyle = '#8a9096';
+        g.fillRect(0, r * rh + rh - 6, s, 6);
+      }
+      g.fillStyle = '#7a8086';
+      g.fillRect(0, 0, 6, s);
+      g.fillRect(s - 6, 0, 6, s);
+    },
+  },
+  roller: {
+    scale: 1, size: 128, draw: (g, s) => {
+      g.fillStyle = '#a9aea6';
+      g.fillRect(0, 0, s, s);
+      for (let i = 0; i < 8; i++) {
+        const y = (i * s) / 8;
+        g.fillStyle = '#c9cec6'; g.fillRect(0, y + 2, s, 4);
+        g.fillStyle = '#6e736b'; g.fillRect(0, y + s / 8 - 3, s, 3);
+      }
+      speckle(g, s, s * 3, ['#8a8f87', '#bfc4bc', '#7a6a50'], 0.35, 2);
+    },
+  },
   stone: { scale: 2, size: 256, draw: blocks('#8a8680', '#b0aca4', '#5a5650', '#3a3632', 4, 3) },
   hedge: { scale: 1, size: 256, draw: noiseTex('#2e5a22', ['#1e4216', '#3e7a2e', '#4a8a36', '#16300f'], 80, 0.7, 5) },
   pooltile: { scale: 1, size: 256, draw: slabs('#4aa8d0', '#9ad8f0', '#2a7aa0', '#e8f4f8', 8) },
@@ -1229,9 +1265,10 @@ function buildDecor(d, ctx) {
     case 'barrel': {
       obj = new THREE.Group();
       obj.position.set(...d.p);
-      obj.add(mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.05, 12), lam(d.color ? new THREE.Color(d.color).getHex() : [0x2a5a8a, 0x8a3a2a, 0x3a6a3a][(Math.random() * 3) | 0]), 0, 0.53, 0));
-      obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), lam(0x222222), 0, 0.3, 0, false).rotateX(Math.PI / 2));
-      obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), lam(0x222222), 0, 0.8, 0, false).rotateX(Math.PI / 2));
+      // (barrels of a colour share their material, so the static ones nearby merge into one mesh)
+      obj.add(mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.05, 12), ctx.lamOf(d.color ? new THREE.Color(d.color).getHex() : [0x2a5a8a, 0x8a3a2a, 0x3a6a3a][(Math.random() * 3) | 0]), 0, 0.53, 0));
+      obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), ctx.lamOf(0x222222), 0, 0.3, 0, false).rotateX(Math.PI / 2));
+      obj.add(mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), ctx.lamOf(0x222222), 0, 0.8, 0, false).rotateX(Math.PI / 2));
       break;
     }
     case 'ceilinglamp': {
@@ -1559,7 +1596,9 @@ export function buildWorld(scene, map, qualityName) {
   }
 
   const byGroup = {};
-  const ctx = { group, animated, lights, quality: qualityName, levers: [], groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }) };
+  const lamCache = new Map();
+  const ctx = { group, animated, lights, quality: qualityName, levers: [], groupOf: g => (byGroup[g] ||= { lights: [], glows: [], glassMats: [], switches: [] }),
+    lamOf: hex => lamCache.get(hex) || lamCache.set(hex, lam(hex)).get(hex) };
   // Window frames, ceiling lamps (and their light) and light switches hang on breakable walls and ceilings: they
   // come down with them (see setBrokenPieces).
   const fixtures = [];
@@ -1681,8 +1720,25 @@ export function buildWorld(scene, map, qualityName) {
     const key = alongX ? 'z' : 'x', open = alongX ? s * Math.PI / 2 : -s * Math.PI / 2;
     return { d, pivot, target: 0, key, open };
   };
+  // A roller door (Mansion's garage): a ribbed steel curtain that rolls up into its drum (squeezed towards the top).
+  const roller = d => {
+    const { min: [x1, z1], max: [x2, z2], y, h } = d.roller;
+    const alongZ = z2 - z1 > x2 - x1, len = alongZ ? z2 - z1 : x2 - x1;
+    const pivot = new THREE.Group();
+    pivot.position.set((x1 + x2) / 2, y + h, (z1 + z2) / 2);
+    const map = material(d.tex || 'roller').mat.map.clone();
+    map.needsUpdate = true;
+    map.repeat.set(len, h);
+    const panel = mesh(new THREE.BoxGeometry(alongZ ? x2 - x1 : len, h, alongZ ? len : z2 - z1), lam(0xffffff, { map }), 0, -h / 2, 0);
+    const curtain = new THREE.Group();
+    curtain.add(panel);
+    pivot.add(curtain);
+    group.add(pivot);
+    return { d, pivot, curtain, target: 0, f: 0, roll: true };
+  };
   const doors = (map.doors || []).map(d => {
     if (d.hatch) return hatch(d);
+    if (d.roller) return roller(d);
     const pivot = new THREE.Group();
     pivot.position.set(...d.hinge);
     const leafMat = lam(0xffffff, { map: material(d.tex || 'door1').mat.map });
@@ -1752,6 +1808,7 @@ export function buildWorld(scene, map, qualityName) {
   function setDoors(states) {
     doors.forEach((o, i) => {
       o.pivot.visible = states?.[i] !== 9; // blown off
+      if (o.roll) { o.target = states?.[i] && states[i] !== 9 ? 1 : 0; return; }
       if (o.key) { o.target = states?.[i] && states[i] !== 9 ? o.open : 0; return; }
       const a = doorAngle(o.d, states?.[i] === 9 ? 0 : states?.[i] || 0);
       o.target = o.pivot.rotation.y + Math.atan2(Math.sin(a - o.pivot.rotation.y), Math.cos(a - o.pivot.rotation.y));
@@ -1797,6 +1854,14 @@ export function buildWorld(scene, map, qualityName) {
       for (const fn of animated) fn(t, dt);
       if (pool.length && t >= pickAt) { pickAt = t + 0.1; lightNearest(camPos); }
       for (const o of doors) {
+        if (o.roll) {
+          // rolls up over d.slow seconds, comes down in one
+          const diff = o.target - o.f;
+          if (!diff) continue;
+          o.f += Math.sign(diff) * Math.min(Math.abs(diff), dt / (diff > 0 ? o.d.slow || 1 : 1));
+          o.curtain.scale.y = 1 - 0.94 * o.f;
+          continue;
+        }
         const k = o.key || 'y', diff = o.target - o.pivot.rotation[k];
         o.pivot.rotation[k] += Math.sign(diff) * Math.min(Math.abs(diff), dt * (o.d.slow ? 1.6 / o.d.slow : 4.5));
       }

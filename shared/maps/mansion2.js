@@ -8,6 +8,7 @@
 //   - a smugglers' tunnel from the cellar to a hatch in the shed's floor
 //   - a storm drain from a grate in the street to a grate in the cellar's floor
 //   - the roof of the front porch made a terrace, with a drainpipe ladder up to it
+//   - a garage against the house's north wall: a roller door to the lawn, a car inside, a side door to the kitchen
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -16,6 +17,7 @@ const IN = 0.0254; // a texel, in metres
 export const NEW_TEX = {
   x_concrete: ['concrete', 64], x_wood: ['wood', 40], x_shelf: ['shelf', 64], x_metal: ['metal', 40],
   x_gravel: ['gravel', 80], x_wine: ['winerack', 40], x_earth: ['rubble', 80], x_deck: ['deck', 80], x_trim: ['trim', 40], x_stone: ['stone', 80],
+  x_tools: ['toolshelf', 64],
 };
 
 // ---- geometry: a solid is [x1, y1, z1, x2, y2, z2]; a face is a flat array [x, y, z, u, v, ...] whose first
@@ -74,6 +76,7 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   const tex = { ...TEXTURES };
   for (const [t, [, n]] of Object.entries(NEW_TEX)) tex[t] = [n, n];
   const doors = [], decor = [], ladders = [], rooms = [], switches = [];
+  const keep = []; // boxes whose solids never break (steps, oil drums), see breakable() in mansion.js
 
   // Take a box out of the level: its solids and the faces inside it.
   const carve = (x1, y1, z1, x2, y2, z2) => {
@@ -216,8 +219,8 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     decor.push({ type: 'tunnel-lamp', p: [14.15, y2 - 0.2, 11] });
     ladders.push([hatchAt[0], (hatchAt[1] + hatchAt[3]) / 2, [1, 0], y1, floorY + 0.95, 0.8]);
     doors.push({ hatch: { min: [hatchAt[0], hatchAt[1]], max: [hatchAt[2], hatchAt[3]], y: floorY, side: '+x' }, hinge: [hatchAt[2], floorY, (hatchAt[1] + hatchAt[3]) / 2], tex: 'wood', slow: 0.9 });
-    rooms.push({ group: 'tunnel', amb: 0.4, min: [-14.85, -2.3, 4.45], max: [14.85, -0.15, 6.35] });
-    rooms.push({ group: 'tunnel', amb: 0.4, min: [13.45, -2.3, 6.35], max: [14.85, -0.15, 16.85] });
+    // one lighting box for both legs (the rest of it is solid ground: nothing else is drawn there)
+    rooms.push({ group: 'tunnel', amb: 0.4, min: [-14.85, -2.3, 4.45], max: [14.85, -0.15, 16.85] });
   }
 
   // ---------------------------------------------------------------- 9. the storm drain
@@ -246,9 +249,8 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     const grate = (r, y, side) => doors.push({ hatch: { min: [r[0], r[1]], max: [r[2], r[3]], y, side }, grate: true, hinge: [(r[0] + r[2]) / 2, y, (r[1] + r[3]) / 2], tex: 'metal', slow: 0.8 });
     grate(street, 0, '-x');
     grate(cellar, -2.2, '+x');
-    rooms.push({ group: 'tunnel', amb: 0.4, min: [3.35, -5.1, -2.65], max: [26.95, -2.95, -1.35] });
-    rooms.push({ group: 'tunnel', amb: 0.4, min: [3.35, -5.1, -1.35], max: [4.65, -2.95, -0.25] });
-    rooms.push({ group: 'tunnel', amb: 0.4, min: [-19.65, -5.1, -0.25], max: [4.65, -2.95, 1.05] });
+    // one lighting box for the three legs (deep underground: nothing else is drawn in it)
+    rooms.push({ group: 'tunnel', amb: 0.4, min: [-19.65, -5.1, -2.65], max: [26.95, -2.95, 1.05] });
   }
 
   // ---------------------------------------------------------------- 10. the roof terrace
@@ -269,6 +271,51 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     ladders.push([-3.35, -9.45, [1, 0], 0, 5.3, 0.5]);
   }
 
+  // ---------------------------------------------------------------- 11. the garage
+  // Against the house's north wall, between the manhole and the ladder, its back wall the estate wall: a flat-roofed
+  // garage with a steel roller door onto the north lawn (E rolls it up in 2 s, loudly; a blast tears it out) and a
+  // car parked inside facing it (see vehicles in mansion.js), tool shelves, a workbench, oil drums and a strip light.
+  // A side door from the kitchen opens onto three steps down (the kitchen's north window looks into the garage).
+  // Its walls and roof break like the house's.
+  {
+    const [x1, z1, x2, z2, top] = [-22.35, -20.73, -15.85, -14.43, 3.3], T = 0.25, roof = top + 0.2;
+    const d1 = -20.0, d2 = -15.8, dh = 2.7; // the roller door's opening in the east wall
+    const ext = 'out_wall4a', int = 'x_concrete';
+    carve(x1, -0.03, z1, x2, 0.001, z2);
+    brush(x1, -0.03, z1, x2, 0, z2, int, ['bottom', '-x', '+x', '-z', '+z']);
+    // the west wall, the east wall around the door, the roof (gravel on top)
+    brush(x1 - T, 0, z1, x1, top, z2, { '-x': ext, '+x': int, side: ext }, ['bottom', 'top', '-z', '+z']);
+    for (const [a, b, end] of [[z1, d1, '-z'], [d2, z2, '+z']]) brush(x2, 0, a, x2 + T, top, b, { '+x': ext, '-x': int, side: int }, ['bottom', 'top', end]);
+    brush(x2, dh, d1, x2 + T, top, d2, { '+x': ext, '-x': int, bottom: int }, ['top', '-z', '+z']);
+    brush(x1 - T, top, z1, x2 + T, roof, z2, { top: 'x_gravel', bottom: int, side: 'x_trim' }, ['-z', '+z']);
+    // the roller door, and its drum under the ceiling
+    doors.push({ roller: { min: [x2 + 0.07, d1], max: [x2 + 0.18, d2], y: 0, h: dh }, tex: 'roller', slow: 2.0 });
+    brush(x2 - 0.35, dh + 0.05, d1, x2, top - 0.05, d2, 'x_metal', ['+x'], false);
+    // the side door from the kitchen (between the filing cabinet and the window) and three concrete steps down
+    const k1 = -22.05, k2 = -21.05, ktop = 3.0, wall = [-14.43, -14.02];
+    carve(k1, 0.813, wall[0] - 0.03, k2, ktop, wall[1] + 0.03); // (the kitchen floor's top is at 0.813)
+    reveal(2, wall[0], wall[1], k1, k2, 0.813, ktop, 'c1a1w1d', 'c1a2_flr1');
+    for (const [z, h] of [[-15.63, 0.27], [-15.23, 0.54], [-14.83, 0.81]]) {
+      brush(k1 - 0.1, 0, z, k2 + 0.1, h, wall[0], 'crete3_wall02', ['bottom', '+z']);
+      keep.push([k1 - 0.11, -0.01, z - 0.01, k2 + 0.11, h + 0.01, wall[0] + 0.01]);
+    }
+    doors.push({ axis: 'x', dir: 1, len: k2 - k1, h: ktop - 0.81 - 0.02, hinge: [k1, 0.81, (wall[0] + wall[1]) / 2], tex: 'door1' });
+    // tool shelves in the north-west corner, a workbench along the estate wall, oil drums by the door
+    brush(x1, 0, z1, x1 + 0.45, 2.1, -18.95, 'x_tools', ['bottom', '-x', '-z']);
+    brush(x1 + 0.45, 0, z1, -20.2, 2.1, z1 + 0.45, 'x_tools', ['bottom', '-z']);
+    brush(-19.9, 0, z1, -17.0, 0.92, z1 + 0.7, { top: 'x_wood', side: 'x_tools' }, ['bottom', '-z']);
+    for (const [x, z, c] of [[-16.35, -15.05, '#3a5a8a'], [-17.05, -14.85, '#8a3a2a'], [-16.4, -20.2, '#3a6a3a']]) {
+      solids.push([x - 0.3, 0, z - 0.3, x + 0.3, 1.05, z + 0.3]);
+      keep.push([x - 0.31, -0.01, z - 0.31, x + 0.31, 1.06, z + 0.31]);
+      decor.push({ type: 'barrel', p: [x, 0, z], color: c });
+    }
+    // a strip light under the ceiling, switched by the steps
+    decor.push({ type: 'ceilinglamp', p: [-19.1, top, -17.6], group: 'garage' });
+    decor.push({ type: 'light', p: [-19.1, top - 0.5, -17.6], color: '#e8eeff', intensity: 20, distance: 10, group: 'garage' });
+    switches.push({ group: 'garage', p: [x1 + 0.01, 1.4, -15.2], rot: Math.PI / 2 });
+    rooms.push({ group: 'garage', power: true, min: [x1, -0.1, z1], max: [x2, top, z2] });
+  }
+
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox };
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep };
 }

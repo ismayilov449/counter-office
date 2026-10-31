@@ -40,19 +40,21 @@ for (const f of RM.faces.out_grnd2) {
 }
 FACE_MATS.out_grnd2_wall = 'greybrick';
 
-// ---- what explosions can break: the walls, furniture and roofs of the house and the shed (a roof together with
+// ---- what explosions can break: the walls, furniture and roofs of the house, the shed and the garage (a roof together with
 // the top floor's ceiling under it, so a shell through the roof drops into the room). The floors, the ceiling
 // between the storeys and the stairs stay, and so does the foundation under the ground floor (0.81 m), so a hole
 // is a doorway.
 const inHouse = b => b.min[0] > -24.5 && b.max[0] < -5.5 && b.min[2] > -15 && b.max[2] < 12.5;
 const inShed = b => b.min[0] > 12.5 && b.max[0] < 18.5 && b.min[2] > 14 && b.max[2] < 18.5;
+const inGarage = b => b.min[0] > -22.7 && b.max[0] < -15.5 && b.min[2] > -20.74 && b.max[2] < -14.42;
+const kept = b => RM.keep.some(k => [0, 1, 2].every(i => b.min[i] >= k[i] && b.max[i] <= k[i + 3]));
 const onStairs = b => b.min[0] > -12.95 && b.max[0] < -11.4 && ((b.min[2] > -9.8 && b.max[2] < -3.4) || (b.min[2] > 0.15 && b.max[2] < 6.55));
 const FLOOR = 0.81;
 function breakable(b) {
-  const house = inHouse(b), shed = inShed(b);
-  if (!house && !shed) return null;
+  const house = inHouse(b), shed = inShed(b), garage = !house && inGarage(b);
+  if ((!house && !shed && !garage) || kept(b)) return null;
   const dx = b.max[0] - b.min[0], dy = b.max[1] - b.min[1], dz = b.max[2] - b.min[2];
-  if (b.min[1] >= (house ? 6.45 : 2.4)) return { kind: 'roof' };
+  if (b.min[1] >= (house ? 6.45 : garage ? 3.29 : 2.4)) return { kind: 'roof' };
   if (dx > 2.6 && dz > 2.6) return null; // floors and ceilings
   if (dy <= 0.3 && [[3.95, 4.3], [6.4, 6.95]].some(([lo, hi]) => b.min[1] >= lo && b.min[1] <= hi)) return null; // floor edges
   if (onStairs(b)) return null;
@@ -201,9 +203,11 @@ export default {
   switches: [...SWITCHES, ...RM.switches],
   // Blackout: holding E at the fuse box in the cellar cuts (T) or restores (CT) the power of these rooms' lights.
   fusebox: { ...RM.fusebox, groups: [...new Set([...ROOMS.map(r => r.group), ...RM.rooms.map(r => r.group).filter(g => g !== 'tunnel')])] },
-  // One pickup truck with a PKT machine gun in the back, on the lawn by the left (south) door.
+  // One pickup truck with a PKT machine gun in the back, on the lawn by the left (south) door, and a car in the
+  // garage, facing its roller door (y: dropped onto the ground from that height, under the garage roof).
   vehicles: [
     { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },
+    { p: [-19.75, -17.9], y: 1, yaw: -Math.PI / 2, color: '#7a1e1a' },
   ],
   labels: {},
   theme: {

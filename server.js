@@ -21,7 +21,7 @@ const PARTY_WEAPONS = ['', 'awp', 'deagle', 'scout', 'ak47', 'knife', 'rpg'];
 import { CAR, carBoxes, seatPos, exitSpots } from './shared/vehicles.js';
 import { CollisionWorld } from './shared/collision.js';
 import { skyOf } from './shared/maps/sky.js';
-import { doorBox, doorCenter, openingSide, GONE } from './shared/doors.js';
+import { doorBox, doorCenter, doorReach, openingSide, GONE } from './shared/doors.js';
 import { Stats, rating } from './lib/stats.js';
 import { rankIndex } from './shared/ranks.js';
 import { ACHIEVEMENTS } from './shared/achievements.js';
@@ -595,7 +595,7 @@ function blastShove(at, weapon) {
     }
   }
   const D = REAL.door[weapon];
-  if (D) (MAP.doors || []).forEach((d, i) => { if (dist3(at, doorCenter(d)) < D * (d.weak ? 1.6 : 1)) blowDoor(i); });
+  if (D) (MAP.doors || []).forEach((d, i) => { if (doorReach(d, at) < D * (d.weak ? 1.6 : 1)) blowDoor(i); });
   const S = REAL.smoke[weapon];
   if (S) (game.smokes ||= []).push({ p: [at[0], at[1] + 0.5, at[2]], until: now() + S * 1000 });
 }
@@ -677,7 +677,7 @@ function freshCar(v, id) {
   // A pickup has a driver and one gunner on the PKT in the back; a car has a driver and two passengers.
   const type = v.type || 'car';
   const c = { id, type, p: [v.p[0], 0, v.p[1]], yaw: v.yaw, speed: 0, steer: 0, driver: null, riders: type === 'pickup' ? [null] : [null, null], color: v.color, hp: CAR.hp, wrecked: false };
-  c.p[1] = groundY(c.p[0], 10, c.p[2]); // parked cars stand in the open: drop them onto the ground from above
+  c.p[1] = groundY(c.p[0], v.y ?? 10, c.p[2]); // drop it onto the ground from above (from v.y under a roof)
   return c;
 }
 
@@ -819,7 +819,7 @@ function warmupRepairs(t) {
     if (!home || c.driver != null || c.riders.some(id => id != null) || !c.leftAt || t - c.leftAt < 20000) continue;
     c.leftAt = 0;
     if (dist2(c.p, [home.p[0], 0, home.p[1]]) < 1) continue;
-    c.p = [home.p[0], groundY(home.p[0], 10, home.p[1]), home.p[1]];
+    c.p = [home.p[0], groundY(home.p[0], home.y ?? 10, home.p[1]), home.p[1]];
     c.yaw = home.yaw;
     c.speed = 0;
     c.steer = 0;
@@ -855,7 +855,8 @@ function useDoor(p, i) {
   const next = world.doorStates[i] === 0 ? openingSide(d, p.p) : 0;
   const box = doorBox(d, next);
   const inWay = [...players.values()].some(q => q.alive && overlapsAny([box], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height)) ||
-    game.hostages.some(h => h.state !== 'dead' && h.state !== 'rescued' && overlapsAny([box], h.p[0], h.p[1], h.p[2], PLAYER.radius, PLAYER.height));
+    game.hostages.some(h => h.state !== 'dead' && h.state !== 'rescued' && overlapsAny([box], h.p[0], h.p[1], h.p[2], PLAYER.radius, PLAYER.height)) ||
+    world.cars.some(c => carBoxes(c).some(b => [0, 1, 2].every(k => b.min[k] < box.max[k] && b.max[k] > box.min[k])));
   if (inWay) { send(p, { t: 'msg', text: 'Someone is in the way of the door.' }); return; }
   if (d.slow && next !== 0) { slowOpen(i, next); return; }
   const states = world.doorStates.slice();
@@ -2421,7 +2422,7 @@ function explodeSatchel(s) {
   broadcast({ t: 'boom', p: at.map(r2), k: 'satchel' });
   blastMap(at, 'satchel');
   // (On maps without realism blastMap doesn't touch doors: blow them open here.)
-  if (!MAP.realism) (MAP.doors || []).forEach((d, k) => { if (dist3(at, doorCenter(d)) < REAL.door.satchel) blowDoor(k); });
+  if (!MAP.realism) (MAP.doors || []).forEach((d, k) => { if (doorReach(d, at) < REAL.door.satchel) blowDoor(k); });
   breakGlass(world.intactGlass.filter(g => dist3(at, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < 6).map(g => g.id));
   for (const q of players.values()) {
     if (!q.alive || !inTeam(q)) continue;
@@ -2724,7 +2725,7 @@ function spreadFire(f, t) {
     }
   }
   (MAP.doors || []).forEach((d, i) => {
-    if (world.doorStates[i] === GONE) return;
+    if (world.doorStates[i] === GONE || d.roller || d.grate) return; // (steel doesn't burn)
     const c = doorCenter(d);
     if (Math.hypot(c[0] - f.p[0], c[2] - f.p[2]) > r + 0.6 || Math.abs(c[1] - 1.2 - f.p[1]) > 1.5) return;
     game.doorHeat[i] = (game.doorHeat[i] || 0) + FIRE.tick;

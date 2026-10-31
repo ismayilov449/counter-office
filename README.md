@@ -96,8 +96,9 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - CTs win by rescuing every living hostage or eliminating the Terrorists; Terrorists win by
     eliminating the CTs or running out the clock. Rescue: +$1000 for the rescuer, +$150 for the other
     CTs. Killing a hostage costs $1500.
-  - Three **doors** lead into the house: the **front door** (porch), the **left door** (south side) and the
-    **kitchen back door** (west, behind the house, up three stone steps). Press **E** to open or close them — they
+  - Four **doors** lead into the house: the **front door** (porch), the **left door** (south side), the
+    **kitchen back door** (west, behind the house, up three stone steps) and the kitchen's **side door** from the
+    garage. Press **E** to open or close them — they
     swing away from you, creak, and won't swing into someone standing in the way. The back door is old and stiff:
     it takes 1.6 seconds to creak open, loud enough to hear across the house (closing is quick), and it's weak —
     a dozen pistol shots or a blast further off knock it out.
@@ -137,6 +138,13 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     loud clank) onto a ladder down into a concrete drain with a trickle of dirty water. It runs west under the lawn
     and the fountain, with a jog half way, to a ladder up through a second grate in the **cellar's floor**. With the
     smugglers' tunnel it makes a loop under the estate.
+  - **Garage** against the house's north wall, between the manhole and the ladder: a steel **roller door** opens onto
+    the north lawn. **E** rolls it up (2 seconds, a loud rattle; it comes down at once, but not on someone or a car in
+    the way), and a blast nearby tears it out. Inside stands a **car** you can drive out (see Cars below), with tool
+    shelves, a workbench, oil drums and a light switched by the steps. A **side door** at the top of three concrete
+    steps leads into the kitchen, whose north window looks into the garage. The walls and the flat roof break like the
+    house's (a mortar set up inside blasts its way out through the roof), and you can climb onto the roof from the
+    ladder next to it. The blackout switches its light off too.
   - **Roof terrace** over the front porch: reached from the top floor through the opening above the front door, or
     up the **drainpipe ladder** at the porch's north-east corner. A waist-high parapet, a table, a bench and potted
     shrubs for cover; open to the sky (the mortar reaches it) and seen from three sides.
@@ -166,7 +174,7 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   health). Everyone gets free Kevlar + helmet each round, and an AWP (in the middle), AK-47, M4A1 and two Desert
   Eagles lie in the field. Buying works in your spawn area.
 
-**Cars** (Dust II has two, the mansion has the pickup): **E** in/out; the first one in **drives** (**W/S**
+**Cars** (Dust II has two, the mansion has the pickup and a car in the garage): **E** in/out; the first one in **drives** (**W/S**
 gas/brake, **A/D** steer, **Space** handbrake, **V** camera, **Mouse 1** horn). A car takes two passengers who
 look around and shoot out of the windows; the pickup takes one gunner. When the driver gets out, the one who got
 in first takes the wheel. Cars can be **destroyed**: bullets, grenades and rockets wear them down — they smoke,

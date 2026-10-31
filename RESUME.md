@@ -1,4 +1,4 @@
-# RESUME POINT — Counter-Office feature plan (stopped 2026-10-30)
+# RESUME POINT — Counter-Office feature plan (stopped 2026-10-30, continued 2026-10-31 on the new PC)
 
 **To continue:** check out branch `resume/2026-10-30` and tell Claude Code:
 *"Read RESUME.md and continue the plan from the resume point."*
@@ -9,7 +9,7 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 
 ---
 
-## 1. Where things stand (9 of 15 steps done)
+## 1. Where things stand (11 of 15 steps done)
 
 | # | Step | Status | Commit(s) |
 |---|------|--------|-----------|
@@ -23,7 +23,7 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 | 8 | Mansion: smugglers' tunnel to the shed | ✅ done | `a6cdbda` |
 | 9 | Mansion: storm drain | ✅ done | `971813a` |
 | 10 | Mansion: roof terrace + drainpipe ladder | ✅ done | `971813a` |
-| 11 | Mansion: garage | ⬜ not started | |
+| 11 | Mansion: garage | ✅ done | see `git log` ("Mansion: garage ...") |
 | 12 | Mansion: neighbour's house | ⬜ not started | |
 | 13 | Mansion: back garden | ⬜ not started | |
 | 14 | Mansion at night | ⬜ not started | |
@@ -32,15 +32,15 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 Merge commits on this branch: `5d335cd` (feature/mansion) and `34e90ed` (feature/t-weapons; the jammer/satchel
 conflicts were resolved by keeping both).
 
-**Nothing is half-done.** Both agents stopped after finishing a step, so there are no WIP commits. The next job is step 11.
+**Nothing is half-done.** Every step is committed and pushed when it's finished, so there are no WIP commits. The next job is
+the first step in the table that isn't done.
 
 ### Post-merge check (on the old laptop, Mansion, headless Edge)
 The merged build starts, and Mansion loads. A Terrorist bought the jammer, satchel and RPG-26 together ($16,000 → $10,500),
 put the jammer down and threw the satchel, which stuck. There were no page errors.
 
-**Not re-checked after the merge:** setting off the satchel with the phone, and firing the RPG-26. Headless clicks were
-missed during the weapon draw. Both passed on their own branches, but **do this check first on the new laptop**, by hand
-in a real browser.
+**Checked by hand on 2026-10-31** (the user, in a real browser on the new PC): setting off the satchel with the phone, and
+firing the RPG-26. Both work.
 
 ---
 
@@ -138,11 +138,38 @@ in a real browser.
 - **Bots:** the nav mesh still builds (24.8k nodes against 24.5k before) and bots don't crash. No game with bots was
   played, and de_dust2/de_dusty weren't re-checked by that agent. The merged server did start with all maps.
 
+### 11. Garage
+- **Where:** against the house's north wall, x −22.6…−15.6, z −20.73 (the estate wall is its back wall)…−14.43, between
+  the manhole and the north ladder; flat roof at 3.3–3.5 m (reachable from the ladder).
+- **Roller door** (a new door kind, `roller` in `shared/doors.js`): in the east wall, 4.2 m wide, 2.7 m high. E rolls it up in
+  2 s (`slow`), with a rattle; it comes down at once, but not on a player, hostage or car (any door now refuses to close
+  on a car). Blasts measure their distance to the whole door (`doorReach`), not its middle; steel doors (roller, grates)
+  don't burn.
+- **The car:** `vehicles[1]` in mansion.js, parked facing the door. Vehicles can have `y`: the height they are dropped
+  onto the ground from (under a roof). It drives out onto the north lawn.
+- **Inside:** tool shelves (a new `toolshelf` texture), a workbench, three oil drums, a lamp and a switch (room group
+  `garage`, cut by the blackout). The kitchen's north window looks into it.
+- **Side door:** kitchen ↔ garage in the house's north wall at x −22.05…−21.05, with three concrete steps down.
+- **Breaks:** walls and the roof are breakable (`inGarage` in mansion.js; roof pieces above 3.29 m, so a mortar inside blasts
+  out). Steps and oil drums are kept whole (`keep` boxes from mansion2.js).
+- **Draw cost:** barrels now share their material per colour, so they merge (this also merged the cellar's 7 barrels).
+- **Verified:** server test `t11.mjs` (roll up, close, refused while someone stands in the door, get in and out of the car,
+  an HE blows the door out); browser test `g11.mjs` (hint, rolling, open, drive out, side door; no page errors);
+  `walk.mjs` through both doors; the car sim drives out; screenshots `v11.json` looked at; the old tests t5/t7/t8 still pass;
+  nav builds; 60 s with BOTS=4 and no errors; de_dust2 loads.
+- **Not verified:** the rattle by ear; the roller animation at full frame rate (headless runs at a few fps).
+
 ### Known problems to watch
-- **Mansion load time:** building Mansion takes about 1.3× as long as before. That was measured on an overloaded
-  machine, so **profile it** on a normal laptop.
-- **Lighting rooms:** Mansion now has 22 of the 24 allowed in `public/js/roomlight.js`. Two were freed by merging the halves
-  of `lampa6` and `lampa7`. The garage and neighbour's house will need care, or the limit raised.
+- **Mansion load time** (measured 2026-10-31 on the new PC, i9-13980HX, 5 runs each): building cs_mansion on the server
+  (importing mansion.js) takes ~350–390 ms, the same as `main` before Mansion 2.0 (~335–380 ms); `remodel()` is ~29 ms of
+  it, `breakUp()` most of the rest. The 1.3× was the overloaded old laptop. In the browser, `buildWorld` takes ~230–260 ms
+  (swiftshader). After step 11: the same.
+- **Lighting rooms:** Mansion uses 20 of the 24 allowed in `public/js/roomlight.js`: the storm drain's three boxes and the
+  smugglers' tunnel's two were merged into one box each (they're deep underground, nothing else is drawn in them), which
+  freed three; the garage took one.
+- **Frame cost** (fixed views `vcost.json`, viewer.js on swiftshader; draw calls include the shadow pass). Before step 11 →
+  after: draw calls +1…+19 per view (+19 in the kitchen, which looks into the garage), triangles +3.5k…+5.8k (~+4%), frame
+  time within the noise (±4%).
 - **Map bounds** are still ±29.2. Growing them (steps 12 and 13) shrinks everything on the radar and affects the mortar
   map, the sky grid and nav.
 - **Nav quirk:** false "drop through the floor" links next to walls: 97 already on main, plus 15 between the living room
@@ -230,16 +257,25 @@ For every step:
 
 ## 6. Test tooling
 
-- `dev/test-scripts/` holds the test scripts used so far. They are copies; their paths and ports are hardcoded to the old
-  laptop's temp folder, so fix the paths before using them.
-  - `restart.sh`: the test server on :3999 with fresh test data. `restart-mansion.sh` and `restart-tweapons.sh` are the agents' variants.
+- `dev/test-scripts/` holds the test scripts. Paths are relative to the repo; ports come from `GAME_PORT` (default 3999)
+  and `CDP_PORT` (default 9333), screenshots go to `OUT`, scratch files to `SP` (default `$TEMP/co-test`). They run on
+  Node 20 (they fall back to the `ws` package when there's no global WebSocket).
+  - `restart.sh` / `up.sh`: the test server on GAME_PORT with fresh test data in `$SP/testdata`. `mansion/edge.ps1`: (re)start
+    or stop the headless Edge on 9333.
+  - `mansion/game.mjs`: the real game in the headless Edge (join, fake pointer lock, `tp` to put the player anywhere, look,
+    keys, clicks, screenshots, page errors). `mansion/loadmap.mjs`: load whatever map runs and screenshot it.
+  - `mansion/views.mjs` + `viewer.js`: fixed views (and `viewTop` plans) with draw calls and triangles; `BENCH=n` times frames.
+    `vcost.json` is the fixed set for frame cost. `meshes.mjs` lists the world's meshes (diff two runs).
+  - `mansion/botsoak.mjs`: one scripted player for N seconds, so the bots play.
   - `roofmortar.mjs`, `mortarmap.mjs` and `mergetest.mjs`: the CDP browser-test pattern. Inject a WebSocket wrapper, join a team, fake
     pointer lock, send synthetic mouse and key events, take screenshots, collect page errors.
   - `spottest.mjs`/`spotbrowser.mjs` (radar), `jamtest.mjs`/`jambrowser.mjs` (jammer), `tw-*.mjs` (RPG-26 and satchel;
     `tw-lib.mjs` is the helper).
   - `mansion/`: `client.mjs` (a scripted player over WebSocket), `walk.mjs` (walks a body through the map with the game's
     physics), `views.mjs` + `viewer.js` + `v*.json` (screenshots from fixed views), `navcheck.mjs`, `sky.mjs`, `load.mjs`,
-    and the tests `t5`/`t7`/`t8.mjs`.
+    and the tests `t5`/`t7`/`t8`/`t11.mjs` (server) and `g11.mjs` (browser).
+  - Comparing with an older commit: `git worktree add --detach <SP>/wt-base <commit>`, junction its `node_modules` to the repo's,
+    run its server on another port (e.g. 3997) and point `GAME_PORT` at it. Remove the worktree afterwards.
 - **Headless Edge:**
   `msedge.exe --headless=new --remote-debugging-port=9333 --user-data-dir=<temp>\edge-profile --enable-unsafe-swiftshader --use-angle=swiftshader --no-first-run --window-size=1280,720 about:blank`
 - **Useful server env vars:** `MAP=cs_mansion`, `BOTS=0..8`, `START_MONEY=16000`, `GAME_MODE`, `DEBUG_TICK=1` (tick times),

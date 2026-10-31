@@ -2491,7 +2491,7 @@ const net = new Net({
       const s = game.doors.slice();
       s[m.i] = m.side;
       world?.setDoors(s);
-      audio.play('creak', m.p, m.creak);
+      audio.play(map.doors[m.i]?.roller ? 'roller' : 'creak', m.p, m.creak);
       return;
     }
     applyDoors(m.doors);
@@ -2503,7 +2503,8 @@ const net = new Net({
       if (d) fx.puff(m.p, 0x8a7a66, 2, 2);
       return;
     }
-    audio.play(m.open ? 'dooropen' : 'doorclose', m.p);
+    if (map.doors[m.i]?.roller) audio.play('roller', m.p, 1);
+    else audio.play(m.open ? 'dooropen' : 'doorclose', m.p);
   },
   brk(m) {
     for (const id of m.ids) game.brk.add(id);
@@ -3264,7 +3265,7 @@ function updateHud(now) {
     else if (satchelToDefuse()) hint = `Hold E to defuse the satchel charge (${me.kit ? SATCHEL.kitDefuse : SATCHEL.defuse} s)`;
     else if (current() === 'phone') hint = 'Click to set off your satchel charge';
     else if (camoHidden(performance.now())) hint = 'Camouflaged — enemies can barely see you (H to switch off)';
-    else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the ${map.doors[door.i]?.hatch ? (map.doors[door.i].grate ? 'grate' : 'trapdoor') : 'door'}`;
+    else if (!canDefuseHere() && door && (!sw || door.dist < Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]))) hint = `Press E to ${game.doors[door.i] ? 'close' : 'open'} the ${map.doors[door.i]?.hatch ? (map.doors[door.i].grate ? 'grate' : 'trapdoor') : map.doors[door.i]?.roller ? 'garage door' : 'door'}`;
     else if (!canDefuseHere() && sw) hint = `Press E to switch the lights ${game.lights[sw.group] === false ? 'on' : 'off'}`;
     else if (!canDefuseHere() && car && game.phase !== 'freeze') hint = !car.driver ? 'Press E to drive the car' : car.type === 'pickup' ? 'Press E to man the machine gun' : 'Press E to get in as a passenger';
     else if (ladderAt(map.ladders, me.p, PLAYER.height) && !me.onGround) hint = 'Ladder: look up/down + W to climb, Space to jump off';
