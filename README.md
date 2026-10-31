@@ -151,6 +151,33 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     looks over the street wall and the estate wall straight at the front of the mansion: a sniper's nest for the CTs.
     It's real glass (shoot it out), and the wall it's in breaks like the mansion's; the rest of the house stays whole.
     Its lights are its own (a switch by the front door and one upstairs), not on the mansion's fuse box.
+  - **Zip line** from the neighbour's roof down to the mansion's roof terrace, the CTs' fast and risky way onto the
+    house. A ladder in the neighbour's bedroom (by the bed) goes up through an opening onto the flat roof, and a short
+    ladder onto a wooden deck with a steel mast. The cable runs 41 m from there over the street, the estate wall and the
+    lawn to a pole on the terrace.
+    - Stand on the deck by the mast, or on the terrace by the parapet, and press **E** to hook on. Going down is fast:
+      it speeds up to about 10 m/s and slows down at the end, where you drop off onto the terrace (about 6.5 seconds).
+      Going up from the terrace is slow, hand over hand (2.5 m/s, about 16 seconds).
+    - On the cable you hang under the trolley for everyone to see (and shoot). You can look around, but you can't shoot
+      or use your items. **E** or **Space** lets go and you fall. A long drop hurts (CS 1.6's fall damage: nothing up to
+      about 5.4 m; letting go over the street, about 7 m up, costs 16). The rest of the game has no fall damage.
+    - A Terrorist can **cut the cable** at its tensioner low on the terrace pole: **hold E** for 3 seconds (everyone
+      hears the cutters). Whoever is on it falls. It's back each round (with no rounds, after 60 seconds).
+    - (Shots from the neighbour's window over the street wall now reach the mansion: a millimetre-thin leftover of the
+      invisible wall over that wall used to stop them, and one over the west estate wall too.)
+  - **CCTV**: four security cameras with a blinking red light — **CAM 1** on the street's far wall looking through the
+    gate, **CAM 2** on the front of the house over the lawn and the fountain, **CAM 3** by the kitchen's back door
+    looking down the back lawn to the garden gateway, **CAM 4** high in a corner of the main hall. Each has blind spots.
+    - The **security desk** with four monitors is in the small room at the top of the stairs (upstairs, north-east).
+      Anyone can use it: press **E** at the chair to sit down and watch. You see one camera full-screen in black and white
+      with scan lines, noise, the date and time and its name; **1–4** or **Mouse 1 / Mouse 2** switch cameras, the mouse
+      turns the camera a little, **E** or **Esc** gets you up (so does being hit). While you watch you can't move or
+      shoot, and everyone sees you sitting there.
+    - Enemies the camera you watch can see show up as **red dots** on your team's radar.
+    - **One bullet breaks a camera** (or a blast near it): its feed shows NO SIGNAL. A **signal jammer** within 15 m of a
+      camera blinds it the same way. The **blackout** turns the whole CCTV off (NO POWER, black monitors). Broken
+      cameras are back each round (with no rounds, after 30 seconds).
+    - On **Mansion at night** the cameras are infrared: the picture is bright, so you can see in the dark on them.
   - With the neighbour's house and the back garden the radar shows 100 m instead of 58, so everything on it is smaller.
   - **Back garden** behind the house: a **gateway** in the middle of the west estate wall (across the back lawn from
     the kitchen's back door) opens onto a walled garden 20 m deep.
@@ -471,11 +498,11 @@ The HUD shows the active party modes under the timer.
 
 | Key | Action | Key | Action |
 |---|---|---|---|
-| W A S D | move | Space | jump |
+| W A S D | move | Space | jump (lets go of the zip line) |
 | Ctrl | duck | Shift | walk (silent) |
 | Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
-| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car | G | drop weapon |
+| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, zip line on/off, CCTV desk | G | drop weapon |
 | 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |
 | Q | last weapon | Wheel | switch weapon |
 | B | buy menu | O | buy equipment |
@@ -486,7 +513,7 @@ The HUD shows the active party modes under the timer.
 | Y / U | chat / team chat | Tab | scores |
 | M | choose team | F5 | screenshot |
 | H | ghillie camo on / off | Middle click | ping "!" on the team radar |
-| Esc | menu (settings, map vote) | 0–9 | pick in menus |
+| Esc | menu (settings, map vote) | 0–9 | pick in menus (1–4 at the CCTV desk: cameras) |
 
 Ducking makes you 0.9 m tall, as in CS, so you fit through vents and crawl spaces. Duck in mid-air (jump, then
 Ctrl) to pull your legs up and reach higher ledges, windows and vent openings. On a ladder, look up and hold W to
@@ -570,6 +597,8 @@ shared/doors.js      Swinging doors (collision boxes per open/closed state)
 shared/maps/breakables.js Destructible walls and furniture: cuts a level's solids into chunks with their faces (cs_mansion)
 shared/maps/mansion2.js Mansion 2.0: the parts cs_mansion has beyond the original level (solids + faces, carved in)
 shared/maps/mansion_night.js cs_mansion_night: the same Mansion at night (theme, lamps, lit rooms)
+shared/gadgets.js    The Mansion's gadgets (zip line, CCTV): the numbers and the maths both sides use; public/js/gadgets.js
+                     draws and drives them in the browser, server.js runs them
 shared/maps/*_bsp.js cs_mansion / de_dust2 / de_inferno / cs_assault geometry converted from the original .bsp files
                      (generated by tools/bsp/convert.mjs; de_inferno's textures by tools/bsp/textures.mjs into public/textures)
 lib/bots.js          Bots: buying, seeing, aiming, fighting, objectives, moving
