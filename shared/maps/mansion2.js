@@ -12,6 +12,7 @@
 //   - the neighbour's house across the street (CT side): two storeys, its bedroom window facing the mansion
 //   - a back garden west of the estate wall: a pool, a gazebo, a glass greenhouse and a hedge maze
 //   - a zip line from a deck on the neighbour's roof down to the roof terrace
+//   - CCTV: four cameras and a security desk upstairs
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -548,6 +549,41 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     };
   }
 
+  // ---------------------------------------------------------------- 17. CCTV
+  // Four cameras on walls (the gate, from the street's far wall; the lawn, from the front of the house; the back door; the
+  // main hall, from high in its south-west corner) and a security desk with four monitors in the small room at the top
+  // of the stairs (the upper floor's north-east room), against its north wall, with a chair. The cameras and the
+  // monitors' screens are drawn by the browsers (their lights blink, they break, the screens flicker); the desk, the
+  // chair and the monitors' frames are part of the level (and never break). Watching them: server.js and
+  // shared/gadgets.js (map.cctv: each camera's lens, view and the wall it hangs on; where you sit).
+  let cctv;
+  {
+    // (the desk and the chair on the bots' 0.5 m grid, like the zip line's deck)
+    const y = 4.27, wall = -14.0, d1 = -11.5, d2 = -9.0, top = y + 0.75;
+    brush(d1, y, wall, d2, top, wall + 0.5, { top: 'x_wood', side: 'x_wood' }, ['bottom', '-z']);
+    // the chair (its seat solid, so you sit on it), its back
+    const [cx, cz] = [-10.25, -12.75];
+    brush(cx - 0.25, y, cz - 0.25, cx + 0.25, y + 0.45, cz + 0.25, { top: 'fifties_cch2', side: 'x_metal' }, ['bottom']);
+    brush(cx - 0.25, y + 0.45, cz + 0.25, cx + 0.25, y + 1.05, cz + 0.3, 'fifties_cch2', [], false);
+    keep.push([d1 - 0.01, y - 0.01, wall - 0.01, d2 + 0.01, top + 0.01, wall + 0.51], [cx - 0.26, y - 0.01, cz - 0.26, cx + 0.26, y + 1.06, cz + 0.31]);
+    // the monitors' frames: two on the desk, two above on a bracket (the screens go 1 cm in front of them)
+    const mons = [];
+    for (const [mx, my] of [[cx - 0.6, top + 0.05], [cx + 0.6, top + 0.05], [cx - 0.6, top + 0.47], [cx + 0.6, top + 0.47]]) {
+      brush(mx - 0.27, my, -13.62, mx + 0.27, my + 0.4, -13.56, 'black', [], false);
+      mons.push([mx, my + 0.2, -13.555]);
+    }
+    brush(cx - 0.04, top, -13.66, cx + 0.04, top + 0.9, -13.62, 'black', [], false);
+    // the cameras: lens, view (yaw as a player's: 0 north, + turning left; pitch down -), the field of view (degrees),
+    // the wall it hangs on (where its bracket meets the wall)
+    const cams = [
+      { name: 'FRONT GATE', p: [28.5, 3.2, -0.75], yaw: Math.PI / 2, pitch: -0.22, fov: 70, wall: [28.7, 3.2, -0.75] },
+      { name: 'LAWN', p: [-6.3, 6.35, 1.0], yaw: -1.5, pitch: -0.28, fov: 75, wall: [-6.5, 6.35, 1.0] },
+      { name: 'BACK DOOR', p: [-23.95, 3.5, -11.2], yaw: 2.7, pitch: -0.3, fov: 75, wall: [-23.75, 3.5, -11.2] },
+      { name: 'MAIN HALL', p: [-12.7, 6.4, 6.25], yaw: -0.37, pitch: -0.32, fov: 80, wall: [-12.7, 6.4, 6.5] },
+    ];
+    cctv = { cams, seat: [cx, y + 0.45, cz], yaw: 0, floor: y, monitors: mons, screen: [0.5, 0.36] };
+  }
+
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip };
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv };
 }

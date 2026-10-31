@@ -36,13 +36,13 @@ conflicts were resolved by keeping both).
 **Nothing is half-done.** Every step was committed and pushed when it was finished. The plan is complete; what's left is
 in "Known problems to watch" and the "Not verified" lines below.
 
-**New on 2026-10-31: three Mansion gadgets, one at a time, each committed and pushed** (see section 7):
+**New on 2026-10-31: Mansion gadgets, one at a time, each committed and pushed** (see section 7):
 
 | # | Gadget | Status |
 |---|--------|--------|
-| 16 | Zip line (neighbour's roof → roof terrace) | ✅ done ("Zip line: …" in `git log`) |
-| 17 | CCTV (4 cameras, a security desk) | not started |
-| 18 | Lift in the house (cellar, ground floor, upper floor) | not started |
+| 16 | Zip line (neighbour's roof → roof terrace) | ✅ done (`7498ad3`) |
+| 17 | CCTV (4 cameras, a security desk) | ✅ done ("CCTV: …" in `git log`) |
+| 18 | Lift in the house (cellar, ground floor, upper floor) | moved: the user had another agent build it on branch `feature/elevator` (its own worktree); not in this work |
 
 ### Post-merge check (on the old laptop, Mansion, headless Edge)
 The merged build starts, and Mansion loads. A Terrorist bought the jammer, satchel and RPG-26 together ($16,000 → $10,500),
@@ -407,15 +407,16 @@ For every step:
 - **Useful server env vars:** `MAP=cs_mansion`, `BOTS=0..8`, `START_MONEY=16000`, `GAME_MODE`, `DEBUG_TICK=1` (tick times),
   `PORT`, `HTTPS_PORT`, `DATA_DIR`.
 
-## 7. The Mansion's gadgets (2026-10-31): zip line, CCTV, lift
+## 7. The Mansion's gadgets (2026-10-31): zip line, CCTV
 
 The user asked for three features on both Mansion maps, in this order, each tested, committed and pushed on its own:
-a zip line, CCTV, a lift in the house. Code: geometry in `shared/maps/mansion2.js` (sections 16–18, exported on the
-map as `zip`, …), the numbers and maths both sides use in **`shared/gadgets.js`**, the server's part in `server.js`
-("The Mansion's gadgets", after the blackout), the browser's in **`public/js/gadgets.js`** (main.js calls it: `load`,
-`local`, `update`, `hint`, `pose`, the messages). Their state reaches the browsers in one `gadgets` message (on join,
+a zip line, CCTV, a lift in the house (the lift then went to another agent, branch `feature/elevator`). Code: geometry
+in `shared/maps/mansion2.js` (sections 16–17, exported on the map as `zip` and `cctv`), the numbers and maths both
+sides use in **`shared/gadgets.js`**, the server's part in `server.js` ("The Mansion's gadgets", after the blackout),
+the browser's in **`public/js/gadgets.js`** (main.js calls it: `load`, `local`, `update`, `camera`, `hint`, `pose`,
+the mouse and keys while watching, the messages). Their state reaches the browsers in one `gadgets` message (on join,
 each round, on every change). A gadget's pose for other players is the snapshot row's last field (1 hanging from the
-zip line). `busy(p)` on the server (someone on a gadget can't shoot, throw or use items).
+zip line, 2 sitting at the CCTV desk). `busy(p)` on the server (someone on a gadget can't shoot, throw or use items).
 
 ### 16. Zip line
 - **Where:** the cable runs at z = −8.0 from `a` = (34.87, 9.6) under the crossbar of a mast on a deck on the
@@ -460,3 +461,46 @@ zip line). `busy(p)` on the server (someone on a gadget can't shoot, throw or us
 - **Choices:** more than one rider at a time (not within 1.5 m of another at the start); bots never hook on; a
   Terrorist pressing E within 0.9 m of the tensioner cuts instead of hooking on (the hint says which); hooking on at the
   terrace lifts you about a metre (you jump up to the handle).
+
+### 17. CCTV
+- **Cameras** (`map.cctv.cams`: lens `p`, `yaw`/`pitch` like a player's, vertical `fov`, the `wall` point its bracket
+  meets): CAM 1 FRONT GATE (28.5, 3.2, −0.75) on the street's east wall looking west through the gate at the lawn and
+  the house; CAM 2 LAWN (−6.3, 6.35, 1.0) on the front of the house over the terrace, looking east over the lawn and
+  the fountain (moved from z 5.3: the terrace's cypress filled half its picture); CAM 3 BACK DOOR (−23.95, 3.5, −11.2)
+  on the west wall north of the back door, down the back lawn to the garden gateway; CAM 4 MAIN HALL (−12.7, 6.4, 6.25)
+  high in the hall's south-west corner, looking north. Blind spots: the street's ends, the north lawn and the garage,
+  under the terrace, the gallery under CAM 4, the garden itself. Each turns ±0.55 rad and tilts ±0.25 (`CCTV`).
+- **Desk:** the upper floor's north-east room (top of the stairs): a desk x −11.5…−9.0, z −14…−13.5 against the north
+  wall, a chair with a solid seat (x −10.5…−10, z −13…−12.5, top 4.72; you sit on it at `seat` (−10.25, 4.72, −12.75)
+  facing north), the monitors' black frames as level brushes (non-solid); all `keep`. Desk and chair are on the bots'
+  0.5 m grid for the same reason as the deck (off it they added 12 false drop links).
+- **Server:** `atDesk` (within 1.3 m of the seat), `cctvOn` (one watcher at a time; position pinned to the seat, crouched,
+  pose 2 in the snapshot; the 'state' handler ignores the browser's position), `onCctv` ({t:'cctv', cam, yaw, pitch}
+  from the browser, ten a second at most; `off` for Esc), `cctvOff` (back where you stood; on E, Esc, being hurt, death),
+  `camLive` (power on, not broken, no jammer within 15 m of the lens), spotting in `updateSpotting` from the lens with
+  `camView` and `camHalfFov` (16:9), `breakCam` (one bullet: `rayAABB` round the lens in `onShoot`; blasts through
+  `blastJammers`, which every blast calls, and the satchel's), `cctvTick` (without rounds broken cameras back after 30 s),
+  `game.camsDown` cleared in `resetWorld`. The broken list rides in the `gadgets` message (`cams`).
+- **Browser:** the four camera bodies are one merged mesh (vertex colours), their lights one Points (blinking, hidden for
+  broken ones), the screens one mesh with a 256 px canvas (2×2 panels), redrawn 4×/s only within 8 m of the desk
+  (black with the power off). Watching: `camera()` puts the main camera at the lens (no second render), a CSS filter
+  (grayscale + contrast; night: bright IR), an overlay (noise, scan lines, vignette, name, REC, date and time,
+  NO SIGNAL / NO POWER); a dead feed isn't rendered at all; the weapon, crosshair, flashlight and NVG overlay are off;
+  sound is heard from the desk, not the camera. 1–4 / Mouse 1 / Mouse 2 switch, the mouse pans, E (server) or Esc
+  (also leaving pointer lock) gets you up.
+- **Verified:** server test `t17cctv.mjs` (sit down: pose 2 on the chair; a CT on the lawn not seen on CAM 3, seen on
+  CAM 2, seen at the edge of CAM 2's picture and not with it turned 0.55 away; seen on CAM 4 in the hall; a second
+  player can't sit; E gets up where you stood; a jammer 10 m from CAM 2 blinds it; one USP bullet breaks CAM 1 for
+  everyone; seen on CAM 3, not after the blackout; shot at the desk you get up; mended after a restart); browser test
+  `g17cctv.mjs` on both maps (hint, monitors, all four feeds, panning, Mouse 1 wrapping round, Esc, NO SIGNAL after a
+  scripted CT's shot, NO POWER and black monitors after a scripted T's blackout, a scripted T seen sitting at the desk,
+  the camera on the house from the lawn; infrared picture at night; no page errors); close-ups of two camera models;
+  t16zip, t7, t11 still pass; walls.mjs 0/0; nav 30.4k nodes, false drop links 157 as before; 60 s with BOTS=4, no
+  errors, tick ~1.3 ms; de_dust2 loads.
+- **Draw cost** (vcost.json + the zip line's two views + the security room and the hall, against the zip line commit):
+  static −2…+3 draw calls, +0…+0.2k triangles (desk, chair, frames). In game: +1 draw call for all four camera bodies,
+  +1 for their lights, +1 for the screens where they're in view. Watching costs a normal frame from the lens (less: no
+  weapon pass), a dead feed nothing.
+- **Not verified:** the sounds by ear; how readable the infrared picture is on the players' screens.
+- **Choices:** one watcher at a time; being hurt gets you up; both teams use it; cameras are neutral (anyone breaks them,
+  friendly fire or not); the pan is small, so each camera keeps its blind spots.

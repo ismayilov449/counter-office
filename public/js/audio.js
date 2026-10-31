@@ -826,6 +826,18 @@ export const audio = {
         tone(out, t, { freq: 1350, freqEnd: 180, dur: 1.1, type: 'triangle', gain: 0.1 });
         burst(out, t + 0.05, { dur: 0.8, type: 'bandpass', freq: 1400, freqEnd: 300, q: 3, gain: 0.3 });
         break;
+      case 'cctvon':
+        // sitting down at the security desk: the chair's creak and the monitors' faint whine
+        tone(out, t, { freq: 180, freqEnd: 120, dur: 0.18, type: 'sawtooth', gain: 0.05 });
+        burst(out, t, { dur: 0.15, type: 'bandpass', freq: 900, q: 4, gain: 0.15 });
+        tone(out, t + 0.15, { freq: 15600, dur: 0.6, type: 'sine', gain: 0.015 });
+        break;
+      case 'cambreak':
+        // a bullet through a camera: its lens and housing cracking, a spit of sparks
+        burst(out, t, { dur: 0.05, type: 'highpass', freq: 3000, gain: 0.9 });
+        for (let k = 0; k < 6; k++) burst(out, t + 0.03 + k * 0.035 + Math.random() * 0.02, { dur: 0.025, type: 'highpass', freq: 4000 + Math.random() * 2000, gain: 0.35 });
+        tone(out, t, { freq: 1200, freqEnd: 300, dur: 0.15, type: 'square', gain: 0.05 });
+        break;
       case 'creak': {
         // a stuck old door forced open: a thump, then a long groaning creak of dry hinges (arg: seconds)
         const len = arg || 1.5;
