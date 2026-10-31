@@ -62,7 +62,7 @@ state([S[1], S[2], t0, 0], undefined, { q: [2] });
 let worst = 0;
 const T = tripTime(S[1], S[2]) * 1000 + 400;
 while (clock < t0 + T) { frame(8 + Math.random() * 30); worst = Math.max(worst, Math.abs(me.p[1] - coll.elev[0].max[1])); }
-ok(Math.abs(me.p[1] - S[2]) < 0.002 && me.onGround && worst < 0.002, `rode up on the cabin's floor every frame (8-38 ms frames; off by ${worst.toFixed(4)} m at worst)`);
+ok(Math.abs(me.p[1] - S[2]) < 1e-6 && me.onGround && worst < 1e-6, `rode up on the cabin's floor every frame (8-38 ms frames; off by ${worst.toFixed(4)} m at worst)`);
 ok(Math.abs(me.viewY - S[2]) < 0.01, `the view came along (${me.viewY.toFixed(3)})`);
 ok(played.some(p => p[0] === 'loop' && p[2] === 'hum' && p[3] === 1) && played.at(-1)?.[3] === 0, 'the motor hummed while it moved, quiet now');
 // the blackout half way down: braked, then the hint says stuck; aiming up: the hatch

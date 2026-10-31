@@ -254,20 +254,23 @@ export function createElevator(ctx) {
     local(dt, now) {
       if (!E) return;
       step(now);
-      const was = inCabin(E, yPrev, me.p, 0.12) || onRoof(E, yPrev, me.p, 0.12);
-      if (was && dy) {
-        me.p[1] += dy;
+      const inside = inCabin(E, yPrev, me.p, 0.12), roof = !inside && onRoof(E, yPrev, me.p, 0.12);
+      if ((inside || roof) && dy) {
+        // (kept exactly on the floor when standing on it: yPrev + dy isn't always exactly y in floating point)
+        const from = inside ? yPrev : roofAt(E, yPrev), to = inside ? y : roofAt(E, y);
+        const rel = Math.abs(me.p[1] - from) < 1e-6 ? 0 : me.p[1] - from;
+        me.p[1] = to + rel;
         if (Number.isFinite(me.viewY)) me.viewY += dy;
       }
       // no room to stand: crouch (on the roof near the shaft's top, under the cabin coming down)
       if (onRoof(E, y, me.p, 0.15) && roofAt(E, y) + PLAYER.height + 0.02 > E.top) me.crouch = true;
-      if (inShaft(E, me.p) && me.p[1] < y && me.p[1] + PLAYER.height > y - E.cabin.floor - 0.03) me.crouch = true;
+      if (inShaft(E, me.p) && me.p[1] + 0.5 < y && me.p[1] + PLAYER.height > y - E.cabin.floor - 0.03) me.crouch = true;
       // never let a moving box catch us (movePlayer would lift us onto it or push us through a wall): a door closing on
       // us lets us be (the server opens it again); the cabin rising into our feet lifts us, coming down onto us pushes
       // us down
-      const h = me.crouch ? PLAYER.crouchHeight : PLAYER.height;
+      const h = me.crouch ? PLAYER.crouchHeight : PLAYER.height, feet = [me.p[0], me.p[1] + 1e-6, me.p[2]];
       for (const b of B.all) {
-        if (!touches(b, me.p, PLAYER.radius - 0.01, h)) continue;
+        if (!touches(b, feet, PLAYER.radius - 0.01, h - 2e-6)) continue;
         if (b.elevDoor != null) { b.min[1] = b.max[1] = -1000; continue; }
         if (!dy) continue;
         if (b.max[1] - me.p[1] < 0.6) { me.p[1] = b.max[1] + 0.001; me.v[1] = Math.max(0, me.v[1]); }
