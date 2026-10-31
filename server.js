@@ -2208,7 +2208,7 @@ function onShoot(p, m) {
   if (isHNS() && p.team === 'CT' && game.phase === 'live' && t < (game.hideUntil || 0)) return;
   p.lastShot = t;
   if (!def.melee) bots.heard(p, o);
-  cat.shot(p, o, dirs, !!def.melee); // cat: a bullet throws it, gunfire scares it
+  cat.shot(p, o, def.rocket ? [] : dirs, !!def.melee); // cat: a bullet throws it, gunfire scares it (a rocket: its blast)
   if (item) item.mag--;
   if (def.rocket) {
     launchRocket(p, o, dirs[0], def, w);
