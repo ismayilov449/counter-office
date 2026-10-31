@@ -2,9 +2,10 @@
 // screenshots of the jammer, the radar static and the hint; V and middle-click are refused; then the CT shoots it.
 // Usage: node jambrowser.mjs OUTDIR
 import fs from 'node:fs';
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
 const OUT = process.argv[2];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const list = await (await fetch('http://127.0.0.1:9333/json/list')).json();
+const list = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9333}/json/list`)).json();
 const cdp = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
 await new Promise(r => (cdp.onopen = r));
 let id = 0; const pending = new Map(); const errors = [];
@@ -22,11 +23,11 @@ await cmd('Page.addScriptToEvaluateOnNewDocument', { source: `
     set(fn) { desc.set.call(this, e => { try { const m = JSON.parse(e.data); if (m.t === 'jamdown' || m.t === 'jammers' || m.t === 'msg') __in.push(m); if (m.t === 'spawn') window.__spawn = m; } catch {} fn(e); }); } });
   const send0 = WebSocket.prototype.send; WebSocket.prototype.send = function (d) { window.__ws = this; return send0.call(this, d); };
 ` });
-await cmd('Page.navigate', { url: 'http://localhost:3999/' });
+await cmd('Page.navigate', { url: `http://localhost:${process.env.GAME_PORT || 3999}/` });
 for (let i = 0; i < 60; i++) { await sleep(500); if (/Connected/.test(await ev("document.getElementById('conn-status')?.textContent") || '')) break; }
 await ev(`document.getElementById('name').value = 'CTcam'; document.querySelector('#join .team-btn[data-team="CT"]').click(); 'ok'`);
 // the Terrorist
-const T = { ws: new WebSocket('ws://127.0.0.1:3999/ws'), seq: 0 };
+const T = { ws: new WebSocket(`ws://127.0.0.1:${process.env.GAME_PORT || 3999}/ws`), seq: 0 };
 T.ws.onmessage = e => { const m = JSON.parse(e.data); if (m.t === 'welcome') T.ws.send(JSON.stringify({ t: 'join', name: 'JamT', team: 'T' })); if (m.t === 'spawn') T.seq = m.sq; if (m.t === 'msg' || m.t === 'jammers') console.log('  T got', m.t, m.text || JSON.stringify(m.list)); };
 await sleep(7000); // the match starts, freeze time ends
 await ev("Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => document.querySelector('#game canvas') }); document.dispatchEvent(new Event('pointerlockchange')); document.getElementById('paused').classList.add('hidden'); 'ok'");

@@ -2,7 +2,7 @@
 import { player, sleep } from './client.mjs';
 const t = await player('Tee', 'T');
 const ct = await player('Cee', 'CT');
-await sleep(3000);
+await sleep(7500); // (past "game commencing" and the freeze time: the lever only works in a live round or warmup)
 const t0 = Date.now();
 const ev = [];
 for (const c of [t, ct]) c.on.lights = m => ev.push([c === t ? 'T' : 'CT', Date.now() - t0, m.power || 'switch', m.lights.power, m.lights.lampa5, m.lights.cellar]);

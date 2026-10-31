@@ -1,9 +1,8 @@
 // Satchel charge on cs_mansion: throw (browser T), defuse (raw CT), shoot it (raw CT), set off with the phone,
 // stick one on the pickup and drive it away before setting it off (raw T2 + CT), owner dead = no detonation.
 import { open, bot, sleep } from './tw-lib.mjs';
-const WT = 'C:/Users/Rufat.Ismayilov/Desktop/CS1.6/.claude/worktrees/agent-a01c73aa3d67d1462';
-const { MAPS } = await import('file:///' + WT + '/shared/maps/index.js');
-const { CollisionWorld } = await import('file:///' + WT + '/shared/collision.js');
+const { MAPS } = await import(new URL('../../shared/maps/index.js', import.meta.url).href);
+const { CollisionWorld } = await import(new URL('../../shared/collision.js', import.meta.url).href);
 const coll = new CollisionWorld(MAPS.cs_mansion);
 const ground = (x, z, from = 10) => { const h = coll.raycast([x, from, z], [0, -1, 0], 30, 'solid'); return h ? from - h.t : 0; };
 

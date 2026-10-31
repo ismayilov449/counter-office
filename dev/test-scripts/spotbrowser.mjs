@@ -1,9 +1,10 @@
 // Radar red dots in the browser: join a team, wait for spotted enemies, screenshot the radar; then again after
 // they're lost (rings). Usage: node spotbrowser.mjs OUTDIR [team]
 import fs from 'node:fs';
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
 const OUT = process.argv[2], TEAM = process.argv[3] || 'CT';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const list = await (await fetch('http://127.0.0.1:9333/json/list')).json();
+const list = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9333}/json/list`)).json();
 const cdp = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
 await new Promise(r => (cdp.onopen = r));
 let id = 0; const pending = new Map(); const errors = [];
@@ -21,7 +22,7 @@ await cmd('Page.addScriptToEvaluateOnNewDocument', { source: `
     set(fn) { desc.set.call(this, e => { try { const m = JSON.parse(e.data); if (m.t === 's') window.__sp = m.sp || []; } catch {} fn(e); }); } });
   const send0 = WebSocket.prototype.send; WebSocket.prototype.send = function (d) { window.__ws = this; return send0.call(this, d); };
 ` });
-await cmd('Page.navigate', { url: 'http://localhost:3999/' });
+await cmd('Page.navigate', { url: `http://localhost:${process.env.GAME_PORT || 3999}/` });
 for (let i = 0; i < 60; i++) { await sleep(500); if (/Connected/.test(await ev("document.getElementById('conn-status')?.textContent") || '')) break; }
 await ev(`document.getElementById('name').value = 'Radar'; document.querySelector('#join .team-btn[data-team="${TEAM}"]').click(); 'ok'`);
 await sleep(2500);

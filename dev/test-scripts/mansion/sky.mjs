@@ -1,5 +1,5 @@
 // Sky checks at points: open?, where a shell lands (ground), and roof pieces over it. node sky.mjs '[[x,y,z],...]' [map]
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/.claude/worktrees/agent-a556089471e441071/';
+const G = new URL('../../../', import.meta.url).href;
 const { MAPS } = await import(G + 'shared/maps/index.js');
 const { CollisionWorld } = await import(G + 'shared/collision.js');
 const { skyOf } = await import(G + 'shared/maps/sky.js');

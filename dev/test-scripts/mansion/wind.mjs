@@ -1,4 +1,4 @@
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/.claude/worktrees/agent-a556089471e441071/';
+const G = new URL('../../../', import.meta.url).href;
 const B = await import(G + 'shared/maps/cs_mansion_bsp.js');
 const nrm = f => { const a = f.slice(0, 3), b = f.slice(5, 8), c = f.slice(10, 13); const u = b.map((v, i) => v - a[i]), w = c.map((v, i) => v - a[i]); return [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]].map(v => +v.toFixed(3)); };
 const floor = B.FACES.c1a2_flr1.find(f => Math.abs(f[1] - 0.813) < 0.01);

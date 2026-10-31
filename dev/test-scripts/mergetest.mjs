@@ -1,9 +1,10 @@
-// After merging: on Mansion (game on 3999, Edge on 9333) a Terrorist buys the jammer, satchel and RPG-26, puts the
+// After merging: on Mansion (game on GAME_PORT, Edge on CDP_PORT; defaults 3999 and 9333) a Terrorist buys the jammer, satchel and RPG-26, puts the
 // jammer down, throws and sets off the satchel, fires the RPG-26. Prints what the server said and any page errors.
 import fs from 'node:fs';
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
 const OUT = process.argv[2];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const page = (await (await fetch('http://127.0.0.1:9333/json/list')).json()).find(t => t.type === 'page');
+const page = (await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9333}/json/list`)).json()).find(t => t.type === 'page');
 const cdp = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise(r => (cdp.onopen = r));
 let id = 0; const pending = new Map(); const errors = [];
@@ -22,7 +23,7 @@ await cmd('Page.addScriptToEvaluateOnNewDocument', { source: `
   Object.defineProperty(WebSocket.prototype, 'onmessage', { configurable: true, get() { return desc.get.call(this); },
     set(fn) { desc.set.call(this, e => { try { const m = JSON.parse(e.data); if (['msg','jammers','satchels','satchelThrow','rocket','boom','brk'].includes(m.t)) __in.push(m.t + (m.text ? ':' + m.text : '') + (m.list ? '(' + m.list.length + ')' : '')); } catch {} fn(e); }); } });
 ` });
-await cmd('Page.navigate', { url: 'http://localhost:3999/' });
+await cmd('Page.navigate', { url: `http://localhost:${process.env.GAME_PORT || 3999}/` });
 for (let i = 0; i < 80; i++) { await sleep(500); if (/Connected/.test(await ev("document.getElementById('conn-status')?.textContent") || '')) break; }
 await ev(`document.getElementById('name').value = 'Merge'; document.querySelector('#join .team-btn[data-team="T"]').click(); 1`);
 await sleep(4000);

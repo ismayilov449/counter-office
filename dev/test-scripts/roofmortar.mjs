@@ -1,9 +1,10 @@
 // Mansion, Terrorist at their spawn inside the house: set the mortar up under the roof, aim on the map, fire —
 // the roof above must break (brk) and the shell fly; a second shell breaks nothing more. Screenshots.
 import fs from 'node:fs';
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
 const OUT = process.argv[2];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const list = await (await fetch('http://127.0.0.1:9333/json/list')).json();
+const list = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9333}/json/list`)).json();
 const cdp = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
 await new Promise(r => (cdp.onopen = r));
 let id = 0; const pending = new Map(); const errors = [];
@@ -22,7 +23,7 @@ await cmd('Page.addScriptToEvaluateOnNewDocument', { source: `
   Object.defineProperty(WebSocket.prototype, 'onmessage', { configurable: true, get() { return desc.get.call(this); },
     set(fn) { desc.set.call(this, e => { try { const m = JSON.parse(e.data); if (m.t === 'shell' || m.t === 'brk' || m.t === 'boom') __in.push(m); } catch {} fn(e); }); } });
 ` });
-await cmd('Page.navigate', { url: 'http://localhost:3999/' });
+await cmd('Page.navigate', { url: `http://localhost:${process.env.GAME_PORT || 3999}/` });
 for (let i = 0; i < 60; i++) { await sleep(500); if (/Connected/.test(await ev("document.getElementById('conn-status')?.textContent") || '')) break; }
 await ev(`document.getElementById('name').value = 'Gunner'; document.querySelector('#join .team-btn[data-team="T"]').click(); 'ok'`);
 await sleep(3000);

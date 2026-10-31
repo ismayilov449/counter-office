@@ -1,6 +1,6 @@
 // Nav links that drop through a floor: a link between nodes more than 1.5 m apart in height where a solid lies
 // between them (between the two heights at the midpoint). Lists them by area.
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/';
+const G = new URL('../../../', import.meta.url).href;
 const { MAPS } = await import(G + 'shared/maps/index.js');
 const { CollisionWorld } = await import(G + 'shared/collision.js');
 const { buildNav } = await import(G + 'lib/nav.js');

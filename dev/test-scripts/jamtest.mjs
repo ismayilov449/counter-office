@@ -1,12 +1,13 @@
 // Signal jammer, server logic, with two clients on de_dust2 (warmup, no bots):
 //  T buys and places a jammer at the T spawn; spotting near/inside; CT radar ('sp') empty inside; ping refused inside;
 //  a second jammer can't be bought; CT shoots it 3 times -> 'jamdown' and the list is empty.
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/';
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
+const G = new URL('../../', import.meta.url).href;
 const { MAPS } = await import(G + 'shared/maps/index.js');
 const map = MAPS.de_dust2;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function client(name, team) {
-  const c = { name, msgs: [], sp: null, me: null, seq: 0, ws: new WebSocket('ws://127.0.0.1:3999/ws') };
+  const c = { name, msgs: [], sp: null, me: null, seq: 0, ws: new WebSocket(`ws://127.0.0.1:${process.env.GAME_PORT || 3999}/ws`) };
   c.ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.t === 'welcome') { c.id = m.id; c.ws.send(JSON.stringify({ t: 'join', name, team })); }

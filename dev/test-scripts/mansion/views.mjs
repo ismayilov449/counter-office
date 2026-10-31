@@ -1,9 +1,11 @@
-// Usage: node views.mjs <outPrefix> <viewsJson> [map] — views: [[name, jsExpr], ...]; renders with mz/viewer.js
+// Usage: node views.mjs <outPrefix> <viewsJson> [map] — views: [[name, jsExpr], ...]; renders with viewer.js.
+// Prints each view's draw calls and triangles; BENCH=n also times n frames of each (median ms, swiftshader).
 import fs from 'node:fs';
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
 const [out, viewsFile, mapId = 'cs_mansion'] = process.argv.slice(2);
 const views = JSON.parse(fs.readFileSync(viewsFile, 'utf8'));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const list = await (await fetch('http://127.0.0.1:9335/json/list')).json();
+const list = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9333}/json/list`)).json();
 const ws = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
 await new Promise(r => (ws.onopen = r));
 let id = 0; const pending = new Map(); const errors = [];
@@ -19,16 +21,20 @@ const ev = async e => { const r = await cmd('Runtime.evaluate', { expression: e,
 await cmd('Runtime.enable'); await cmd('Page.enable');
 await cmd('Fetch.enable', { patterns: [{ urlPattern: '*/js/main.js*' }] });
 await cmd('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
-await cmd('Page.navigate', { url: 'http://127.0.0.1:4200/?nocache=' + Date.now() });
+await cmd('Page.navigate', { url: `http://127.0.0.1:${process.env.GAME_PORT || 3999}/?nocache=` + Date.now() });
 await sleep(2500);
 await ev(`window.VIEW_MAP = ${JSON.stringify(mapId)}; 1`);
 await ev(fs.readFileSync(new URL('./viewer.js', import.meta.url), 'utf8'));
 for (let i = 0; i < 60; i++) { await sleep(500); if (await ev('window.viewReady === true || !!window.viewError')) break; }
 const verr = await ev('window.viewError || ""');
 if (verr) { console.log('VIEWER ERROR', verr); process.exit(1); }
+console.log('world built in', Math.round(await ev('window.buildMs')), 'ms');
 for (const [name, expr] of views) {
   const r = await ev(expr);
   if (r !== 'ok') errors.push(name + ': ' + r);
+  const info = await ev('JSON.stringify(window.info)');
+  const ms = process.env.BENCH ? await ev(`bench(${+process.env.BENCH})`) : '';
+  console.log(name.padEnd(14), info, ms ? ms + ' ms' : '');
   await sleep(200);
   const s = await cmd('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(`${out}${name}.png`, Buffer.from(s.result.data, 'base64'));

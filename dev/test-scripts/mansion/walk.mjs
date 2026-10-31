@@ -1,5 +1,5 @@
 // Walk a body through the world with the game's physics: node walk.mjs '[start]' '[[vx,vz,secs],...]' [crouch] [map]
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/.claude/worktrees/agent-a556089471e441071/';
+const G = new URL('../../../', import.meta.url).href;
 const { MAPS } = await import(G + 'shared/maps/index.js');
 const { CollisionWorld } = await import(G + 'shared/collision.js');
 const { movePlayer, ladderAt, ladderPull } = await import(G + 'shared/physics.js');

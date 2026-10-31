@@ -1,5 +1,5 @@
 // What covers a point on Mansion: faces above it (static vs a breakable piece's), and breakable boxes above it.
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/';
+const G = new URL('../../', import.meta.url).href;
 const { MAPS } = await import(G + 'shared/maps/index.js');
 const map = MAPS.cs_mansion;
 const inside = (xs, zs, x, z) => { let hit = false; for (let i = 0, j = xs.length - 1; i < xs.length; j = i++) if ((zs[i] > z) !== (zs[j] > z) && x < ((xs[j] - xs[i]) * (z - zs[i])) / (zs[j] - zs[i]) + xs[i]) hit = !hit; return hit; };

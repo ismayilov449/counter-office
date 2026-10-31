@@ -1,6 +1,7 @@
 // Radar spotting: join as a CT with bots around, watch the "sp" lists in snapshots for ~25 s.
 // Checks: only enemies (Terrorists) ever listed; positions match the snapshot; counts over time.
-const ws = new WebSocket('ws://127.0.0.1:3999/ws');
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
+const ws = new WebSocket(`ws://127.0.0.1:${process.env.GAME_PORT || 3999}/ws`);
 let me = null, team = process.argv[2] || 'CT';
 const stats = { snaps: 0, withSp: 0, maxSp: 0, wrongTeam: 0, mismatch: 0, ids: new Set() };
 ws.onmessage = e => {

@@ -1,7 +1,8 @@
-// A scripted test player over the game's WebSocket (server on :4200). The server trusts the client's position,
+// A scripted test player over the game's WebSocket (server on GAME_PORT, default 3999). The server trusts the client's position,
 // so a test can stand anywhere: c.at([x, y, z]) moves there.
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
-export async function player(name, team, port = 4200) {
+export async function player(name, team, port = +(process.env.GAME_PORT || 3999)) {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
   const c = { ws, log: [], sq: 0, p: null, yaw: 0, me: null, alive: false, on: {} };
   ws.onmessage = e => {
@@ -25,7 +26,7 @@ export async function player(name, team, port = 4200) {
   return c;
 }
 // Admin action (password testpass)
-export async function admin(action, port = 4200) {
+export async function admin(action, port = +(process.env.GAME_PORT || 3999)) {
   const r = await fetch(`http://127.0.0.1:${port}/api/admin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'testpass', ...action }) });
   return r.json();
 }

@@ -1,12 +1,13 @@
-// Shared CDP helpers for the t-weapons tests (Edge on 9334, game on 4100).
+// Shared CDP helpers for the t-weapons tests (Edge on CDP_PORT, game on GAME_PORT; defaults 9333 and 3999).
 import fs from 'node:fs';
-export const OUT = 'C:/Users/RUFAT~1.ISM/AppData/Local/Temp/claude/C--Users-Rufat-Ismayilov-Desktop-CS1-6/fda3fa36-5543-4bf3-aafd-2dd06116628f/scratchpad/tw-shots';
+if (!globalThis.WebSocket) globalThis.WebSocket = (await import('ws')).default; // Node 20 has no global WebSocket
+export const OUT = (process.env.OUT || (await import('node:os')).tmpdir() + '/co-test') + '/tw-shots';
 fs.mkdirSync(OUT, { recursive: true });
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 export async function open(team = 'T', name = 'Tester', keep = ['rocket', 'boom', 'brk', 'satchels', 'msg', 'me']) {
   // one tab, reused (the page's leave-site prompt is switched off below, so navigating again never hangs)
-  const page = (await (await fetch('http://127.0.0.1:9334/json/list')).json()).find(t => t.type === 'page');
+  const page = (await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9333}/json/list`)).json()).find(t => t.type === 'page');
   const cdp = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise(r => (cdp.onopen = r));
   let id = 0; const pending = new Map(); const errors = [];
@@ -29,7 +30,7 @@ export async function open(team = 'T', name = 'Tester', keep = ['rocket', 'boom'
     Object.defineProperty(WebSocket.prototype, 'onmessage', { configurable: true, get() { return desc.get.call(this); },
       set(fn) { desc.set.call(this, e => { try { const m = JSON.parse(e.data); if (__keep.includes(m.t)) __in.push(m); } catch {} fn(e); }); } });
   ` });
-  await cmd('Page.navigate', { url: 'http://localhost:4100/' });
+  await cmd('Page.navigate', { url: `http://localhost:${process.env.GAME_PORT || 3999}/` });
   for (let i = 0; i < 60; i++) { await sleep(500); if (/Connected/.test(await ev("document.getElementById('conn-status')?.textContent") || '')) break; }
   await ev(`document.getElementById('name').value = '${name}'; document.querySelector('#join .team-btn[data-team="${team}"]').click(); 'ok'`);
   await sleep(3000);
@@ -45,7 +46,7 @@ export async function open(team = 'T', name = 'Tester', keep = ['rocket', 'boom'
 
 // A second, plain WebSocket player (no browser): joins a team and gets the messages.
 export async function bot(team, name) {
-  const ws = new WebSocket('ws://127.0.0.1:4100/ws');
+  const ws = new WebSocket(`ws://127.0.0.1:${process.env.GAME_PORT || 3999}/ws`);
   const inbox = [];
   ws.onmessage = e => { try { inbox.push(JSON.parse(e.data)); } catch {} };
   await new Promise(r => (ws.onopen = r));

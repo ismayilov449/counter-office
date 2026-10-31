@@ -1,4 +1,4 @@
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/.claude/worktrees/agent-a556089471e441071/';
+const G = new URL('../../../', import.meta.url).href;
 const B = await import(G + 'shared/maps/cs_mansion_bsp.js');
 const f2 = v => v.toFixed(2);
 const Y = +process.argv[2];

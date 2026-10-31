@@ -1,5 +1,5 @@
 // Load the maps, report Mansion's numbers, and check walkability of given points (nav).
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/.claude/worktrees/agent-a556089471e441071/';
+const G = new URL('../../../', import.meta.url).href;
 const t0 = Date.now();
 const { MAPS } = await import(G + 'shared/maps/index.js');
 console.log('maps loaded in', Date.now() - t0, 'ms:', Object.keys(MAPS).join(' '));

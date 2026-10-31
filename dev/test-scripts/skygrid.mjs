@@ -1,5 +1,5 @@
 // Mansion: where the mortar's "open sky" check passes, on a 1 m grid at ground level, and at each spawn.
-const G = 'file:///C:/Users/Rufat.Ismayilov/Desktop/CS1.6/';
+const G = new URL('../../', import.meta.url).href;
 const { MAPS } = await import(G + 'shared/maps/index.js');
 const { CollisionWorld } = await import(G + 'shared/collision.js');
 const { skyOf } = await import(G + 'shared/maps/sky.js');
