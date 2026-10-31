@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -295,6 +296,7 @@ function refreshViewModel() {
 
 function switchSlot(slot, silent = false) {
   if (!weaponOf(slot) || me.drone) return;
+  if (body.blocksSlot(slot)) return; // body: only the pistol while down
   if (slot === me.slot && vmId === current()) return;
   if (slot !== me.slot) me.lastSlot = me.slot;
   me.slot = slot;
@@ -2306,6 +2308,7 @@ document.addEventListener('keydown', e => {
       if (me.alive) { me.flashlight = !me.flashlight; audio.play('click'); }
       break;
     case 'KeyH': if (me.alive) toggleCamo(); break;
+    case 'KeyK': body.key(); break; // body: play dead
     case 'KeyN':
       if (!me.nvg) hud.small('You do not own nightvision goggles.');
       else { me.nvgOn = !me.nvgOn; audio.play('nvg'); }
@@ -3154,6 +3157,7 @@ const net = new Net({
     fx.removeSpray(m.id);
   },
 });
+initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio }); // body
 
 // ---------------------------------------------------------------- per-frame updates
 
@@ -3177,9 +3181,9 @@ function updateLocal(dt, now) {
   const moveBoxes = coll.move(null, me.p, 2);
   const id = current(), def = WEAPONS[id];
   const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || atFuseBox() || !!satchelToDefuse());
-  const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar;
+  const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar || body.frozen(); // body: playing dead
 
-  const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar;
+  const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar || body.crouched(); // body: crawling
   // Ducking in the air pulls the legs up half way, as in CS: a crouch-jump reaches higher (into vents and windows).
   // Standing up in the air lets them down again, if there's room below.
   const tuck = (PLAYER.height - PLAYER.crouchHeight) / 2;
@@ -3216,6 +3220,7 @@ function updateLocal(dt, now) {
   const wet = inWater(map.water, me.p);
   if (wet) speed *= 0.7;
   speed *= 1 - 0.45 * Math.min(1, dazed(performance.now()));
+  speed = body.move(speed); // body: a crawl while down, no jumping
   // Swim up: hold Space in water to rise to the surface and climb out over the edge.
   if (wet && keys.has('Space') && !frozen) { me.v[1] = Math.max(me.v[1], 3.2); me.onGround = false; }
 
@@ -3292,13 +3297,14 @@ function updateLocal(dt, now) {
     if (me.stepDist > (wet ? 1.8 : 2.4)) { me.stepDist = 0; audio.play(wet ? 'splash' : 'step', null, surfaceAt(me.p)); }
   }
   me.eyeH += ((me.crouch ? PLAYER.crouchEye : PLAYER.eye) - me.eyeH) * Math.min(1, dt * 14);
+  body.eye(dt); // body: low on the floor while down
 
   if (me.reload && now >= me.reload.until) finishReload();
   if (me.resumeScope && now >= me.resumeAt) {
     if (WEAPONS[current()].sniper && !me.reload) me.scope = me.resumeScope;
     me.resumeScope = 0;
   }
-  const canFire = game.phase !== 'freeze' && !ui.chat && locked && !me.act;
+  const canFire = game.phase !== 'freeze' && !ui.chat && locked && !me.act && !body.frozen(); // body: not while playing dead
   if (mouse1 && canFire) tryFire(now);
   if (now - me.lastFire > (def.rate || 0.1) * 1000 + 150) {
     if (!mouse1) me.shotsFired = 0;
@@ -3875,10 +3881,12 @@ function frame() {
   updateKillcam(dt);
   recordSelf();
   updateRemotes(dt);
+  body.frame(dt, now); // body: bodies on the floor, overlays
   updateCars(dt);
   updateHostageModels(dt);
   updateBomb(now);
   updateCamera(dt, now);
+  body.camera(camera); // body: the view from the floor
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -3893,6 +3901,7 @@ function frame() {
   fx.update(dt, camera);
   world?.update(dt, camera.position);
   updateViewModel(dt, now);
+  if (vm && body.frozen()) vm.visible = false; // body: nothing in your hands while playing dead
   updateHud(now);
   sendState(now);
 
