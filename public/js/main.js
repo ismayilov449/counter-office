@@ -1,7 +1,7 @@
 // Counter-Office client: input, local movement/shooting prediction, remote interpolation, rendering.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP, siteAt, inBuyZone } from '/shared/maps/index.js';
-import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, mortarElev, MINES, MINE, CAMO, PING, JAMMER, SATCHEL } from '/shared/weapons.js';
+import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, itemInfo, slotKey, ammoCost, MILS, milsText, bearingOf, mortarRange, mortarElev, MINES, MINE, CAMO, PING, JAMMER, SATCHEL, DRONE, droneSignal } from '/shared/weapons.js';
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
@@ -11,7 +11,7 @@ import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, setGlow, ambientAt, glowAt } from './roomlight.js';
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
-import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel } from './guns.js';
+import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
 import { EMOTES, EMOTE } from '/shared/emotes.js';
 import { RANKS } from '/shared/ranks.js';
@@ -118,6 +118,8 @@ function loadMap(id) {
   clearMineModels();
   clearJammerModels();
   clearSatchelModels();
+  clearDroneModels();
+  endDrone(null);
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
@@ -149,6 +151,7 @@ function prewarm() {
   place(buildPlacedMine('pmn', MINE.mon50.wire, MINE.mon50.wireHalf), 3.2);
   place(buildPlacedMine('mon50', MINE.mon50.wire, MINE.mon50.wireHalf), 3.8);
   place(buildPlacedJammer(), 4.4);
+  place(buildDrone(), 2.5, -1);
   scene.add(extra);
   // effects
   fx.crater(by(-2, 0, -2), 1, true);
@@ -208,7 +211,7 @@ addEventListener('resize', () => {
 
 const me = {
   id: null, joined: false, team: 'SPEC', alive: false, hp: 0, armor: 0, helmet: false, kit: false, nvg: false, money: 0,
-  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, c4: false },
+  inv: { primary: null, secondary: null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false },
   slot: 'knife', lastSlot: 'knife', pendingSlot: false,
   p: [0, 0, 0], v: [0, 0, 0], onGround: false, crouch: false, eyeH: PLAYER.eye, airSpeed: 0,
   yaw: 0, pitch: 0, punchP: 0, punchY: 0, lastYaw: 0, sway: 0, bobT: 0,
@@ -257,6 +260,7 @@ function weaponOf(slot) {
     case 'c4': return me.inv.c4 ? 'c4' : null;
     case 'satchel': return me.inv.satchel > 0 ? 'satchel' : null;
     case 'phone': return phoneLive() ? 'phone' : null;
+    case 'drone': return me.inv.drone > 0 || me.drone ? 'drone' : null;
     default: return (GRENADES.includes(slot) || MINES.includes(slot) || slot === 'jammer') && me.inv[slot] > 0 ? slot : null;
   }
 }
@@ -264,7 +268,7 @@ function weaponOf(slot) {
 const current = () => (me.riding?.gunner ? 'pkt' : weaponOf(me.slot) || 'knife');
 const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me.inv[me.slot] : null);
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
-const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'jammer', 'satchel', 'phone', 'c4'];
+const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'c4'];
 
 // The gun in your hands: one model per weapon and look, made once and kept (building a new one at every switch was a
 // small hitch each time, and the old ones were never freed). prewarm fills it while the map loads.
@@ -290,7 +294,7 @@ function refreshViewModel() {
 }
 
 function switchSlot(slot, silent = false) {
-  if (!weaponOf(slot)) return;
+  if (!weaponOf(slot) || me.drone) return;
   if (slot === me.slot && vmId === current()) return;
   if (slot !== me.slot) me.lastSlot = me.slot;
   me.slot = slot;
@@ -498,6 +502,7 @@ function tryFire(now) {
   if (!def.auto && !me.triggerFresh) return;
   me.triggerFresh = false;
   if (def.mortar) { mortarFire(now); return; }
+  if (id === 'drone') { launchDrone(now); return; }
   if (def.device) { placeJammer(now); return; }
   if (def.mine) { layMine(id, now); return; }
   if (def.satchel) { throwSatchel(now); return; }
@@ -730,6 +735,208 @@ function updateSatchelFlights(now) {
 
 // Ghillie camouflage: H switches it on and off. We can't see ourselves fade, so the HUD says when we're hidden
 // (same rule as the server: on, and not just after a shot).
+// ---------------------------------------------------------------- FPV drone
+// Terrorists: 6 takes out the remote, Mouse1 launches the drone, and you fly it through its camera (grainy video, a
+// signal bar, the battery) while you crouch with the remote and can't move or shoot. WASD flies, the mouse steers,
+// Space climbs, Ctrl descends; Mouse1 drops its bomb, right mouse dives (kamikaze), E lets go (it falls); land it by
+// yourself to put it back in the bag. The flight is worked out here and sent to the server (like a car's driver),
+// which checks the battery, the signal and jammers, and ends it ('droneEnd'). Everyone sees and hears the drones from
+// the snapshot's 'dn' list.
+const DRONE_WHY = {
+  signal: 'Signal lost — the drone fell', battery: 'Battery flat — the drone fell', jammer: 'The drone flew into a signal jammer and fell',
+  shot: 'Your drone was shot down', blast: 'Your drone was caught in a blast', released: 'You let go of the drone — it fell',
+  landed: 'The drone landed out of your reach — it\'s lost', recovered: 'The drone is back in your bag', nolaunch: 'You can\'t launch the drone now',
+};
+function launchDrone(now) {
+  if (me.drone || !(me.inv.drone > 0)) return;
+  if (!me.onGround) { hud.small('Stand on the ground to launch the drone', 2); return; }
+  const eye = eyePos(), f = [-Math.sin(me.yaw), 0, -Math.cos(me.yaw)];
+  let start = [eye[0] + f[0] * 0.6, eye[1] + 0.1, eye[2] + f[2] * 0.6];
+  if (coll.raycast(eye, f, 0.9, 'move')) start = [eye[0], eye[1] + 0.35, eye[2]];
+  me.drone = { id: null, p: start, v: [0, 2.5, 0], yaw: me.yaw, pitch: -0.15, roll: 0, state: 'fly', bomb: true, until: now + DRONE.battery * 1000, t: 0, sentAt: 0, sig: 1, sigAt: 0, jam: false };
+  me.inv.drone = 0;
+  stopEmote();
+  net.send({ t: 'drone', launch: 1, p: start.map(v => Math.round(v * 1000) / 1000), yaw: me.yaw });
+  audio.play('dronestart', start);
+}
+function endDrone(why) {
+  if (!me.drone) return;
+  me.drone = null;
+  droneOverlay().el.style.display = 'none';
+  if (why && DRONE_WHY[why]) hud.small(DRONE_WHY[why], 3);
+  if (me.alive) switchSlot(why === 'recovered' ? 'drone' : bestSlot(), true);
+}
+function droneBomb() {
+  const d = me.drone;
+  if (!d || d.state !== 'fly') return;
+  if (!d.bomb) { hud.small('No bomb left: dive into them (right mouse), or fly back and land by yourself', 2.5); return; }
+  d.bomb = false;
+  net.send({ t: 'drone', drop: 1, p: d.p });
+}
+function droneDive() {
+  const d = me.drone;
+  if (!d || d.state !== 'fly') return;
+  d.state = 'dive';
+  net.send({ t: 'drone', dive: 1, p: d.p });
+}
+function releaseDrone() {
+  if (!me.drone) return;
+  net.send({ t: 'drone', release: 1 });
+  endDrone('released');
+}
+
+function updateDroneFlight(dt, now) {
+  const d = me.drone;
+  me.crouch = true;
+  me.v = [0, 0, 0];
+  d.t += dt;
+  if (d.state !== 'fly' && d.state !== 'dive') return;
+  const free = !ui.chat && locked && game.phase !== 'freeze';
+  const fw = free ? (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0) : 0;
+  const st = free ? (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0) : 0;
+  const up = free ? (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') || keys.has('ControlRight') ? 1 : 0) : 0;
+  if (d.state === 'fly') {
+    const sy = Math.sin(d.yaw), cy = Math.cos(d.yaw), n = Math.hypot(fw, st) || 1;
+    const tx = ((-sy * fw + cy * st) / n) * DRONE.speed, tz = ((-cy * fw - sy * st) / n) * DRONE.speed, ty = up * DRONE.climb;
+    const k = Math.min(1, dt * 3.2); // it takes a moment to speed up and to stop
+    d.v[0] += (tx - d.v[0]) * k; d.v[1] += (ty - d.v[1]) * k; d.v[2] += (tz - d.v[2]) * k;
+    d.roll += (-st * 0.25 - d.roll) * Math.min(1, dt * 5);
+  } else {
+    const cp = Math.cos(d.pitch), sp = Math.min(DRONE.dive, Math.hypot(...d.v) + 30 * dt);
+    d.v = [-Math.sin(d.yaw) * cp * sp, Math.sin(d.pitch) * sp, -Math.cos(d.yaw) * cp * sp];
+  }
+  // fly into the world's boxes (a small box round its middle): stop there; in a dive, that's the impact
+  const boxes = coll.move(null, d.p, 4);
+  let hit = false, landed = false;
+  for (const ax of [0, 1, 2]) {
+    const step = d.v[ax] * dt;
+    if (!step) continue;
+    d.p[ax] += step;
+    if (overlapsAny(boxes, d.p[0], d.p[1] - 0.1, d.p[2], 0.22, 0.2)) {
+      d.p[ax] -= step;
+      if (ax === 1 && d.v[1] < -0.5 && d.state === 'fly' && d.t > 1 && Math.hypot(d.v[0], d.v[2]) < 3) landed = true;
+      d.v[ax] = 0;
+      hit = true;
+    }
+  }
+  const b = map.bounds;
+  d.p[0] = clamp(d.p[0], b.min, b.max); d.p[2] = clamp(d.p[2], b.min, b.max); d.p[1] = Math.min(d.p[1], 30);
+  if (d.state === 'dive') {
+    for (const r of remotes.values()) {
+      if (r.alive && Math.hypot(r.p[0] - d.p[0], r.p[2] - d.p[2]) < 0.6 && d.p[1] > r.p[1] - 0.2 && d.p[1] < r.p[1] + 1.9) hit = true;
+    }
+    if (hit) { net.send({ t: 'drone', p: d.p, boom: d.p }); d.state = 'gone'; return; }
+  }
+  if (landed) { net.send({ t: 'drone', p: d.p, land: 1 }); d.state = 'gone'; return; }
+  if (now - d.sentAt > 30) {
+    d.sentAt = now;
+    const r3 = v => Math.round(v * 1000) / 1000;
+    net.send({ t: 'drone', p: d.p.map(r3), yaw: r3(d.yaw), pitch: r3(d.pitch) });
+  }
+  // the signal, as the server works it out (shown as bars and as noise in the picture)
+  if (now - d.sigAt > 100) {
+    d.sigAt = now;
+    const eye = [me.p[0], me.p[1] + PLAYER.crouchEye, me.p[2]], to = [d.p[0] - eye[0], d.p[1] - eye[1], d.p[2] - eye[2]], dist = Math.hypot(...to) || 1;
+    d.sig = droneSignal(dist, !!coll.raycast(eye, to.map(v => v / dist), dist, 'solid'));
+    d.jam = [...jammerModels.values()].some(e => Math.hypot(d.p[0] - e.p[0], d.p[1] - e.p[1], d.p[2] - e.p[2]) < JAMMER.radius);
+  }
+}
+
+function droneCamera() {
+  const d = me.drone;
+  camera.position.set(d.p[0], d.p[1], d.p[2]);
+  camera.rotation.set(d.pitch, d.yaw, d.roll);
+}
+
+// The video feed's look: noise (more as the signal weakens), scan lines and a dark edge, and the pilot's readouts.
+let droneHud = null;
+function droneOverlay() {
+  if (droneHud) return droneHud;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d'), img = g.createImageData(128, 128);
+  for (let i = 0; i < 128 * 128; i++) { const v = Math.random() * 255; img.data.set([v, v, v, Math.random() < 0.55 ? 90 : 0], i * 4); }
+  g.putImageData(img, 0, 0);
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;display:none;font:bold 15px Consolas,monospace;color:#d8f0d0;text-shadow:0 0 3px #000';
+  const noise = document.createElement('div');
+  noise.style.cssText = `position:absolute;inset:0;background:url(${c.toDataURL()});image-rendering:pixelated;opacity:0.2`;
+  const tint = document.createElement('div');
+  tint.style.cssText = 'position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.16) 0 2px,transparent 2px 4px),radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.65) 100%)';
+  const tl = document.createElement('div');
+  tl.style.cssText = 'position:absolute;left:24px;bottom:150px';
+  const tr = document.createElement('div');
+  tr.style.cssText = 'position:absolute;right:24px;top:24px;text-align:right';
+  const mid = document.createElement('div');
+  mid.style.cssText = 'position:absolute;left:0;right:0;top:46%;text-align:center;font-size:28px;color:#ffd030;display:none';
+  const help = document.createElement('div');
+  help.style.cssText = 'position:absolute;left:0;right:0;bottom:120px;text-align:center;font-size:13px;opacity:0.85';
+  help.textContent = 'WASD fly · mouse steer · Space up · Ctrl down · Mouse1 drop the bomb · right mouse dive · E let go · land by yourself to pack it up';
+  el.append(noise, tint, tl, tr, mid, help);
+  document.body.appendChild(el);
+  return (droneHud = { el, noise, tl, tr, mid, at: 0 });
+}
+function updateDroneHud(now) {
+  const d = me.drone;
+  if (!d) return;
+  const o = droneOverlay();
+  o.el.style.display = '';
+  o.noise.style.backgroundPosition = `${(Math.random() * 128) | 0}px ${(Math.random() * 128) | 0}px`;
+  o.noise.style.opacity = d.jam ? 0.85 : (0.14 + (1 - d.sig) * 0.6).toFixed(2);
+  if (now - o.at < 100) return;
+  o.at = now;
+  const bars = d.jam ? 0 : Math.ceil(d.sig * 5), left = Math.max(0, (d.until - now) / 1000);
+  const ground = coll.raycast(d.p, [0, -1, 0], 60, 'move');
+  o.tl.innerHTML = `<span style="color:#ff4a3a">●</span> REC<br>SIG ${'▮'.repeat(bars)}${'▯'.repeat(5 - bars)}<br>BAT ${Math.round((left / DRONE.battery) * 100)}% (${Math.ceil(left)} s)`;
+  o.tr.innerHTML = `${d.bomb ? 'BOMB READY' : 'BOMB DROPPED'}<br>ALT ${ground ? ground.t.toFixed(1) : '--'} m${d.state === 'dive' ? '<br><span style="color:#ff4a3a">DIVE</span>' : ''}`;
+  o.mid.style.display = d.jam || d.sig < 0.25 || left < 6 ? '' : 'none';
+  o.mid.textContent = d.jam ? 'SIGNAL JAMMED' : d.sig < 0.25 ? 'WEAK SIGNAL — TURN BACK' : 'BATTERY LOW';
+}
+
+// Everyone's drones from the snapshot: drawn where they fly (a moment in the past, like the players), props
+// spinning, buzzing; your own isn't drawn while you fly it (you're its camera).
+const droneModels = new Map(); // id -> { obj, buf, owner, state, bomb }
+function onDroneSnapshot(list, time) {
+  const seen = new Set();
+  for (const [id, owner, x, y, z, yaw, state, bomb] of list || []) {
+    seen.add(id);
+    let e = droneModels.get(id);
+    if (!e) {
+      e = { obj: buildDrone(), buf: [] };
+      scene.add(e.obj);
+      droneModels.set(id, e);
+    }
+    Object.assign(e, { owner, state, bomb });
+    e.buf.push({ t: time, p: [x, y, z], yaw });
+    if (e.buf.length > 20) e.buf.shift();
+  }
+  for (const [id, e] of droneModels) if (!seen.has(id)) { scene.remove(e.obj); audio.buzz(id, null); droneModels.delete(id); }
+}
+function clearDroneModels() { onDroneSnapshot([], 0); }
+function updateDroneModels(dt, now) {
+  const rt = renderTime();
+  for (const [id, e] of droneModels) {
+    const own = e.owner === me.id && me.drone;
+    let p, yaw;
+    if (own) { p = me.drone.p; yaw = me.drone.yaw; } else {
+      const b = e.buf;
+      let a = b[0], n = b[b.length - 1], f = 0;
+      if (rt <= a.t) n = a;
+      else if (rt >= n.t) a = n;
+      else for (let i = b.length - 1; i > 0; i--) if (b[i - 1].t <= rt && rt <= b[i].t) { a = b[i - 1]; n = b[i]; f = (rt - a.t) / (n.t - a.t || 1); break; }
+      p = [lerp(a.p[0], n.p[0], f), lerp(a.p[1], n.p[1], f), lerp(a.p[2], n.p[2], f)];
+      yaw = a.yaw + angleDiff(a.yaw, n.yaw) * f;
+    }
+    e.obj.visible = !own;
+    e.obj.position.set(p[0], p[1], p[2]);
+    e.obj.rotation.set(e.state === 1 ? -0.5 : 0, yaw, e.state === 2 ? now * 0.01 : 0);
+    if (e.state !== 2) for (const pr of e.obj.userData.props) pr.rotation.y += dt * 90;
+    e.obj.userData.bomb.visible = !!e.bomb;
+    e.obj.userData.led.visible = Math.floor(now / 250) % 2 === 0;
+    audio.buzz(id, e.state === 2 ? null : p, e.state === 1);
+  }
+}
+
 function toggleCamo() {
   if (!me.camo) { hud.small('You do not own ghillie camouflage (buy menu -> Mines & camo).', 2); return; }
   me.camoOn = !me.camoOn;
@@ -1086,6 +1293,7 @@ function stopUse(src) {
 
 function die() {
   if (!me.alive) return;
+  if (me.drone) endDrone(null);
   if (me.emote) stopEmote();
   if (me.driving != null || me.riding) leaveCar(null);
   me.alive = false;
@@ -1155,7 +1363,7 @@ function cantBuy(id) {
   const i = itemInfo(id);
   if (!availableTo(id, me.team)) return `${i.team === 'CT' ? 'CT' : 'T'} only`;
   if (id === 'kit' && (game.mode !== 'bomb' || game.cfg.gameMode !== 'classic')) return 'Bomb maps only';
-  if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar' || id === 'jammer' || id === 'satchel')) return 'Not in Zombie';
+  if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar' || id === 'jammer' || id === 'satchel' || id === 'drone')) return 'Not in Zombie';
   return '';
 }
 
@@ -1940,6 +2148,11 @@ function takeScreenshot() {
 document.addEventListener('mousemove', e => {
   if (!locked || !me.alive) return;
   const k = 0.0022 * settings.sens * (camera.fov / BASE_FOV);
+  if (me.drone) {
+    me.drone.yaw = Math.atan2(Math.sin(me.drone.yaw - e.movementX * k), Math.cos(me.drone.yaw - e.movementX * k));
+    me.drone.pitch = clamp(me.drone.pitch - e.movementY * k, -1.45, 0.6);
+    return;
+  }
   if (me.driving != null) {
     me.camYaw -= e.movementX * k;
     me.camPitch = clamp(me.camPitch + e.movementY * k * (me.carCam === 'seat' ? -1 : 1), -0.8, 1.0);
@@ -1959,6 +2172,11 @@ document.addEventListener('mousedown', e => {
   if (mortarMap.open) {
     if (e.button === 0) pickMortarSpot();
     else if (e.button === 2) openMortarMap(false);
+    return;
+  }
+  if (me.drone && me.alive) {
+    if (e.button === 0) droneBomb();
+    else if (e.button === 2) droneDive();
     return;
   }
   if (e.button === 0) {
@@ -1987,7 +2205,7 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('dragstart', e => e.preventDefault());
 document.addEventListener('wheel', e => {
   if (e.ctrlKey) e.preventDefault();
-  if (locked && me.alive && !ui.chat && !mortarMap.open) cycleWeapon(e.deltaY > 0 ? 1 : -1);
+  if (locked && me.alive && !ui.chat && !mortarMap.open && !me.drone) cycleWeapon(e.deltaY > 0 ? 1 : -1);
 }, { passive: false });
 renderer.domElement.addEventListener('click', () => {
   if (!locked && me.joined && !sprayEditor.isOpen) enterGame();
@@ -2056,12 +2274,12 @@ document.addEventListener('keydown', e => {
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
-    case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'satchel', 'phone']); break;
+    case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': startReload(); break;
-    case 'KeyE': if (me.mortar) me.mortar = null; else if (me.alive) startUse('key'); break;
-    case 'KeyG': if (me.alive && !['knife', ...GRENADES, ...MINES, 'jammer', 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;
+    case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
+    case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
     case 'KeyO': openBuy(5); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;
@@ -2601,6 +2819,7 @@ const net = new Net({
     syncDrops(m.dr);
     syncBomb(m.b);
     onCarSnapshot(m.cars, m.time);
+    onDroneSnapshot(m.dn, m.time);
     syncHostages(m.hs, m.time);
   },
   shot(m) {
@@ -2672,6 +2891,22 @@ const net = new Net({
   jammers(m) {
     syncJammers(m.list);
   },
+  droneStart(m) {
+    if (!me.drone) return;
+    me.drone.id = m.id;
+    me.drone.until = performance.now() + m.left;
+    me.drone.bomb = !!m.bomb;
+  },
+  droneEnd(m) {
+    endDrone(m.why);
+  },
+  droneDown(m) {
+    // shot down, caught in a blast or fallen: sparks, bits and a crack
+    fx.sparks(m.p, [0, 1, 0]);
+    fx.debris(m.p.map(v => v - 0.2), m.p.map(v => v + 0.2), null, 6);
+    fx.puff(m.p, 0x3a3836, 0.8, 1, 0.6);
+    audio.play('dronedown', m.p);
+  },
   jamdown(m) {
     // shot to pieces: sparks, a crack and a puff of smoke
     fx.sparks(m.p, [0, 1, 0]);
@@ -2726,7 +2961,7 @@ const net = new Net({
   nade(m) {
     fx.nade(m.k, m.o, m.v, nadeFuse(m.k), p => audio.play('bounce', p));
     // 'Fire in the hole!' goes out on the thrower's team radio.
-    if (settings.radioVoice && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole');
+    if (settings.radioVoice && m.k !== 'dronebomb' && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole');
   },
   boom(m) {
     audio.muffled = !!map.realism && indoors(me.p) !== indoors(m.p);
@@ -2781,6 +3016,15 @@ const net = new Net({
       const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
       me.shake = Math.max(me.shake, clamp(1 - d / 25, 0, 1) * 1.0);
       if (me.alive && d < 10) shellShock(clamp(1.2 - d / 10, 0.3, 0.9));
+      return;
+    }
+    if (m.k === 'drone') {
+      fx.explosion(m.p, true);
+      blastMark(m.p, 0.8);
+      audio.play('rpgboom', m.p);
+      const d = Math.hypot(me.p[0] - m.p[0], me.p[1] - m.p[1], me.p[2] - m.p[2]);
+      me.shake = Math.max(me.shake, clamp(1 - d / 22, 0, 1) * 0.9);
+      if (me.alive && d < 9) shellShock(clamp(1.2 - d / 9, 0.3, 0.9));
       return;
     }
     if (m.k === 'car') {
@@ -2901,6 +3145,7 @@ const net = new Net({
 
 function updateLocal(dt, now) {
   if (!me.alive) return;
+  if (me.drone) { updateDroneFlight(dt, now); return; }
   if (me.driving != null && me.car) { updateDriving(dt, now); return; }
   if (me.riding) {
     updateRiding();
@@ -3072,6 +3317,10 @@ function updateCamera(dt, now) {
   if (killcam) {
     killcamCamera();
     hud.spectating(null);
+  } else if (me.alive && me.drone) {
+    droneCamera();
+    fov = 95;
+    hud.spectating(null);
   } else if (me.alive && me.driving != null && me.car) {
     carCamera();
     hud.spectating(null);
@@ -3134,7 +3383,7 @@ function updateCamera(dt, now) {
 
 function updateViewModel(dt, now) {
   if (!vm) return;
-  vm.visible = me.alive && me.driving == null && !(me.scope && WEAPONS[current()].sniper);
+  vm.visible = me.alive && me.driving == null && !me.drone && !(me.scope && WEAPONS[current()].sniper);
   // (dimmer on a night map outdoors, map.theme.viewmodel; lit by a room's glow indoors)
   const amb = ambientAt(camera.position), k = map.theme.viewmodel ?? 1, glow = glowAt(camera.position);
   vmHemi.intensity = 2.2 * Math.max(0.12, amb) * Math.max(k, Math.min(1, glow * 0.7));
@@ -3319,6 +3568,7 @@ function sendState(now) {
   const r3 = v => Math.round(v * 1000) / 1000;
   const yaw = me.car ? me.car.yaw + me.camYaw : me.yaw;
   if (me.riding) me.crouch = !me.riding.gunner;
+  if (me.drone) me.crouch = true;
   net.send({ t: 'state', sq: me.spawnSeq, p: me.p.map(r3), yaw: r3(yaw), pitch: r3(me.car ? 0 : me.pitch), c: me.crouch ? 1 : 0, w: current(), fl: me.flashlight ? 1 : 0, mo: me.mortar ? Math.round(me.mortar.elev) : 0 });
 }
 
@@ -3622,6 +3872,8 @@ function frame() {
   updateJammers(now);
   updateSatchelModels(now);
   updateSatchelFlights(now);
+  updateDroneModels(dt, now);
+  updateDroneHud(now);
   updateFires(dt, now);
   updateZombieGrowls(now);
   fx.update(dt, camera);

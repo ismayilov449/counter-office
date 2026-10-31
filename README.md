@@ -256,7 +256,7 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   "game commencing" after 3 s and 3 s freeze time per round.
 - **Weapons:** Glock, USP, P228, Desert Eagle, Five-SeveN, Dual Berettas, M3, XM1014, MAC-10, TMP,
   MP5, UMP45, P90, Galil, FAMAS, AK-47, M4A1, Scout, SG 552, AUG, AWP, the semi-automatic snipers
-  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 (CT only, $6000), RPG-26 (T only, $3500), 82-BM-37 mortar ($6000); HE, flashbang and smoke
+  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 (CT only, $6000), RPG-26 (T only, $3500), 82-BM-37 mortar ($6000), FPV drone (T only, $5500); HE, flashbang and smoke
   grenades, Molotov; Kevlar, helmet, defuse kit, nightvision.
 - **RPG-7** (buy menu → Heavy, CTs only, $6000; a Terrorist can pick it up from a dead CT): the rocket flies to
   the first wall, car or person and explodes for up to 500 damage within 9 m — but only to people who can see the
@@ -322,6 +322,21 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   goes off) or hold **E** next to it to defuse it (3 s, 1.5 s with a kit, +$200); an explosion nearby sets it off too.
   If its owner dies it stays (and can still be defused), but nobody can set it off. Up to 2 out at once; cleared every
   round. Bots don't use it.
+- **FPV drone** (buy menu → 5 Heavy, Terrorists only, $5500; one per team each round — in warmup and Deathmatch one in
+  anyone's hands at a time; not in Zombie mode). Press **6** to take out its remote (with the mines) and **Mouse1** to
+  launch it. You crouch where you are with the remote — you can't move or shoot, and everyone can see you — and fly it
+  through its camera: a grainy video with a signal bar, the battery left and the height.
+  - **W A S D** fly, the **mouse** steers (and looks up and down), **Space** climbs, **Ctrl** descends.
+  - **Mouse1** drops its bomb: it falls straight down and goes off where it lands, an HE grenade's blast. **Right mouse**
+    dives (kamikaze): it races along where you look and blows up on whatever it hits, stronger than an HE (up to 140
+    damage within 7 m, walls protect; it breaks the mansion's walls and wrecks cars). **E** lets go: it falls and breaks.
+  - Land it within 4 m of yourself to put it back in your bag (with the battery it has left, and its bomb if it still has
+    it); landed anywhere else, it's lost.
+  - The battery lasts 40 seconds. The signal weakens beyond 60 m and is lost at 80 m, and a wall between you and the drone
+    counts the distance half as much again. A signal jammer brings it down — any jammer, the Terrorists' own too. Out of
+    signal or battery, it falls.
+  - One bullet brings it down (so does a blast nearby), and it buzzes loudly, so it's heard coming.
+  - What its camera sees counts for your team's radar red dots. Bots don't use it.
 - **Ghillie camo** (buy menu → 7 Mines & camo, $1000): press **H** to switch it on and off. While it's on, enemies see only a faint
   shimmer of you (bots can't make you out beyond 4 m); each shot shows you for 1.5 seconds. Teammates always see you.
   Lost when you die.

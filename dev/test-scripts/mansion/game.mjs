@@ -27,7 +27,7 @@ export async function open(team = 'T', name = 'Tester', keep = ['msg', 'doors', 
   const shot = async n => { const r = await cmd('Page.captureScreenshot', { format: 'png' }); const f = OUT + '/' + n; fs.writeFileSync(f, Buffer.from(r.result.data, 'base64')); return f; };
   await cmd('Runtime.enable'); await cmd('Page.enable');
   await cmd('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
-  await cmd('Page.addScriptToEvaluateOnNewDocument', { source: `
+  await cmd('Page.addScriptToEvaluateOnNewDocument', { source: `if (!window.__wired) { window.__wired = true;
     const ael = EventTarget.prototype.addEventListener;
     EventTarget.prototype.addEventListener = function (k, ...a) { if (k !== 'beforeunload') return ael.call(this, k, ...a); };
     window.__in = []; window.__keep = ${JSON.stringify(keep)}; window.__sq = 0;
@@ -36,7 +36,7 @@ export async function open(team = 'T', name = 'Tester', keep = ['msg', 'doors', 
     const desc = Object.getOwnPropertyDescriptor(WebSocket.prototype, 'onmessage');
     Object.defineProperty(WebSocket.prototype, 'onmessage', { configurable: true, get() { return desc.get.call(this); },
       set(fn) { window.__onmsg = fn; desc.set.call(this, e => { try { const m = JSON.parse(e.data); if (m.t === 'spawn') __sq = m.sq; if (__keep.includes(m.t)) __in.push(m); } catch {} fn(e); }); } });
-  ` });
+  } window.__keep = ${JSON.stringify(keep)};` }); // (opening again in the same tab adds this again: only the first wires things up)
   await cmd('Page.navigate', { url: `http://localhost:${GAME}/?nocache=${Date.now()}` });
   for (let i = 0; i < 80; i++) { await sleep(500); if (/Connected/.test(await ev("document.getElementById('conn-status')?.textContent") || '')) break; }
   await ev(`document.getElementById('name').value = '${name}'; document.querySelector('#join .team-btn[data-team="${team}"]').click(); 'ok'`);

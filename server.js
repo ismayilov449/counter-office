@@ -11,7 +11,7 @@ import zlib from 'node:zlib';
 import { spawn } from 'node:child_process';
 import { WebSocketServer } from 'ws';
 import { MAPS, MAP_IDS, DEFAULT_MAP, siteAt, inBuyZone, inRescueZone, mapMode } from './shared/maps/index.js';
-import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, JAMMER, BREAK, BLAST_FIRE, REAL, SATCHEL } from './shared/weapons.js';
+import { WEAPONS, ITEMS, GRENADES, FIRE, GUNGAME, defaultPistol, slotKey, ammoCost, shellFlight, mortarRange, MILS, MINES, MINE, CAMO, PING, JAMMER, BREAK, BLAST_FIRE, REAL, SATCHEL, DRONE, droneSignal } from './shared/weapons.js';
 import { RADIO } from './shared/radio.js';
 import { PLAYER, NADE, rayAABB, rayPlayer, simulateNade, overlapsAny, inWater } from './shared/physics.js';
 // Zombie mode: zombie health, the first ("mother") zombies' health, seconds until the infection, respawn delay.
@@ -285,6 +285,7 @@ const game = {
   fires: [],
   mines: [],
   jammers: [],
+  drones: [],
   nextMineId: 1,
   satchels: [],
   endVote: null,
@@ -314,7 +315,7 @@ function broadcast(msg, filter) {
 const notify = (text, big = false, filter) => broadcast({ t: 'msg', text, big }, filter);
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
-const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, c4: false });
+const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
 const ownItem = (p, w) => (p.inv.primary?.id === w ? p.inv.primary : p.inv.secondary?.id === w ? p.inv.secondary : null);
 
 function addMoney(p, amount) {
@@ -397,6 +398,7 @@ function randomSpot(p) {
 
 function spawnPlayer(p) {
   p.burnUntil = 0;
+  p.piloting = null;
   p.buys = []; // what can be sold back (onSell): this life's purchases
   // Zombie mode: humans spread over both spawn areas, zombies come back at the T spawn.
   const spots = (isZM() && p.team === 'CT' ? [...MAP.spawns.CT, ...MAP.spawns.T] : MAP.spawns[p.team]).slice().sort(() => Math.random() - 0.5);
@@ -770,6 +772,7 @@ function explodeCar(c, attacker) {
     if (d < R) hurtHostage(h, attacker, 130 * (1 - d / R), 'car');
   }
   blastJammers(center, 6);
+  blastDrones(center, 6);
   // Chain reaction
   for (const o of world.cars) {
     if (o === c || o.wrecked) continue;
@@ -1637,7 +1640,7 @@ function openMatchEnd(winner, extra = {}) {
 // tears off the part it hit, a Scout or Desert Eagle does it with a headshot.
 function gibOf(weapon, hs, how) {
   if (!how) return null;
-  if (how.part === 'he' && ['rpg', 'rpg26', 'mortar', 'he', 'c4', 'car', 'mon50', 'satchel'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
+  if (how.part === 'he' && ['rpg', 'rpg26', 'mortar', 'he', 'c4', 'car', 'mon50', 'satchel', 'drone'].includes(weapon)) return { k: 'blast', from: how.from.map(r2) };
   if (weapon === 'pmn' && how.part === 'legs') return { k: 'shot', part: 'legs', from: how.from.map(r2) };
   if (['awp', 'm249'].includes(weapon) || (hs && ['scout', 'deagle'].includes(weapon))) return { k: 'shot', part: how.part, from: how.from.map(r2) };
   return null;
@@ -1843,6 +1846,7 @@ function explodeBomb() {
   }
   chainMines(pos, 15);
   blastJammers(pos, 15);
+  blastDrones(pos, 15);
 }
 
 function updateActions(t) {
@@ -1902,6 +1906,7 @@ function updateActions(t) {
 
 function onUse(p, m, t) {
   if (!m.on) { p.act = null; return; }
+  if (p.piloting != null) { const d = game.drones.find(x => x.id === p.piloting); if (d) loseDrone(d, 'released'); else p.piloting = null; return; }
   if (!p.alive || p.act) return;
   if (p.driving != null || p.riding != null) { exitCar(p); return; }
   if (game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p)) {
@@ -1991,7 +1996,7 @@ function rewind(q, rt) {
 
 function onShoot(p, m) {
   const t = now();
-  if (!p.alive || game.phase === 'freeze') return;
+  if (!p.alive || game.phase === 'freeze' || p.piloting != null) return;
   p.protectUntil = 0;
   const w = m.w, def = WEAPONS[w];
   if (!def || def.grenade || def.mortar || w === 'c4') return; // (the mortar fires with a 'mortar' message)
@@ -2033,7 +2038,7 @@ function onShoot(p, m) {
   const traces = [];
   const hits = [];
   const ownCar = carOf(p)?.id ?? null;
-  const shattered = [], chipped = [], jamHits = [], shotSatchels = [];
+  const shattered = [], chipped = [], jamHits = [], shotSatchels = [], shotDrones = [];
   for (const d of dirs) {
     const wall = world.raycast(o, d, range, 'bullet', ownCar);
     const wallT = wall ? wall.t : range;
@@ -2080,6 +2085,10 @@ function onShoot(p, m) {
     else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
     if (!def.melee) for (const s of game.satchels) if (!shotSatchels.includes(s) && raySatchel(o, d, s, endT + 0.1)) shotSatchels.push(s);
+    for (const dr of game.drones) {
+      if (shotDrones.includes(dr) || (!CFG.friendlyFire && mates(p, dr) && dr.owner !== p.id)) continue;
+      if (rayAABB(o, d, dr.p.map(v => v - DRONE.hit), dr.p.map(v => v + DRONE.hit), endT + 0.1)) shotDrones.push(dr);
+    }
     for (const g of world.intactGlass) {
       const gh = rayAABB(o, d, g.min, g.max, endT);
       if (gh) shattered.push(g.id);
@@ -2089,6 +2098,7 @@ function onShoot(p, m) {
   for (const j of jamHits) if (--j.hp <= 0) destroyJammer(j, p);
   breakPieces(chipped);
   for (const s of shotSatchels) explodeSatchel(s);
+  for (const dr of shotDrones) downDrone(dr, p);
 
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
   if (!hits.length) return;
@@ -2161,6 +2171,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
     applyDamage(q, owner, def.damage * (1 - d / R), 'he', weapon, def.pen, null, at);
   }
   blastJammers(at, Math.max(JAMMER.blast, R * 0.6));
+  blastDrones(at, Math.max(DRONE.blast, R * 0.6));
   for (const h of game.hostages) {
     if (h.state === 'dead' || h.state === 'rescued') continue;
     const chest = [h.p[0], h.p[1] + 1.1, h.p[2]];
@@ -2240,6 +2251,7 @@ function sendMines(to = null) {
 function clearMines() {
   clearJammers();
   clearSatchels();
+  clearDrones();
   if (!game.mines?.length) return;
   game.mines = [];
   sendMines();
@@ -2324,6 +2336,7 @@ function detonateMine(mine, stepper = null) {
   }
   chainMines(at, MINE.chain);
   blastJammers(at, 3);
+  blastDrones(at, 3);
 }
 
 // Mines near an explosion go off too (a moment later, one after another).
@@ -2498,6 +2511,160 @@ function blastJammers(at, r) {
   for (const j of [...game.jammers]) if (dist3(j.p, at) < r && lineOfSight(at, [j.p[0], j.p[1] + 0.3, j.p[2]])) destroyJammer(j, null);
 }
 
+// ---- FPV drone (Terrorists; see DRONE in shared/weapons.js). Launched with Mouse1, it's flown by its pilot's browser
+// (which sends where it is, like a car's driver) while the pilot crouches with the remote and can't move or shoot.
+// The server keeps the list, checks the battery, the signal (distance from the pilot, walls in between) and jammers,
+// takes the bomb drop and the kamikaze dive's impact, shoots it down, and lets it fall when control is lost. Its
+// camera spots enemies for the team's radar (see updateSpotting). Everyone sees it (the 'dn' part of the snapshot)
+// and hears it buzz.
+function onDrone(p, m, t) {
+  const d = game.drones.find(x => x.owner === p.id && (x.state === 'fly' || x.state === 'dive'));
+  if (m.launch) {
+    const pos = vec3(m.p);
+    if (!pos || !p.alive || !(p.inv.drone > 0) || d || game.phase === 'freeze' || game.phase === 'end' || dist3(pos, eyeOf(p)) > 1.5) return send(p, { t: 'droneEnd', why: 'nolaunch' });
+    p.inv.drone--;
+    const left = p.droneLeft ?? DRONE.battery * 1000;
+    const nd = { id: game.nextMineId++, owner: p.id, team: p.team, p: pos, yaw: isNum(m.yaw) ? m.yaw : p.yaw, pitch: 0, state: 'fly', bomb: p.droneBomb ?? true, until: t + left, at: t, vy: 0 };
+    p.droneLeft = null; p.droneBomb = null;
+    game.drones.push(nd);
+    p.piloting = nd.id;
+    p.act = null;
+    send(p, { t: 'droneStart', id: nd.id, left, bomb: nd.bomb });
+    sendMe(p);
+    return;
+  }
+  if (!d) return;
+  if (m.p) {
+    // where the pilot's browser flew it: believed up to a sane speed
+    const pos = vec3(m.p);
+    if (!pos) return;
+    const dt = Math.max(0.03, (t - d.at) / 1000);
+    if (dist3(pos, d.p) > (d.state === 'dive' ? DRONE.dive * 1.5 : 20) * dt + 1) return;
+    d.p = pos;
+    d.at = t;
+    if (isNum(m.yaw)) d.yaw = m.yaw;
+    if (isNum(m.pitch)) d.pitch = Math.max(-1.5, Math.min(1.5, m.pitch));
+  }
+  if (m.drop && d.bomb && d.state === 'fly') dropDroneBomb(d, p);
+  if (m.dive && d.state === 'fly') { d.state = 'dive'; broadcast({ t: 'sfx', s: 'dronedive', p: d.p }); }
+  if (m.boom && d.state === 'dive') {
+    const at = vec3(m.boom);
+    explodeDrone(d, at && dist3(at, d.p) < 6 ? at : d.p);
+  }
+  if (m.release) loseDrone(d, 'released');
+  if (m.land && d.state === 'fly') {
+    // landed: back in the bag if it's by the pilot, otherwise lost
+    removeDrone(d);
+    if (dist3(d.p, p.p) < DRONE.pickup) {
+      p.inv.drone = 1;
+      p.droneLeft = Math.max(0, d.until - t);
+      p.droneBomb = d.bomb;
+      endPiloting(p, 'recovered');
+    } else endPiloting(p, 'landed');
+    sendMe(p);
+  }
+}
+
+function removeDrone(d) {
+  const i = game.drones.indexOf(d);
+  if (i >= 0) game.drones.splice(i, 1);
+}
+
+function endPiloting(p, why) {
+  if (!p || p.piloting == null) return;
+  p.piloting = null;
+  send(p, { t: 'droneEnd', why });
+}
+
+// Control lost (the battery, the signal, a jammer, the pilot let go or died): it drops out of the air.
+function loseDrone(d, why) {
+  if (d.state === 'fall') return;
+  d.state = 'fall';
+  d.vy = 0;
+  endPiloting(players.get(d.owner), why);
+}
+
+// Shot down, or caught in a blast: it falls in pieces (it doesn't go off).
+function downDrone(d, by, why = 'shot') {
+  removeDrone(d);
+  endPiloting(players.get(d.owner), why);
+  broadcast({ t: 'droneDown', p: d.p.map(r2) });
+  if (by && by.id !== d.owner) send(by, { t: 'msg', text: 'Drone shot down.' });
+}
+
+function blastDrones(at, r) {
+  for (const d of [...game.drones]) if (dist3(d.p, at) < r && lineOfSight(at, d.p)) downDrone(d, null, 'blast');
+}
+
+// The bomb: dropped straight down (with the drone's way), it goes off where it lands — an HE grenade's blast.
+function dropDroneBomb(d, p) {
+  d.bomb = false;
+  const o = [d.p[0], d.p[1] - 0.2, d.p[2]], v = [0, -1, 0];
+  const path = [], end = simulateNade(world.nade(), o, v, WEAPONS.dronebomb.fuse, path, true);
+  const id = game.nextNadeId++;
+  game.nades.push({ id, k: 'he', owner: p.id, at: now() + path.length * NADE.dt * 1000, end });
+  broadcast({ t: 'nade', id, k: 'dronebomb', o, v, owner: p.id });
+}
+
+// The kamikaze dive hits something: a blast stronger than an HE's.
+function explodeDrone(d, at) {
+  removeDrone(d);
+  const owner = players.get(d.owner) || null, R = DRONE.radius;
+  endPiloting(owner, 'exploded');
+  broadcast({ t: 'boom', p: at.map(r2), k: 'drone' });
+  blastMap(at, 'drone');
+  if (!MAP.realism) (MAP.doors || []).forEach((dr, k) => { if (doorReach(dr, at) < REAL.door.drone) blowDoor(k); });
+  breakGlass(world.intactGlass.filter(g => dist3(at, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < 5).map(g => g.id));
+  for (const q of players.values()) {
+    if (!q.alive || !inTeam(q)) continue;
+    if (owner && q !== owner && mates(q, owner) && !CFG.friendlyFire) continue;
+    const chest = [q.p[0], q.p[1] + 1.1, q.p[2]], dd = dist3(at, chest);
+    if (dd > R || !lineOfSight(at, chest)) continue;
+    applyDamage(q, owner, DRONE.damage * (1 - dd / R), 'he', 'drone', 1, null, at);
+  }
+  for (const h of game.hostages) {
+    if (h.state === 'dead' || h.state === 'rescued') continue;
+    const chest = [h.p[0], h.p[1] + 1.1, h.p[2]], dd = dist3(at, chest);
+    if (dd < R && lineOfSight(at, chest)) hurtHostage(h, owner, DRONE.damage * (1 - dd / R), 'drone');
+  }
+  for (const c of world.cars) {
+    const dd = dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
+    if (dd < R * 0.7) damageCar(c, DRONE.car * (1 - dd / (R * 0.7)), owner);
+  }
+  chainMines(at, MINE.chain);
+  blastJammers(at, JAMMER.blast);
+  blastDrones(at, DRONE.blast * 1.5);
+}
+
+// Every tick: the battery, the signal, jammers, a pilot who died or left; falling drones fall and break.
+function updateDrones(t) {
+  for (const d of [...game.drones]) {
+    const pilot = players.get(d.owner);
+    if (d.state === 'fall') {
+      const dt = Math.min(0.1, (t - d.at) / 1000);
+      d.at = t;
+      d.vy -= 20 * dt;
+      const h = world.raycast(d.p, [0, -1, 0], -d.vy * dt + 0.2, 'move');
+      if (h) { removeDrone(d); broadcast({ t: 'droneDown', p: [r2(d.p[0]), r2(d.p[1] - h.t + 0.1), r2(d.p[2])] }); continue; }
+      d.p[1] += d.vy * dt;
+      if (d.p[1] < -60) removeDrone(d);
+      continue;
+    }
+    if (!pilot || !pilot.alive || pilot.piloting !== d.id) { loseDrone(d, 'pilot'); continue; }
+    if (t >= d.until) { loseDrone(d, 'battery'); continue; }
+    if (jammedAt(d.p)) { loseDrone(d, 'jammer'); continue; }
+    const eye = eyeOf(pilot);
+    if (droneSignal(dist3(eye, d.p), !lineOfSight(eye, d.p)) <= 0) { loseDrone(d, 'signal'); continue; }
+    if (t - d.at > 3000) loseDrone(d, 'signal'); // (nothing heard from the pilot's browser)
+  }
+}
+
+function clearDrones() {
+  for (const d of game.drones) endPiloting(players.get(d.owner), 'round');
+  game.drones = [];
+  for (const p of players.values()) { p.piloting = null; p.droneLeft = null; p.droneBomb = null; }
+}
+
 // Ghillie camouflage: switched on (H), you're hidden from enemies, except for a moment after each shot (see CAMO).
 function updateCamo(t) {
   for (const p of players.values()) p.hidden = !!(p.camo && p.camoOn && p.alive && t - (p.lastShot || 0) >= CAMO.still * 1000);
@@ -2547,6 +2714,14 @@ function updateSpotting(t) {
         if (spots(eyeOf(v), v.yaw, e, t)) (e.spotAt ||= {})[v.team] = t;
       }
     }
+    // what a flying drone's camera sees counts for its team too
+    for (const d of game.drones) {
+      if (d.state === 'fall') continue;
+      for (const e of list) {
+        if (e.team === d.team || (d.id * 7 + e.id + spotTick) % SPOT.every) continue;
+        if (spots(d.p, d.yaw, e, t, DRONE.fov)) (e.spotAt ||= {})[d.team] = t;
+      }
+    }
     for (const e of list) {
       const team = other(e.team);
       if (t - (e.spotAt?.[team] ?? -1e9) < SPOT.keep) seen[team].push([e.id, r2(e.p[0]), r2(e.p[2])]);
@@ -2568,7 +2743,7 @@ function onPing(p, m) {
 
 function onNade(p, m) {
   const k = GRENADES.includes(m.k) ? m.k : 'he';
-  if (!p.alive || p.inv[k] <= 0 || game.phase === 'freeze') return;
+  if (!p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || p.piloting != null) return;
   const o = vec3(m.o), v = vec3(m.v);
   if (!o || !v || Math.hypot(...v) > 30 || dist3(o, eyeOf(p)) > 2.5) return;
   p.inv[k]--;
@@ -2646,7 +2821,7 @@ function explodeNade(n) {
     if (d > 9 || !lineOfSight(o, chest)) continue;
     applyDamage(q, owner, 100 * (1 - d / 9), 'he', 'he', WEAPONS.he.pen, null, o);
   }
-  if (n.k === 'he') { chainMines(o, MINE.chain); blastJammers(o, JAMMER.blast); }
+  if (n.k === 'he') { chainMines(o, MINE.chain); blastJammers(o, JAMMER.blast); blastDrones(o, DRONE.blast); }
   if (n.k === 'he') {
     for (const c of world.cars) {
       const d = dist3(o, [c.p[0], c.p[1] + 0.7, c.p[2]]);
@@ -2868,7 +3043,7 @@ function onBuy(p, id) {
   const def = wdef || idef;
   if (!def || def.price == null) return;
   if (def.team && def.team !== p.team) return fail('Your team cannot buy that.');
-  if ((MINES.includes(id) || id === 'camo' || id === 'jammer' || id === 'satchel') && isZM()) return fail('Not in Zombie mode.');
+  if ((MINES.includes(id) || id === 'camo' || id === 'jammer' || id === 'satchel' || id === 'drone') && isZM()) return fail('Not in Zombie mode.');
   if (id === 'jammer' && (game.jamUsed?.[p.team] || [...players.values()].some(q => q !== p && q.team === p.team && q.inv.jammer > 0))) {
     return fail('Your team already has its signal jammer this round.');
   }
@@ -2878,10 +3053,11 @@ function onBuy(p, id) {
     const holder = [...players.values()].find(q => q !== p && (isDM() || q.team === p.team) && q.inv.primary?.id === 'mortar');
     if (holder) return fail(isDM() ? `${holder.name} already has the mortar.` : `Your team already has a mortar (${holder.name}).`);
   }
-  // The RPG-26: one per team each round (in Deathmatch and warmup, one in anyone's hands at a time).
+  // The RPG-26 and the drone: one per team each round (in Deathmatch and warmup, one in anyone's hands at a time).
   if (wdef?.perTeam) {
     const free = isDM() || game.phase === 'warmup';
-    if (free ? [...players.values()].some(q => q.inv.primary?.id === id) : teamBought(p.team, id) >= wdef.perTeam) return fail(free ? `Somebody already has the ${wdef.name}.` : `Your team has already bought the ${wdef.name} this round.`);
+    const has = q => q.inv.primary?.id === id || q.inv[id] > 0 || (id === 'drone' && game.drones.some(d => d.owner === q.id && d.state !== 'fall'));
+    if (free ? [...players.values()].some(has) : teamBought(p.team, id) >= wdef.perTeam) return fail(free ? `Somebody already has the ${wdef.name}.` : `Your team has already bought the ${wdef.name} this round.`);
   }
   let price = def.price;
 
@@ -3166,6 +3342,7 @@ function handle(p, m) {
         if (p.reloadUntil && m.w !== p.reloadWeapon) p.reloadUntil = 0;
         p.w = m.w;
       }
+      if (p.piloting != null) { p.c = 1; p.w = 'drone'; } // (a drone's pilot crouches with the remote)
       p.history.push({ t, p: pos, c: p.c });
       while (p.history.length && p.history[0].t < t - 1000) p.history.shift();
       break;
@@ -3207,6 +3384,9 @@ function handle(p, m) {
       break;
     case 'buy':
       onBuy(p, m.item);
+      break;
+    case 'drone':
+      onDrone(p, m, t);
       break;
     case 'sell':
       onSell(p, m.item);
@@ -3403,6 +3583,7 @@ function tick() {
   updatePickups();
   updateMines(t);
   updateSatchels();
+  if (game.drones.length) updateDrones(t);
   updateCamo(t);
   updateSpotting(t);
   // the time that really passed since the last tick: on Windows the timer fires every 31 or 47 ms rather than 33,
@@ -3436,6 +3617,8 @@ function tick() {
     tl: game.phase === 'warmup' || (isGG() && game.phase === 'live') ? -1 : Math.max(0, (game.phaseEnd - t) / 1000),
     el: Math.max(0, (t - game.roundStartAt) / 1000),
     pl,
+    // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb]
+    ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0]) } : {}),
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

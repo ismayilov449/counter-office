@@ -632,6 +632,47 @@ export function buildPlacedSatchel() {
   return out;
 }
 
+// The FPV drone's remote: a grey two-stick controller with a small screen and an antenna, held in both hands.
+function droneRemote(gun, P) {
+  const m = X();
+  P.box(0.17, 0.035, 0.1, m.flashgrey, 0, 0, -0.06);                                           // body
+  for (const x of [-0.07, 0.07]) P.box(0.04, 0.03, 0.06, m.flashgrey, x, -0.01, -0.01);          // grips
+  P.box(0.07, 0.004, 0.045, new THREE.MeshBasicMaterial({ color: 0x5a8ab0 }), 0, 0.019, -0.07);  // screen
+  for (const x of [-0.05, 0.05]) P.cyl(0.006, 0.025, m.dark, x, 0.03, -0.04, 0, 0, 0, 6);        // sticks
+  P.cyl(0.004, 0.12, m.dark, 0.07, 0.07, -0.1, 0.4, 0, 0, 5);                                     // antenna
+  return [0, 0.02, -0.12];
+}
+
+// The FPV drone itself: a carbon-black frame, four arms with motors and two-blade propellers (userData.props spin),
+// a camera on the front, a red light (userData.led) and its bomb hanging underneath (userData.bomb). Facing -z.
+export function buildDrone() {
+  const g = new THREE.Group(), P = new Parts(), m = X();
+  P.box(0.14, 0.05, 0.2, m.dark, 0, 0, 0);                                                        // body
+  P.box(0.06, 0.04, 0.05, m.metal, 0, 0.005, -0.12);                                              // camera
+  P.cyl(0.014, 0.01, m.glass, 0, 0.005, -0.15);                                                   // its lens
+  const arms = [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([x, z]) => [x * 0.17, z * 0.17]);
+  for (const [x, z] of arms) {
+    P.box(0.025, 0.018, 0.24, m.dark, x / 2, 0, z / 2, 0, Math.atan2(x, z), 0);                  // arm
+    P.cyl(0.022, 0.035, m.metal, x, 0.02, z, 0, 0, 0, 10);                                       // motor
+  }
+  P.build(g);
+  g.userData.props = arms.map(([x, z]) => {
+    const prop = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.004, 0.018), m.poly);
+    prop.position.set(x, 0.042, z);
+    g.add(prop);
+    return prop;
+  });
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2a1a }));
+  led.position.set(0, 0.03, 0.1);
+  g.add(led);
+  g.userData.led = led;
+  const bomb = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.1, 10), m.hegreen);
+  bomb.position.set(0, -0.06, 0);
+  g.add(bomb);
+  g.userData.bomb = bomb;
+  return g;
+}
+
 // PKT: long heavy barrel, box receiver, ammo can on the side, spade grips at the back.
 function pkt(gun, P) {
   const m = X();
@@ -688,6 +729,7 @@ const BUILD = {
   phone: (g, P) => phone(g, P),
   mon50: (g, P) => mon50Mine(g, P),
   jammer: (g, P) => jammerHeld(g, P),
+  drone: (g, P) => droneRemote(g, P),
   pkt: (g, P) => pkt(g, P),
   sg550: (g, P) => autoSniper(g, P, {}),
   m249: (g, P) => mg(g, P),

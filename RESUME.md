@@ -1,4 +1,4 @@
-# RESUME POINT — Counter-Office feature plan (stopped 2026-10-30, continued 2026-10-31 on the new PC)
+# RESUME POINT — Counter-Office feature plan (stopped 2026-10-30, finished 2026-10-31 on the new PC)
 
 **To continue:** check out branch `resume/2026-10-30` and tell Claude Code:
 *"Read RESUME.md and continue the plan from the resume point."*
@@ -9,7 +9,7 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 
 ---
 
-## 1. Where things stand (14 of 15 steps done)
+## 1. Where things stand (all 15 steps done)
 
 | # | Step | Status | Commit(s) |
 |---|------|--------|-----------|
@@ -26,14 +26,14 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 | 11 | Mansion: garage | ✅ done | `f56ff90` (test scripts fixed in `07c7d96`) |
 | 12 | Mansion: neighbour's house | ✅ done | `eb58669` |
 | 13 | Mansion: back garden | ✅ done | `6f11419` |
-| 14 | Mansion at night | ✅ done | see `git log` ("Mansion at night ...") |
-| 15 | FPV drone (T) | ⬜ not started (do it last) | |
+| 14 | Mansion at night | ✅ done | `f5592d0` |
+| 15 | FPV drone (T) | ✅ done | see `git log` ("FPV drone ...") |
 
 Merge commits on this branch: `5d335cd` (feature/mansion) and `34e90ed` (feature/t-weapons; the jammer/satchel
 conflicts were resolved by keeping both).
 
-**Nothing is half-done.** Every step is committed and pushed when it's finished, so there are no WIP commits. The next job is
-the first step in the table that isn't done.
+**Nothing is half-done.** Every step was committed and pushed when it was finished. The plan is complete; what's left is
+in "Known problems to watch" and the "Not verified" lines below.
 
 ### Post-merge check (on the old laptop, Mansion, headless Edge)
 The merged build starts, and Mansion loads. A Terrorist bought the jammer, satchel and RPG-26 together ($16,000 → $10,500),
@@ -219,7 +219,9 @@ firing the RPG-26. Both work.
   night map's fuse-box groups: the blackout puts them out (their glows hide, their heads' shared material turns grey).
 - **Lit rooms:** roomlight.js got `setGlow(k, groups)`: on a night map a room whose lights are on (and whose group has a
   switch) adds a warm light of strength k everywhere in it. It's encoded in the room's existing ambient value (2 + k), so
-  the per-pixel room loop is unchanged — a second uniform array in that loop cost ~8–10% of a frame on swiftshader.
+  the per-pixel room loop is unchanged — a second uniform array in that loop cost ~8–10% of a frame on swiftshader. The
+  few extra instructions after the loop are in every map's shaders: the day maps measured +1…+5% on swiftshader
+  (alternating runs; on a real GPU it should be far less).
   Window glass of lit rooms gets the theme's `litGlass` colour. The first-person weapon's lights scale with
   `viewmodel` outdoors and with the room's glow indoors.
 - **Night skyline:** `skyline` decor with `night` lights more windows, brighter, and ignores the fog.
@@ -228,6 +230,34 @@ firing the RPG-26. Both work.
 - **Frame cost** (night vs day, same build, swiftshader, `vcost.json`): draw calls +7…+26 per view, triangles +0.2k…+0.9k,
   frame time +0…+10% (the most in views with many lamps and the sky in them).
 - **Not verified:** how dark it feels on the players' screens (the headless renderer's colours are close, but not the same).
+
+### 15. FPV drone
+- **Shared:** `WEAPONS.drone` (slot 6, `device`, T, $5500, `perTeam: 1`; Heavy column of the buy menu), `WEAPONS.dronebomb`
+  (the bomb in the air: an impact "grenade" for the browsers' flight; the server explodes it as an HE), `DRONE` and
+  `droneSignal(dist, blocked)` (used by both sides), and `drone` entries in BREAK/REAL.
+- **Server** (`onDrone`, `updateDrones`, …, after the jammer's code): launch (checks it's by the pilot's eyes), position
+  updates from the pilot's browser (believed up to a sane speed), the bomb (`dropDroneBomb`: `simulateNade` with impact,
+  an HE `nade`), the dive's impact (`explodeDrone`: like the satchel's blast), letting go (E, also as the 'use' message),
+  landing (recovered within 4 m of the pilot, else lost); every tick the battery, `jammedAt`, the signal and a dead or
+  missing pilot (`loseDrone`: it falls and breaks on the ground); one bullet (`rayAABB` round it) or a blast
+  (`blastDrones`, next to every `blastJammers`) brings it down. The pilot can't shoot or throw, is forced crouched with
+  the remote (`p.w = 'drone'`). Drones are in every snapshot while there are any (`dn`). Its camera spots enemies for
+  its team (`updateSpotting`, its own fov).
+- **Browser:** the flight (`updateDroneFlight`: WASD/mouse/Space/Ctrl, inertia, a dive along the view, collisions with a
+  small box, landing), its camera (fov 95), the video overlay (one noise layer whose position jumps every frame, one
+  layer of scan lines and vignette, the readouts), the drone models from the snapshot (props spin, the light blinks, the
+  bomb hangs until dropped), the buzz (`audio.buzz`, positional, carries far, higher in a dive), sounds for the launch,
+  dive and crash. Models in guns.js: the remote (held) and `buildDrone()` (also the buy-menu picture, tilted).
+- **Verified:** server test `t15.mjs` (buy, a second refused, launch, snapshot, the pilot crouched with the remote, the
+  bomb (an HE where it lands, 91 damage to a CT next to it), letting go, landing by the pilot (back in the bag with
+  33.5 s left and no bomb), relaunch, a jammer crash, losing the signal out of range, the camera spotting a CT the pilot
+  couldn't see, a dive killing a CT, a CT's single shot bringing one down); `t15b.mjs` (the battery); browser test
+  `g15.mjs` (buy menu picture, the remote in hand, launch, flying with the overlay, the bomb, the dive; a CT watching a
+  drone hover and shooting it down; no page errors).
+- **Not verified:** the buzz and the other sounds by ear; flying it by hand at full frame rate (headless runs at a few
+  fps); the pilot seen crouching with the remote in a screenshot (the server's snapshot says so; a hedge was in the way).
+- **Choices:** in the Heavy column; landing far from the pilot loses it; any jammer brings it down; teammates can't shoot
+  their own team's drone unless friendly fire is on; the bomb drops straight down (with no sideways speed).
 
 ### Known problems to watch
 - **Mansion load time** (measured 2026-10-31 on the new PC, i9-13980HX, 5 runs each): building cs_mansion (importing

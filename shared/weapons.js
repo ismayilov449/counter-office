@@ -69,6 +69,11 @@ export const WEAPONS = {
   // you hold the detonator, an old phone, and Mouse1 sets it off from anywhere (see SATCHEL).
   satchel: { name: 'Satchel charge', slot: 6, cls: 'satchel', satchel: true, team: 'T', price: 1200, max: 1, speed: 6.3 },
   phone: { name: 'Detonator', slot: 6, cls: 'phone', speed: 6.3 },
+  // FPV drone (Terrorists, one per team each round): 6 takes out its remote (with the mines), Mouse1 launches it, and
+  // you fly it through its camera while you crouch with the remote; see DRONE.
+  drone: { name: 'FPV drone', slot: 6, cls: 'drone', device: true, team: 'T', price: 5500, max: 1, perTeam: 1, speed: 6.3 },
+  // The drone's bomb in the air: falls and goes off where it lands, an HE grenade's blast (never in anyone's hands).
+  dronebomb: { name: 'Drone bomb', slot: 4, cls: 'grenade', impact: true, fuse: 6, speed: 6.3 },
 };
 
 export const GRENADES = ['he', 'flash', 'smoke', 'molotov'];
@@ -97,6 +102,18 @@ export const JAMMER = { radius: 15, hits: 3, blast: 4 };
 // set it off). The blast is about 1.5 HE grenades: damage in the middle, nothing at radius m (walls protect), car
 // damage to cars. Enemies defuse it with E (defuse s, kitDefuse with a kit, +reward), or shoot it (it goes off);
 // an explosion within chain m sets it off too. Each player has at most perPlayer out. Cleared every round.
+// FPV drone: flown through its camera while the pilot crouches with the remote and can't move or shoot. speed m/s
+// across, climb m/s up and down; battery seconds in the air. The signal weakens from weak metres and is lost at range
+// (with a wall between the pilot and the drone, distances count half as much again: droneSignal). It carries one bomb
+// (dropped straight down: an HE grenade's blast where it lands); the kamikaze dive (dive m/s) goes off on impact:
+// damage within radius metres (more than an HE), car damage to cars. One bullet brings it down (hit: its radius), so
+// does a blast within blast metres, and it crashes inside a signal jammer's area. Landed within pickup metres of the
+// pilot it goes back into the bag (with what's left of its battery and its bomb); landed anywhere else it's lost.
+// fov: how far to each side its camera spots enemies for the radar (radians).
+export const DRONE = { speed: 9, climb: 4, battery: 40, weak: 60, range: 80, dive: 24, damage: 140, radius: 7, car: 600, blast: 2.5, hit: 0.4, pickup: 4, fov: 0.9 };
+// The drone's signal, 1 (full) to 0 (lost): dist from the pilot, through a wall or not.
+export const droneSignal = (dist, blocked) => { const d = dist * (blocked ? 1.5 : 1); return d <= DRONE.weak ? 1 : Math.max(0, 1 - (d - DRONE.weak) / (DRONE.range - DRONE.weak)); };
+
 export const SATCHEL = { throw: 12, damage: 150, radius: 10, car: 900, defuse: 3, kitDefuse: 1.5, reward: 200, reach: 1.6, chain: 3, perPlayer: 2 };
 
 // Ghillie camouflage: crouched, not moving and not shooting for still seconds, you're nearly invisible to enemies
@@ -106,7 +123,7 @@ export const CAMO = { still: 1.5, botSees: 4 };
 // bullet's damage the heavy guns do to them (other bullets don't hurt them). A wall chunk has 200-300 hp,
 // furniture 80-130 (see shared/maps/breakables.js).
 export const BREAK = {
-  blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], rpg26: [2.4, 420], satchel: [3.6, 570], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320] },
+  blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], rpg26: [2.4, 420], satchel: [3.6, 570], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320], drone: [3, 480] },
   chip: { m249: 0.5, awp: 0.5, pkt: 0.5 },
 };
 // Maps with `realism` (cs_mansion): what explosions do besides breaking things.
@@ -116,9 +133,9 @@ export const BREAK = {
 //   the most fires at once, and how long a door can stand in a fire (s); wallShot: share of a bullet's damage
 //   left after going through a thin wall or a door (at most thin m thick).
 export const REAL = {
-  push: { c4: [22, 16], mortar: [16, 12], rpg: [11, 10], rpg26: [8, 8], satchel: [12, 10], car: [11, 10], he: [8, 7], pmn: [4, 5], mon50: [5, 6] },
-  door: { c4: 8, mortar: 4, rpg: 3, rpg26: 2.5, satchel: 4, car: 4, he: 2.5, pmn: 1.5, mon50: 2 },
-  smoke: { c4: 9, mortar: 6, rpg: 5, rpg26: 4, satchel: 5, car: 6, he: 4 },
+  push: { c4: [22, 16], mortar: [16, 12], rpg: [11, 10], rpg26: [8, 8], satchel: [12, 10], car: [11, 10], he: [8, 7], pmn: [4, 5], mon50: [5, 6], drone: [10, 9] },
+  door: { c4: 8, mortar: 4, rpg: 3, rpg26: 2.5, satchel: 4, car: 4, he: 2.5, pmn: 1.5, mon50: 2, drone: 3 },
+  smoke: { c4: 9, mortar: 6, rpg: 5, rpg26: 4, satchel: 5, car: 6, he: 4, drone: 4 },
   collapse: 25,
   burn: { chance: 0.12, life: 16, dps: 7, max: 28, door: 5 },
   wallShot: 0.5, thin: 0.45,
@@ -150,7 +167,7 @@ export const BUY_COLUMNS = [
   { title: 'Shotguns', items: ['m3', 'xm1014'] },
   { title: 'SMGs', items: ['mac10', 'tmp', 'mp5', 'ump45', 'p90'] },
   { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'scout', 'sg552', 'aug', 'sg550', 'g3sg1', 'awp'] },
-  { title: 'Heavy', items: ['m249', 'rpg', 'rpg26', 'mortar'] },
+  { title: 'Heavy', items: ['m249', 'rpg', 'rpg26', 'mortar', 'drone'] },
   { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg'] },
   { title: 'Mines & camo', items: ['pmn', 'mon50', 'satchel', 'camo', 'jammer'] },
 ];

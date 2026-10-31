@@ -72,7 +72,7 @@ export class Hud {
     const slots = [
       ['1', me.inv.primary?.id], ['2', me.inv.secondary?.id], ['3', me.zombie ? 'claws' : 'knife'],
       ...GRENADES.filter(g => me.inv[g] > 0).map(g => ['4', g]),
-      ...[...MINES, 'jammer'].filter(g => me.inv[g] > 0).map(g => ['6', g]),
+      ...[...MINES, 'jammer', 'drone'].filter(g => me.inv[g] > 0).map(g => ['6', g]),
       ['5', me.inv.c4 ? 'c4' : null],
     ];
     this.set('slots', slots.filter(s => s[1]).map(([k, id]) =>

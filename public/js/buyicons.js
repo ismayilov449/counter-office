@@ -3,7 +3,7 @@
 // to the left; armour, the kit, nightvision and the ghillie suit are
 // drawn. Made while a map loads (see prewarm in main.js), so opening the menu never stutters.
 import * as THREE from 'three';
-import { buildGun, buildMortarSetup, buildPlacedMine } from './guns.js';
+import { buildGun, buildMortarSetup, buildPlacedMine, buildDrone } from './guns.js';
 
 const GOLD = '#e7b350', W = 256, H = 128;
 const icons = new Map();
@@ -103,7 +103,8 @@ export function makeBuyIcons(renderer, ids) {
     if (['vest', 'vesthelm', 'kit', 'nvg', 'camo'].includes(id)) { icons.set(id, drawn(id)); continue; }
     let obj;
     try {
-      obj = id === 'mortar' ? buildMortarSetup(50) : id === 'pmn' || id === 'mon50' ? buildPlacedMine(id, 0.01, 0.01) : buildGun(id);
+      obj = id === 'mortar' ? buildMortarSetup(50) : id === 'pmn' || id === 'mon50' ? buildPlacedMine(id, 0.01, 0.01) : id === 'drone' ? buildDrone() : buildGun(id);
+      if (id === 'drone') obj.rotation.z = -1.05; // (its top towards the camera: the arms and propellers in an X)
     } catch { continue; }
     icons.set(id, renderModel(renderer, obj, target, scene, camera, gold));
   }

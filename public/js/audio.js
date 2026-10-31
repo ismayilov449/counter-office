@@ -189,7 +189,7 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { creak: [9, 0.7], roller: [9, 0.7], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
+const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -771,6 +771,25 @@ export const audio = {
       case 'door':
         tone(out, t, { freq: 160, freqEnd: 90, dur: 0.15, type: 'square', gain: 0.15 });
         break;
+      case 'dronestart': {
+        // the drone spinning up off the pilot's hands
+        tone(out, t, { freq: 120, freqEnd: 420, dur: 0.5, type: 'sawtooth', gain: 0.12 });
+        burst(out, t, { dur: 0.4, type: 'bandpass', freq: 900, freqEnd: 2400, q: 2, gain: 0.25 });
+        break;
+      }
+      case 'dronedive': {
+        // the motors screaming into a dive
+        tone(out, t, { freq: 300, freqEnd: 900, dur: 0.8, type: 'sawtooth', gain: 0.14 });
+        tone(out, t, { freq: 450, freqEnd: 1350, dur: 0.8, type: 'square', gain: 0.05 });
+        break;
+      }
+      case 'dronedown': {
+        // a drone breaking up: a crack of plastic, rattling bits
+        burst(out, t, { dur: 0.12, freq: 2600, gain: 0.8 });
+        for (let k = 0; k < 5; k++) burst(out, t + 0.06 + k * 0.05 + Math.random() * 0.03, { dur: 0.04, type: 'bandpass', freq: 1800 + Math.random() * 1500, q: 3, gain: 0.35 });
+        tone(out, t, { freq: 500, freqEnd: 120, dur: 0.3, type: 'sawtooth', gain: 0.08 });
+        break;
+      }
       case 'roller': {
         // a steel roller door rolling up or down: a motor's drone, the slats rattling over the drum, a clunk (arg: seconds)
         const len = arg || 2;
@@ -823,6 +842,42 @@ export const audio = {
     e.o2.frequency.setTargetAtTime(19 + rpm * 42, t, 0.08);
     e.f.frequency.setTargetAtTime(400 + rpm * 900, t, 0.1);
     e.g.gain.setTargetAtTime(running ? 0.07 + rpm * 0.09 : 0, t, 0.15);
+  },
+  // A drone's buzz: four little motors and their blades, loud and carrying far, higher when it dives; one per
+  // drone while it flies, buzz(id, null) stops it.
+  buzzes: new Map(),
+  buzz(id, pos, diving = false) {
+    if (!ctx || ctx.state !== 'running') return;
+    let b = this.buzzes.get(id);
+    if (!pos) {
+      if (b) { b.o1.stop(); b.o2.stop(); b.lfo.stop(); b.g.disconnect(); this.buzzes.delete(id); }
+      return;
+    }
+    if (!b) {
+      const out = this.out(pos, [7, 0.8]);
+      const g = ctx.createGain(), f = ctx.createBiquadFilter();
+      g.gain.value = 0.07;
+      f.type = 'bandpass';
+      f.frequency.value = 1100;
+      f.Q.value = 0.6;
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+      o1.type = 'sawtooth'; o1.frequency.value = 210;
+      o2.type = 'sawtooth'; o2.frequency.value = 318;
+      lfo.frequency.value = 37; lg.gain.value = 0.035; // the blades' beat
+      lfo.connect(lg).connect(g.gain);
+      o1.connect(f); o2.connect(f);
+      f.connect(g).connect(out);
+      for (const o of [o1, o2, lfo]) o.start();
+      b = { out, g, o1, o2, lfo, diving: false };
+      this.buzzes.set(id, b);
+    }
+    if (b.out.positionX) { b.out.positionX.value = pos[0]; b.out.positionY.value = pos[1]; b.out.positionZ.value = pos[2]; }
+    if (b.diving !== diving) {
+      b.diving = diving;
+      const t = ctx.currentTime;
+      b.o1.frequency.setTargetAtTime(diving ? 420 : 210, t, 0.2);
+      b.o2.frequency.setTargetAtTime(diving ? 640 : 318, t, 0.2);
+    }
   },
   // A signal jammer's electric hum (with a slow warble), one per jammer while it stands; hum(id, null) stops it.
   hums: new Map(),
