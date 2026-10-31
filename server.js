@@ -28,6 +28,7 @@ import { ACHIEVEMENTS } from './shared/achievements.js';
 import { EMOTE } from './shared/emotes.js';
 import { createHostages, updateHostages, HOSTAGE_STATE } from './lib/hostages.js';
 import { BotManager, BOT_LEVELS } from './lib/bots.js';
+import { createFlood } from './lib/flood.js'; // Floodgate
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -313,6 +314,9 @@ function broadcast(msg, filter) {
   for (const p of players.values()) if ((!filter || filter(p)) && p.ws.readyState === 1) p.ws.send(s);
 }
 const notify = (text, big = false, filter) => broadcast({ t: 'msg', text, big }, filter);
+// Floodgate (Mansion): the storm drain's valve floods the underground (see lib/flood.js)
+const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
+  sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // (sparkAt: the gas system's, when merged)
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -536,6 +540,7 @@ function resetWorld() {
   world.setDoors([]);
   game.hostages = isHostageMap() && CFG.gameMode === 'classic' ? createHostages(MAP) : [];
   clearMines();
+  flood.reset(); // Floodgate: drained every round
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
 }
 
@@ -1853,6 +1858,7 @@ function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
+    if (a.type === 'flood') { flood.updateAct(p, a, t); continue; } // Floodgate: turning the valve
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
@@ -1951,6 +1957,7 @@ function onUse(p, m, t) {
     p.act = { type: 'satchel', satchel: sat.id, start: t, pos: p.p.slice(), dur: (p.kit ? SATCHEL.kitDefuse : SATCHEL.defuse) * 1000 };
     return;
   }
+  if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
   if (atFuseBox(p) && (game.phase === 'live' || game.phase === 'warmup')) {
     // Terrorists cut the power (3 s), CTs bring it back (5 s)
     const off = game.lights.power === false;
@@ -2789,6 +2796,7 @@ function lineOfSight(a, b) {
 }
 
 function explodeNade(n) {
+  if (flood.douse(n)) return; // Floodgate: under water a grenade fizzles (an HE's blast stays in the water)
   const owner = players.get(n.owner) || null;
   const o = [n.end[0], n.end[1] + 0.1, n.end[2]];
   broadcast({ t: 'boom', p: n.end, k: n.k, id: n.id });
@@ -3597,6 +3605,7 @@ function tick() {
   // and moving by a fixed step made bots and hostages stutter on everyone's screen
   const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
   tick.prev = t;
+  flood.tick(t, dt); // Floodgate: the water level, drowning, electrocution
   bots.update(dt);
   if (game.hostages.length) {
     for (const ev of updateHostages(game.hostages, players, dt, p => world.move(null, p, 2), t)) {
@@ -3626,6 +3635,7 @@ function tick() {
     pl,
     // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb, hits it can still take]
     ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0, d.hp]) } : {}),
+    ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.
