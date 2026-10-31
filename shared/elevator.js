@@ -143,10 +143,10 @@ export const touches = (b, p, r = 0.35, h = 1.8) => p[0] + r > b.min[0] && p[0] 
 //   'b0'..'b2' a button on the cabin's panel, 'h' the roof hatch (from inside, or from the roof back down), 'f' the
 //   cabin's doors (open them; between floors or in a blackout: pry them), 'l0'..'l2' a landing's doors from the shaft.
 export function aimAt(E, y, feet, eye, dir, power = true) {
-  const hit = (axis, at) => {
+  const hit = (axis, at, reach = ELEV.reach) => {
     if (Math.abs(dir[axis]) < 1e-6) return null;
     const t = (at - eye[axis]) / dir[axis];
-    return t > 0 && t < ELEV.reach ? [eye[0] + dir[0] * t, eye[1] + dir[1] * t, eye[2] + dir[2] * t] : null;
+    return t > 0 && t < reach ? [eye[0] + dir[0] * t, eye[1] + dir[1] * t, eye[2] + dir[2] * t] : null;
   };
   const D = E.door, H = E.hatch, inDoor = (q, y0) => q && q[0] > D.x1 && q[0] < D.x2 && q[1] > y0 && q[1] < y0 + D.h;
   const inHatch = (q, m) => q && q[0] > H.x1 - m && q[0] < H.x2 + m && q[2] > H.z1 - m && q[2] < H.z2 + m;
@@ -162,7 +162,8 @@ export function aimAt(E, y, feet, eye, dir, power = true) {
     return null;
   }
   if (inShaft(E, feet)) {
-    if (Math.abs(feet[1] - roofAt(E, y)) < 0.3 && dir[1] < 0 && inHatch(hit(1, roofAt(E, y)), 0.2)) return 'h';
+    // (the hatch is at your feet: standing, your eyes are 1.62 m over it, more than the reach)
+    if (Math.abs(feet[1] - roofAt(E, y)) < 0.3 && dir[1] < 0 && inHatch(hit(1, roofAt(E, y), ELEV.reach + 0.6), 0.2)) return 'h';
     if (dir[2] > 0) { const q = hit(2, E.shaft.z2); for (let s = 0; s < E.stops.length; s++) if (inDoor(q, E.stops[s])) return 'l' + s; }
     return null;
   }

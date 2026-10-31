@@ -173,6 +173,12 @@ for (const y of [S[0], S[1], S[2]]) {
   const H = E.hatch, hc = [(H.x1 + H.x2) / 2, y + cab.ceil, (H.z1 + H.z2) / 2], from = [hc[0] - 0.2, y + 1.62, hc[2] + 0.3];
   const up = [hc[0] - from[0], hc[1] - from[1], hc[2] - from[2]], lu = Math.hypot(...up);
   ok(aimAt(E, y, [from[0], y, from[2]], from, up.map(v => v / lu)) === 'h', 'aiming up at the hatch');
+  // from the roof, standing (eyes 1.62 m over the hatch) and crouching, at the spot the hatch puts you
+  for (const eh of [PLAYER.eye, PLAYER.crouchEye]) {
+    const rs = roofSpot(E, y), re = [rs[0], rs[1] + eh, rs[2]], hr = [hc[0], roofAt(E, y), hc[2]];
+    const dn = [hr[0] - re[0], hr[1] - re[1], hr[2] - re[2]], ld = Math.hypot(...dn);
+    ok(aimAt(E, y, rs, re, dn.map(v => v / ld)) === 'h', `aiming down at the hatch from the roof (eyes ${eh} m up)`);
+  }
   ok(aimAt(E, y, [mid[0], y, mid[2]], [mid[0], y + 1.62, mid[2]], [0, 0, 1]) === 'f', 'aiming at the cabin doors');
   for (let s = 0; s < 3; s++) {
     const c = E.call[s], e2 = [c[0] + 0.2, S[s] + 1.62, E.out.z2 + 0.8], dir = [c[0] - e2[0], c[1] - e2[1], c[2] - e2[2]], l = Math.hypot(...dir);

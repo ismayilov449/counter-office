@@ -1743,6 +1743,7 @@ function applyDoors(states) {
 }
 
 function nearestSwitch() {
+  if (elevator.walledIn(me.p)) return null; // elevator: not through the shaft's walls (the switch is on its outside)
   let best = null, bd = 1.8;
   for (const sw of map.switches || []) {
     const d = Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]);
@@ -3564,6 +3565,7 @@ function updateHud(now) {
     } else if (me.mortar) hint = '';
     else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : mortarCanSetUp(me.p) ? 'Click to set up the mortar (the first shell blasts through the roof)' : NO_SKY;
     else if (me.riding) hint = 'Press E to get out of the car';
+    else if (elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server)
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if ((gh = gadgets.hint())) hint = gh;

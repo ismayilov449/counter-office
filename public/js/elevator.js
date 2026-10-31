@@ -46,13 +46,21 @@ export function createElevator(ctx) {
     parts.push(boxGeo(bx(P.x - 0.012, P.ys[0] - 0.1, P.z - 0.075, P.x + 0.005, P.ys[2] + 0.12, P.z + 0.075), 0x2b2d30));
     P.ys.forEach(h => parts.push(boxGeo(bx(P.x - 0.022, h - 0.025, P.z - 0.025, P.x - 0.012, h + 0.025, P.z + 0.025), 0xcfd2d4)));
     parts.push(boxGeo(bx(c.x1 + 0.2, c.ceil - 0.004, c.z2 - 0.75, c.x1 + 0.6, c.ceil - 0.001, c.z2 - 0.25), 0xdedede)); // (the light's frame)
+    // the hatch's steel frame round its opening on the ceiling (seen from inside: where to look up)
+    const fw = 0.04, fy = c.ceil - 0.008;
+    parts.push(boxGeo(bx(H.x1 - fw, fy, H.z1 - fw, H.x2 + fw, c.ceil, H.z1), 0xc4c8cb));
+    parts.push(boxGeo(bx(H.x1 - fw, fy, H.z2, H.x2 + fw, c.ceil, H.z2 + fw), 0xc4c8cb));
+    parts.push(boxGeo(bx(H.x1 - fw, fy, H.z1, H.x1, c.ceil, H.z2), 0xc4c8cb));
+    parts.push(boxGeo(bx(H.x2, fy, H.z1, H.x2 + fw, c.ceil, H.z2), 0xc4c8cb));
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
     mats.push(mat);
     cabin = new THREE.Group();
     const body = new THREE.Mesh(mergeGeometries(parts), mat);
     cabin.add(body);
     // the hatch's lid: shut, flush with the roof; open, standing up on its west edge
-    lid = new THREE.Mesh(tint(new THREE.BoxGeometry(H.x2 - H.x1, c.roof, H.z2 - H.z1).translate((H.x2 - H.x1) / 2, c.roof / 2, 0), 0x63676b), mat);
+    // (with a handle underneath, by its east edge)
+    const lw = H.x2 - H.x1, lidParts = [tint(new THREE.BoxGeometry(lw, c.roof, H.z2 - H.z1).translate(lw / 2, c.roof / 2, 0), 0x63676b), boxGeo(bx(lw - 0.12, -0.025, -0.1, lw - 0.08, 0, 0.1), 0x2b2d30)];
+    lid = new THREE.Mesh(mergeGeometries(lidParts), mat);
     lid.position.set(H.x1, c.ceil, (H.z1 + H.z2) / 2);
     cabin.add(lid);
     scene.add(cabin);
@@ -319,6 +327,10 @@ export function createElevator(ctx) {
       if (aim !== sentAim) { sentAim = aim; net.send({ t: 'elevAim', a: aim }); }
     },
     hint() { return E && st && me.alive ? hintFor(aim) : null; },
+    // Aimed at a button, the hatch or the doors: E goes to the lift before anything else (as on the server).
+    aiming() { return !!(E && st && me.alive && aim); },
+    // Inside the shaft (the cabin, its roof, the ladder): its walls are between you and the rooms (no light switch).
+    walledIn(p) { return !!E && inShaft(E, p); },
     progress(a) { return a === 'elevforce' ? 'Prying the lift\'s doors open...' : null; },
   };
 }

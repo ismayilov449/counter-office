@@ -1084,6 +1084,7 @@ const elevator = createElevator({
 });
 
 function nearestSwitch(p) {
+  if (MAP.elevator && elevator.walledIn(p.p)) return null; // elevator: not through the shaft's walls (the switch is on its outside)
   let best = null, bd = 1.8;
   for (const sw of MAP.switches || []) {
     const d = dist2(p.p, sw.p);

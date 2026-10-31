@@ -1,6 +1,6 @@
 # Elevator (lift in the Mansion)
 
-## STATUS (2026-10-31: built, server-side tested; browser checks still to do)
+## STATUS (2026-11-01: built, server-side tested, browser-tested on both Mansion maps; only the sounds by ear and a real-GPU ride left)
 
 - **Done:** the whole spec, on both Mansion maps (`cs_mansion`, `cs_mansion_night`). The shaft is part of the level; the
   cabin, its sliding doors, the calls, the blackout, the roof hatch, prying the doors, riding (players, bots, hostages,
@@ -16,30 +16,63 @@
   - **Climbing out of the shaft at a landing is an E action** (like the hatch): a climber on the shaft's ladder can't line
     up with the doorway (the ladder is on the west wall, the doorways in the south wall). Once a landing's doors are
     pried open, E (looking at them, from the roof or the ladder) puts you on that landing.
-- **Tests that pass** (see RESUME notes for what each checks): `elevator/unit.mjs` (692 checks), `elevator/client-node.mjs`
+- **Tests that pass** (see RESUME notes for what each checks): `elevator/unit.mjs` (694 checks), `elevator/client-node.mjs`
   (the browser module run in node, 15 checks), `elevator/t-elev.mjs` (35 checks, on both Mansion maps),
   `mansion/walls.mjs` (0 missing, 0 drawn twice, with the shaft added), nav (same false drop links as before),
   `walk.mjs` walks round the shaft, 60 s with `BOTS=4`, all 7 maps start, a map change at runtime, and t5, t7, t8, t11,
   t16zip, t17cctv as before.
-- **Browser checks still to do** (nothing was run in a browser; `dev/test-scripts/elevator/g-elevator.mjs` is written
-  and ready, run it on both maps with `START_MONEY=16000 BOTS=0`):
-  - the look of the shaft in the three rooms (it stands out 1.4 m into the living room and 1 m into the Ts' room, cut
-    through the upstairs bookcase), the doorways' steel frames, the call buttons;
-  - the cabin inside (panel, handrail, ceiling light), the door panels sliding (telescopic, two each side), the hatch's
-    lid open and shut, the ladder in the shaft from the roof;
-  - riding at the real frame rate: no jitter, the view smooth; another player in the cabin drawn standing on its floor;
-  - the blackout: the cabin and the shaft dark (lighting room `elevator`), the ceiling light and the lit buttons off;
-  - the sounds by ear (hum, ding, doors, brake, prying, hatch, click) and how far they carry;
-  - the hints and the progress bar; no page errors;
-  - draw cost with `viewer.js` (`vcost.json` plus a view of the living room's north-west corner): expected +1…+5 draw
-    calls where the shaft is in view (cabin, door panels, lights, plates, lid), no new lights or shadows.
+- **Browser-verified (2026-11-01, headless Edge + swiftshader, `g-elevator.mjs` on `cs_mansion` and `cs_mansion_night`,
+  server with `START_MONEY=16000 BOTS=0 ROUND_TIME=600`; every screenshot looked at):** all its checks pass on both maps,
+  no page errors.
+  - The shaft in the living room (its steel doors, the call button's plate, the moved light switch on its east side),
+    upstairs (built into the bookcase wall), the doorways' frames; the cabin inside (panel, lit button while queued, the
+    hatch's frame, the ceiling light); the doors sliding open; the hatch shut and open from inside, the lid standing up
+    on the roof (with its handle), the ladder in the shaft from the roof.
+  - The ride: the height the page sends every frame is the cabin floor's within 1 mm all the way (22–24 frames of a
+    4.5 s trip: headless Edge draws 1–2 frames a second, so "smooth at 60 fps" itself is a real-GPU check; the node test
+    `client-node.mjs` covers uneven frame rates). Another player standing in the cabin is drawn with his feet on its
+    floor, moving and stopped.
+  - The blackout: the cabin dark (the flashlight lights it), stuck between floors with the "stuck in the dark" hint; out
+    through the hatch, prying the upper landing's doors from the roof (hint, progress bar "Prying the lift's doors
+    open..."), climbing out; the power back: on down to the cellar, ding, doors. With the power on: up through the hatch
+    and back down it (E on the hatch from the roof).
+  - Every hint on the way (call, panel buttons, hatch from inside and from the roof, pry, climb out).
+- **Fixed in the browser pass:**
+  - E aimed at the lift with a hostage near (the upper landing is by the hostages) showed the hostage's hint while the
+    server gives E to the lift first: the lift's hint now comes first when aimed at it (`elevator.aiming()`, hook in
+    `main.js`).
+  - Standing on the cabin's roof, E on the hatch never worked (your eyes are 1.62 m over it, the reach 1.6 m): only
+    crouching did. `aimAt` gives the hatch at your feet a longer reach (+0.6 m); two new `unit.mjs` checks (694).
+  - The living room's light switch (on the shaft's east face) could be used from inside the cabin, its roof and the
+    ladder, through the wall: not from inside the shaft any more (`elevator.walledIn`, hooks in both `nearestSwitch`).
+  - The hatch was invisible from inside (the lid flush with the roof, the same grey): a light steel frame round it on
+    the ceiling and a handle under the lid (in the existing meshes: no extra draw call).
+  - Night map: the cabin was dark navy with the power on (its lighting room didn't glow while the rooms round it did),
+    and the landing doors' inner panels showed stripes (their front face is exactly on the lift room's padded edge, so
+    pixels flipped between the two rooms' light). `elevator` is now one of the night map's always-lit rooms (like the
+    tunnels: its ceiling light is on with the power; the blackout still darkens it): warm cabin, no stripes.
+  - `g-elevator.mjs` reworked so it runs at 1–2 fps (waits for each hint before pressing E), joins all scripted players
+    before the game starts (a T joining restarted the round mid-test; a player joining a live round waits dead), checks
+    the ride frame by frame against the cabin's motion, and visits the roof with the power on.
+- **Draw cost** (`viewer.js`, `vcost.json` + five lift views, swiftshader, day map; the lift's models loaded into the
+  viewer's scene for the last column): base (main ed6374b) → branch level (the shaft) → branch with the lift's models:
+  the lift's views +3…+6 draw calls in all (living room 130→129→134, landing 126→126→131, upstairs 129→129→135,
+  cellar 114→113→117, in the cabin 130→131→136), the other views +0…+5; triangles +0.3k…+2.6k for the shaft and +0.64k
+  for the models; 3 more shader programs (the models' vertex-colour, instanced and basic materials); no lights, no
+  shadows.
+- **Left (by ear / on a real laptop):** the sounds (hum, ding, doors, brake, prying, hatch, click) and how far they carry;
+  the ride and the view at a real frame rate on a real GPU.
 - **Known limits (small, left alone):** a grenade or a Molotov's fire on the cabin's floor doesn't ride along (their
   flight is worked out when thrown); bullet holes on the cabin stay where they were made; a hostage riding is drawn a
   few centimetres off the floor (other players are corrected, hostages aren't); a satchel stuck to a door panel rides up
   and down but doesn't slide with the panel; a pried landing door with the cabin elsewhere leaves the shaft open (you
   can fall in: there's no fall damage outside the zip line). The living room's floor is 0.91 m to walk on while the floor
   you see is at 0.813 (the cellar's ceiling under it, from Mansion 2.0): the cabin's floor is the one you see, so you
-  step 10 cm down into it.
+  step 10 cm down into it. What E aims at goes to the server once a frame: looking at a button and pressing E within the
+  same frame uses the last frame's aim (16 ms at 60 fps). Inside the cabin, its lighting is the darker of the lift's
+  room and the room it's in (roomlight.js takes the minimum of overlapping rooms): with the living room's lights
+  switched off, the cabin at the ground floor is dim too. The hostages' own E reach (3D, through walls, on main) lets a
+  CT riding past the upper floor lead a hostage standing by the shaft.
 
 ## README (player-facing)
 
@@ -82,11 +115,11 @@ maps.
   there holds the doors), `makeLadders`/`placeLadders`, `inCabin`/`onRoof`/`inShaft`, `roofSpot`/`cabinSpot`, `aimAt` (what
   E would do).
 - **`lib/elevator.js`:** the server's part (`createElevator(ctx)`: `reset`, `tick`, `send`, `message`, `use`, `act`,
-  `fixRider`, `stick`).
+  `fixRider`, `stick`, `walledIn`).
 - **`public/js/elevator.js`:** the browser's part (`createElevator(ctx)`: `load`, `onState`, `onSfx`, `onTo`, `local`,
-  `remote`, `update`, `hint`, `progress`).
+  `remote`, `update`, `hint`, `aiming`, `walledIn`, `progress`).
 - **Tests and tools** in `dev/test-scripts/elevator/`: `unit.mjs`, `client-node.mjs`, `t-elev.mjs`, `soak.mjs`,
-  `g-elevator.mjs` (browser, not run yet), `server.sh` (test server on 4090/4091, fresh data), the survey tools
+  `g-elevator.mjs` (browser: run on both maps, see STATUS), `server.sh` (test server on 4090/4091, fresh data), the survey tools
   `slice.mjs`, `boxes.mjs`, `tops.mjs`, `faces.mjs`. `mansion/walls.mjs` checks the shaft too.
 
 ### Hooks in existing files (each line marked "elevator")
@@ -103,10 +136,14 @@ maps.
   it belongs with "the old uses", after shield grab, revive, uniform and the floodgate valve); `updateActions`: the
   `'elevforce'` action (prying, any phase) goes to `elevator.act`; `handle()`: `elev…` messages to
   `elevator.message`; the `'state'` handler: `elevator.fixRider(pos)` before `p.p = pos`; on connect
-  `elevator.send(p)`; `onSatchel`: `elevator.stick(s, hit, flight)` when it sticks.
+  `elevator.send(p)`; `onSatchel`: `elevator.stick(s, hit, flight)` when it sticks; `nearestSwitch`: first line, no
+  switch from inside the shaft (`elevator.walledIn`).
+- **`shared/maps/mansion_night.js`:** `'elevator'` added to the theme's `glowRooms` (the cabin lit at night).
 - **`public/js/main.js`:** import; `elevator.load(map)` in `loadMap`; `elevator.local(dt, now)` first thing in
   `updateLocal` (after the alive check: it runs for drivers and drone pilots too); `elevator.remote(s.p, rt)` after
-  `sampleRemote`; `elevator.update(dt, now)` after `gadgets.update`; a hint line after the gadgets' hint; a progress line
+  `sampleRemote`; `elevator.update(dt, now)` after `gadgets.update`; a hint line after the gadgets' hint, and one before
+  the hostage's (aimed at the lift: `elevator.aiming()`, E goes to it first as on the server; when merging the E order,
+  it moves with `elevator.use`); `nearestSwitch`: first line (`elevator.walledIn(me.p)`); a progress line
   after the gadgets' progress; the three message handlers; `createElevator({...})` after `createGadgets`.
 
 ### Protocol
