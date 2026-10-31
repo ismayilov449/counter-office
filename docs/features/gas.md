@@ -11,6 +11,11 @@
   For the elevator: `gas.sparkAt(motorPos, 'motor', player)`.
 - **Tests that exist** (all pass): `t_gas.mjs` (server, 6 parts), `graph.mjs` (no server), `client_smoke.mjs` (browser
   module in Node), `maps.mjs` (all 7 maps), `botgas.mjs` (BOTS=4); the old `mansion/t5.mjs` and `t7.mjs` still pass.
+- **Browser run (paused, partial):** in headless Edge on cs_mansion the kitchen pipe and meter look right (a yellow
+  pipe, a grey meter with its dial, a red lever), and a real mouse click on the meter fired a shot that holed the pipe
+  (`gasLeak`, "You smell gas" under the crosshair). That first run is void beyond this point: the server had bots on by
+  default, so start it with `BOTS=0`. The fresh Edge profile also had extensions installed by sync, which inject pages
+  and errors, so add `--disable-extensions`. Nothing in the code was changed. Everything else below is still to do.
 - **Browser checks still to do:** pipe, vapour, shimmer (subtle, not fog; day, night, blackout), blast and HUD line by
   eye; sounds by ear; no page errors on both Mansion maps through a leak, a blast and a round reset; frame cost with gas
   in view; a real mouse click on the meter.
