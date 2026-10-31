@@ -36,6 +36,7 @@ const newRound = async () => {
 };
 const KSPOT = [-17.5, 0.81, -11.5], METER = [-16.6, 1.5, -13.92], CMETER = [-13.405, -0.22, 2.15];
 const AWAY = [-6, 0, 18]; // on the south lawn
+const CSPOT = [-16.5, -2.2, 2.15]; // in the cellar, facing the boiler
 const want = n => !process.env.PARTS || process.env.PARTS.split(',').includes(String(n)); // PARTS=1,3: only those
 // (the match starts by itself a moment after both have joined: wait for that first, or it restarts under the test)
 await waitFor(() => t.got('round').length > 0, 15);
@@ -117,7 +118,7 @@ ok(`the CT who flipped it was hurt (${ct.got('dmg').map(m => m.d).join(',')}), k
 // ---------------------------------------------------------------- 4. the fuse box (the cellar's boiler)
 if (want(4)) {
 await newRound();
-const CSPOT = [-16.5, -2.2, 2.15];
+
 t.at(CSPOT, Math.PI / 2); ct.at(AWAY, 0); await sleep(300);
 shootAt(t, CSPOT, CMETER, 'glock'); await sleep(400);
 ok(`a shot holes the boiler's pipe: ${JSON.stringify(t.got('gasLeak')[0])}`, t.got('gasLeak').some(m => m.i === 1 && m.s === 1));

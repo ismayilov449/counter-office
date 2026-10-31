@@ -90,9 +90,8 @@ export function createGasClient(ctx) {
         // a quarter-turn lever on the pipe: along the pipe's side when open, across it when shut
         lever = new THREE.Group();
         lever.position.set(...p.p);
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.16).translate(0, 0, 0.09), mats.valve);
-        lever.add(arm);
-        lever.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 8).rotateX(Math.PI / 2), mats.meter));
+        // (the arm and its hub in one mesh: one draw call)
+        lever.add(new THREE.Mesh(mergeGeometries([new THREE.BoxGeometry(0.03, 0.025, 0.16).translate(0, 0, 0.09), new THREE.CylinderGeometry(0.035, 0.035, 0.05, 8).rotateX(Math.PI / 2)]), mats.valve));
         lever.userData.open = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...p.open));
         lever.userData.shut = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...p.shut));
         lever.quaternion.copy(lever.userData.open);
