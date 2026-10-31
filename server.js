@@ -28,6 +28,7 @@ import { ACHIEVEMENTS } from './shared/achievements.js';
 import { EMOTE } from './shared/emotes.js';
 import { createHostages, updateHostages, HOSTAGE_STATE } from './lib/hostages.js';
 import { BotManager, BOT_LEVELS } from './lib/bots.js';
+import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -313,6 +314,14 @@ function broadcast(msg, filter) {
   for (const p of players.values()) if ((!filter || filter(p)) && p.ws.readyState === 1) p.ws.send(s);
 }
 const notify = (text, big = false, filter) => broadcast({ t: 'msg', text, big }, filter);
+// gas (Mansion): see lib/gas.js; other sparks call gas.sparkAt(pos, kind, by)
+const gas = createGas({
+  map: () => MAP, world: () => world, game, players, now, broadcast, send, inTeam: q => inTeam(q), mates: (a, b) => mates(a, b),
+  applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), damageCar: (...a) => damageCar(...a),
+  breakPieces: (...a) => breakPieces(...a), piecesNear: (...a) => piecesNear(...a), hurtPiece: (...a) => hurtPiece(...a),
+  breakGlass: ids => breakGlass(ids), blowDoor: i => blowDoor(i), lineOfSight: (a, b) => lineOfSight(a, b),
+  roundless: () => game.phase === 'warmup' || isDM() || isGG(),
+});
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -536,6 +545,7 @@ function resetWorld() {
   world.setDoors([]);
   game.hostages = isHostageMap() && CFG.gameMode === 'classic' ? createHostages(MAP) : [];
   clearMines();
+  gas.reset(); // gas: the pipes are mended and the air is clean again
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
 }
 
@@ -643,6 +653,7 @@ function hurtPiece(pc, dmg, out) {
 // thing; nothing behind something that can't break (a floor, the stairs). Runs after the blast has hurt people,
 // so a wall it breaks still shielded them.
 function blastMap(at, weapon) {
+  gas.sparkAt(at, weapon); // gas: any explosion sets it off
   const B = BREAK.blast[weapon];
   if (!MAP.breakables || !B) return;
   const round = game.round;
@@ -915,6 +926,7 @@ function setPower(on, by) {
   for (const g of MAP.fusebox.groups) game.lights[g] = on;
   broadcast({ t: 'lights', lights: game.lights, power: on ? 'on' : 'off', p: MAP.fusebox.p });
   notify(on ? `${by.name} brought the power back on` : `${by.name} cut the power — the house is dark`);
+  gas.sparkAt(MAP.fusebox.p, 'fusebox', by); // gas: the fuse box's lever sparks
 }
 
 function nearestSwitch(p) {
@@ -1853,6 +1865,7 @@ function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
+    if (a.type === 'gasValve') { gas.valve(p, a, t); continue; } // gas: shutting a valve
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
@@ -1951,6 +1964,7 @@ function onUse(p, m, t) {
     p.act = { type: 'satchel', satchel: sat.id, start: t, pos: p.p.slice(), dur: (p.kit ? SATCHEL.kitDefuse : SATCHEL.defuse) * 1000 };
     return;
   }
+  if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
   if (atFuseBox(p) && (game.phase === 'live' || game.phase === 'warmup')) {
     // Terrorists cut the power (3 s), CTs bring it back (5 s)
     const off = game.lights.power === false;
@@ -1967,6 +1981,7 @@ function onUse(p, m, t) {
   if (sw) {
     game.lights[sw.group] = !game.lights[sw.group];
     broadcast({ t: 'lights', lights: game.lights, p: sw.p });
+    gas.sparkAt(sw.p, 'switch', p); // gas: a light switch sparks
     return;
   }
   const car = world.cars
@@ -2094,6 +2109,7 @@ function onShoot(p, m) {
       if (gh) shattered.push(g.id);
     }
   }
+  gas.onShot(p, o, traces, def); // gas: a bullet holes a pipe; muzzle flashes and hits are sparks
   breakGlass(shattered);
   for (const j of jamHits) if (--j.hp <= 0) destroyJammer(j, p);
   breakPieces(chipped);
@@ -2159,6 +2175,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
   const killsBefore = owner.kills;
   if (weapon === 'rpg') setTimeout(() => { if (owner.kills - killsBefore >= 2) unlockAch(owner, 'rpg_double'); }, 0);
   broadcast({ t: 'boom', p: at, k: weapon });
+  gas.sparkAt(at, weapon, owner); // gas: a rocket or a shell sets it off (credited to the shooter)
   blastMap(at, weapon);
   blastFire(at, owner, weapon);
   breakGlass(world.intactGlass.filter(g => dist3(at, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < R * 0.7).map(g => g.id));
@@ -2792,6 +2809,7 @@ function explodeNade(n) {
   const owner = players.get(n.owner) || null;
   const o = [n.end[0], n.end[1] + 0.1, n.end[2]];
   broadcast({ t: 'boom', p: n.end, k: n.k, id: n.id });
+  if (n.k !== 'smoke') gas.sparkAt(o, n.k, owner); // gas: an HE, a flashbang or a Molotov sets it off
   if (n.k === 'smoke') {
     (game.smokes ||= []).push({ p: o, until: now() + 17000 }); // bots can't see through it
     // Smoke puts out Molotov fires it lands in.
@@ -3609,6 +3627,7 @@ function tick() {
     if (t >= game.nades[i].at) explodeNade(game.nades.splice(i, 1)[0]);
   }
   updateFires(t);
+  gas.tick(t); // gas: leaks, spreading, choking, fires setting it off
 
   // Snapshot
   const pl = [];
@@ -3626,6 +3645,7 @@ function tick() {
     pl,
     // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb, hits it can still take]
     ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0, d.hp]) } : {}),
+    ...gas.snap(), // gas: { gs: { p: pipe states, r: [room, concentration 0..250, ...] } } while there is any
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

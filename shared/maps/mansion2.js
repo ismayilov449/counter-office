@@ -12,6 +12,7 @@
 //   - the neighbour's house across the street (CT side): two storeys, its bedroom window facing the mansion
 //   - a back garden west of the estate wall: a pool, a gazebo, a glass greenhouse and a hedge maze
 import { clip } from './breakables.js';
+import { addGasPipes } from './mansion_gas.js'; // gas: the kitchen's gas pipe and the cellar's boiler
 
 const IN = 0.0254; // a texel, in metres
 
@@ -486,6 +487,8 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     hedgeX(MZ[1], MX[1], MX[4]); hedgeX(MZ[2], x1 + th, MX[3]); hedgeX(MZ[3], MX[1], MX[2]);
     hedgeZ(MX[3], MZ[2], MZ[3]); hedgeZ(MX[2], MZ[3], z2 - th);
   }
+
+  addGasPipes({ decor, solids }); // gas: pipes you can shoot (see shared/maps/mansion_gas.js)
 
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
   return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass };

@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -121,6 +122,7 @@ function loadMap(id) {
   clearDroneModels();
   endDrone(null);
   fx.reset();
+  gas.setMap(map); // gas: this map's pipes (Mansion)
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
   if (plantedBomb) { scene.remove(plantedBomb); plantedBomb = null; }
@@ -228,6 +230,8 @@ const game = {
   bomb: { s: 'none', p: null, tl: 0 }, cfg: { roundTime: 115, buyTime: 25, freezeTime: 3 }, roster: [], carrier: null, maps: [],
   lights: {}, broken: [], doors: [],
 };
+// gas (Mansion): see gas.js
+const gas = createGasClient({ scene, camera, fx, audio, me, brk: () => game.brk, indoors: p => indoors(p), shellShock: s => shellShock(s), realBlast: m => realBlast(m) });
 
 const remotes = new Map();
 const drops = new Map();
@@ -2829,6 +2833,7 @@ const net = new Net({
     onCarSnapshot(m.cars, m.time);
     onDroneSnapshot(m.dn, m.time);
     syncHostages(m.hs, m.time);
+    gas.snapshot(m.gs); // gas: the pipes and the gas in each room (none: clean air)
   },
   shot(m) {
     const r = remotes.get(m.id);
@@ -3154,6 +3159,7 @@ const net = new Net({
     fx.removeSpray(m.id);
   },
 });
+Object.assign(net.handlers, gas.handlers); // gas: gasLeak, gasBoom, gasCough
 
 // ---------------------------------------------------------------- per-frame updates
 
@@ -3526,6 +3532,7 @@ function updateHud(now) {
     else if (current() === 'jammer') hint = 'Click to put the signal jammer down — no enemy radar, pings or drones within 15 m';
     else if (jammedHere()) hint = JAM_HINT;
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
+    else if (gas.hint()) hint = gas.hint(); // gas: by a leaking pipe's valve
     else if (atFuseBox()) hint = game.lights.power === false ? (me.team === 'CT' ? 'Hold E to bring the power back (5 s)' : 'The power is off') : me.team === 'T' ? 'Hold E to cut the power to the house (3 s)' : 'The fuse box — the Terrorists can cut the power here';
     else if (satchelToDefuse()) hint = `Hold E to defuse the satchel charge (${me.kit ? SATCHEL.kitDefuse : SATCHEL.defuse} s)`;
     else if (current() === 'phone') hint = 'Click to set off your satchel charge';
@@ -3545,6 +3552,7 @@ function updateHud(now) {
   if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
+  if (me.act?.a === 'gasValve') hud.progress('Closing the gas valve...', me.act.pr); // gas
 
   let target = null;
   if (me.alive) {
@@ -3891,6 +3899,7 @@ function frame() {
   updateFires(dt, now);
   updateZombieGrowls(now);
   fx.update(dt, camera);
+  gas.update(dt, now); // gas: the shimmer, the hiss, "You smell gas"
   world?.update(dt, camera.position);
   updateViewModel(dt, now);
   updateHud(now);
