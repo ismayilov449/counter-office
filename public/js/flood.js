@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FLOOD, FLOOD_AREAS, floodMap, waterTop, makeFloodBoxes, setFloodBoxes, atValve } from '/shared/flood.js';
+import { floodPipes } from '/shared/maps/mansion_flood.js';
 import { PLAYER } from '/shared/physics.js';
 import { audio, floodKit } from './audio.js';
 
@@ -89,6 +90,22 @@ function buildWheel() {
   return m;
 }
 
+// The pipes from the ceiling to the valve and on to the outlet: one mesh (as map decor each pipe was a draw call of its
+// own: five more in every view with the drain in it). The map's pipe colour; lit like the map (room light), no shadow
+// cast (there's no sun down there).
+function buildPipes() {
+  const parts = floodPipes().map(([from, to]) => {
+    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to);
+    const g = new THREE.CylinderGeometry(0.12, 0.12, a.distanceTo(b), 8);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()));
+    return g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  });
+  const m = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshLambertMaterial({ color: 0x5a4636 }));
+  for (const p of parts) p.dispose();
+  m.receiveShadow = true;
+  return m;
+}
+
 // The water falling out of the outlet: two crossed sheets, each drawn both ways, 1 m tall (scaled to the drop).
 function buildGush() {
   const sheets = [];
@@ -131,7 +148,7 @@ export function setMap(m) {
   surf.visible = false;
   wheel = buildWheel();
   gush = buildGush();
-  group.add(surf, wheel, gush);
+  group.add(surf, wheel, gush, buildPipes());
   D.scene.add(group);
 }
 
