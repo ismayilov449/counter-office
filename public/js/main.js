@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, shieldSpeed, shieldRay, shieldHint, shieldPoseRemote, shieldPoseHostage } from './shield.js'; // shield: the human shield
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -295,6 +296,7 @@ function refreshViewModel() {
 
 function switchSlot(slot, silent = false) {
   if (!weaponOf(slot) || me.drone) return;
+  if (!shieldSlotOk(slot)) return; // shield: only the pistol while holding a hostage
   if (slot === me.slot && vmId === current()) return;
   if (slot !== me.slot) me.lastSlot = me.slot;
   me.slot = slot;
@@ -384,6 +386,7 @@ function localTrace(o, d, range) {
   }
   for (const hs of hostages.values()) {
     if (hs.state > 1) continue;
+    if (shieldHeldBy(hs.id) != null) { const h = shieldRay(hs, o, d, t); if (h) { t = h.t; hitR = hs; } continue; } // shield: a held hostage's hitboxes
     const h = rayPlayer(o, d, hs.p, false, t);
     if (h) { t = h.t; hitR = hs; }
   }
@@ -1555,6 +1558,7 @@ function updateRemotes(dt) {
       const em = r.emote && EMOTE[r.emote.id];
       if (em && performance.now() - r.emote.start < em.secs * 1000) poseEmote(r.model, r.emote.id, (performance.now() - r.emote.start) / 1000);
       else if (r.emote) { r.emote = null; clearEmote(r.model); showEmoteLabel(r, null); }
+      shieldPoseRemote(r); // shield: the arm round a held hostage's neck
       if (speed > 4 && speed < 15 && !killcam) {
         r.stepAcc += moved;
         if (r.stepAcc > 2.4) { r.stepAcc = 0; audio.play('step', s.p, surfaceAt(s.p)); }
@@ -1921,6 +1925,7 @@ function updateHostageModels(dt) {
       h.walk += moved * 3.2;
       posePlayer(h.model, false, h.state === 1 ? 0 : 1.1, h.walk, Math.min(1, moved / dt / 4));
     }
+    shieldPoseHostage(h); // shield: a held hostage leans against its holder
   }
 }
 
@@ -2829,6 +2834,7 @@ const net = new Net({
     onCarSnapshot(m.cars, m.time);
     onDroneSnapshot(m.dn, m.time);
     syncHostages(m.hs, m.time);
+    shieldSnap(m.sh); // shield: who holds which hostage
   },
   shot(m) {
     const r = remotes.get(m.id);
@@ -3154,6 +3160,7 @@ const net = new Net({
     fx.removeSpray(m.id);
   },
 });
+initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
 
 // ---------------------------------------------------------------- per-frame updates
 
@@ -3179,6 +3186,7 @@ function updateLocal(dt, now) {
   const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || atFuseBox() || !!satchelToDefuse());
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar;
 
+  shieldLimitKeys(keys); // shield: no ducking or jumping while holding a hostage
   const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar;
   // Ducking in the air pulls the legs up half way, as in CS: a crouch-jump reaches higher (into vents and windows).
   // Standing up in the air lets them down again, if there's room below.
@@ -3213,6 +3221,7 @@ function updateLocal(dt, now) {
   let speed = def.speed * (me.scope ? 0.55 : 1);
   if (me.crouch) speed *= 0.34;
   else if (walking) speed *= 0.52;
+  speed = shieldSpeed(speed, def); // shield: walking pace while holding a hostage
   const wet = inWater(map.water, me.p);
   if (wet) speed *= 0.7;
   speed *= 1 - 0.45 * Math.min(1, dazed(performance.now()));
@@ -3541,6 +3550,7 @@ function updateHud(now) {
   } else if (!me.alive && me.team !== 'SPEC' && game.phase !== 'warmup') {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
+  if (me.alive && !me.act) hint = shieldHint(hint); // shield: grab / let go / held
   hud.hint(hint);
   if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
