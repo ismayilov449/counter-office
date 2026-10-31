@@ -150,8 +150,16 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     room below, a bedroom above (stairs along the back wall). The bedroom's **window**
     looks over the street wall and the estate wall straight at the front of the mansion: a sniper's nest for the CTs.
     It's real glass (shoot it out), and the wall it's in breaks like the mansion's; the rest of the house stays whole.
-    Its lights are its own (a switch by the front door and one upstairs), not on the mansion's fuse box. The radar
-    shows a bit more of the map now, so everything on it is a little smaller.
+    Its lights are its own (a switch by the front door and one upstairs), not on the mansion's fuse box.
+  - With the neighbour's house and the back garden the radar shows 100 m instead of 58, so everything on it is smaller.
+  - **Back garden** behind the house: a **gateway** in the middle of the west estate wall (across the back lawn from
+    the kitchen's back door) opens onto a walled garden 20 m deep.
+    - A **swimming pool** (9 × 9 m, 2 m deep) on the north side: jump in and you swim (slowly); hold **Space** to come up
+      and climb out over the edge, or walk out up the steps in its south-east corner.
+    - A white **gazebo** at the end of the path, a **glass greenhouse** in the south-east (every pane shatters — bullets
+      go through and break the ones behind too) with planting tables to hide behind, and a **hedge maze** in the
+      south-west corner (its way in is at the north-east; one dead end).
+    - Everything there is open to the sky (the mortar reaches it). The glass is back each round.
   - **Roof terrace** over the front porch: reached from the top floor through the opening above the front door, or
     up the **drainpipe ladder** at the porch's north-east corner. A waist-high parapet, a table, a bench and potted
     shrubs for cover; open to the sky (the mortar reaches it) and seen from three sides.

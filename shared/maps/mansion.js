@@ -112,6 +112,10 @@ for (const w of [...BSP.WINDOWS, ...RM.windows]) {
   if (w.axis === 'z') m.box(c - g, w.from, c + g, w.to, w.top - w.bottom, 'glass', w.bottom, extra);
   else m.box(w.from, c - g, w.to, c + g, w.top - w.bottom, 'glass', w.bottom, extra);
 }
+// ---- the greenhouse in the back garden: plain panes (their steel frame is part of the level)
+for (const { min, max } of RM.glass) {
+  m.box(min[0], min[2], max[0], max[2], max[1] - min[1], 'glass', min[1], { glass: true, plain: true, id: m.boxes.filter(b => b.glass).length, group: null });
+}
 
 // ---- ladders: up the north wall to the first-floor window, and down the two manholes into the tunnel
 const north = BSP.LADDERS.find(l => l[4] > 3);
@@ -155,8 +159,9 @@ for (const x of [-16, -4, 8, 20]) m.add({ type: 'tunnel-lamp', p: [x, -2.2, -18.
 for (const d of RM.decor) m.add(d);
 for (const l of RM.ladders) m.ladder(...l);
 
-// Lawns beyond the estate walls (so the city skyline stands on the ground), then the skyline itself
-for (const [x1, z1, x2, z2] of [[-400, -400, 400, -22.9], [-400, 22.9, 400, 400], [-400, -22.9, -29.3, 22.9], [29.3, -22.9, 400, 22.9]]) {
+// Lawns beyond the estate walls (so the city skyline stands on the ground; not under the back garden, where they'd
+// show in the pool), then the skyline itself
+for (const [x1, z1, x2, z2] of [[-400, -400, 400, -22.9], [-400, 22.9, 400, 400], [-400, -22.9, -49.45, 22.9], [29.3, -22.9, 400, 22.9]]) {
   m.add({ type: 'plane', mat: 'grassdirt', min: [x1, z1], max: [x2, z2], y: -0.05 });
 }
 m.add({ type: 'skyline', seed: 7 });
@@ -184,7 +189,7 @@ export default {
   pieceFaces: BRK.pieceFaces,
   faceTex: { ...RM.tex, out_grnd2_wall: BSP.TEXTURES.out_grnd2 },
   faceMats: FACE_MATS,
-  bounds: { min: -40.5, max: 40.5 }, // (the neighbour's garden reaches x 40)
+  bounds: { min: -50, max: 50 }, // (the back garden reaches x -49.5, the neighbour's garden x 40)
   zones: {
     rescue: { min: [24.1, -22.8], max: [29.2, 22.8] },
     buyCT: { min: [24.1, -22.8], max: [29.2, 22.8] },
@@ -195,7 +200,7 @@ export default {
     T: [...BSP.SPAWNST.map(spawn), { p: [-14.6, 4.27, -2.5], yaw: 0 }],
   },
   ladders: m.ladders,
-  water: BSP.WATER.map(w => ({ min: [w[0], w[1], w[2]], max: [w[3], w[4], w[5]] })),
+  water: [...BSP.WATER.map(w => ({ min: [w[0], w[1], w[2]], max: [w[3], w[4], w[5]] })), ...RM.water],
   doors: DOORS,
   rooms: [
     ...ROOMS,

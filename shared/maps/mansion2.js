@@ -10,6 +10,7 @@
 //   - the roof of the front porch made a terrace, with a drainpipe ladder up to it
 //   - a garage against the house's north wall: a roller door to the lawn, a car inside, a side door to the kitchen
 //   - the neighbour's house across the street (CT side): two storeys, its bedroom window facing the mansion
+//   - a back garden west of the estate wall: a pool, a gazebo, a glass greenhouse and a hedge maze
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -284,8 +285,8 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     const [x1, z1, x2, z2, top] = [-22.35, -20.73, -15.85, -14.43, 3.3], T = 0.25, roof = top + 0.2;
     const d1 = -20.0, d2 = -15.8, dh = 2.7; // the roller door's opening in the east wall
     const ext = 'out_wall4a', int = 'x_concrete';
-    carve(x1, -0.03, z1, x2, 0.001, z2);
-    brush(x1, -0.03, z1, x2, 0, z2, int, ['bottom', '-x', '+x', '-z', '+z']);
+    carve(x1, -0.1, z1, x2, 0.001, z2); // (10 cm: the bots' grid takes floors within 5 cm of each other for one)
+    brush(x1, -0.1, z1, x2, 0, z2, int, ['bottom', '-x', '+x', '-z', '+z']);
     // the west wall, the east wall around the door, the roof (gravel on top)
     brush(x1 - T, 0, z1, x1, top, z2, { '-x': ext, '+x': int, side: ext }, ['bottom', 'top', '-z', '+z']);
     for (const [a, b, end] of [[z1, d1, '-z'], [d2, z2, '+z']]) brush(x2, 0, a, x2 + T, top, b, { '+x': ext, '-x': int, side: int }, ['bottom', 'top', end]);
@@ -403,6 +404,79 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     rooms.push({ group: 'neighbour', min: [ix1, -0.1, iz1], max: [ix2, ceil, iz2] });
   }
 
+  // ---------------------------------------------------------------- 13. the back garden
+  // Behind the house, through a gateway in the west estate wall: a walled garden 20 m deep — a swimming pool (north),
+  // a gazebo at the end of the path (west), a glass greenhouse (south-east) and a hedge maze in the south-west corner.
+  // Kept cheap: the hedges, paths and walls are in materials the level already draws, the greenhouse's panes share one
+  // material (one mesh), the gazebo is one merged decor piece. The invisible wall west of the estate wall is gone;
+  // new ones stand over the garden's walls.
+  const water = [], glass = [];
+  {
+    const [x1, z1, x2, z2] = [-49.2, -20.73, -29.16, 21.95], W = 3.45, T = 0.25, wall = 'c1a3wall05', hedge = 'out_cac2', pave = 'c2a4_flr1';
+    const gate = [-1.5, 1.5];
+    // the old invisible wall beyond the estate wall (and a sliver of an invisible ledge over it)
+    carve(-30.8, 0, -21.54, -29.16, 15.66, 22.76);
+    carve(-30.8, 4.2, -12.5, -29.16, 4.4, -7.0);
+    // the gateway, and faces on the outer side of the estate wall
+    carve(-29.2, 0, gate[0], -28.3, W + 0.01, gate[1]);
+    face(wall, 2, 1, gate[0], [-29.16, 0, 0], [-28.35, W, 0]);
+    face(wall, 2, -1, gate[1], [-29.16, 0, 0], [-28.35, W, 0]);
+    face(pave, 1, 1, 0, [-29.16, 0, gate[0]], [-28.35, 0, gate[1]]);
+    face(wall, 0, -1, -29.16, [0, 0, z1], [0, W, gate[0]]);
+    face(wall, 0, -1, -29.16, [0, 0, gate[1]], [0, W, z2]);
+    // the ground, the garden's walls (as tall as the estate's) and invisible walls over them
+    brush(x1 - T, -0.3, -21.54, -29.16, 0, 22.76, '-0out_grss1', ['bottom', '-x', '+x', '-z', '+z']);
+    brush(x1 - T, 0, -21.54, x1, W, 22.76, { '+x': wall, top: wall }, ['bottom', '-x', '-z', '+z']);
+    brush(x1, 0, -21.54, -29.16, W, z1, { '+z': wall, top: wall }, ['bottom', '-z', '-x', '+x']);
+    brush(x1, 0, z2, -29.16, W, 22.76, { '-z': wall, top: wall }, ['bottom', '+z', '-x', '+x']);
+    solids.push([x1 - T, W, -21.54, -29.16, 20, z1], [x1 - T, W, z2, -29.16, 20, 22.76], [x1 - T, W, z1, x1, 20, z2]);
+    // paths: from the gateway west to the gazebo, and south to the greenhouse's door (drawn just over the grass)
+    const path = (a, b, c, d) => face(pave, 1, 1, 0.01, [a, 0, b], [c, 0, d]);
+    path(-42.4, -1.2, -29.16, 1.2);
+    path(-34.9, 1.2, -33.6, 8.0);
+    // the pool: 9 x 9 m, 2 m deep, with steps down in its south-east corner, inside a paved deck
+    const [p1, q1, p2, q2] = [-44.5, -16.5, -35.5, -7.5], deep = -2.0;
+    path(-46.0, -18.0, -33.5, q1); path(-46.0, q2, -33.5, -6.0); path(-46.0, q1, p1, q2); path(p2, q1, -33.5, q2);
+    path(-40.6, -6.0, -39.4, -1.2);
+    hollow([{ box: [p1, deep, q1, p2, 0.001, q2], floor: 'tnnl_flr4c', wall: 'tnnl_flr4c', open: ['top'] }]);
+    for (const [d, top] of [[2.4, -1.6], [1.8, -1.2], [1.2, -0.8], [0.6, -0.4]]) brush(p2 - d, deep, -9.6, p2, top, q2, 'tnnl_flr4c', ['bottom', '+x', '+z']);
+    water.push({ min: [p1, deep - 0.1, q1], max: [p2, 0.1, q2] }); // (to just over the edge, so a swimmer can climb out)
+    decor.push({ type: 'water', min: [p1, q1], max: [p2, q2], y: -0.25, color: '#2a8ec4' });
+    // the gazebo at the end of the path: eight pillars and a raised floor (the octagon from three boxes)
+    const [gx, gz, gr] = [-45.2, 0, 2.6];
+    decor.push({ type: 'gazebo', c: [gx, gz], r: gr, h: 2.6 });
+    for (const [a, b] of [[2.4, 1.0], [1.0, 2.4], [1.7, 1.7]]) solids.push([gx - a, 0, gz - b, gx + a, 0.25, gz + b]);
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + Math.PI / 8, px = gx + Math.cos(ang) * (gr - 0.2), pz = gz + Math.sin(ang) * (gr - 0.2);
+      solids.push([px - 0.13, 0, pz - 0.13, px + 0.13, 2.6, pz + 0.13]);
+    }
+    // the greenhouse: steel posts and beams, glass panes (walls and a flat roof), a door gap facing the path, two
+    // planting tables along the sides
+    const [h1, k1, h2, k2, H] = [-38, 8, -32, 14, 2.5], posts = [-38, -36.5, -35, -33.5, -32], rows = [8, 9.5, 11, 12.5, 14];
+    for (const x of posts) for (const z of [k1, k2]) brush(x - 0.05, 0, z - 0.05, x + 0.05, H, z + 0.05, 'x_metal', ['bottom', 'top']);
+    for (const z of rows.slice(1, -1)) for (const x of [h1, h2]) brush(x - 0.05, 0, z - 0.05, x + 0.05, H, z + 0.05, 'x_metal', ['bottom', 'top']);
+    brush(h1 - 0.05, H, k1 - 0.05, h2 + 0.05, H + 0.1, k1 + 0.05, 'x_metal'); brush(h1 - 0.05, H, k2 - 0.05, h2 + 0.05, H + 0.1, k2 + 0.05, 'x_metal');
+    for (const x of posts) brush(x - 0.05, H, k1 + 0.05, x + 0.05, H + 0.1, k2 - 0.05, 'x_metal', ['-z', '+z']);
+    const pane = (a, b, c, d, e, f) => glass.push({ min: [a, b, c], max: [d, e, f] });
+    for (let i = 0; i < 4; i++) {
+      const [a, b] = [posts[i] + 0.05, posts[i + 1] - 0.05];
+      if (i !== 2) pane(a, 0, k1 - 0.02, b, H, k1 + 0.02); // (the third bay of the north side is the door)
+      pane(a, 0, k2 - 0.02, b, H, k2 + 0.02);
+      pane(h1 - 0.02, 0, rows[i] + 0.05, h1 + 0.02, H, rows[i + 1] - 0.05);
+      pane(h2 - 0.02, 0, rows[i] + 0.05, h2 + 0.02, H, rows[i + 1] - 0.05);
+      pane(a, H + 0.06, k1 + 0.05, b, H + 0.1, k2 - 0.05);
+    }
+    for (const x of [h1 + 0.2, h2 - 1.0]) brush(x, 0, k1 + 0.6, x + 0.8, 0.85, k2 - 0.6, { top: hedge, side: 'x_wood' }, ['bottom']);
+    face('x_gravel', 1, 1, 0.01, [h1, 0, k1], [h2, 0, k2]);
+    // the hedge maze in the south-west corner (4 x 4 cells, its way in from the north-east)
+    const MX = [x1, -47.15, -45.1, -43.05, -41.0], MZ = [13.0, 15.24, 17.48, 19.71, z2], ht = 2.2, th = 0.3; // (too tall to jump onto)
+    const hedgeX = (z, xa, xb) => brush(xa - th, 0, z - th, xb + th, ht, z + th, hedge, ['bottom']);
+    const hedgeZ = (x, za, zb) => brush(x - th, 0, za - th, x + th, ht, zb + th, hedge, ['bottom']);
+    hedgeX(MZ[0], x1 + th, MX[3]); hedgeZ(MX[4], MZ[0], z2 - th);
+    hedgeX(MZ[1], MX[1], MX[4]); hedgeX(MZ[2], x1 + th, MX[3]); hedgeX(MZ[3], MX[1], MX[2]);
+    hedgeZ(MX[3], MZ[2], MZ[3]); hedgeZ(MX[2], MZ[3], z2 - th);
+  }
+
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows };
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass };
 }

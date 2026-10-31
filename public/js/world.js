@@ -1638,6 +1638,7 @@ export function buildWorld(scene, map, qualityName) {
   const frameMat = lam(0xeae4d6);
   const windows = new Batch(group, { receiveShadow: q.shadows });
   const showPane = p => windows.setVisible(p.pane, !p.broken && !p.down);
+  let plainGlass = null; // (one material for all of them, so they merge into one mesh)
   for (const b of map.boxes.filter(x => x.glass)) {
     const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1], d = b.max[2] - b.min[2];
     const alongX = w > d;
@@ -1647,8 +1648,9 @@ export function buildWorld(scene, map, qualityName) {
       // A converted level's glass (shop windows, skylights): just the pane, its frame is part of the level.
       const pane = new THREE.Group();
       pane.position.set(...c);
-      pane.add(mesh(new THREE.BoxGeometry(Math.max(w, 0.02), Math.max(h, 0.02), Math.max(d, 0.02)),
-        new THREE.MeshPhongMaterial({ color: 0x9ab4c0, transparent: true, opacity: 0.3, shininess: 120, specular: 0xffffff, depthWrite: false, side: THREE.DoubleSide }), 0, 0, 0, false));
+      // (front faces only: a pane is a closed box, so you still see one face of it from either side — half the overdraw)
+      plainGlass ||= new THREE.MeshPhongMaterial({ color: 0x9ab4c0, transparent: true, opacity: 0.3, shininess: 120, specular: 0xffffff, depthWrite: false });
+      pane.add(mesh(new THREE.BoxGeometry(Math.max(w, 0.02), Math.max(h, 0.02), Math.max(d, 0.02)), plainGlass, 0, 0, 0, false));
       panes.set(b.id, { pane: windows.add(pane), center: c, size: [w, h, d], ids: wallAround(b) });
       continue;
     }

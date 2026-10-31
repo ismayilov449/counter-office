@@ -9,7 +9,7 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 
 ---
 
-## 1. Where things stand (12 of 15 steps done)
+## 1. Where things stand (13 of 15 steps done)
 
 | # | Step | Status | Commit(s) |
 |---|------|--------|-----------|
@@ -24,8 +24,8 @@ together. `main` itself only has steps 1 and 4. The branches `feature/t-weapons`
 | 9 | Mansion: storm drain | ✅ done | `971813a` |
 | 10 | Mansion: roof terrace + drainpipe ladder | ✅ done | `971813a` |
 | 11 | Mansion: garage | ✅ done | `f56ff90` (test scripts fixed in `07c7d96`) |
-| 12 | Mansion: neighbour's house | ✅ done | see `git log` ("Mansion: the neighbour's house ...") |
-| 13 | Mansion: back garden | ⬜ not started | |
+| 12 | Mansion: neighbour's house | ✅ done | `eb58669` |
+| 13 | Mansion: back garden | ✅ done | see `git log` ("Mansion: back garden ...") |
 | 14 | Mansion at night | ⬜ not started | |
 | 15 | FPV drone (T) | ⬜ not started (do it last) | |
 
@@ -166,7 +166,7 @@ firing the RPG-26. Both work.
 - **The window:** in the bedroom's west wall, z −8.4…−5.6, y 4.1…5.4; glass from `RM.windows` (mansion.js now takes windows
   from mansion2.js too, with their own light group). From it you see the mansion's front over both walls; from the street
   you can't see it (only the top 0.7 m of the house shows over the street wall).
-- **Bounds:** ±40.5 now (was ±29.2): the radar shows 81 m instead of 58.4 m. Checked: the radar draws the house at the
+- **Bounds:** ±40.5 after this step (was ±29.2; ±50 after step 13): the radar showed 81 m instead of 58.4 m. Checked: the radar draws the house at the
   right edge, the sky grid covers it (ground floor covered by the bedroom floor, bedroom under breakable roof pieces, the
   roof open), nav builds (26.6k nodes).
 - **Invisible walls:** the one over the street wall is cut away along the garden; new ones stand over the garden walls,
@@ -181,14 +181,40 @@ firing the RPG-26. Both work.
   page errors); screenshots `v12.json` looked at; t5/t8/t11 still pass; nav builds; BOTS=4 for 60 s; de_dust2 loads.
 - **Not verified:** bots using the house (bot work is skipped).
 
+### 13. Back garden
+- **Where:** x −49.2…−29.16 (inside its walls), z −20.73…21.95, behind the west estate wall; a 3 m gateway through that
+  wall at z −1.5…1.5. Garden walls as tall as the estate's (3.45 m) with invisible walls over them; the old invisible
+  wall beyond the estate wall (x −30.79…−29.16, from the ground up) is gone. The estate wall got faces on its garden side.
+- **Pool:** x −44.5…−35.5, z −16.5…−7.5, floor at −2.0, water surface drawn at −0.25. Dug with `hollow()` (open top),
+  pool tiles, 4 steps of 0.4 m in the south-east corner. Its water box (`RM.water`, added to `map.water`) reaches 0.1 m
+  above the deck so a swimmer holding Space rises high enough to step out. `swim.mjs` simulates swimming.
+- **Greenhouse:** x −38…−32, z 8…14: steel posts and beams (`x_metal` brushes), 19 plain glass panes (`RM.glass`, made in
+  mansion.js as `plain` glass boxes), a door gap on the north side, gravel floor, two planting tables.
+- **Gazebo** (the existing `gazebo` decor, centre (−45.2, 0)) with solid pillars and a raised floor; **maze**: 4×4 cells in
+  x −49.2…−41, z 13…21.95, hedges 2.2 m (too tall to climb onto, the bench idea was dropped for that reason).
+- **Bounds** ±50 now (the radar shows 100 m). The outside lawn plane no longer runs under the garden (it showed in the pool).
+- **Draw cost kept down:** walls, hedges and paths use materials the level already draws; plain glass panes now share one
+  material (all of them merge into one mesh — this also helps cs_assault) and draw front faces only (half the overdraw).
+- **Fixed on the way:** the garage floor had no nav nodes (the bots' grid merges floors less than 5 cm apart and kept
+  the lower one); its slab is 10 cm thick now.
+- **Verified:** `walk.mjs`/`swim.mjs` (through the gateway, into the pool and out over the edge with Space and up the
+  steps, into the greenhouse by its door, glass stops you); nav reaches the maze's dead end, the greenhouse, the gazebo,
+  the pool floor and deck from the T spawn; browser test `g13.mjs` (walk into the pool, swim out, a pistol shot breaks
+  two panes, no page errors); screenshots `v13.json` looked at; t7/t11 pass; BOTS=4 for 60 s; de_dust2 loads.
+- **Frame cost** (before → after, swiftshader, `vcost.json`): views that don't face the garden: draw calls +0…+9,
+  triangles +0.2k…+1.1k (<1%), frame time within the noise. Facing it: through the gateway from the back lawn 49 → 60
+  calls, 113.0k → 115.2k triangles, 102 → 115 ms (+12%); from the T spawn's west window 54 → 63 calls, 236 → 241 ms (+2%);
+  in the garden itself 35 calls and 11.8k triangles.
+
 ### Known problems to watch
 - **Mansion load time** (measured 2026-10-31 on the new PC, i9-13980HX, 5 runs each): building cs_mansion (importing
   mansion.js, which the browser does too on every page load) took ~350–390 ms, the same as `main` before Mansion 2.0
   (~335–380 ms), so the 1.3× was the overloaded old laptop. `breakUp()` was most of it: for each piece it looked at every
   static solid (the caps) and clipped every face of a plane against every piece on it. In step 12 both got an index /
-  quick bounds test (the output is byte-for-byte the same, checked by hashing every map), and the build now takes
-  **~260–280 ms** with steps 11–12 in it (`remodel()` ~40 ms of that). In the browser `buildWorld` takes ~240–300 ms
-  (swiftshader).
+  quick bounds test (the output is byte-for-byte the same, checked by hashing every map), and the build took
+  **~260–280 ms** with steps 11–12 in it (`remodel()` ~40 ms of that). Timings on this PC drift (it got ~1.4× slower over
+  the afternoon), so compare side by side: after step 13, in one sitting, the resume point built in ~500–530 ms, step 12
+  in ~355 ms and step 13 in ~360 ms (`remodel()` ~70 ms). In the browser `buildWorld` takes ~240–440 ms (swiftshader).
 - **Lighting rooms:** Mansion uses 21 of the 24 allowed in `public/js/roomlight.js`: the storm drain's three boxes and the
   smugglers' tunnel's two were merged into one box each (they're deep underground, nothing else is drawn in them), which
   freed three; the garage and the neighbour's house (one box for both floors) took one each.
@@ -196,8 +222,9 @@ firing the RPG-26. Both work.
   after: draw calls +1…+19 per view (+19 in the kitchen, which looks into the garage), triangles +3.5k…+5.8k (~+4%), frame
   time within the noise (±4%). Step 12: +22…+24 draw calls in views facing east (T spawn, porch, terrace, street; its
   lamps, door, window and new materials), none elsewhere; triangles +2.5k…+3.5k (~+2%); frame time within the noise.
-- **Map bounds** are still ±29.2. Growing them (steps 12 and 13) shrinks everything on the radar and affects the mortar
-  map, the sky grid and nav.
+  Step 13: see its notes.
+- **Map bounds** are ±50 now (were ±29.2): the radar and the mortar map show 100 m, so things on them are smaller; the
+  sky grid and nav grid grew with them (nav 30.3k nodes, built in ~160–220 ms).
 - **Nav quirk:** false "drop through the floor" links next to walls: 97 already on main, plus 15 between the living room
   and the cellar. Left alone because bot work is skipped.
 
