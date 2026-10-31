@@ -3,7 +3,8 @@
 // bleeds. 1. the cap (BLOOD.max) piled up in view, and the draw calls with the drops shown and hidden (one draw call);
 // 2. the Runner's trail along the Mansion's street, then down the cellar stairs (the drops lie on the steps);
 // 3. the Runner shoots the Watcher: the BLEEDING badge, his own drops as he walks, P bandages (bar, slow walking),
-// the badge goes; 4. Dust II: a trail over the sand slope beside Long A, the drops tilted with it.
+// the badge goes; 4. Mansion at night: a new map clears the drops, a trail over the house's sloped roof (the drops
+// tilted with it) and along the street in the dark. Run it with CDP_PORT=9420 GAME_PORT=4020 (up.sh starts the server).
 // Screenshots in OUT (gb_*.png), page errors printed.
 import { open, sleep } from '../mansion/game.mjs';
 import { player, admin } from '../mansion/client.mjs';
@@ -151,32 +152,38 @@ await tp([27, 0, 4], 0, -0.35);
 await sleep(800);
 await shot('gb_ownTrail.png');
 
-// ---- 4. Dust II: the sand slope beside Long A
-await admin({ action: 'map', map: 'de_dust2' });
-coll = new CollisionWorld(MAPS.de_dust2);
+// ---- 4. Mansion at night: a new map clears the drops; a trail over the house's sloped roof, the drops tilted with it
+await admin({ action: 'map', map: 'cs_mansion_night' });
+coll = new CollisionWorld(MAPS.cs_mansion_night);
 phase = null;
 await sleep(4000);
 await live();
 await hook();
 ok(`a new map: no drops (${await drops()})`, (await drops()) === 0);
-const y0 = floorY(52, -16, 4.5);
-runner.at([52, y0, -16], 0); await sleep(700);
-const hpD = await wound();
-ok(`the runner bleeds on Dust II (hp ${hpD})`, hpD < 100);
-const sand = [];
-for (let z = -16; z >= -28.01; z -= 0.5) sand.push([52 + Math.sin(z * 0.6) * 1.5, z]);
-await walk(runner, sand, y0);
-runner.at([30, 0.1, -33]);
-await tp([46.5, floorY(46.5, -22, 3.5), -22], -Math.PI / 2, -0.4);
+const y0 = floorY(-22.5, -8, 8.5);
+runner.at([-22.5, y0, -8], Math.PI / 2); await sleep(700);
+const hpN = await wound();
+ok(`the runner bleeds at night (hp ${hpN})`, hpN < 100);
+const roof = [];
+for (let x = -22.5; x <= -16.01; x += 0.5) roof.push([x, -8 + Math.sin(x * 0.8) * 0.8]);
+await walk(runner, roof, y0);
+runner.at([-18, -2.2, -1]); // (down in the cellar, out of sight)
+await tp([-20.5, floorY(-20.5, -3.5, 9.5), -3.5], 0, -0.45);
 await sleep(1200);
-const nSand = await drops();
-ok(`drops on the sand slope: ${nSand}`, nSand >= 15);
-await shot('gb_dust2.png');
-const tilted = (await matrices(0)).filter(([x, y, z, nx, ny]) => ny < 0.995).length;
-ok(`drops lying tilted on the slope: ${tilted} of ${nSand}`, tilted >= 5);
-await tp([50.2, floorY(50.2, -22, 3.5), -21], -Math.PI / 2, -0.85);
+const nRoof = await drops();
+ok(`drops on the roof: ${nRoof}`, nRoof >= 8);
+await shot('gb_night_roof.png');
+const tilted = (await matrices(0)).filter(([x, y, z, nx, ny]) => ny < 0.95).length;
+ok(`drops lying tilted on the roof's slope: ${tilted} of ${nRoof}`, tilted >= nRoof - 2);
+await tp([27, 0, 1], 0, -0.3);
+runner.at([27, 0, -14], Math.PI); await sleep(700);
+await wound();
+const st2 = [];
+for (let z = -14; z <= -6.01; z += 0.5) st2.push([27 + Math.sin(z * 0.6), z]);
+await walk(runner, st2, 0);
+runner.at([-18, -2.2, -1]);
 await sleep(1000);
-await shot('gb_dust2_close.png');
+await shot('gb_night_street.png');
 
 console.log('page errors:', errors.length ? errors.slice(0, 8).join('\n') : 'none');
 ok('no page errors', !errors.length);
