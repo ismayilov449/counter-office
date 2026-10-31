@@ -11,6 +11,7 @@
 //   - a garage against the house's north wall: a roller door to the lawn, a car inside, a side door to the kitchen
 //   - the neighbour's house across the street (CT side): two storeys, its bedroom window facing the mansion
 //   - a back garden west of the estate wall: a pool, a gazebo, a glass greenhouse and a hedge maze
+//   - a zip line from a deck on the neighbour's roof down to the roof terrace
 import { clip } from './breakables.js';
 
 const IN = 0.0254; // a texel, in metres
@@ -345,7 +346,9 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     const up = 3.2, ceil = 5.8, gw = 2.2; // the bedroom's floor, the roof's underside, the garden walls' height
     const ext = 'x_tanbrick', int = 'c1a1w1d', wall = 'c1a3wall05', gate = [-7.6, -6.4], door = [-7.5, -6.5], win = [-8.4, -5.6, 4.1, 5.4];
     // the street wall: no invisible wall over it here (nor along its top beyond), a gap in it, a face on its garden side
-    carve(29.16, 3.45, gz1, 30.79, 17.3, gz2);
+    // (from 29.15: the invisible wall began at 29.159, and a 1 mm sliver of it left over the street wall stopped bullets
+    // from the bedroom window, and the zip line's riders)
+    carve(29.15, 3.451, gz1, 30.79, 17.3, gz2);
     solids.push([28.7, 3.45, gz1 - 0.3, 29.16, 20, gz1], [28.7, 3.45, gz2, 29.16, 20, gz2 + 0.3]);
     carve(28.7, 0, gate[0], 30.85, 2.4, gate[1]);
     reveal(0, 28.75, 30.79, gate[0], gate[1], 0, 2.4, wall, 'c2a4_flr1');
@@ -427,6 +430,7 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     // the old invisible wall beyond the estate wall (and a sliver of an invisible ledge over it)
     carve(-30.8, 0, -21.54, -29.16, 15.66, 22.76);
     carve(-30.8, 4.2, -12.5, -29.16, 4.4, -7.0);
+    carve(-29.17, 3.461, -21.54, -29.15, 15.66, 22.76); // (and a 1 mm sliver of it left over the wall, which stopped bullets)
     // the gateway, and faces on the outer side of the estate wall
     carve(-29.2, 0, gate[0], -28.3, W + 0.01, gate[1]);
     face(wall, 2, 1, gate[0], [-29.16, 0, 0], [-28.35, W, 0]);
@@ -487,6 +491,63 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     hedgeZ(MX[3], MZ[2], MZ[3]); hedgeZ(MX[2], MZ[3], z2 - th);
   }
 
+  // ---------------------------------------------------------------- 16. the zip line
+  // A steel cable from a platform on the neighbour's roof down to a pole on the mansion's roof terrace, over the
+  // street, the estate wall and the lawn (39 m, 5% down): the CTs' fast, risky way onto the house. A ladder in the
+  // bedroom (by the bed) goes up through an opening in the roof; on the roof a 1 m deck with a railing carries the mast
+  // the cable hangs from. At the terrace end the cable runs over a pulley on the pole down to its tensioner, low enough
+  // for a Terrorist to cut. The cable itself is drawn by the browsers (it can be cut); riding it is in server.js and
+  // shared/gadgets.js (map.zip: the ends, where you hook on, where a ride stops).
+  let zip;
+  {
+    // (the deck on the bots' 0.5 m grid, and the pole between its cell centres: a cell centre just under something solid
+    // loses its floor, and the grid then links the floors around it straight down through the roof)
+    const roof = 6.0, top = roof + 1.0, z = -8.0, [d1, d2] = [33.0, 35.0], rail = 0.95;
+    // an opening in the bedroom's ceiling by the bed, and an attic ladder up its south edge (you climb facing south and
+    // step off onto the roof there, away from the parapet)
+    const [h1, k1, h2, k2] = [35.5, -10.0, 36.5, -9.0]; // (room for a climber held 0.5 m off the ladder)
+    carve(h1, 5.79, k1, h2, roof + 0.01, k2);
+    face('x_trim', 0, 1, h1, [0, 5.8, k1], [0, roof, k2]);
+    face('x_trim', 0, -1, h2, [0, 5.8, k1], [0, roof, k2]);
+    face('x_trim', 2, 1, k1, [h1, 5.8, 0], [h2, roof, 0]);
+    face('x_trim', 2, -1, k2, [h1, 5.8, 0], [h2, roof, 0]);
+    ladders.push([(h1 + h2) / 2, k2, [0, -1], 3.2, roof + 0.95, 0.6]);
+    // the deck (2 x 2 m, 1 m high) with a ladder up its south side, railings north and south (one box each to bump
+    // into; a top bar and posts to see), the mast at its east edge: two posts and a crossbar the cable hangs from
+    brush(d1, roof, z - 1, d2, top, z + 1, { top: 'x_deck', side: 'x_wood' }, ['bottom']);
+    keep.push([d1 - 0.01, roof - 0.01, z - 1.01, d2 + 0.01, top + 0.01, z + 1.01]);
+    ladders.push([34.3, z + 1, [0, 1], roof, top + 0.95, 0.5]);
+    for (const [x1, x2, za, zb] of [[d1, d2, z - 1, z - 0.96], [d1, 34.0, z + 0.96, z + 1], [34.6, d2, z + 0.96, z + 1]]) {
+      solids.push([x1, top, za, x2, top + rail, zb]);
+      brush(x1, top + rail - 0.05, za, x2, top + rail, zb, 'x_metal', ['bottom'], false);
+      const n = Math.ceil((x2 - x1) / 0.9);
+      for (let i = 0; i <= n; i++) {
+        const x = Math.min(x2 - 0.02, Math.max(x1 + 0.02, x1 + ((x2 - x1) * i) / n));
+        brush(x - 0.02, top, za, x + 0.02, top + rail - 0.05, zb, 'x_metal', ['bottom', 'top'], false);
+      }
+    }
+    const mx = d2 - 0.13;
+    for (const pz of [z - 0.55, z + 0.45]) brush(mx - 0.05, top, pz, mx + 0.05, top + 2.85, pz + 0.1, 'x_metal', ['bottom']);
+    brush(mx - 0.05, top + 2.75, z - 0.55, mx + 0.05, top + 2.85, z + 0.55, 'x_metal');
+    // the pole on the terrace (bolted to the house's front wall by a bracket), its pulley up top, the tensioner below
+    const px = -5.95;
+    brush(px - 0.04, 4.27, z - 0.06, px + 0.04, 7.85, z + 0.06, 'x_metal', ['bottom']);
+    brush(-6.5, 6.4, z - 0.03, px - 0.04, 6.48, z + 0.03, 'x_metal', [], false);
+    brush(px - 0.04, 7.55, z - 0.09, px + 0.12, 7.71, z + 0.09, 'x_metal', [], false);
+    brush(px + 0.04, 5.25, z - 0.05, px + 0.14, 5.6, z + 0.05, 'x_metal', ['-x'], false);
+    keep.push([-6.51, 4.26, z - 0.1, px + 0.17, 7.86, z + 0.1]); // (in the house's breakable area, but it stays)
+    // the cable: from a (under the crossbar) to b (the pulley); a rider's feet hang `hang` below it. Where you hook on
+    // (the deck, by the mast; the terrace, by the parapet) and where rides stop (`s`: metres down the cable from a)
+    const a = [mx, top + 2.6, z], b = [px, 7.6, z], len = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const sAt = x => ((a[0] - x) / (a[0] - b[0])) * len;
+    zip = {
+      a, b, hang: 2.35,
+      stands: [{ p: [34.1, top, z], s: sAt(34.1), dir: 1 }, { p: [-4.5, 4.27, z], s: sAt(-4.5), dir: -1 }],
+      endDown: sAt(-4.6), endUp: sAt(34.1),
+      cut: [px + 0.09, 5.42, z], floor: 4.27, // the tensioner, on the terrace's floor
+    };
+  }
+
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass };
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip };
 }

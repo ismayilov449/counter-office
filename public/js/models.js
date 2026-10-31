@@ -170,6 +170,20 @@ export function poseEmote(model, id, t) {
   }
 }
 
+// On one of the Mansion's gadgets (after posePlayer each frame): 1 hanging by both hands from the zip line's handle.
+// clearEmote puts the arms back afterwards.
+export function poseGadget(model, pose) {
+  const u = model.userData;
+  if (pose === 1) {
+    u.arms.rotation.x = 0;
+    u.rArm.rotation.set(1.62, 0, -0.08);
+    u.lArm.rotation.set(1.62, -0.45, 0.08); // (the left arm's box is turned in towards the gun's grip)
+    u.legs[0].rotation.x = 0.3;
+    u.legs[1].rotation.x = 0.12;
+  }
+  if (u.gun) u.gun.visible = !pose;
+}
+
 export function clearEmote(model) {
   const u = model.userData;
   u.hand.visible = true;

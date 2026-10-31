@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import { createGadgets } from './gadgets.js';
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -120,6 +121,7 @@ function loadMap(id) {
   clearSatchelModels();
   clearDroneModels();
   endDrone(null);
+  gadgets.load(map);
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
@@ -1302,6 +1304,7 @@ function stopUse(src) {
 function die() {
   if (!me.alive) return;
   if (me.drone) endDrone(null);
+  gadgets.died();
   if (me.emote) stopEmote();
   if (me.driving != null || me.riding) leaveCar(null);
   me.alive = false;
@@ -1506,7 +1509,7 @@ function sampleRemote(r, rt) {
   else if (rt >= c.t && b.length > 1 && c.alive && b[b.length - 2].alive && rt - c.t < 150) {
     // the next snapshot is late: keep them going the way they were (up to 150 ms) instead of freezing them
     const p = b[b.length - 2], k = Math.min(rt - c.t, 150) / (c.t - p.t || 1);
-    return { p: [c.p[0] + (c.p[0] - p.p[0]) * k, c.p[1], c.p[2] + (c.p[2] - p.p[2]) * k], yaw: c.yaw, pitch: c.pitch, c: c.c, alive: c.alive, w: c.w };
+    return { p: [c.p[0] + (c.p[0] - p.p[0]) * k, c.p[1], c.p[2] + (c.p[2] - p.p[2]) * k], yaw: c.yaw, pitch: c.pitch, c: c.c, alive: c.alive, w: c.w, pose: c.pose };
   } else if (rt >= c.t) a = c;
   else {
     for (let i = b.length - 1; i > 0; i--) {
@@ -1524,6 +1527,7 @@ function sampleRemote(r, rt) {
     c: f < 0.5 ? a.c : c.c,
     alive: (f < 0.5 ? a : c).alive,
     w: (f < 0.5 ? a : c).w,
+    pose: (f < 0.5 ? a : c).pose,
   };
 }
 
@@ -1572,6 +1576,7 @@ function updateRemotes(dt) {
     if (deployed && !r.mortarSet) { r.mortarSet = new THREE.Group(); scene.add(r.mortarSet); }
     if (r.mortarSet) { r.mortarSet.visible = deployed; if (deployed) placeMortarModel(r.mortarSet, s.p, s.yaw, r.mo); }
     if (r.model.userData.gun) r.model.userData.gun.visible = !deployed;
+    gadgets.pose(r, alive ? s.pose || 0 : 0); // (hanging from the zip line...)
     r.model.userData.headG.scale.setScalar(bigHeads());
     if (r.tag) r.tag.visible = alive;
     r.model.visible = !(!me.alive && me.specId === r.id && specActive) && !(killcam && killcam.killer === r.id) && !(!alive && r.model.userData.gibAll);
@@ -2182,6 +2187,7 @@ document.addEventListener('mousedown', e => {
     else if (e.button === 2) openMortarMap(false);
     return;
   }
+  if (gadgets.busy() && me.alive && e.button !== 1) return; // (on a gadget: no shooting or throwing)
   if (me.drone && me.alive) {
     if (e.button === 0) droneBomb();
     else if (e.button === 2) droneDive();
@@ -2783,8 +2789,18 @@ const net = new Net({
   exited(m) {
     leaveCar(m.p, m.yaw);
   },
+  gadgets(m) {
+    gadgets.onState(m);
+  },
+  zip(m) {
+    gadgets.onZip(m);
+  },
+  zipEnd(m) {
+    gadgets.onZipEnd(m);
+  },
   spawn(m) {
     if (me.driving != null || me.riding) leaveCar(null);
+    gadgets.died();
     if (isGG()) setTimeout(() => { const w = GUNGAME[me.ggLevel || 0]; if (me.alive && w === 'he') switchSlot('he', true); }, 150);
     Object.assign(me, {
       p: m.p.slice(), v: [0, 0, 0], yaw: m.yaw, pitch: 0, alive: true, spawnSeq: m.sq, reload: null, scope: 0,
@@ -2803,7 +2819,7 @@ const net = new Net({
     me.act = m.me;
     hud.score(m.sc);
     const seen = new Set();
-    for (const [id, x, y, z, yaw, pitch, c, w, alive, tc, fl, mo, hid] of m.pl) {
+    for (const [id, x, y, z, yaw, pitch, c, w, alive, tc, fl, mo, hid, pose = 0] of m.pl) {
       if (id === me.id) continue;
       seen.add(id);
       const team = tc === 1 ? 'T' : 'CT';
@@ -2818,7 +2834,7 @@ const net = new Net({
       r.fl = fl;
       r.mo = mo;
       r.hidden = !!hid;
-      r.buf.push({ t: m.time, p: [x, y, z], yaw, pitch, c, w, alive });
+      r.buf.push({ t: m.time, p: [x, y, z], yaw, pitch, c, w, alive, pose });
       if (r.buf.length > 300) r.buf.shift();
       if (w !== r.w) { r.w = w; setPlayerWeapon(r.model, w); }
     }
@@ -3155,10 +3171,14 @@ const net = new Net({
   },
 });
 
+// The Mansion's gadgets: the zip line (see gadgets.js).
+const gadgets = createGadgets({ scene, me, net, audio, remotes, serverNow, stopEmote: () => stopEmote() });
+
 // ---------------------------------------------------------------- per-frame updates
 
 function updateLocal(dt, now) {
   if (!me.alive) return;
+  if (gadgets.local(dt, now)) return;
   if (me.drone) { updateDroneFlight(dt, now); return; }
   if (me.driving != null && me.car) { updateDriving(dt, now); return; }
   if (me.riding) {
@@ -3176,7 +3196,7 @@ function updateLocal(dt, now) {
   }
   const moveBoxes = coll.move(null, me.p, 2);
   const id = current(), def = WEAPONS[id];
-  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || atFuseBox() || !!satchelToDefuse());
+  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || atFuseBox() || !!satchelToDefuse() || gadgets.holdSpot());
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar;
 
   const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar;
@@ -3397,7 +3417,7 @@ function updateCamera(dt, now) {
 
 function updateViewModel(dt, now) {
   if (!vm) return;
-  vm.visible = me.alive && me.driving == null && !me.drone && !(me.scope && WEAPONS[current()].sniper);
+  vm.visible = me.alive && me.driving == null && !me.drone && !gadgets.hidesWeapon() && !(me.scope && WEAPONS[current()].sniper);
   // (dimmer on a night map outdoors, map.theme.viewmodel; lit by a room's glow indoors)
   const amb = ambientAt(camera.position), k = map.theme.viewmodel ?? 1, glow = glowAt(camera.position);
   vmHemi.intensity = 2.2 * Math.max(0.12, amb) * Math.max(k, Math.min(1, glow * 0.7));
@@ -3510,7 +3530,7 @@ function updateHud(now) {
   hud.crosshair(settings.chGap + opening, me.alive && !def.sniper);
   hud.scope(sniperScoped);
 
-  let hint = '';
+  let hint = '', gh = null;
   if (me.alive && !me.act) {
     const drop = nearestDrop();
     const sw = nearestSwitch(), car = nearestCar(), door = nearestDoor();
@@ -3523,6 +3543,7 @@ function updateHud(now) {
     else if (me.riding) hint = 'Press E to get out of the car';
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
+    else if ((gh = gadgets.hint())) hint = gh;
     else if (current() === 'jammer') hint = 'Click to put the signal jammer down — no enemy radar, pings or drones within 15 m';
     else if (jammedHere()) hint = JAM_HINT;
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
@@ -3542,7 +3563,8 @@ function updateHud(now) {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
   hud.hint(hint);
-  if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
+  if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
+  else if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
 
@@ -3875,6 +3897,7 @@ function frame() {
   updateKillcam(dt);
   recordSelf();
   updateRemotes(dt);
+  gadgets.update(dt, now);
   updateCars(dt);
   updateHostageModels(dt);
   updateBomb(now);

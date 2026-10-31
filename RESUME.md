@@ -36,6 +36,14 @@ conflicts were resolved by keeping both).
 **Nothing is half-done.** Every step was committed and pushed when it was finished. The plan is complete; what's left is
 in "Known problems to watch" and the "Not verified" lines below.
 
+**New on 2026-10-31: three Mansion gadgets, one at a time, each committed and pushed** (see section 7):
+
+| # | Gadget | Status |
+|---|--------|--------|
+| 16 | Zip line (neighbour's roof → roof terrace) | ✅ done ("Zip line: …" in `git log`) |
+| 17 | CCTV (4 cameras, a security desk) | not started |
+| 18 | Lift in the house (cellar, ground floor, upper floor) | not started |
+
 ### Post-merge check (on the old laptop, Mansion, headless Edge)
 The merged build starts, and Mansion loads. A Terrorist bought the jammer, satchel and RPG-26 together ($16,000 → $10,500),
 put the jammer down and threw the satchel, which stuck. There were no page errors.
@@ -398,3 +406,57 @@ For every step:
   `msedge.exe --headless=new --remote-debugging-port=9333 --user-data-dir=<temp>\edge-profile --enable-unsafe-swiftshader --use-angle=swiftshader --no-first-run --window-size=1280,720 about:blank`
 - **Useful server env vars:** `MAP=cs_mansion`, `BOTS=0..8`, `START_MONEY=16000`, `GAME_MODE`, `DEBUG_TICK=1` (tick times),
   `PORT`, `HTTPS_PORT`, `DATA_DIR`.
+
+## 7. The Mansion's gadgets (2026-10-31): zip line, CCTV, lift
+
+The user asked for three features on both Mansion maps, in this order, each tested, committed and pushed on its own:
+a zip line, CCTV, a lift in the house. Code: geometry in `shared/maps/mansion2.js` (sections 16–18, exported on the
+map as `zip`, …), the numbers and maths both sides use in **`shared/gadgets.js`**, the server's part in `server.js`
+("The Mansion's gadgets", after the blackout), the browser's in **`public/js/gadgets.js`** (main.js calls it: `load`,
+`local`, `update`, `hint`, `pose`, the messages). Their state reaches the browsers in one `gadgets` message (on join,
+each round, on every change). A gadget's pose for other players is the snapshot row's last field (1 hanging from the
+zip line). `busy(p)` on the server (someone on a gadget can't shoot, throw or use items).
+
+### 16. Zip line
+- **Where:** the cable runs at z = −8.0 from `a` = (34.87, 9.6) under the crossbar of a mast on a deck on the
+  neighbour's roof (deck x 33…35, z −9…−7, top 7.0; the roof is at 6.0) down to `b` = (−5.95, 7.6), a pulley on a pole on
+  the roof terrace (41 m, 4.9% down); over the pulley it runs down the pole to its tensioner (−5.86, 5.42). Up to the
+  roof: an attic ladder in the bedroom on the south edge of an opening x 35.5…36.5, z −10…−9 in the ceiling (you climb
+  facing south and step off onto the roof, away from the parapet); up the deck: a ladder on its south side (railing
+  gap). The deck, mast and pole are level brushes (`keep`: they never break; the pole is in the house's breakable area).
+  The cable, its loose ends and the trolleys are drawn by the browsers (gadgets.js), not part of the level, so it
+  doesn't block mortar shells or touch the sky grid.
+- **Why those numbers:** the deck sits on the bots' 0.5 m grid and the pole between its cell centres (x −5.99…−5.91):
+  a cell centre just under something solid loses its floor and the grid then links the floors around it straight down
+  through the roof (the first try added 27 such links; now there are 157 against 159 before).
+- **Riding:** `map.zip.stands` (deck (34.1, 7.0), terrace (−4.5, 4.27); within 1.3 m), `endDown`/`endUp` (s along the
+  cable from `a`), `hang` 2.35 (feet under the cable). `zipRide(z, s0, dir, t)` is a fixed 1/120 s step from the start
+  (+ the part step), so the server (zipTick, every tick; the 'state' handler ignores the rider's own position) and the
+  rider's browser (from `serverNow()`) agree; others see the snapshot position. Down: 2.5 m/s² to 10 m/s, braking at
+  4 m/s² to 3 m/s at the end (6.5 s); up: 2.5 m/s (16 s). Letting go (E = 'use', Space = `{t:'zip', off:1}`) sends
+  `zipEnd` with the cable's velocity; the landing is found from the positions the browser sends (no lower for 150 ms)
+  and costs `fallDamage(drop)` (CS 1.6's: 0 up to 14.7 m/s, 100 at 26 m/s). **The game had no fall damage at all**;
+  only falls off the zip line hurt.
+- **Cutting:** a Terrorist within 0.9 m of the tensioner holds E (act `cut`, 3 s, `zipsaw` sound, also in warmup);
+  riders fall, `zipsnap`. `game.zipCut` is cleared in `resetWorld` (each round), after 60 s without rounds.
+- **Fixed on the way:** a 1 mm sliver (x 29.159…29.16, y 3.45…17.3) of the old invisible wall was left over the street
+  wall along the neighbour's garden by step 12's carve: it stopped every bullet from the bedroom window to the mansion
+  (and would have stopped riders). Another over the west estate wall (x −29.16…−29.159, above 3.46) stopped shots over
+  that wall. Both carved away.
+- **Verified:** server test `t16zip.mjs` (hook on at the deck, the snapshot shows pose 1 under the cable, a pistol shot
+  from the terrace hits the rider, drop-off at the terrace after 6.5 s, top speed ~10 m/s, letting go over the street
+  then a 6.8 m drop = 16 damage as fallDamage says, climbing from the terrace, the T cuts it (sound, state, the climber
+  falls), no hooking on to a cut cable, back after a restart); browser test `g16zip.mjs` on both maps (hints, the ride
+  in first person, looking up at our trolley, the drop-off, a scripted CT hanging under his trolley seen from the
+  terrace, cutting with the progress bar, the loose ends; no page errors); `walk.mjs` up both ladders; `zipcheck`
+  (a scratch script: raycasts along the cable and the rider's body: nothing in the way, highest drop 7.1 m); t5, t7, t8,
+  t11, t15hits still pass; walls.mjs 0/0; nav builds (30.4k nodes); 60 s with BOTS=4, no errors, tick ~1 ms;
+  de_dust2 loads.
+- **Draw cost** (vcost.json + a view from the deck and one over the neighbour's roof, viewer.js): +0…+4 draw calls and
+  +0.2k…+1.3k triangles per view (the deck, mast, railings and pole), plus 2 for the cable where it's in view and 1 per
+  rider's trolley (these are drawn by gadgets.js, not counted by viewer.js).
+- **Not verified:** the whir, clip, saw and snap sounds by ear; the ride at full frame rate (headless Edge runs at a few
+  fps; its screenshots lag the game by a second or more, so the scripted rider in g16 climbs slowly).
+- **Choices:** more than one rider at a time (not within 1.5 m of another at the start); bots never hook on; a
+  Terrorist pressing E within 0.9 m of the tensioner cuts instead of hooking on (the hint says which); hooking on at the
+  terrace lifts you about a metre (you jump up to the handle).

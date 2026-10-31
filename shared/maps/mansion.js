@@ -218,6 +218,8 @@ export default {
     { p: [-19.75, -17.9], y: 1, yaw: -Math.PI / 2, color: '#7a1e1a' },
   ],
   labels: {},
+  // The zip line from the neighbour's roof to the roof terrace (see mansion2.js and shared/gadgets.js).
+  zip: RM.zip,
   theme: {
     skyTop: '#3f7fc4', skyHorizon: '#cfe0ec', fog: ['#d8e2e8', 90, 300],
     sun: { color: '#fff4e2', intensity: 2.8, dir: [35, 75, 25] },

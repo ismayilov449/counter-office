@@ -805,6 +805,27 @@ export const audio = {
         tone(out, t + len, { freq: 120, freqEnd: 70, dur: 0.14, type: 'square', gain: 0.12 });
         break;
       }
+      case 'zipclip':
+        // a trolley's carabiner snapping onto the zip line, the cable taking the weight
+        burst(out, t, { dur: 0.03, type: 'highpass', freq: 3500, gain: 0.6 });
+        tone(out, t, { freq: 2400, freqEnd: 1900, dur: 0.05, type: 'square', gain: 0.06 });
+        tone(out, t + 0.04, { freq: 180, freqEnd: 140, dur: 0.4, type: 'triangle', gain: 0.12 });
+        break;
+      case 'zipsaw':
+        // bolt cutters working on the steel cable at its tensioner: strained creaks and scrapes (3 s)
+        for (let k = 0; k < 9; k++) {
+          const t0 = t + k * 0.33 + Math.random() * 0.05;
+          burst(out, t0, { dur: 0.22, type: 'bandpass', freq: 2200 + Math.random() * 900, q: 6, gain: 0.35 });
+          tone(out, t0, { freq: 300 + Math.random() * 120, freqEnd: 420, dur: 0.18, type: 'sawtooth', gain: 0.05 });
+        }
+        break;
+      case 'zipsnap':
+        // the cable parting: a sharp crack and a long whipping twang
+        burst(out, t, { dur: 0.06, type: 'highpass', freq: 2500, gain: 1.4 });
+        tone(out, t, { freq: 900, freqEnd: 120, dur: 1.4, type: 'sawtooth', gain: 0.12 });
+        tone(out, t, { freq: 1350, freqEnd: 180, dur: 1.1, type: 'triangle', gain: 0.1 });
+        burst(out, t + 0.05, { dur: 0.8, type: 'bandpass', freq: 1400, freqEnd: 300, q: 3, gain: 0.3 });
+        break;
       case 'creak': {
         // a stuck old door forced open: a thump, then a long groaning creak of dry hinges (arg: seconds)
         const len = arg || 1.5;
@@ -913,6 +934,49 @@ export const audio = {
   stopEngines() {
     for (const e of this.engines.values()) { e.o1.stop(); e.o2.stop(); e.g.disconnect(); }
     this.engines.clear();
+  },
+  // A steady machine sound at a spot, one per id while it runs; loop(id, null) stops it. 'whir': a zip line trolley's
+  // wheels on the cable (level: its speed in m/s, higher and louder the faster); 'hum': the lift's motor (level 1 running,
+  // 0 stopped).
+  loops: new Map(),
+  loop(id, pos, kind = 'whir', level = 1) {
+    if (!ctx || ctx.state !== 'running') return;
+    let l = this.loops.get(id);
+    if (!pos) {
+      if (l) { l.o1.stop(); l.o2.stop(); l.src.stop(); l.g.disconnect(); this.loops.delete(id); }
+      return;
+    }
+    if (!l) {
+      const out = this.out(pos, kind === 'whir' ? [4, 1] : [2.5, 1.3]);
+      const g = ctx.createGain(), f = ctx.createBiquadFilter(), nf = ctx.createBiquadFilter(), ng = ctx.createGain();
+      g.gain.value = 0;
+      f.type = 'lowpass';
+      f.frequency.value = kind === 'whir' ? 1800 : 500;
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), src = ctx.createBufferSource();
+      o1.type = 'sawtooth'; o2.type = kind === 'whir' ? 'triangle' : 'square';
+      o1.frequency.value = kind === 'whir' ? 160 : 50; o2.frequency.value = kind === 'whir' ? 340 : 100;
+      // (and a hiss of the wheels or the cables running)
+      src.buffer = noise; src.loop = true;
+      nf.type = 'bandpass'; nf.frequency.value = kind === 'whir' ? 2600 : 900; nf.Q.value = 1.2;
+      ng.gain.value = kind === 'whir' ? 0.5 : 0.25;
+      src.connect(nf).connect(ng).connect(g);
+      o1.connect(f); o2.connect(f);
+      f.connect(g).connect(out);
+      for (const o of [o1, o2, src]) o.start();
+      l = { out, g, o1, o2, src, kind, level: -1 };
+      this.loops.set(id, l);
+    }
+    if (l.out.positionX) { l.out.positionX.value = pos[0]; l.out.positionY.value = pos[1]; l.out.positionZ.value = pos[2]; }
+    if (Math.abs(l.level - level) > 0.05) {
+      l.level = level;
+      const t = ctx.currentTime;
+      if (l.kind === 'whir') {
+        const k = Math.min(1, Math.abs(level) / 10);
+        l.o1.frequency.setTargetAtTime(120 + 260 * k, t, 0.1);
+        l.o2.frequency.setTargetAtTime(250 + 520 * k, t, 0.1);
+        l.g.gain.setTargetAtTime(Math.abs(level) < 0.1 ? 0 : 0.03 + 0.07 * k, t, 0.1);
+      } else l.g.gain.setTargetAtTime(level > 0 ? 0.06 : 0, t, 0.2);
+    }
   },
 
   // Radio commands are read out loud, like the CS radio voice.
