@@ -1,5 +1,38 @@
 # Floodgate (agent "flood", branch `feature/flood`)
 
+## STATUS
+- **Done and browser-verified** (headless Edge, swiftshader, 2026-11-01): `g1.mjs` passes **21/21 on cs_mansion and
+  on cs_mansion_night**, no page errors. Screenshots looked at: the valve and its hint, holding E (progress bar, the
+  wheel turning), the gush (still showing ~10 s after opening, until its mouth goes under), the drain filling, under
+  the water in the drain (green murk, fog, the AIR bar), drowning (10 a second once the air is gone), the tunnel's
+  water, the full cellar (head under standing, Space swims you up, out up the stairs by keyboard), the zap with the
+  power restored (both in the water killed, the fuse blown), the next round dry **at once** (level -4.88 one snapshot
+  into the round), the **lit cellar's water** with the power on, and the zap **seen by a victim who lives** (on a
+  stair 25 cm deep: 77 damage, a blue flash over the water, the lights flicker and go dark). The three fixes from the
+  partial run hold (the gush stays visible, the swim-up spot is clear of the table, the round reset snaps the level).
+- **Fixed in this run:** the five pipes of the valve were five draw calls (each map `pipe` decor gets its own material,
+  so the decor batching can't merge them; that's `world.js`, untouched): they're now one mesh drawn by
+  `public/js/flood.js` (`floodPipes()` in `shared/maps/mansion_flood.js` lists them). `g1.mjs`: two teleport spots were
+  inside the map's collision boxes (the valve spot 5 cm from the drain's south wall, the stairwell spot 20 cm into a
+  step: the game's physics throws a player out sideways from inside a box), now clear; a 960×540 page (`VIEW=`);
+  checks added for the gush at ~10 s, drowning, no shock with the power cut, the instant drain, and part g (the power
+  on, a victim who lives).
+- **Draw calls, against main** (at the fork, `14f3acf`; the live game, the same views, the largest frame): valve
+  196 → 199, drain 196 → 199, drain west 221 → 224, tunnel 256 → 259, street 211 → 212, cellar 255 → 255 (the wheel,
+  the pipes and the valve body's metal: +3 where the drain is in the frustum). Before the pipe fix it was ~+7. The
+  flood's own moving things: the wheel 1, the water surface 1, the gush 1 (measured by hiding them in the same frames).
+  The frame time on a real Intel iGPU isn't measured (swiftshader runs at 2–3 fps here).
+- **Tests** (all pass, 2026-11-01): `g1.mjs` (browser, both Mansion maps), `t1.mjs` 18/18, `t2.mjs` 7/7 (night),
+  `t3.mjs` (BOTS=4, 75 s: no server errors, tick ~0.8 ms avg, max 1.7), `swim.mjs` 7/7, `mansion/walls.mjs` (0 missing,
+  0 doubled). The server starts with all 7 maps.
+- **What's left:** the sounds by ear (gush, clunk, crackle, fizzle, muffled boom, gasp, blub); the frame time on a real
+  laptop. Seen in passing, not the flood's: from the stairwell a thin bright line shows at the same spot by day and at
+  night (light through a seam near the stairwell wall, it seems).
+- **How to run the browser test:** `GAME_PORT=4040 sh dev/test-scripts/flood/srv.sh ROUND_TIME=600` (add
+  `MAP=cs_mansion_night` for the night map), one headless Edge on CDP 9440 with `--disable-extensions --disable-sync`
+  and a fresh profile, then `GAME_PORT=4040 CDP_PORT=9440 node dev/test-scripts/flood/g1.mjs` (~4 minutes). Restart
+  the server before each run.
+
 ## (a) README
 
 For the cs_mansion section (it works the same on cs_mansion_night), after the storm drain:
@@ -34,9 +67,11 @@ Keys table: **E** (hold 3 s at the valve in the storm drain) opens or closes it 
   0.45, the cellar/tunnel to -0.45 at 1), `FLOOD_AREAS` (the spaces the water fills: `[x1, z1, x2, z2, floor,
   ceil]`), `floodMap(map)` (= `map.mansion2`), `waterTop(level, p)` / `underWater(level, p)`, `makeFloodBoxes()` /
   `setFloodBoxes(boxes, level)` (the boxes for `map.water`), `atValve(p)`.
-- `shared/maps/mansion_flood.js` — `floodWorks({ brush, decor })`: the valve body and stem (`x_metal`, not solid:
-  the drain is 1.2 m wide), five `pipe` decors (supply down from the ceiling; out of the valve west, up, west under
-  the ceiling, down to the mouth) and a flange at the mouth. The wheel is not here (it turns: see the client).
+- `shared/maps/mansion_flood.js` — `floodWorks({ brush })` (mansion2.js passes `decor` too; unused now): the valve
+  body and stem (`x_metal`, not solid: the drain is 1.2 m wide) and a flange at the mouth; `floodPipes()`: the five
+  pipes as `[from, to]` (supply down from the ceiling; out of the valve west, up, west under the ceiling, down to the
+  mouth), drawn by the client as one mesh (as map `pipe` decors they were a draw call each). The wheel is not here
+  either (it turns: see the client).
 - `lib/flood.js` — `createFlood(deps)` → `{ reset, tick, onUse, updateAct, douse, snap, state }`: the valve (an
   action `p.act.type === 'flood'`, 3 s, cancelled by letting go of E or moving > 0.6 m), the fill (`+dt/40` open,
   `-dt/90` closed), the boxes in `MAP.water` (so Deathmatch's `randomSpot` avoids flooded spots), breath and
@@ -45,14 +80,14 @@ Keys table: **E** (hold 3 s at the valve in the storm drain) opens or closes it 
 - `public/js/flood.js` — `init`, `setMap`, `onSnapshot`, `update`, `hint`, `actLabel`, `level`, `debug`: the water
   surface (one mesh with up- and down-facing quads for the areas the water's top is in, rebuilt only when that set
   changes; Phong + map + transparent like the map's own water, so no new shader), the wheel (one merged mesh,
-  spins while `fl[2]`), the gushing column (two crossed sheets, while open and its mouth is above the water) with
+  spins while `fl[2]`), the pipes (one merged Lambert mesh, the map's pipe colour, no shadow cast), the gushing column (two crossed sheets, while open and its mouth is above the water) with
   foam/bubble particles near the camera, the gush loop sound, the underwater tint (a fixed div, z-index 4) and fog
   (the scene fog's colour/near/far swapped while the camera is under, restored after), the AIR bar (in `#hud`,
   following the server's rule), bubbles and a blub when running out, a gasp on surfacing, the zap (sparks, a blue
   flash, a crackle, a flicker ending dark), fizzles and underwater HE (splash, muffled boom).
 - Tests: `dev/test-scripts/flood/` — `srv.sh` (test server on 4040/4041, fresh `DATA_DIR` in `$SP/testdata`,
   BOTS=0, MAP=cs_mansion, FREEZE_TIME=1 unless given), `t1.mjs`, `t2.mjs`, `t3.mjs` (server), `swim.mjs` (Node
-  only, the game's physics), `g1.mjs` (browser, not run to the end, see below).
+  only, the game's physics), `g1.mjs` (browser, 21 checks, both Mansion maps: see STATUS).
 
 ### Hooks in existing files (each marked `// Floodgate`)
 - `shared/maps/mansion2.js`: the import, and one call `floodWorks({ brush, decor })` in `remodel()` right after the
@@ -144,22 +179,19 @@ Keys table: **E** (hold 3 s at the valve in the storm drain) opens or closes it 
 - `walls.mjs`: 0 missing, 0 drawn twice (the valve's faces don't double the drain's walls). The server starts with
   all 7 maps.
 
-### Browser (partly verified, then stopped by the user's rule: no headless browser tests)
+### Browser
+- **2026-11-01: verified on both Mansion maps** — see STATUS at the top (21/21 checks, screenshots, draw calls). What
+  follows is the history of the first, partial run.
 - One run of `g1.mjs` on cs_mansion (before the last three fixes) passed: the hint at the valve, the progress label
   "Opening the valve...", the wheel turning, the valve opening, the drain's water rising, under the water in the
   drain (tint, fog, the AIR bar draining), the tunnel's surface, the CT electrocuted at the fuse box and the power
   off, the next round's hint, no page errors. Screenshots looked at: the valve (`fl1`), the flooding drain (`fl3`),
   under water (`fl4`), the tunnel (`fl5`), the cellar in the blackout (`fl6`, too dark to judge), the round end after
   the zap. Draw calls at the valve view: 216 dry → 218 flooding (the surface and the gush).
-- Fixed after that run, **not re-checked in a browser**: the gush was hidden after ~6 s (its mouth was low: moved
-  up under the ceiling); the swim-up check stood the player under the cellar's table (moved; the physics passes in
-  `swim.mjs`); the client eased the level down after a round reset instead of snapping (now snaps on a jump > 0.5 m).
-- **Still to do in a browser** (`GAME_PORT=4040 CDP_PORT=<port> node dev/test-scripts/flood/g1.mjs`, srv.sh first):
-  all 14 checks of `g1.mjs` (the gushing column visible for ~11 s; swimming up in the full cellar and out up the
-  stairs by keyboard; the T floating in the cellar electrocuted with the CT, its sparks and flicker in `fl9`; the
-  next round dry at once); the night map (no page errors, the water surface lit by the tunnel's glow); the cellar's
-  surface with the power on; the sounds by ear (gush, clunk, crackle, fizzle, muffled boom, gasp, blub); the frame
-  cost on a real Intel iGPU.
+- Fixed after that run (re-checked in the browser on 2026-11-01: they hold): the gush was hidden after ~6 s (its
+  mouth was low: moved up under the ceiling); the swim-up check stood the player under the cellar's table (moved);
+  the client eased the level down after a round reset instead of snapping (now snaps on a jump > 0.5 m).
+- Still not checked: the sounds by ear; the frame cost on a real Intel iGPU.
 
 ### Not verified / known gaps
 - Grenades aren't slowed in flight by water (both sides simulate the flight without it); only where they go off
