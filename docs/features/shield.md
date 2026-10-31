@@ -1,6 +1,14 @@
 # Human shield (agent "shield", branch `feature/shield`)
 
-## STATUS (paused 2026-10-31, work in progress)
+## STATUS (paused again 2026-10-31, work in progress; the user's session ran out)
+
+**Since the first pause:** `main` (zip line, CCTV) is merged in (`d796da8`). Two conflicts, both kept both sides:
+`onNade` keeps main's `busy(p)` plus the shield line; main.js imports `gadgets.js` and `shield.js`. In `onUse` the
+zip line / CCTV checks (getting off, getting up) run before `shield.use`, the hooking on, the cutting and sitting down
+after it, so a holder's E always lets go first. Added after the merge, in the shield's own files: a hold also ends on
+`p.zip` / `p.cctv` (`holdBreak`, 'busy'; it can't happen through E, a safety net), and `shieldHint` stays quiet on the
+zip line, at the CCTV desk, in a car or flying the drone (E does that first on the server). **Nothing was rerun after
+the merge** (no server was started): the node tests below are the first thing to do.
 
 **Done and working (tested on cs_mansion):**
 - Server (`lib/shield.js`): grab with E (Terrorist, alive, not a bot, not downed, live or warmup, a waiting or following
@@ -35,24 +43,34 @@
 **Half-done / not verified:**
 - After those screenshots the poses were tweaked (the T's left arm scaled 1.4× and aimed across the hostage's throat;
   the hostage's arms lowered to 0.55 rad and turned inwards). **Not looked at yet.**
-- `g-shield.mjs` had two test bugs, both fixed in the script but **not rerun**: the browser shot used an 80 ms click
-  (headless draws a few frames a second: now 400 ms), and part 2 (the browser as the holder: hint, E, pistol, no
-  AK/duck/jump, walking pace 2.5–3.5 m/s, E lets go, AK and full speed again) joined the page after the scripted CT, so
-  auto team balance made the page a CT (now the page joins first).
-- Not run at all: cs_assault (`MAP=cs_assault` for t-shield, t-rescue and g-shield), the 60 s `BOTS=4` soak, the
-  scream by ear, the frame cost (it adds nothing to draw: two existing models are posed).
+- The pose review by reading the numbers (task 3 of the resume brief) was not done either.
+- `g-shield.mjs`: both test bugs are fixed in the script (checked: the shot is a 400 ms click, line 61; the page
+  joins before the scripted CT, line 78) but **not rerun**. It is ready to run.
+- Not run at all: cs_assault (`MAP=cs_assault` for t-shield, t-rescue and g-shield), the 60 s `BOTS=4` soak (both
+  maps), the scream by ear, the frame cost (it adds nothing to draw: two existing models are posed).
 
-**Next steps (exact):**
+**Next steps (exact), server and node only:**
 1. Start the test server (`PORT=4050 HTTPS_PORT=4051 MAP=cs_mansion BOTS=0 START_MONEY=16000 DATA_DIR=<temp>/testdata
-   ADMIN_PASSWORD=testpass node server.js`) and a headless Edge on CDP 9450.
-2. `GAME_PORT=4050 CDP_PORT=9450 OUT=<temp>/shots node dev/test-scripts/shield/g-shield.mjs`: all checks should pass;
-   look at `sh_cs_mansion_front/side/angle/hit/holder*.png` and adjust the poses in `shieldPoseRemote` /
-   `shieldPoseHostage` if the arm or hands look wrong (restart the server after client changes).
-3. Restart with `MAP=cs_assault` and run `t-shield.mjs`, `t-rescue.mjs` and `g-shield.mjs` with `MAP=cs_assault` (the
-   browser test has a cs_assault setup, untested: check its spots with `spots.mjs` if it fails).
-4. `BOTS=4` for 60 s on cs_mansion (e.g. `dev/test-scripts/mansion/botsoak.mjs`) with no server errors; check
-   de_dust2 still loads.
-5. Fill in the "Verified" lines below, then commit and push.
+   ADMIN_PASSWORD=testpass node server.js`); check the log lists all 7 maps.
+2. `GAME_PORT=4050 node dev/test-scripts/shield/t-shield.mjs` and `t-rescue.mjs` (28 checks, then the rescue): they
+   passed before the merge and must still pass.
+3. Restart with `MAP=cs_assault` and run both with `MAP=cs_assault`; fix any cs_assault-specific trouble (hostage
+   spots, tight rooms, wall clamping in `heldSpot`); `spots.mjs` / `paths.mjs` list free spots and paths.
+4. `BOTS=4` for 60 s on cs_mansion and on cs_assault (`dev/test-scripts/mansion/botsoak.mjs`) with no server errors.
+5. Read `shieldPoseRemote` / `shieldPoseHostage` against the model sizes in `public/js/models.js` (left arm ×1.4
+   across the throat; the hostage's arms at 0.55 rad, turned in) for clipping into the hostage's head or body.
+6. Fill in "Verified", commit and push.
+
+**Browser checks still to do (for the architect, at the end; headless Edge):**
+- `GAME_PORT=4050 CDP_PORT=<cdp> OUT=<temp>/shots node dev/test-scripts/shield/g-shield.mjs` on cs_mansion, then with
+  `MAP=cs_assault` (server restarted with that map): all checks pass, no page errors. Look at
+  `sh_<map>_front/side/angle/hit/holder*.png`: the hostage in front of the T, his head showing past its leaning head,
+  the pistol beside it, the T's longer left arm across the throat without poking through the hostage's head or chest,
+  the hostage's lowered hands at his arm. Part 2 (the page as the holder): the hint, E, pistol only, no AK / duck /
+  jump, walking pace 2.5–3.5 m/s, E lets go, AK and full speed again.
+- By ear: the muffled scream at a grab.
+- With the gadgets merged: a T holding a hostage near the zip line's terrace stand or the CCTV desk sees "Press E to
+  let the hostage go", not the gadget's hint; on the zip line or at the desk no grab hint shows.
 
 **Tests:** `dev/test-scripts/shield/` — `t-shield.mjs` (server, scripted players), `t-rescue.mjs` (rescue after
 release; `NOSHIELD=1` for the control, `TRACE=1` to print the walk), `g-shield.mjs` (browser), `spots.mjs` and
@@ -109,8 +127,9 @@ release; `NOSHIELD=1` for the control, `TRACE=1` to print the walk), `g-shield.m
 - Key: E (the existing use key), only as a Terrorist next to a hostage, or while holding one.
 
 **Contracts:** writes `p.shield`; reads `p.downed` (a downed T lets go, a downed player can't grab) in
-`lib/shield.js` (`holdBreak`, `use`). For integration: E is consumed by `shield.use` before planting, doors, switches
-and cars, but only when a T is near a free hostage or is holding one (and for a CT pressing E next to a held one), so
+`lib/shield.js` (`holdBreak`, `use`). For integration: E goes to the drone, the zip line / CCTV (getting off / up)
+and getting out of a car first; then `shield.use`; it is consumed there before planting, leading hostages, the fuse
+box, hooking on the zip line, cutting it, the CCTV desk, doors, switches and cars, but only when a T is near a free hostage or is holding one (and for a CT pressing E next to a held one), so
 the revive / uniform / valve uses of E should be ordered with that in mind.
 
 **Choices and known gaps:**

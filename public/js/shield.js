@@ -53,6 +53,8 @@ export function shieldHint(hint) {
   if (!C || !C.me.alive) return hint;
   if (shieldHolding()) return 'Press E to let the hostage go';
   const me = C.me;
+  // on the zip line, at the CCTV desk, in a car or flying the drone, E does that first (as on the server)
+  if (me.zip || me.cctv || me.driving != null || me.riding || me.drone) return hint;
   if (me.team === 'T' && !me.act && (C.game.phase === 'live' || C.game.phase === 'warmup')) {
     for (const h of C.hostages.values()) {
       if (h.state > 1 || held.has(h.id)) continue;
