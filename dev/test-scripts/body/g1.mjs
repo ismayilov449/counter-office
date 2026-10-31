@@ -6,7 +6,7 @@
 //   Mate plays dead (seen by his teammate: a corpse with his name).
 // Part 2, the browser is a CT: a Terrorist plays dead in front of him (a kill in the feed, a corpse, dead on the
 //   scoreboard), then gets up ("... was playing dead!").
-// Screenshots in OUT, page errors printed.
+// Screenshots in OUT, page errors printed. It takes ~5 minutes (run it with a long timeout).
 import { open, sleep } from '../mansion/game.mjs';
 import { player } from '../mansion/client.mjs';
 const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if (!cond) process.exitCode = 1; };
@@ -34,7 +34,7 @@ const has = async pred => (await pull()).some(pred);
 ok('round starts', await until(() => M.got('round').length > 0, 40000));
 await send({ t: 'buy', item: 'ak47' }); await sleep(3500);
 const me = idOf('Tester'), mate = idOf('Mate');
-M.at([20, 0, -30], 0); C1.at([20, 0, -36], 0); C2.at([8, 0, -22], 0);
+M.at([20, 0, -30], 0); C1.at([20, 0, -24], Math.PI); C2.at([8, 0, -22], 0);
 await tp([16, 0, -30], -Math.PI / 2, -0.12); await sleep(800);
 for (let i = 0; i < 12 && !M.got('bodyDown').length; i++) await shoot(C1, [20, 1.2, -30]);
 ok('Mate is down', M.got('bodyDown').some(m => m.v === mate));
@@ -51,7 +51,7 @@ await sleep(4200); await keyUp('KeyE');
 ok('Mate revived by the browser', M.got('bodyUp').some(m => m.v === mate && m.by === me));
 
 // the browser goes down
-M.at([24, 0, -27], 0);
+M.at([10, 0, -24], 0);
 await tp([20, 0, -30], 0, 0); await sleep(700);
 for (let i = 0; i < 12 && !(await has(m => m.t === 'bodyDown' && m.v === me)); i++) await shoot(C1, [20, 1.2, -30]);
 ok('the browser is down', await has(m => m.t === 'bodyDown' && m.v === me));
@@ -78,7 +78,7 @@ ok('down overlay gone', (await ev("getComputedStyle(document.getElementById('bd-
 await shot('g1_revived.png');
 
 // the browser plays dead
-M.at([24, 0, -27], 0);
+M.at([10, 0, -24], 0);
 await tp([20, 0, -30], -Math.PI / 2, 0); await sleep(600);
 C2.clear();
 await key('KeyK'); await sleep(900);
@@ -114,7 +114,7 @@ await shoot(C1, [M.p[0], M.p[1] + 1.62, M.p[2]], 'usp', 500); // end the round
 ok('next round', await until(() => M.got('round').length > 0, 15000));
 await sleep(3500);
 const mate2 = idOf('Mate');
-M.at([20, 0, -26], 0); Tom.at([20, 0, -33], 0); C1.at([14, 0, -21], 0);
+M.at([20, 0, -26], 0); Tom.at([20, 0, -33], 0); C1.at([10, 0, -25], 0);
 await tp([14, 0, -26], -Math.PI / 2, -0.12); await sleep(800);
 await shot('g1_ct_before.png');
 M.send({ t: 'bodyPlayDead' }); await sleep(1200);

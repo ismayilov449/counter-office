@@ -15,6 +15,8 @@ c.on.bodyKill = m => { ev[m.how]++; pendingFinish = m.how === 'finished' ? m.v :
 c.on.kill = m => { ev.kills++; if (pendingFinish === m.v && bots.has(m.k)) ev.finishedByBot++; pendingFinish = null; down.delete(m.v); };
 c.on.bodyUp = m => { if (!m.pd) ev.revived++; down.delete(m.v); };
 c.on.roundEnd = m => ev.rounds.push(m.reason);
+let rescues = 0;
+c.on.sfx = m => { if (m.s === 'rescue') rescues++; };
 const crawls = [];
 c.on.s = m => {
   for (const r of m.pl) {
@@ -34,6 +36,7 @@ while (Date.now() - t0 < secs * 1000) {
   for (const [id, d] of down) if (Date.now() - d.at > 4000 && !d.logged) { d.logged = true; crawls.push(`${names.get(id)}: ${d.max.toFixed(1)} m in 4 s, crouched ${d.c}, holding ${d.w}`); }
 }
 console.log('downs', ev.down, '| finished', ev.finished, `(by bots ${ev.finishedByBot})`, '| bled out', ev.bled, '| revived', ev.revived, '| kills', ev.kills);
+console.log('hostages rescued:', rescues);
 console.log('rounds ended:', ev.rounds.length, ev.rounds.join(' | '));
 console.log('downed bots after 4 s:', crawls.slice(0, 12).join('; ') || '(none lasted 4 s)');
 c.close(); process.exit(0);
