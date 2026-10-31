@@ -262,7 +262,7 @@ export function createGasClient(ctx) {
       const sp = board.take();
       if (!sp) break;
       const base = new THREE.Vector3(r.min[0] + 0.7 + Math.random() * Math.max(0, w - 1.4), y0 + Math.random() * (y1 - y0), r.min[2] + 0.7 + Math.random() * Math.max(0, d - 1.4));
-      const size = 1.8 + Math.random() * 0.9;
+      const size = 2.5 + Math.random() * 1.3;
       sp.position.copy(base);
       sp.scale.set(size, size * 0.7, 1);
       sp.material.opacity = 0;
@@ -284,10 +284,11 @@ export function createGasClient(ctx) {
       const k = clamp((c - GAS.haze) / (0.5 - GAS.haze), 0, 1);
       for (const s of list) {
         s.sp.position.set(s.base.x + Math.sin(t * 0.23 + s.ph) * 0.6, s.base.y + Math.sin(t * 0.31 + s.ph * 2) * 0.15, s.base.z + Math.cos(t * 0.19 + s.ph) * 0.6);
-        // as bright as the room is lit (in the dark you hardly see it), and it shimmers a little
+        // a yellow-green tinge (a paler one vanishes on the cream walls), as bright as the room is lit (in the dark you
+        // hardly see it), and it shimmers a little; browser-checked: hardly there at 'ignite', a faint veil when choking
         const light = clamp(ambientAt(s.sp.position) / 0.85, 0.06, 1);
-        s.sp.material.color.setRGB(0.86 * light, 0.9 * light, 0.7 * light);
-        s.sp.material.opacity = (0.035 + 0.1 * k) * (0.8 + 0.2 * Math.sin(t * 1.7 + s.ph));
+        s.sp.material.color.setRGB(0.66 * light, 0.8 * light, 0.36 * light);
+        s.sp.material.opacity = (0.08 + 0.46 * k) * (0.8 + 0.2 * Math.sin(t * 1.7 + s.ph));
         s.sp.material.rotation = t * 0.05 + s.ph;
       }
     }
@@ -304,7 +305,8 @@ export function createGasClient(ctx) {
         if (sp) {
           sp.position.set(...p.at);
           sp.scale.set(0.1, 0.1, 1);
-          sp.material.color.setRGB(0.9, 0.92, 0.88);
+          const light = clamp(ambientAt(sp.position) / 0.85, 0.12, 1); // (no white glow in a dark room)
+          sp.material.color.setRGB(0.9 * light, 0.92 * light, 0.95 * light);
           const n = p.def.parts.find(q => q.k === 'dial')?.n || [0, 0, 1];
           puffs.push({ sp, life: 0.8, max: 0.8, v: [n[0] * 1.6 + (Math.random() - 0.5) * 0.7, 0.25 + Math.random() * 0.4, n[2] * 1.6 + (Math.random() - 0.5) * 0.7] });
         }
@@ -316,8 +318,8 @@ export function createGasClient(ctx) {
       if (q.life <= 0) { board.drop(q.sp); puffs.splice(k, 1); continue; }
       const a = 1 - q.life / q.max;
       q.sp.position.x += q.v[0] * dt; q.sp.position.y += q.v[1] * dt; q.sp.position.z += q.v[2] * dt;
-      q.sp.scale.set(0.1 + a * 0.6, 0.1 + a * 0.6, 1);
-      q.sp.material.opacity = 0.3 * (1 - a);
+      q.sp.scale.set(0.1 + a * 0.7, 0.1 + a * 0.7, 1);
+      q.sp.material.opacity = 0.55 * (1 - a);
     }
     board.mesh.visible = board.items.length > 0;
     if (board.mesh.visible) board.flush(ctx.camera);
