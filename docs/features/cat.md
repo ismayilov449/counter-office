@@ -11,8 +11,19 @@
   - `clientsmoke.mjs`: 31 checks.
   - `soak.mjs`: 60 s with `BOTS=4`, no server errors; ticks about 1 ms on average.
   - `maps.mjs`: all 7 maps start.
-- **Not done:** no browser test was run (the user's rule: no Edge until every agent has finished). Nobody has seen the
-  cat or heard it yet.
+- **Browser, part 1 (`catview.mjs`, headless Edge, both Mansion maps; paused before `g1.mjs`):**
+  - Seen in the screenshots: every pose (sit, walk, trot, run, wash, stretch, hide, air, sleep, loaf) reads clearly.
+    The size next to the sofa is right (a sitting cat's head is about at seat height). The tail curls when it sits
+    and loafs. The paws rest on the floor in the standing poses. The loaf on the sofa seat and the bowl in the
+    kitchen look right. At night the eyes are two small yellow-green dots, they glow in the dark living room, and
+    they are shut when it sleeps. No page errors on either map.
+  - Draw calls: by day about 1 for each cat in view. At night about 1.75 (its shadow and the eyes). Basket and bowl
+    are 1 each. The eyes have `frustumCulled = false`, so at night they cost 1 call even when the cat is off screen
+    (minor).
+  - Test fix: `catview.mjs`'s `basket` view looked past the basket (yaw `+0.55` changed to `-0.55`). Not re-run yet.
+  - Still to check: whether the hide and loaf tail tips dip below the floor (from the side they look slightly
+    low). Then all of `g1.mjs` on both maps (the basket at round start, following, foot sliding, hops, bolting,
+    the eyes in the game).
 - **Browser checks still to do (architect):**
   - **`catview.mjs`** (posed cats, no game; on `cs_mansion` and `cs_mansion_night`):
     - its size next to the sofa;

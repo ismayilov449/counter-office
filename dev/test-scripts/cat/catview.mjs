@@ -99,7 +99,7 @@ const views = [
   ['row', [-19.6, 1.35, -0.8], Math.PI / 2 + 0.05, -0.32],       // the row of poses, from the east
   ...pairs,
   ['sofa', [-21.3, 1.5, 0.9], Math.PI / 2 - 0.5, -0.25],          // on the sofa, and the basket beyond
-  ['basket', [-21.6, 1.4, 4.4], Math.PI / 2 + 0.55, -0.45],       // asleep in its basket
+  ['basket', [-21.6, 1.4, 4.4], Math.PI / 2 - 0.55, -0.45],       // asleep in its basket
   ['bowl', [-16.6, 1.3, -12.3], 0.45, -0.45],                     // the bowl in the kitchen
   ['dark', [-19.6, 1.35, -0.8], Math.PI / 2 + 0.05, -0.32, { lights: dark }], // the living room's lights off
   ['far', [-14.5, 1.7, -0.5], Math.PI / 2, -0.06, { lights: dark }],          // across the dark room
