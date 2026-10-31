@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -126,6 +127,7 @@ function loadMap(id) {
   if (plantedBomb) { scene.remove(plantedBomb); plantedBomb = null; }
   renderMapVotes();
   world.setShadowSize(qlevel.shadowSize);
+  flood.setMap(map); // Floodgate
   prewarm();
 }
 
@@ -2829,6 +2831,7 @@ const net = new Net({
     onCarSnapshot(m.cars, m.time);
     onDroneSnapshot(m.dn, m.time);
     syncHostages(m.hs, m.time);
+    flood.onSnapshot(m.fl); // Floodgate: the water level and the valve
   },
   shot(m) {
     const r = remotes.get(m.id);
@@ -3541,10 +3544,12 @@ function updateHud(now) {
   } else if (!me.alive && me.team !== 'SPEC' && game.phase !== 'warmup') {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
+  if (me.alive && !me.act && flood.hint()) hint = flood.hint(); // Floodgate: the valve in the storm drain
   hud.hint(hint);
   if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
+  if (me.act?.a === 'flood') hud.progress(flood.actLabel(), me.act.pr); // Floodgate
 
   let target = null;
   if (me.alive) {
@@ -3879,6 +3884,7 @@ function frame() {
   updateHostageModels(dt);
   updateBomb(now);
   updateCamera(dt, now);
+  flood.update(dt, now, camera); // Floodgate
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -3905,6 +3911,7 @@ function frame() {
   }
   if (shotRequested) saveScreenshot();
 }
+flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();

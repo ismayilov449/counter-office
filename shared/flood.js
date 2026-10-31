@@ -10,8 +10,8 @@ export const FLOOD = {
   // the wheel's centre (it faces +z, out of the drain's north wall at z -2.6), how close you must stand to turn it
   // (to the wheel, along the floor) and the drain's floor under it
   valve: { p: [23.8, -3.9, -2.2], reach: 1.3, floor: -5.0 },
-  // the outlet the water gushes out of (a pipe's mouth, pointing down), next to the valve
-  outlet: [22.7, -4.0, -2.45],
+  // the outlet the water gushes out of (a pipe's mouth under the ceiling, pointing down), next to the valve
+  outlet: [22.4, -3.36, -2.45],
   hold: 3, // seconds of E to open or close it
   fill: 40, // seconds from dry to full (open)
   drain: 90, // seconds from full to dry (closed)

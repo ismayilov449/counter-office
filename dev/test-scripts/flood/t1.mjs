@@ -36,7 +36,7 @@ console.log(sec(), 'live; teams:', [T1, T2, C1, C2].map(c => c.me?.team).join(' 
 // ---- 1. power on
 const VALVE = [23.8, -5.0, -1.9];
 T1.at(VALVE);
-C1.at([-17, -2.2, 0]); // the cellar floor
+C1.at([-15.5, -2.2, 1.5]); // the cellar floor
 C2.at([-14.4, -0.996, -6.95]); // a step of the cellar stairs, above where the water will be at the fuse box
 T2.at([26.4, -5.0, -2.0]); // the drain under the street shaft
 await sleep(300);
@@ -91,7 +91,7 @@ check(lights?.power === false, 'the T cut the power at the fuse box');
 const zapsBefore = evs('floodZap').length, s3 = +sec();
 T1.at(VALVE);
 C1.at([10, -5.0, -1.9]); // stays in the drain: drowns
-C2.at([-17, -2.2, 0]); // the cellar floor
+C2.at([-15.5, -2.2, 1.5]); // the cellar floor
 T2.at([27.5, 0, 1]);
 await sleep(300);
 await hold(T1, 3300);

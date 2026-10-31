@@ -929,3 +929,6 @@ export const audio = {
     s.speak(u);
   },
 };
+
+// Floodgate: the flood's sounds (public/js/flood.js) are made from the same parts; null until the sound is on
+export const floodKit = () => (ctx && ctx.state === 'running' ? { ctx, noise, burst, tone } : null);
