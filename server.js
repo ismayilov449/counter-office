@@ -1509,7 +1509,11 @@ const bots = new BotManager({
 body.init({
   game, players, cfg: CFG, now, mapMode: () => mapMode(MAP), send, broadcast, sendMe, sendRoster, killPlayer, gibOf, mates, inTeam,
   spawnDrop, dropBomb, takeDrop, offsetPos, exitCar, loseDrone,
+  busy, falling: p => !!p.zipFall, // (on the zip line or at the CCTV desk; falling off the zip line)
 });
+// body: going down or playing dead takes you off the zip line (you fall) and up from the CCTV desk
+body.onDown(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'hurt'); });
+body.onPlayDead(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'left'); });
 
 function addBot(team) {
   let p = null;

@@ -359,6 +359,8 @@ export const body = {
     st.keyAt = now;
     if (st.downed) { A.hud.small("You can't play dead while you're down", 2); return; }
     if (A.game.cfg.gameMode !== 'classic') { A.hud.small('Playing dead works in classic matches only', 2); return; }
+    // (a corpse can't hang in the air, on a ladder or in the water; off the zip line the server lets you fall)
+    if (!me.onGround && !me.zip && !st.pd) { A.hud.small('Stand on the ground to play dead', 2); return; }
     st.riseAsk = now;
     A.net.send({ t: 'bodyPlayDead' });
   },
@@ -367,6 +369,7 @@ export const body = {
     const me = A.me;
     if (!me.alive && (st.downed || st.pd)) clearMe();
     if (st.downed) { me.ladderFree = now + 250; forcePistol(); }
+    if (st.pd && !me.onGround) st.pdP = me.p.slice(); // (still falling, off the zip line: the view goes down with you)
     // moving or shooting gets you up
     if (st.pd && now - st.pdAt > 300 && now - st.riseAsk > 600 && (MOVE_KEYS.some(k => A.keys.has(k)) || A.firing())) {
       st.riseAsk = now;
