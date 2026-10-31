@@ -1,5 +1,20 @@
 # Feature: a real gas system (agent "gas", branch `feature/gas`)
 
+## STATUS
+- **Done:** everything in the spec. Server: pipes, leak, spread, venting, choking, all sparks (shot, impact, grenades,
+  explosions, fire, light switch, fuse box), blast, chain, valve, repair. Browser module: pipe models, vapour, shimmer,
+  hiss, coughing, HUD line, blast effects. Hooks, protocol and these notes are written.
+- **Half-done:** nothing on the server. The browser side has only been checked in Node with a stubbed page. One early
+  screenshot of the pipe looked right, then browser tests were stopped.
+- **Next steps:** run the browser checks below (`dev/test-scripts/gas/g_gas.mjs` with the test server on `GAS_LEAK_X=3`);
+  if the shimmer is too strong or too faint, tune the opacity in `public/js/gas.js` (`update()`, `0.035 + 0.1 * k`).
+  For the elevator: `gas.sparkAt(motorPos, 'motor', player)`.
+- **Tests that exist** (all pass): `t_gas.mjs` (server, 6 parts), `graph.mjs` (no server), `client_smoke.mjs` (browser
+  module in Node), `maps.mjs` (all 7 maps), `botgas.mjs` (BOTS=4); the old `mansion/t5.mjs` and `t7.mjs` still pass.
+- **Browser checks still to do:** pipe, vapour, shimmer (subtle, not fog; day, night, blackout), blast and HUD line by
+  eye; sounds by ear; no page errors on both Mansion maps through a leak, a blast and a round reset; frame cost with gas
+  in view; a real mouse click on the meter.
+
 ## (a) README
 
 Text for the README's Mansion section (cs_mansion and cs_mansion_night), after the blackout:
