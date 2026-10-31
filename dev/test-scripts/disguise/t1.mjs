@@ -217,7 +217,7 @@ carl.clear(); alice.clear();
 gun(carl); carl.at(C6, yawTo(C6, AB)); await sleep(300);
 carl.shootAt(alice, carl.w, 'legs');
 ok('Carl (T) shoots her: blown ("hurt")', await until(() => got(alice, 'disguiseOff', m => m.why === 'hurt').length > 0, 1000));
-ok('her health went down', alice.me?.hp < 100);
+ok(`her health went down (${got(alice, 'dmg').at(-1)?.hp})`, got(alice, 'dmg').at(-1)?.hp < 100);
 await kill(carl, alice);
 ok('Carl kills her', !alice.alive);
 await sleep(200);
@@ -228,7 +228,9 @@ ok('Carl (a T) takes Alice\'s uniform', await take(carl, CA, yawTo(CA, AB)));
 await sleep(300);
 {
   const s = dave.snap, asAlice = s.pl.find(r => r[0] === ID.alice);
-  ok('Dave (CT) sees no Carl, and "Alice" alive, a CT, where Carl is', !s.pl.some(r => r[0] === ID.carl) && asAlice && asAlice[8] === 1 && asAlice[9] === 2 && Math.abs(asAlice[1] - CA[0]) < 0.05 && !dave.raw.includes('"dg"'));
+  ok('Dave (CT) sees no Carl, and "Alice" alive, a CT, where Carl is', !s.pl.some(r => r[0] === ID.carl) && asAlice && asAlice[8] === 1 && asAlice[9] === 2 && Math.abs(asAlice[1] - CA[0]) < 0.05);
+  // (the CTs' "dg" still lists Bob's body, which Alice stripped; nothing about Carl)
+  ok(`nothing about Carl in Dave's "dg": ${JSON.stringify(s.dg)}`, !s.dg?.d && !(s.dg?.u || []).includes(ID.carl) && !(s.dg?.s || []).includes(ID.alice));
   ok('Alice (dead, the owner) sees Carl as he is', alice.snap.pl.find(r => r[0] === ID.carl)?.[9] === 1);
   ok('Eve and Bob (Ts) get Carl in their "dg"', eve.snap.dg?.d?.[0]?.[0] === ID.carl && bob.snap.dg?.d?.[0]?.[0] === ID.carl);
 }

@@ -8,7 +8,7 @@ if (MAP_ID !== 'de_dust2') console.log('(run with MAP=de_dust2: the spots are de
 const rounds = [];
 const alice = await player('Alice', 'CT');
 alice.on.round = m => rounds.push(m.n);
-const dave = await player('Dave', 'CT'), bob = await player('Bob', 'T');
+const bob = await player('Bob', 'T'), dave = await player('Dave', 'CT'); // (in this order: auto team balance)
 const ID = { alice: alice.id(), dave: dave.id(), bob: bob.id() };
 await until(() => rounds.length > 0, 30000, 100);
 await sleep(1500);
@@ -22,7 +22,11 @@ await sleep(700);
 for (let i = 0; i < 12 && dave.alive; i++) { bob.shootAt(dave, 'glock'); await sleep(400); }
 ok('Bob kills Dave', !dave.alive);
 const BD = [D[0] - 0.6, D[1], D[2]];
-bob.at(BD, yawTo(BD, D), 1); await sleep(250);
+bob.at(BD, yawTo(BD, D), 1);
+alice.at(A, yawTo(A, BD));
+ok('(control: Alice, looking at Bob from there, has him as a red dot)', await until(() => (alice.snap?.sp || []).some(r => r[0] === ID.bob), 2000));
+alice.at(A, yawTo(A, [40, 0, -10]));
+await sleep(250);
 bob.use(true);
 ok('Bob crouches over Dave and holds E', await until(() => bob.snap?.me?.a === 'disguise', 1500));
 ok('3 s later: in Dave\'s uniform (look CT)', await until(() => bob.got('disguiseOn').some(m => m.you && m.look === 'CT' && m.as === 'Dave'), 4500));

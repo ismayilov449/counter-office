@@ -13,7 +13,7 @@ const ok = checker();
 const KEEP = ['msg', 'disguiseOn', 'disguiseOff', 'disguiseFx', 'round'];
 const errorsAll = [];
 
-const bob = await player('Bob', 'T'), carl = await player('Carl', 'T'), dave = await player('Dave', 'CT');
+const bob = await player('Bob', 'T'), dave = await player('Dave', 'CT'), carl = await player('Carl', 'T'); // (this order: auto team balance)
 bob.w = 'glock'; carl.w = 'glock'; dave.w = 'usp';
 const rounds = [];
 bob.on.round = m => rounds.push(m.n);
