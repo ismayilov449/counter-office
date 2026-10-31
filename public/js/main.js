@@ -20,6 +20,7 @@ import { Effects, nadeFuse } from './effects.js';
 import { AutoQuality } from './autoquality.js';
 import { TeamBar, shrinkPicture } from './teambar.js';
 import { BuyMenu } from './buymenu.js';
+import { BetPanel } from './bet.js'; // bet feature: F3 bet on yourself
 import { makeBuyIcons } from './buyicons.js';
 import { disposeOwn } from './batch.js';
 import { audio } from './audio.js';
@@ -1393,6 +1394,13 @@ const buyUI = new BuyMenu($('buymenu'), {
   autobuy: () => autobuy(),
   rebuy: () => rebuy(),
   close: () => closeBuy(),
+  bet: { open: () => betUI.open(), shown: () => betUI.shown() }, // bet feature: the footer's "F3 Bet"
+});
+
+// bet feature: the F3 bet panel, the bet lines in the chat and the HUD tracker (bet.js)
+const betUI = new BetPanel({
+  me: () => me, game: () => game, send: m => net.send(m), lock: () => lock(), overlays: () => updateOverlays(),
+  buyOpen: () => buyUI.isOpen, small: (text, secs) => hud.small(text, secs), play: s => audio.play(s),
 });
 
 function openBuy(column = null) {
@@ -2101,6 +2109,7 @@ function pause() {
 
 function updateOverlays() {
   const show = me.joined && !locked && !sprayEditor.isOpen && !buyUI.isOpen;
+  if (show && betUI.isOpen) { $('paused').classList.add('hidden'); return; } // bet feature: its panel frees the mouse without pausing
   $('paused').classList.toggle('hidden', !show);
   if (show) { renderMapVotes(); refreshLeaderboard(); refreshAchievements(); }
 }
@@ -2236,6 +2245,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (typing) return;
+  if (betUI.onKey(e)) return; // bet feature: F3, and the keys of the open bet panel
   if (e.code === 'Tab') {
     if (me.joined && !e.repeat) {
       ui.scores = true;
@@ -3154,6 +3164,7 @@ const net = new Net({
     fx.removeSpray(m.id);
   },
 });
+Object.assign(net.handlers, betUI.handlers); // bet feature: betOk, betNo, betNew, betTrack, betEnd, betRound
 
 // ---------------------------------------------------------------- per-frame updates
 

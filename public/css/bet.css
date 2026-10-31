@@ -1,0 +1,56 @@
+/* "Bet on yourself" (F3): the bet panel, the HUD tracker and the chat lines (public/js/bet.js). */
+
+/* The panel: its own overlay, above the buy menu (z 20) and below the menus and modals (z 50). */
+#bet { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0, 0, 0, 0.3); pointer-events: auto; padding: 16px; }
+.bet-panel { width: min(600px, 100%); max-height: 100%; overflow: auto; background: rgba(18, 20, 24, 0.96); border: 1px solid rgba(231, 179, 80, 0.45); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); font-size: 13px; }
+.bet-head { display: flex; align-items: center; gap: 16px; padding: 8px 14px; background: rgba(0, 0, 0, 0.35); }
+.bet-title { font: bold 13px Arial, sans-serif; letter-spacing: 3px; color: #e7b350; }
+.bet-left { flex: 1; text-align: center; color: #cfc6a8; font-size: 12px; }
+.bet-money { font: bold 18px Arial, sans-serif; color: #7ed07e; }
+.bet-reason { padding: 8px 14px 0; color: var(--danger, #ff4a3d); font-size: 12px; text-align: center; }
+.bet-body { padding: 4px 14px 10px; }
+.bet-sub { margin: 8px 0 5px; color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.bet-targets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.bet-t { position: relative; display: grid; justify-items: center; gap: 2px; padding: 10px 6px 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; cursor: pointer; }
+.bet-t b { color: #eee; font-size: 14px; white-space: nowrap; }
+.bet-t i { color: #e7b350; font: bold 18px Arial, sans-serif; font-style: normal; }
+.bet-stakes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.bet-s { position: relative; padding: 8px 4px 6px; text-align: center; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; color: #9fd49f; font: bold 13px Arial, sans-serif; cursor: pointer; white-space: nowrap; }
+.bet-s.max { color: #cfc6a8; }
+.bet-t:hover, .bet-s:hover { background: rgba(231, 179, 80, 0.16); border-color: rgba(231, 179, 80, 0.6); }
+.bet-t.sel, .bet-s.sel { background: rgba(231, 179, 80, 0.25); border-color: #e7b350; }
+.bet-t.off, .bet-s.off { opacity: 0.35; cursor: default; background: rgba(255, 255, 255, 0.05); border-color: transparent; }
+.bet-key { position: absolute; left: 5px; top: 3px; font: bold 10px Arial, sans-serif; color: #999; }
+.bet-sum { margin-top: 10px; min-height: 18px; color: #ddd; text-align: center; }
+.bet-sum b, .bet-placed b { color: #e7b350; }
+.bet-placed { padding: 12px 0 4px; text-align: center; font-size: 15px; color: #ddd; }
+.bet-placed .muted { margin-top: 4px; font-size: 13px; }
+.bet-cap { color: #ffb070; font-size: 12px; }
+.bet-foot { display: flex; justify-content: center; gap: 22px; padding: 7px; background: rgba(0, 0, 0, 0.35); font-size: 12px; color: #cfc6a8; }
+.bet-foot span { cursor: pointer; }
+.bet-foot span:hover { color: #fff; }
+.bet-foot b { color: #e7b350; margin-right: 4px; }
+.bet-foot .bet-go { color: #fff; font-weight: bold; }
+.bet-note { padding: 6px 14px 8px; color: #8a857a; font-size: 11px; line-height: 1.35; }
+@media (max-height: 640px) {
+  .bet-t { padding: 6px 6px 5px; }
+  .bet-s { padding: 6px 4px 4px; }
+  .bet-note { display: none; }
+}
+
+/* The tracker: bottom middle of the HUD. */
+#bet-track { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 3px 12px; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(231, 179, 80, 0.5); border-radius: 3px; font: 13px Consolas, monospace; color: #e8e4d8; white-space: nowrap; }
+#bet-track b { color: #e7b350; }
+#bet-track .bt-k { color: #111; background: #e7b350; font-weight: bold; padding: 0 4px; margin-right: 4px; border-radius: 2px; }
+#bet-track .bt-pips { letter-spacing: 1px; }
+#bet-track.won { border-color: #7ed07e; }
+#bet-track.won b { color: #7ed07e; }
+#bet-track.dead, #bet-track.lost { border-color: rgba(255, 74, 61, 0.7); }
+#bet-track.lost b { color: var(--danger, #ff4a3d); }
+#bet-track.hint { color: #cfc6a8; border-color: rgba(255, 255, 255, 0.15); background: rgba(0, 0, 0, 0.35); }
+
+/* The chat lines: a bet, and how it went. */
+#chat-log .bet-line { color: #ddd; }
+#chat-log .bet-line .bet-won { color: #7ed07e; font-weight: bold; }
+#chat-log .bet-line .bet-lost { color: #ff7a6a; }
+#chat-log .bet-line .bet-cap { color: #ffb070; }
