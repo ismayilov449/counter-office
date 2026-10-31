@@ -27,6 +27,7 @@ import { Hud, TEAM_NAME, TEAM_COLOR, esc } from './hud.js';
 import { MenuPanel } from './menus.js';
 import { SprayEditor, loadSpray, defaultSpray, sprayTexture, getSprayTexture } from './spray.js';
 import { Net } from './net.js';
+import { catLoadMap, catSync, catUpdate, catSound, catWarmModel } from './cat.js'; // the mansion's cat
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -120,6 +121,7 @@ function loadMap(id) {
   clearSatchelModels();
   clearDroneModels();
   endDrone(null);
+  catLoadMap(scene, map); // the mansion's cat (only on its maps)
   fx.reset();
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
@@ -152,6 +154,7 @@ function prewarm() {
   place(buildPlacedMine('mon50', MINE.mon50.wire, MINE.mon50.wireHalf), 3.8);
   place(buildPlacedJammer(), 4.4);
   place(buildDrone(), 2.5, -1);
+  place(catWarmModel(), 1.5, -1); // the cat (a skinned mesh: its own shaders, and its shadow's)
   scene.add(extra);
   // effects
   fx.crater(by(-2, 0, -2), 1, true);
@@ -2829,6 +2832,10 @@ const net = new Net({
     onCarSnapshot(m.cars, m.time);
     onDroneSnapshot(m.dn, m.time);
     syncHostages(m.hs, m.time);
+    catSync(m.cat, m.time); // the mansion's cat
+  },
+  catMeow(m) {
+    catSound(m); // the mansion's cat: meow, mrrp, screech or hiss
   },
   shot(m) {
     const r = remotes.get(m.id);
@@ -3887,6 +3894,7 @@ function frame() {
   updateSatchelModels(now);
   updateSatchelFlights(now);
   updateDroneModels(dt, now);
+  catUpdate(dt, now, renderTime(), camera.position); // the mansion's cat
   updateDroneHud(now);
   updateFires(dt, now);
   updateZombieGrowls(now);
