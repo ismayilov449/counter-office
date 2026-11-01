@@ -16,6 +16,7 @@
 import { clip } from './breakables.js';
 import { addGasPipes } from './mansion_gas.js'; // gas: the kitchen's gas pipe and the cellar's boiler
 import { floodWorks } from './mansion_flood.js'; // Floodgate: the valve in the storm drain
+import { addElevator } from './mansion_elevator.js'; // elevator
 
 const IN = 0.0254; // a texel, in metres
 
@@ -588,6 +589,7 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   }
   addGasPipes({ decor, solids }); // gas: pipes you can shoot (see shared/maps/mansion_gas.js)
 
+  const elevator = addElevator({ carve, unface, face, decor, rooms, keep, solid: (...b) => solids.push(...b) }); // elevator: the lift's shaft (mansion_elevator.js)
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv };
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv, elevator }; // (elevator: + elevator)
 }
