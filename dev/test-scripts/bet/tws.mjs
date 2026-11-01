@@ -1,5 +1,6 @@
 // Bets against the real server, over WebSocket (scripted players, no browser). Needs the test server on GAME_PORT
-// (default 4080) on Dusty with:  up.ps1 BOTS=0 START_MONEY=10000 FRIENDLY_FIRE=1 BUY_TIME=8
+// (default 4080) on the Mansion with:  up.ps1 BOTS=0 START_MONEY=10000 FRIENDLY_FIRE=1 BUY_TIME=8 MAP=cs_mansion
+// (the fight in the street east of the house; whoever isn't in it waits in the garden or on the lawn)
 //   warmup: refused. Round 1 (freeze): Rufat (T) bets $2000 on 3 kills, Tina (T) $500 on surviving, Carl (CT) $200
 //   on 1 kill, Cora (CT) $300 on surviving; refusals: twice, a bad stake, a bad target. Rufat kills the 3 CTs with a
 //   Desert Eagle: his tracker goes 1, 2, 3; Cora's says dead; the round ends: Rufat wins $10000 (capped), Tina $1000,
@@ -57,8 +58,8 @@ ok('Rufat bought a Desert Eagle', rufat.me?.inv?.secondary?.id === 'deagle', JSO
 
 // ---- live: Rufat kills the three CTs, 3 m in front of him
 await sleep(3200); // freeze time (3 s) runs out
-rufat.at([0, 0, 40], 0); for (const c of [carl, cora, cid]) c.at([0, 0, 37], Math.PI);
-tina.at([6, 0, 44], 0);
+rufat.at([19, 0, -8], 0); for (const c of [carl, cora, cid]) c.at([19, 0, -11], Math.PI);
+tina.at([2, 0, 9], 0);
 await sleep(400);
 rufat.clear(); cora.clear();
 for (const target of [carl, cora, cid]) {
@@ -92,7 +93,7 @@ carl.send({ t: 'buy', item: 'deagle' }); await sleep(300);
 ok('Carl bought a Desert Eagle', carl.me?.inv?.secondary?.id === 'deagle');
 const rnd2 = Date.now();
 await sleep(3300);
-rufat.at([0, 0, 40], 0); tina.at([3, 0, 40], 0); carl.at([0, 0, 37], Math.PI); cora.at([-20, 0, -40], 0); cid.at([20, 0, -40], 0);
+rufat.at([19, 0, -8], 0); tina.at([17, 0, -8], 0); carl.at([19, 0, -11], Math.PI); cora.at([-37.5, 0, 4], 0); cid.at([-37.5, 0, -2], 0);
 await sleep(400);
 rufat.clear();
 for (let i = 0; i < 4 && tina.alive; i++) { shoot(rufat, tina, 'deagle'); await sleep(700); }
