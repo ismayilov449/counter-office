@@ -220,7 +220,7 @@ ok('E again lets it go (shieldDrop)', got.some(m => m.t === 'shieldDrop' && m.wh
 await key('Digit1'); await sleep(900);
 ok('then the AK comes out: ' + (await lastState())?.[3], (await lastState())?.[3] === 'ak47');
 await tp([-22.5, F, 6.5], SETUP.walkYaw); await sleep(400); // (5 m of free floor ahead, east along the room)
-const v2 = await speed(1000);
+const v2 = await speed(1500); // (1.5 s: at 1-2 frames a second headless, 1 s of keys was still mostly the speed-up; 5 m of floor)
 ok(`and full speed again: ${v2.toFixed(2)} m/s`, v2 > 4.5);
 
 // ---- 3: the gadgets (a fresh round; the hostage back in the living room)

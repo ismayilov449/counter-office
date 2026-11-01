@@ -29,6 +29,10 @@ const until = async (cond, ms = 3000) => { for (let i = 0; i < ms / 50; i++) { i
 const g = await open('CT', 'Rescuer', ['msg']);
 const { ev, shot, key, errors, cmd } = g;
 await cmd('Emulation.setDeviceMetricsOverride', { width: 640, height: 360, deviceScaleFactor: 1, mobile: false });
+// (on a cold page the team buttons may not take the first click: click again until the join goes through)
+for (let i = 0; i < 8 && !(await ev('document.getElementById("join").classList.contains("hidden")')); i++) {
+  await ev('document.querySelector(\'#join .team-btn[data-team="CT"]\').click(), 1'); await new Promise(r => setTimeout(r, 1500));
+}
 const hint = () => ev("document.getElementById('hint')?.textContent || ''");
 const msgs = async () => JSON.parse(await ev('JSON.stringify(__in.splice(0))'));
 // the browser CT at p looking along yaw (a 'spawn' message to the page: the server takes the position it then sends)

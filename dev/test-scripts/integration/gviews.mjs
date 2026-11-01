@@ -75,7 +75,9 @@ for (const [n, p, yaw, pitch] of [['stair_e', [-14.4, -0.59, -7.6], -Math.PI / 2
 // point light with a shadow is put right over the cat; for 20 frames the cat's shadow draws are counted by the kind of
 // shadow camera (orthographic: the sun's; perspective: a point light's cube faces).
 if (process.env.CAT) {
-  await g.tp([-19.5, LY, 2.5], Math.PI / 2 + 0.6, 0); await sleep(2000); // (near the basket, looking at it)
+  // (go to the cat wherever it has wandered: 2 m from it, looking at it, inside the 12 m its shadow is drawn within)
+  const cp = JSON.parse(await g.ev(`(() => { let p = null; for (const s of __scenes) s.traverse(o => { if (o.userData?.eyes && o.userData?.mesh && o.parent === s) p = o.position; }); return JSON.stringify(p && [p.x, p.y, p.z]); })()`));
+  if (cp) { await g.tp([cp[0] + 1.5, cp[1], cp[2] + 1.2], Math.atan2(1.5, 1.2), -0.3); await sleep(2000); }
   const r = JSON.parse(await g.ev(`(async () => {
     const THREE = await import('three');
     let mesh = null, scene = null;
@@ -85,15 +87,17 @@ if (process.env.CAT) {
     mesh.onBeforeShadow = function (r, o, cam, sc, ...a) { n[sc.isOrthographicCamera ? 'ortho' : 'persp']++; return own.call(this, r, o, cam, sc, ...a); };
     const p = new THREE.Vector3(); mesh.getWorldPosition(p);
     const L = new THREE.PointLight(0xffffff, 5, 8); L.castShadow = true; L.position.set(p.x, p.y + 1.4, p.z); scene.add(L);
+    const frames = async k => { __dc.frames.length = 0; while (__dc.frames.length < k + 2) await new Promise(r => setTimeout(r, 100)); const f = __dc.frames.slice(2); return { min: Math.min(...f), max: Math.max(...f) }; };
     await new Promise(r => setTimeout(r, 1500)); n.ortho = n.persp = 0; // (the new light's shaders)
-    __dc.frames.length = 0; while (__dc.frames.length < 22) await new Promise(r => setTimeout(r, 100));
-    const on = __dc.frames.slice(2).reduce((a, b) => a + b, 0) / 20;
-    mesh.layers.set(31); __dc.frames.length = 0; while (__dc.frames.length < 22) await new Promise(r => setTimeout(r, 100));
-    const off = __dc.frames.slice(2).reduce((a, b) => a + b, 0) / 20;
-    mesh.layers.set(0); scene.remove(L); mesh.onBeforeShadow = own;
-    return JSON.stringify({ ...n, cat: [p.x, p.y, p.z].map(v => +v.toFixed(2)), drawsWithCat: on, drawsWithout: off });
+    const now = await frames(20), cur = { ...n };
+    // the old way, for comparison: castShadow a plain true (the getter taken away)
+    Object.defineProperty(mesh, 'castShadow', { value: true, writable: true, configurable: true });
+    n.ortho = n.persp = 0;
+    const old = await frames(20), was = { ...n };
+    scene.remove(L); mesh.onBeforeShadow = own;
+    return JSON.stringify({ cat: [p.x, p.y, p.z].map(v => +v.toFixed(2)), now: { ...cur, draws: now }, before: { ...was, draws: old } });
   })()`));
-  console.log(`cat shadow, a shadow-casting point light over it: ${JSON.stringify(r)} (perspective must be 0)`);
+  console.log(`cat shadow, a shadow-casting point light over it, 20 frames: ${JSON.stringify(r)} (now: perspective must be 0)`);
   await g.shot(`${PREFIX}_cat.png`);
 }
 console.log('page errors:', g.errors.length ? g.errors.join(' | ') : 'none');
