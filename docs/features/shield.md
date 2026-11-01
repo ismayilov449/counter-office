@@ -1,6 +1,50 @@
 # Human shield (agent "shield", branch `feature/shield`)
 
-## STATUS (finished on the server side 2026-10-31; only the browser checks below are left, for the architect)
+## STATUS (finished on the server side 2026-10-31; browser-verified on cs_mansion and Mansion at night 2026-11-01)
+
+**Browser-verified (2026-11-01, headless Edge 960x540, fresh test server per run, `BOTS=0 START_MONEY=16000
+ROUND_TIME=600`; no page errors anywhere):**
+- `g-shield.mjs`: all 42 checks pass on cs_mansion and on cs_mansion_night.
+  - As a CT: "A hostage is being used as a shield!", the scream plays (its oscillators are made at the grab; heard by
+    ear: not checked), the hint "A Terrorist holds this hostage as a shield" and E refused next to it, a shot at the
+    T's chest from the front hits the hostage ("You hit the hostage!..."), E lets go; a head shot at the side of his
+    head that shows kills the T ("HS" in the feed), the hostage is let go unhurt and the CT leads it away ("The
+    hostage is following you"); shooting the held hostage dead: shieldDrop 'dead', "Viewer killed a hostage!
+    (-$1500)", money $16000 → $14500.
+  - As the T: the grab hint, E grabs, the Glock comes out, 1 doesn't take the AK, no ducking or jumping, 3.27 m/s
+    walking with the hostage (game time), E lets go, the AK again and full speed (4.7–5.3 m/s).
+  - The gadgets: holding the hostage by the zip line's terrace stand and at the CCTV desk the hint is "Press E to let
+    the hostage go" and E lets go (no hooking on, no sitting down); sitting at the desk with a free hostage 1.47 m
+    away, no grab hint, and E gets him up (not a grab). After letting go by the stand the hint is the grab hint (E
+    grabs before hooking on there; as designed in `onUse`).
+- Screenshots looked at (`sh_<map>_front/side/angle/throat/hit/released/headshot/hostage_dead/holder/holder_walked/
+  terrace/desk/desk_seated.png`, plus 1280x720 close-ups from the front, both front corners and both sides): the
+  hostage in front of the T leaning back, its head to his left, the T's head showing past it on his right, the pistol
+  by its right shoulder; the hostage's lowered hands up in front of its throat; from the side, the T's arm stub between
+  the bodies and his chest clear of its back. The night map looks the same, lit by the room's lamp.
+- **Fixes (516b8e3):**
+  - The arm: with `0.24 − pitch, −0.31, 0` × 1.4 only a 3–4 cm stub showed, half behind the hostage's right hand.
+    Now the STATUS's alternative, `0.30 − pitch, −0.40, 0` × 1.6: about twice as much forearm at the throat, below the
+    chin, under its hands; from the T's right a tan forearm is seen crossing in front of its neck. Checked at aim pitch
+    0 and −1.0 (the right arm and pistol drop with the aim; the left arm stays level).
+  - The holder's own view: his hostage's leaning head was 0.36 m from his eyes and filled a third of his screen (a
+    big flat block cut by the near plane, a dark blob at night). In his own view it's now hidden (its shoulders and
+    hands still show in front of him); everyone else sees it. (Someone spectating the holder in first person still
+    sees it.)
+- Test fixes (e1dc9bd): the team click is retried until the join goes through, the page's connection is closed before
+  rejoining (otherwise auto-balance moved the second join), each part starts a fresh round (admin restart), the
+  speeds are measured in game time (headless runs slower than the clock), the full-speed walk has 5 m of free floor
+  (it walked into a wall: 0 m/s), and the side view stands in the room (x −22.9: x −25 was outside, floor 0).
+  Positions use the living room's floor, 0.82.
+- **Draw cost** (`g-cost.mjs`, the page as a CT 3.5 m in front of hostage 3, 4 s each, against this branch and against
+  a server of `main`'s code (origin/main extracted to a temp folder; main has only ROADMAP.md beyond this branch's
+  merge)): this branch held 152.9 draw calls / 473k vertices a frame; main after the same E (nothing happens there)
+  154.1 / 476k. No measurable cost: nothing new is drawn, two models are posed. (Both runs show 10–20 more calls in the
+  first 5 s after the round starts, on main too.)
+- Server tests after the fixes (all pass, no server errors): `t-shield.mjs` 28/28 on cs_mansion and cs_mansion_night,
+  `t-rescue.mjs` 5/5 on both. The server lists all 7 maps at start.
+- **Left:** the scream by ear; a real-frame-rate look at the pose while the holder walks and turns. cs_assault not
+  tested (the user's decision).
 
 **State:** feature complete on cs_mansion and Mansion at night. `main` is merged in twice: zip line + CCTV (`d796da8`;
 two conflicts, both kept both sides: `onNade` keeps main's `busy(p)` plus the shield line, main.js imports
@@ -57,9 +101,9 @@ decision, 2026-10-31: no effort on de_dust2, cs_assault or de_inferno; see "cs_a
     and the last ~7 cm of the forearm in front of the hostage's throat, in the middle (x −0.08…0.02, y 1.41–1.51),
     right under the hostage's right hand (its forearm crosses his by 4.5 cm: reads as gripping it). The hostage's
     head is clear (≤1 cm) down to 0.5 rad of down-pitch; looking steeply down (−0.9…−1.2 rad) the tip rises 3–5 cm
-    into its chin. **Left as it is** (no browser allowed to look); if the screenshots show too little of it, rotation
+    into its chin. Left as it was until the browser could look (2026-11-01: too little showed, so the alternative,
     `0.30 − pitch, −0.40, 0` with z-scale 1.6 shows about twice as much in front (tip at x 0.06, y 1.51, z −0.63;
-    11 cm in the chest) but moves it away from the hostage's hand and in front of the holder's chin.
+    11 cm in the chest; it moves away from the hostage's hand and in front of the holder's chin), is now used.
   - The right arm and the pistol: no overlap with the hostage at any pitch. The pistol (hand at 0.30, 1.45, −0.45) is
     ~0.15 m right of the hostage's right shoulder; the head leans the other way, so it's beside the neck, not the head.
   - The held hostage's lowered arms (0.55 rad, turned in 0.35 / −0.3): only the shoulder roots overlap its own torso,
@@ -79,7 +123,8 @@ corner at (−6.25, −0.31, −14.98). Both test changes were reverted; `g-shie
 **Nothing is left on the server side.** Not done because they need a browser or an ear: the checks below, the
 scream by ear, the frame cost (nothing new is drawn: two existing models are posed).
 
-**Browser checks still to do (for the architect, at the end; headless Edge):**
+**Browser checks (done 2026-11-01, see the top of STATUS; how to run them again — use a fresh server per run, add
+`ROUND_TIME=600`, and run `g-cost.mjs` the same way for the draw cost):**
 - Server: `PORT=4050 HTTPS_PORT=4051 MAP=cs_mansion BOTS=0 START_MONEY=16000 DATA_DIR=<temp>/testdata
   ADMIN_PASSWORD=testpass node server.js`; then `GAME_PORT=4050 CDP_PORT=<cdp> OUT=<temp>/shots node
   dev/test-scripts/shield/g-shield.mjs`. Repeat with `MAP=cs_mansion_night` for both (server restarted; the script
@@ -98,7 +143,7 @@ scream by ear, the frame cost (nothing new is drawn: two existing models are pos
 
 **Tests:** `dev/test-scripts/shield/` — `t-shield.mjs` (server, scripted players), `t-rescue.mjs` (rescue after
 release; `NOSHIELD=1` for the control, `TRACE=1` to print the walk), `g-shield.mjs` (browser; `MAP=cs_mansion` or
-`cs_mansion_night`), `spots.mjs` and `paths.mjs` (no server: free spots round each hostage, the bots' paths from each
+`cs_mansion_night`), `g-cost.mjs` (browser: draw calls with the hostage waiting and held), `spots.mjs` and `paths.mjs` (no server: free spots round each hostage, the bots' paths from each
 hostage to the rescue zone).
 
 ---
@@ -169,8 +214,10 @@ a downed mate unless a free hostage is within 1.6 m (then E grabs it); put it be
 - Explosions and fire hurt the held hostage and the T separately (as before); a rocket uses the plain hostage hitbox.
 - On stairs the held hostage stands at the holder's height (its feet may dip into a step).
 - The holder's left arm is one straight box from his shoulder, so to show its tip at the hostage's throat it passes
-  through the hostage's upper chest out of sight (10–13 cm deep; numbers in STATUS). The pose was checked by numbers
-  only; the browser screenshots decide.
+  through the hostage's upper chest out of sight (about 11 cm deep with the numbers in use; see STATUS). Checked in the
+  browser 2026-11-01.
+- The holder doesn't see his own hostage's head (it would fill a third of his screen); a spectator watching him in
+  first person does.
 - Tested on cs_mansion and Mansion at night only; on cs_assault the feature is active (nothing in the code is
   map-specific) but untested, and its node tests would need changes first (STATUS, "cs_assault").
 - The hostage AI's following (unchanged) sticks at tight corners on cs_mansion (e.g. the wall end at x −13.3, z 7.9,
