@@ -29,6 +29,7 @@ import { ACHIEVEMENTS } from './shared/achievements.js';
 import { EMOTE } from './shared/emotes.js';
 import { createHostages, updateHostages, HOSTAGE_STATE } from './lib/hostages.js';
 import { BotManager, BOT_LEVELS } from './lib/bots.js';
+import { createBlood } from './lib/blood.js'; // blood trails
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -1351,6 +1352,7 @@ function turnZombie(p, by, mother = false) {
 // A zombie's claws: armor soaks the hit, after that the human turns.
 function clawHit(target, zombie, dmg) {
   if (target.armor > 0) {
+    bleed.wound(target, dmg, 'claws', 'chest'); // blood trails: a scratch through the armor bleeds
     target.armor = Math.max(0, target.armor - dmg);
     send(target, { t: 'dmg', hp: target.hp, armor: Math.round(target.armor), from: zombie.p, d: 0 });
     send(zombie, { t: 'hit', hs: false, kill: false });
@@ -1501,6 +1503,7 @@ const bots = new BotManager({
   useDoor: (p, i) => useDoor(p, i), kill: p => killPlayer(p, null, 'world', false),
   doors: () => (MAP.doors || []).map((d, i) => ({ i, box: world.doorBoxes[i], open: world.doorStates[i] !== 0 })),
 });
+const bleed = createBlood({ players, now, send, sendMe, inTeam }); // blood trails (lib/blood.js)
 
 function addBot(team) {
   let p = null;
@@ -1891,6 +1894,7 @@ function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo, from = null) 
     record(attacker, 'damage', dealt);
   }
   v.hp -= d;
+  bleed.wound(v, d, weapon, part); // blood trails: the wound starts bleeding
   if (v.cctv && v.hp > 0) cctvOff(v, 'hurt'); // (hurt at the desk: you jump up)
   if (v.bot) bots.hurt(v, attacker);
   send(v, { t: 'dmg', hp: Math.max(0, v.hp), armor: Math.round(v.armor), from: attacker && attacker !== v ? attacker.p : null, d });
@@ -2174,6 +2178,7 @@ function rewind(q, rt) {
 function onShoot(p, m) {
   const t = now();
   if (!p.alive || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
+  if (bleed.busy(p)) return; // blood trails: no shooting while bandaging
   p.protectUntil = 0;
   const w = m.w, def = WEAPONS[w];
   if (!def || def.grenade || def.mortar || w === 'c4') return; // (the mortar fires with a 'mortar' message)
@@ -2371,6 +2376,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
 function onMortar(p, m) {
   const t = now(), def = WEAPONS.mortar;
   if (!p.alive || game.phase === 'freeze' || p.w !== 'mortar' || busy(p)) return;
+  if (bleed.busy(p)) return; // blood trails: no firing while bandaging
   const item = ownItem(p, 'mortar');
   if (!item || item.mag <= 0 || t - p.lastShot < def.rate * 1000 * 0.9) return;
   if (!isNum(m.b) || !isNum(m.e) || m.e < def.elev[0] - 1 || m.e > def.elev[1] + 1) return;
@@ -2941,6 +2947,7 @@ function onPing(p, m) {
 function onNade(p, m) {
   const k = GRENADES.includes(m.k) ? m.k : 'he';
   if (!p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
+  if (bleed.busy(p)) return; // blood trails: no throwing while bandaging
   const o = vec3(m.o), v = vec3(m.v);
   if (!o || !v || Math.hypot(...v) > 30 || dist3(o, eyeOf(p)) > 2.5) return;
   p.inv[k]--;
@@ -3553,6 +3560,9 @@ function handle(p, m) {
     case 'shoot':
       onShoot(p, m);
       break;
+    case 'bloodBandage': // blood trails: P
+      bleed.bandage(p, t);
+      break;
     case 'reload': {
       const def = WEAPONS[m.w];
       const item = ownItem(p, m.w);
@@ -3794,6 +3804,7 @@ function tick() {
   updateSatchels();
   if (game.drones.length) updateDrones(t);
   updateCamo(t);
+  bleed.tick(t); // blood trails
   updateSpotting(t);
   // the time that really passed since the last tick: on Windows the timer fires every 31 or 47 ms rather than 33,
   // and moving by a fixed step made bots and hostages stutter on everyone's screen
@@ -3829,6 +3840,7 @@ function tick() {
     pl,
     // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb, hits it can still take]
     ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0, d.hp]) } : {}),
+    ...bleed.snap(), // blood trails: who is bleeding, bl: [id, level, flags]
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.
