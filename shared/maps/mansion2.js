@@ -175,11 +175,14 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   {
     // the doorway from the kitchen, in the closet's north wall
     carve(-15.4, 0.81, -10.2, -13.9, 3.0, -9.7);
-    reveal(2, -10.16, -9.75, -15.4, -13.9, 0.81, 3.0, 'c1a1w1d', 'c1a2_flr1');
+    reveal(2, -10.16, -9.75, -15.4, -13.9, 0.8128, 3.0, 'c1a1w1d', 'c1a2_flr1'); // (the sill level with the floors round it)
+    // (the carve takes the kitchen's floor 4 cm past the wall: that strip again, or you saw through the floor there)
+    face('c1a2_flr1', 1, 1, 0.8128, [-15.4, 0.8128, -10.2], [-13.9, 0.8128, -10.16]);
     const stone = 'crete3_wall01b', beams = 'x_wood', flags = 'x_concrete';
     carve(-15.54, 0.6, -9.75, -13.31, 0.82, -5.49); // the closet's floor
     hollow([
-      { box: [-15.54, -2.2, -9.75, -13.31, 0.81, -5.49], floor: flags, ceil: beams, wall: stone, open: ['top'] },
+      // (its walls up to the floor drawn round it, 0.8128: at 0.81 a slit under that floor showed a bright line)
+      { box: [-15.54, -2.2, -9.75, -13.31, 0.8128, -5.49], floor: flags, ceil: beams, wall: stone, open: ['top'] },
       // (lid: the living room's floor is drawn at 0.8128; the shell's top at 0.91 stood players 10 cm above it)
       { box: CELLAR, floor: flags, ceil: beams, wall: stone, lid: 0.8128 },
     ]);
