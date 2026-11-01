@@ -2,6 +2,51 @@
 
 Branch `feature/bet`. Part (a) is the player-facing text for the README; part (b) is for RESUME.md and the architect.
 
+## STATUS
+
+- **Done:** the feature, its hooks and every test. **Browser-verified** in headless Edge (swiftshader) on `cs_mansion` and
+  `cs_mansion_night`, a fresh server for each run. No bug was found in the feature itself; the fixes were all in the tests.
+- **`gbet.mjs`: 36 of 36 on both maps, no page errors.** The screenshots, looked at one by one:
+  - `bet-panel-1920x969.png`, `bet-panel-1280x600.png`: the panel is centred and fits; the four targets with their odds
+    and the six stake chips; "0 Max $2000" with the key clear of the text.
+  - `bet-picked-1280x600.png`: with 2 and 9 pressed, only "2 kills" and the $2000 chip are lit, and the sum line reads
+    "Bet $2000 on 2 kills → it pays $6000".
+  - `bet-warmup.png`: greyed out, "No bets during warmup — they open with the first round."
+  - `bet-placed.png`, `bet-panel-placed.png`, `bet-track-1of2.png`: the HUD money drops by the stake. Also the chat line,
+    the tracker at the bottom (`○○ 0/2`, then `●○ 1/2`), and F3 again showing the placed bet.
+  - `bet-won.png`: "…and won $6000! (only $2800 fit under the $16000 cap)", money $16000, the tracker gone.
+  - `bet-over-buymenu.png`: the panel over the open buy menu, Survive and $500 lit, "(over $16000 is lost)".
+  - `bet-dead.png`, `bet-lost.png`: the tracker turns red ("dead · lost"), then "…and lost $500."
+- **`gaward.mjs` (new): all checks on both maps, no page errors.**
+  - A 3-kill bet wins ×5 ($5000, paid in full) and a team mate's survive bet wins ×2 ($1000), each with its chat line.
+  - The match summary on screen has a "Best gambler · Rufat · +$4000 · 1 of 1 bet won" card next to the other awards
+    (`award-won.png`, `award-summary.png`).
+- **`footer.mjs`:** identical at all 11 sizes (the footer is 31 px high everywhere), no page errors.
+- **`mansion/buyhover.mjs`:** all 41 items stay put at 10 sizes. 900×560 has the 5 known failures (`pmn` not under the
+  mouse; `mon50`, `satchel`, `camo` and `jammer` below the window): the scroll case that is also on `main`. No page errors.
+- **Draw cost against `main`: none.** The feature adds no 3D objects, only page elements. `gdraw.mjs` (new) counts the
+  WebGL draws per frame in the living room. Frames alternate between a light and a heavy kind (shadow maps are redrawn
+  every few frames), and both cost exactly 227 / 369 draws with nothing open, with the panel open, and with a bet on the
+  tracker.
+- **Server tests, re-run on `cs_mansion`:** `unit.mjs` 49/49, `tws.mjs` all, `tmatch.mjs` all, and `tsoak.mjs`
+  (`BOTS=4 ROUND_TIME=20`, 60 s: 3 rounds, only the person bets). The server's stderr was empty, and it starts with all
+  7 maps.
+- **Test fixes (on this branch):**
+  - `gbet.mjs`, `tws.mjs`, `tmatch.mjs`: moved from Dusty positions to the Mansion (the fight in the street east of the
+    house at x 19; whoever isn't in it waits in the garden or on the lawn).
+  - `gbet.mjs`: the 960×540 page outside the two panel shots, and the team click retried on a cold page.
+  - New `gaward.mjs` (the ×5 and ×2 wins and the award on screen), with the joins alternating CT/T: with auto team balance
+    a team can't get two ahead at any join, so a third CT can only join after the second T.
+  - New `gdraw.mjs` (the draw cost).
+- **Seen, not this feature's (for the architect):** the short-lived centre text (`#small-msg`, top 76 px in `main`'s
+  `style.css`) overlaps the team bar's money cards once players are in the game. It happens with "Bet placed…", "You won
+  your bet…" and "You lost your bet…", and the same way with the game's own "Guard the hostages in the mansion!". It
+  belongs to `main`'s HUD layout, so it wasn't changed here.
+- **Left:**
+  - By hand on a real laptop: F3 in buy time frees the mouse; Enter, a click on Place bet, Esc or F3 takes it back
+    without the pause menu flashing (headless Edge fakes pointer lock).
+  - The sounds by ear (the game's existing `buy` when a bet is placed, `deny` when refused, `chat` on someone else's bet).
+
 ## (a) README
 
 **Where:** a new bullet in *Gameplay*, after the **Buy menu** bullet; one change in the *Controls* table; one word in
@@ -162,11 +207,11 @@ All on test ports (server 4080, headless Edge 9480), test data in a temp folder.
   identical with and without the item.
 - The server starts with all 7 maps.
 
-### Browser checks still to do (after the merge)
+### Browser checks (done on the Mansion maps; see STATUS)
 
-With the server on Dusty and headless Edge (GAME_PORT / CDP_PORT set):
+With the server on `MAP=cs_mansion` or `cs_mansion_night` and headless Edge (GAME_PORT / CDP_PORT set):
 
-1. `up.ps1 BOTS=0 START_MONEY=12000 BUY_TIME=40`, then `node dev/test-scripts/bet/gbet.mjs` — all 36 should pass;
+1. `up.ps1 BOTS=0 START_MONEY=12000 BUY_TIME=40 MAP=cs_mansion`, then `node dev/test-scripts/bet/gbet.mjs` — all 36 should pass;
    look at `bet-panel-1920x969.png` / `bet-panel-1280x600.png` / `bet-picked-1280x600.png` (the "0 Max $2000" chip:
    the key no longer touches the text; with $2000 picked only the $2000 chip lights up), `bet-over-buymenu.png`,
    `bet-track-1of2.png`, `bet-won.png`, `bet-dead.png`, `bet-lost.png`.
