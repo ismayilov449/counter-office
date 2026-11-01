@@ -33,6 +33,7 @@ import { BotManager, BOT_LEVELS } from './lib/bots.js';
 import { createBlood } from './lib/blood.js'; // blood trails
 import { createCat } from './lib/cat.js'; // the mansion's cat
 import { createDisguise } from './lib/disguise.js'; // Disguise
+import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -350,6 +351,7 @@ function sendTeamBar() {
     const full = [q.id, q.alive ? 1 : 0, q.inv.primary?.id || q.inv.secondary?.id || 'knife', Math.max(0, Math.round(q.hp)), q.money, nades, (q.kit ? 1 : 0) | (q.inv.c4 ? 2 : 0)];
     return { q, full, enemy: [q.id, q.alive ? 1 : 0, full[2], -1, -1, [], 0] };
   });
+  body.fakeBar(rows); // body: someone playing dead looks dead
   for (const p of players.values()) {
     if (!p.joined) continue;
     const all = !inTeam(p) || !p.alive;
@@ -362,6 +364,7 @@ function sendRoster() {
     id: p.id, name: p.name, team: p.team, k: p.kills, d: p.deaths, ping: p.ping, buf: p.buf || 0, alive: p.alive, vote: p.vote || null,
     lv: isGG() ? (p.level || 0) + 1 : undefined, rank: rankOf(p.name), z: p.zombie ? 1 : 0, bot: p.bot ? 1 : 0,
   }));
+  body.fakeRoster(list); // body: someone playing dead looks dead
   broadcast({ t: 'roster', list, carrier: game.bomb.carrier }, q => q.team === 'T');
   broadcast({ t: 'roster', list, carrier: null }, q => q.team !== 'T');
 }
@@ -404,6 +407,7 @@ function randomSpot(p) {
 }
 
 function spawnPlayer(p) {
+  body.reset(p); // body: up on your feet
   p.burnUntil = 0;
   p.piloting = null;
   p.zip = null;
@@ -1501,7 +1505,7 @@ function swapHns() {
 
 const bots = new BotManager({
   players: () => players, game: () => game, map: () => MAP, world: () => world, cfg: () => CFG, now,
-  inTeam, enemies: (a, b) => !mates(a, b), mode: () => CFG.gameMode, mapMode: () => mapMode(MAP), phase: () => game.phase,
+  inTeam, enemies: (a, b) => !mates(a, b) && !b.playingDead /* body: bots take a "corpse" for dead */, mode: () => CFG.gameMode, mapMode: () => mapMode(MAP), phase: () => game.phase,
   canBuy: p => !canBuy(p, now()), buy: (p, id) => onBuy(p, id), use: p => onUse(p, { on: true }, now()),
   shoot: (p, m) => onShoot(p, m), nade: (p, m) => onNade(p, m), siteAt: pos => siteAt(MAP, pos),
   door: p => { const d = nearestDoor(p); return d && world.doorStates[d.i] === 0 ? d.i : null; },
@@ -1515,6 +1519,15 @@ const cat = createCat({ map: () => MAP, world: () => world, nav: () => bots.nav(
 const shield = initShield({ players, game, now, send, broadcast, world: () => world, map: () => MAP });
 // Disguise: a dead enemy's uniform (lib/disguise.js)
 const disguise = createDisguise({ players, game, cfg: () => CFG, send, lineOfSight, eyeOf });
+// body: "Downed, not dead" + "Play dead" (lib/body.js) gets what it needs
+body.init({
+  game, players, cfg: CFG, now, mapMode: () => mapMode(MAP), send, broadcast, sendMe, sendRoster, killPlayer, gibOf, mates, inTeam,
+  spawnDrop, dropBomb, takeDrop, offsetPos, exitCar, loseDrone,
+  busy, falling: p => !!p.zipFall, // (on the zip line or at the CCTV desk; falling off the zip line)
+});
+// body: going down or playing dead takes you off the zip line (you fall) and up from the CCTV desk
+body.onDown(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'hurt'); });
+body.onPlayDead(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'left'); });
 
 function addBot(team) {
   let p = null;
@@ -1817,6 +1830,7 @@ function gibOf(weapon, hs, how) {
 
 function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
   if (!v.alive) return;
+  if (v.downed || v.playingDead) ({ killer, weapon, hs } = body.died(v, killer, weapon, hs, silent)); // body: who gets the kill
   v.alive = false;
   v.hp = 0;
   v.act = null;
@@ -1889,6 +1903,7 @@ function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
 function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo, from = null) {
   if (!v.alive) return 0;
   if (attacker && attacker !== v && v.protectUntil && now() < v.protectUntil) return 0; // Gun Game spawn protection
+  body.hurt(v, attacker, weapon); // body: a hit wakes someone playing dead
   const mult = { head: 4, chest: 1, stomach: 1.25, legs: 0.75 }[part] ?? 1;
   let d = dmg * mult;
   if (v.armor > 0 && part !== 'legs' && (part !== 'head' || v.helmet)) {
@@ -1911,7 +1926,7 @@ function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo, from = null) 
   disguise.onHurt(v, attacker); // Disguise: a hit stops the changing; a hit from the fooled team gives you away
   if (v.bot) bots.hurt(v, attacker);
   send(v, { t: 'dmg', hp: Math.max(0, v.hp), armor: Math.round(v.armor), from: attacker && attacker !== v ? attacker.p : null, d });
-  const killed = v.hp <= 0;
+  const killed = v.hp <= 0 && !body.tryDown(v, attacker, weapon, part, from); // body: downed, not dead
   if (attacker && attacker !== v) {
     if (hitInfo) { hitInfo.any = true; hitInfo.hs ||= part === 'head'; hitInfo.kill ||= killed; }
     else send(attacker, { t: 'hit', hs: part === 'head', kill: killed });
@@ -1987,6 +2002,7 @@ function updatePickups() {
   for (const p of players.values()) {
     if (!p.alive) continue;
     if (p.zombie) continue;
+    if (p.playingDead) continue; // body: a "corpse" lies on its own weapons
     for (const d of nearbyDrops(p, 1.0)) {
       if (d.w === 'c4' ? p.team === 'T' : !p.inv[slotKey(d.w)]) takeDrop(p, d);
     }
@@ -2088,6 +2104,7 @@ function updateActions(t) {
 
 function onUse(p, m, t) {
   if (!m.on) { p.act = null; return; }
+  if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
   if (p.piloting != null) { const d = game.drones.find(x => x.id === p.piloting); if (d) loseDrone(d, 'released'); else p.piloting = null; return; }
   if (!p.alive || p.act) return;
   if (p.zip) { zipOff(p, t, 'letgo'); return; }
@@ -2195,6 +2212,7 @@ function onShoot(p, m) {
   const t = now();
   if (!p.alive || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
   if (bleed.busy(p)) return; // blood trails: no shooting while bandaging
+  if (body.noFire(p, m.w)) return; // body: down (pistol only), playing dead, reviving
   p.protectUntil = 0;
   const w = m.w, def = WEAPONS[w];
   if (!def || def.grenade || def.mortar || w === 'c4') return; // (the mortar fires with a 'mortar' message)
@@ -2248,7 +2266,7 @@ function onShoot(p, m) {
       if (q === p || !q.alive || !inTeam(q)) continue;
       if (!CFG.friendlyFire && mates(q, p)) continue;
       const st = rewind(q, m.rt);
-      const hit = rayPlayer(o, d, st.p, st.c, wallT, headScale());
+      const hit = body.lying(q) ? body.rayBody(q, o, d, st.p, wallT) : rayPlayer(o, d, st.p, st.c, wallT, headScale()); // body: lying on the floor
       if (hit && (!best || hit.t < best.t)) best = { q, ...hit };
     }
     for (const h of game.hostages) {
@@ -2269,7 +2287,7 @@ function onShoot(p, m) {
           if (q === p || !q.alive || !inTeam(q)) continue;
           if (!CFG.friendlyFire && mates(q, p)) continue;
           const st = rewind(q, m.rt);
-          const hit = rayPlayer(o2, d, st.p, st.c, far, headScale());
+          const hit = body.lying(q) ? body.rayBody(q, o2, d, st.p, far) : rayPlayer(o2, d, st.p, st.c, far, headScale()); // body: lying on the floor
           if (hit && (!beyond || hit.t < beyond.t)) beyond = { q, ...hit };
         }
         if (beyond) hits.push({ ...beyond, t: beyond.t + exit, d, through: REAL.wallShot });
@@ -2926,6 +2944,7 @@ function updateSpotting(t) {
     spotTick++;
     const list = [];
     for (const q of players.values()) if (q.alive && inTeam(q)) list.push(q);
+    body.unspot(list); // body: a "corpse" is never spotted
     for (const v of list) {
       for (const e of list) {
         if (v.team === e.team || (v.id * 7 + e.id + spotTick) % SPOT.every) continue;
@@ -2974,6 +2993,7 @@ function onNade(p, m) {
   if (!p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
   if (bleed.busy(p)) return; // blood trails: no throwing while bandaging
   if (p.shield != null) return; // shield: no grenades while holding a hostage
+  if (body.noFire(p, k)) return; // body: no throwing from the floor
   const o = vec3(m.o), v = vec3(m.v);
   if (!o || !v || Math.hypot(...v) > 30 || dist3(o, eyeOf(p)) > 2.5) return;
   p.inv[k]--;
@@ -3236,6 +3256,7 @@ function rescueHostage(h) {
 
 function canBuy(p, t) {
   if (!p.alive) return 'You must be alive to buy.';
+  if (body.noBuy(p)) return body.noBuy(p); // body: not while down or playing dead
   if (game.phase === 'warmup') return null;
   if (isGG()) return 'There is no buying in Gun Game — kill to get the next weapon.';
   if (isHNS()) return 'There is no buying in Hide and Seek.';
@@ -3531,6 +3552,7 @@ function handleAdmin(req, res) {
 
 function handle(p, m) {
   const t = now();
+  if (body.handle(p, m)) return; // body: play dead (K); a "corpse" doesn't move, emote or all-chat
   switch (m.t) {
     case 'join': {
       if (p.joined) break;
@@ -3834,6 +3856,7 @@ function tick() {
   if (game.drones.length) updateDrones(t);
   updateCamo(t);
   bleed.tick(t); // blood trails
+  body.tick(t); // body: bleeding out, revives, playing dead
   disguise.tick(); // Disguise: breaking (3 m, plant/defuse, going down), losing it, the round's reset
   updateSpotting(t);
   // the time that really passed since the last tick: on Windows the timer fires every 31 or 47 ms rather than 33,
@@ -3861,6 +3884,7 @@ function tick() {
     // (the last one: on a gadget — 1 hanging from the zip line, 2 at the CCTV desk)
     pl.push([p.id, r2(p.p[0]), r2(p.p[1]), r2(p.p[2]), r2(p.yaw), r2(p.pitch), p.c, p.w, p.alive ? 1 : 0, p.team === 'T' ? 1 : 2, p.fl ? 1 : 0, p.mo || 0, p.hidden ? 1 : 0, p.zip ? 1 : p.cctv ? 2 : 0]);
   }
+  body.hidePl(pl); // body: someone playing dead is dead in the snapshot (their team learns the truth from "bd")
   const b = game.bomb;
   const head = JSON.stringify({
     t: 's',
@@ -3896,7 +3920,7 @@ function tick() {
     // (the enemies the player's team has spotted: only to that team)
     const sp = inTeam(p) && spotOn() ? ',"sp":' + (p.team === 'CT' && p.alive && jammedAt(p.p) ? '[]' : spotJson[p.team]) : '';
     // Disguise: the fooled team's copy shows a disguised player as the dead one; "dg" is the wearer's own team's
-    p.ws.send(disguise.headFor(p, head, pl) + (p.gotSnap ? changed : all) + sp + disguise.snapKey(p) + ',"me":' + me + '}');
+    p.ws.send(disguise.headFor(p, head, pl) + (p.gotSnap ? changed : all) + sp + disguise.snapKey(p) + body.snap(p) + ',"me":' + me + '}'); // body: + "bd"
     p.gotSnap = true;
   }
 }
