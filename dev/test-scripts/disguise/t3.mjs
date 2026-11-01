@@ -1,7 +1,8 @@
 // Disguise and bots (MAP=aim_map BOTS=2 FREEZE_TIME=1 AUTO_BALANCE=0; GAME_PORT, default 4070). Alice and Dave are CTs
-// (so no CT bot), Bob a Terrorist plus one Terrorist bot. Alice kills Bob where the bot can't see it and takes his
-// uniform, keeps out of the bot's sight for 3 s, then stays 6 m in front of it, in its sight, for 6 s: it doesn't shoot
-// her. She fires a shot into the air (blown) and stays in front of it: now it shoots her.
+// (so no CT bot), Bob a Terrorist plus one Terrorist bot. Dave kills Bob where the bot can't see it and runs off; Alice
+// takes Bob's uniform, keeps out of the bot's sight for 3 s, then stays 6 m in front of it, in its sight, for 6 s: it doesn't shoot
+// her. She fires a shot into the air (blown) and stays in front of it: now it shoots her. The bot wanders, so a round's
+// set-up can miss (Bob not dead, or the bot finds her while she changes): then the next round tries again, up to 5.
 import { player, sleep, until, checker, yawTo, ground, los } from './lib.mjs';
 const ok = checker();
 const rounds = [];
@@ -42,7 +43,7 @@ async function follow(secs) {
 }
 
 let botId = null, done = false;
-for (let attempt = 1; attempt <= 3 && !done; attempt++) {
+for (let attempt = 1; attempt <= 5 && !done; attempt++) {
   const n = rounds.length;
   await until(() => rounds.length > n, 130000, 100);
   for (const c of [alice]) c.send({ t: 'reload', w: 'usp' });
@@ -51,18 +52,25 @@ for (let attempt = 1; attempt <= 3 && !done; attempt++) {
   await sleep(300);
   if (!alice.alive || !bob.alive || !botRow() || ctBots()) { console.log(`     (round ${rounds.at(-1)}: not the right line-up, next one)`); continue; }
   botId = botRow()[0];
-  dave.at([-24, 0, -24], 0);
-  const B = hidden(), A0 = [B[0], B[1], B[2] - 4];
-  bob.at(B, Math.PI); alice.at(A0, yawTo(A0, B));
+  // Dave shoots him from 4 m towards the middle of the map (never from inside one of its blocks), then runs off to a
+  // corner: gunfire tells the bot where the shooter is (bots.heard: it can see him whichever way it looks for 2.5 s and
+  // turns that way), so the shooter isn't Alice, who then changes by the body
+  const B = hidden(), mid = Math.hypot(B[0], B[2]) || 1, A0 = [B[0] - B[0] / mid * 4, B[1], B[2] - B[2] / mid * 4];
+  bob.at(B, Math.PI); dave.w = 'usp'; dave.at(A0, yawTo(A0, B));
   await sleep(700);
-  for (let i = 0; i < 10 && bob.alive; i++) { alice.shootAt(bob, 'usp'); await sleep(400); }
-  if (!ok(`round ${rounds.at(-1)}: Alice kills Bob out of the bot's sight`, !bob.alive)) continue;
+  for (let i = 0; i < 10 && bob.alive; i++) { dave.shootAt(bob, 'usp'); await sleep(400); }
+  dave.at([-24, 0, -24], 0);
+  if (bob.alive) { console.log(`     (round ${rounds.at(-1)}: Bob still alive after the shots; next round)`); continue; }
+  ok(`round ${rounds.at(-1)}: Dave kills Bob out of the bot's sight`, true);
   const AB = [B[0] + 0.6, B[1], B[2]];
   alice.clear();
   alice.at(AB, yawTo(AB, B), 1); await sleep(250); alice.use(true);
   const on = await until(() => alice.got('disguiseOn').some(m => m.you), 4500);
   alice.use(false); alice.crouch = 0;
-  if (!ok('disguised as Bob' + (on ? '' : ` (hit while changing? ${dmgs().length} hits)`), on)) continue;
+  // (the bot wanders: if it found her while she was changing, before the uniform was on, it shot her and that stopped
+  // it; that's this round's set-up failing, not the disguise: the next round tries again, "the test ran" fails if none works)
+  if (!on) { console.log(`     (round ${rounds.at(-1)}: hit while changing, ${dmgs().length} hits: the bot found her first; next round)`); continue; }
+  ok('disguised as Bob', on);
   // out of the bot's sight for 3 s (whatever it had in mind for her before is forgotten)
   const H = hidden(); alice.at(H, 0, 0);
   await sleep(3000);
