@@ -118,12 +118,12 @@ ok(`round start: the cat asleep in its basket (${f2(cat()?.p)}, ${cat()?.state})
 await until(() => ct.phase === 'live', 10000);
 ok(`the round is live; Tom has camo and a PMN`, ct.phase === 'live' && tom.me?.camo && tom.me?.inv?.pmn > 0);
 ct.at(away.ct); tom.at(away.tom);
-await tp([-19.0, 0.91, 2.2], Math.PI / 2 + 0.44, -0.27); await sleep(1500); // (3.9 m off: beyond following range)
+await tp([-19.0, 0.813, 2.2], Math.PI / 2 + 0.44, -0.27); await sleep(1500); // (3.9 m off: beyond following range)
 await shot(`${P}_1basket.png`);
 const dcIn = await drawCost('looking at the basket (the cat in it)');
 await tp([-16.6, 0.81, -12.3], 0.45, -0.45); await sleep(1200);
 await shot(`${P}_1bowl.png`);
-await tp([-16.0, 0.91, 0.5], -Math.PI / 2, 0); await sleep(800); // (the living room, looking away from the cat)
+await tp([-16.0, 0.813, 0.5], -Math.PI / 2, 0); await sleep(800); // (the living room, looking away from the cat)
 const dcOut = await drawCost('looking away from it');
 
 // ---- 2. following the browser's player: he goes up to it, wherever it has got to, and stands still 1.5 m off
@@ -257,18 +257,18 @@ if (M.night) {
   await admin({ action: 'restart' }); await sleep(1500);
   await until(() => ct.phase === 'live', 10000);
   // the CT flips the living room's switch (lampa7, by the door at z -5) and goes away again
-  ct.at([-19.71, 0.91, -4.6]); await sleep(400);
+  ct.at([-19.71, 0.813, -4.6]); await sleep(400);
   ct.send({ t: 'use', on: true }); await sleep(100); ct.send({ t: 'use', on: false }); await sleep(400);
   ct.at(away.ct);
-  await tp([-21.0, 0.91, 3.0], Math.PI / 2 + 0.3, -0.6); // (by the basket: it wakes up and comes over)
+  await tp([-21.0, 0.813, 3.0], Math.PI / 2 + 0.3, -0.6); // (by the basket: it wakes up and comes over)
   ct.clear();
   await until(() => meows('mrrp').length > 0, 10000);
   await until(() => cat().state === 'sit', 9000); await sleep(800);
   await shot(`${P}_8eyes.png`);
-  await tp([-15.8, 0.91, 1.2], Math.PI / 2 + 0.25, -0.1); await sleep(500); // (across the room: it comes after him)
+  await tp([-15.8, 0.813, 1.2], Math.PI / 2 + 0.25, -0.1); await sleep(500); // (across the room: it comes after him)
   await shot(`${P}_8eyesfar.png`);
   ok(`the cat awake in the dark room (${cat()?.state}): its eyes are drawn (see the pictures)`, cat()?.state !== 'sleep');
-  await tp([-16.0, 0.91, 0.5], -Math.PI / 2, 0); await sleep(800);
+  await tp([-16.0, 0.813, 0.5], -Math.PI / 2, 0); await sleep(800);
   dcNight = await drawCost('night, looking away from it');
 }
 console.log(`draw cost: +${dcIn.toFixed(1)} with the cat and basket in view, +${dcOut.toFixed(1)} looking away${dcNight !== null ? `, +${dcNight.toFixed(1)} at night looking away` : ''}`);

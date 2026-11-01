@@ -115,8 +115,8 @@ ok('by day: no glowing eyes', !cat.userData.eyes.visible);
 
 // ---- snapshots: [x, y, z, yaw, state, purring]; smooth between them
 const camFar = new THREE.Vector3(0, 10, 0);
-C.catSync([-20, 0.91, 0, 0, S.walk, 0], 1000);
-C.catSync([-20, 0.91, 1, 0, S.walk, 0], 1100);
+C.catSync([-20, 0.813, 0, 0, S.walk, 0], 1000);
+C.catSync([-20, 0.813, 1, 0, S.walk, 0], 1100);
 C.catUpdate(0.016, 5000, 1050, camFar);
 ok(`between two snapshots it's half way (z ${cat.position.z.toFixed(2)}), shown`, cat.visible && Math.abs(cat.position.z - 0.5) < 0.01 && Math.abs(cat.position.x + 20) < 0.01);
 let legs = [];
@@ -175,10 +175,10 @@ ok('purring off in the snapshot: it stops', stopped >= 3);
 // ---- the night map: eyes glow (shut asleep); another map: gone; a snapshot without the cat hides it
 C.catLoadMap(scene, MAPS.cs_mansion_night);
 ok('cs_mansion_night: loaded again (the same cat), eyes on', scene.children.filter(o => o === cat).length === 1 && cat.userData.eyes.visible);
-C.catSync([-20, 0.91, 0, 0, S.sit, 0], 2000);
+C.catSync([-20, 0.813, 0, 0, S.sit, 0], 2000);
 C.catUpdate(0.016, t += 16, 2000, camFar);
 ok('awake at night: eyes glowing', cat.userData.eyes.visible);
-C.catSync([-20, 0.91, 0, 0, S.sleep, 0], 2100);
+C.catSync([-20, 0.813, 0, 0, S.sleep, 0], 2100);
 C.catUpdate(0.016, t += 16, 2100, camFar);
 ok('asleep at night: eyes shut', !cat.userData.eyes.visible);
 C.catSync(undefined, 2200);
@@ -186,7 +186,7 @@ ok('a snapshot with no cat: hidden', !cat.visible);
 const other = Object.values(MAPS).find(m => !m.id.startsWith('cs_mansion'));
 C.catLoadMap(scene, other);
 ok(`${other.id}: the cat and its props taken out of the scene`, !scene.children.includes(cat) && !scene.children.includes(props));
-C.catSync([-20, 0.91, 0, 0, S.sit, 0], 2300);
+C.catSync([-20, 0.813, 0, 0, S.sit, 0], 2300);
 C.catUpdate(0.016, t += 16, 2300, camFar);
 ok('and snapshots there do nothing', !cat.visible && !scene.children.includes(cat));
 console.log(fails ? `${fails} FAILED` : 'all passed');

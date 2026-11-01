@@ -61,12 +61,12 @@ ct.at(away.ct);
 
 // ---- 2. following
 t.clear();
-const by = [-21.0, 0.91, 3.4];
+const by = [-21.0, 0.813, 3.4];
 t.at(by, Math.PI / 2, 0);
 ok('the T stands still 1.6 m from it: it follows him ("mrrp")', await until(() => meows('mrrp').length > 0, 9000));
 await until(() => dist2(cat().p, by) < 1.9 && cat().state === 'sit', 8000);
 ok(`it comes up to him and sits (${dist2(cat().p, by).toFixed(2)} m, ${cat().state})`, dist2(cat().p, by) < 1.9 && cat().state === 'sit');
-const by2 = [-20.0, 0.91, -1.5];
+const by2 = [-20.0, 0.813, -1.5];
 t.at(by2, 0, 0);
 ok('he walks 5 m off: it walks after him', await until(() => ['walk', 'trot'].includes(cat().state), 4000));
 const caught = await until(() => dist2(cat().p, by2) < 1.9 && cat().state === 'sit', 12000);

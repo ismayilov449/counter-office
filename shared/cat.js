@@ -13,7 +13,7 @@ export const CAT_SOUNDS = ['meow', 'mrrp', 'screech', 'hiss'];
 export const CAT = {
   // Its basket (in the living room, by the sofa) and its bowl (in the kitchen): drawn by the browsers, it starts
   // every round asleep in the basket.
-  basket: [-22.55, 0.91, 3.85],
+  basket: [-22.55, 0.813, 3.85],
   bowl: [-17.2, 0.81, -13.55],
   // speeds (m/s)
   walk: 0.85, trot: 2.0, run: 5.2,
@@ -23,8 +23,8 @@ export const CAT = {
   // an exact spot it hops onto from there, like the sofa or a window sill), which way it faces there, what it does
   // there and how much it likes it. Spots it can't reach (a closed door in the way) are skipped for a while.
   spots: [
-    { id: 'sofa', pos: [-22.3, 0.91, 0.0], perch: [-22.86, 1.32, 0.0], yaw: -Math.PI / 2, do: ['loaf', 'sleep', 'wash'], w: 3 },
-    { id: 'basket', pos: [-22.1, 0.91, 3.7], perch: [-22.55, 0.96, 3.85], yaw: -Math.PI / 2, do: ['sleep', 'loaf'], w: 2 },
+    { id: 'sofa', pos: [-22.3, 0.813, 0.0], perch: [-22.86, 1.32, 0.0], yaw: -Math.PI / 2, do: ['loaf', 'sleep', 'wash'], w: 3 },
+    { id: 'basket', pos: [-22.1, 0.813, 3.7], perch: [-22.55, 0.863, 3.85], yaw: -Math.PI / 2, do: ['sleep', 'loaf'], w: 2 },
     { id: 'bowl', pos: [-17.2, 0.81, -13.0], perch: [-17.2, 0.81, -13.25], yaw: 0, do: ['sit', 'wash'], w: 2 },
     { id: 'kitchen', pos: [-19.5, 0.81, -9.0], do: ['sit', 'wash', 'loaf'], w: 1 },
     { id: 'stairs', pos: [-12.2, 2.5, -6.6], do: ['sit', 'loaf'], w: 2 },

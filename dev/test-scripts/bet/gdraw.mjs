@@ -34,7 +34,7 @@ const measure = async label => {
 const carl = await player('Carl', 'CT');
 for (let i = 0; i < 100 && !(JSON.parse(await g.ev('JSON.stringify(__in)')).some(m => m.t === 'round')); i++) await sleep(200);
 carl.at([-37.5, 0, 1.5], 0);
-await g.tp([-16.0, 0.91, 0.5], -Math.PI / 2, 0); // (the living room)
+await g.tp([-16.0, 0.813, 0.5], -Math.PI / 2, 0); // (the living room)
 await sleep(1500);
 const a = await measure('nothing open, no bet');
 await g.key('F3'); await sleep(500);

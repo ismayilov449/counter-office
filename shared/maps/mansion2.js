@@ -117,7 +117,8 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     for (const h of list) {
       const [x1, y1, z1, x2, y2, z2] = h.box, open = h.open || [];
       if (!open.includes('bottom')) shells.push([x1 - T, y1 - T, z1 - T, x2 + T, y1, z2 + T]);
-      if (!open.includes('top')) shells.push([x1 - T, y2, z1 - T, x2 + T, y2 + T, z2 + T]);
+      // (lid: where the shell over the room stops, when a floor is drawn lower than y2 + T over it)
+      if (!open.includes('top')) shells.push([x1 - T, y2, z1 - T, x2 + T, h.lid ?? y2 + T, z2 + T]);
       shells.push([x1 - T, y1, z1 - T, x1, y2, z2 + T], [x2, y1, z1 - T, x2 + T, y2, z2 + T], [x1, y1, z1 - T, x2, y2, z1], [x1, y1, z2, x2, y2, z2 + T]);
     }
     // (a shell never reaches into a room dug earlier: that one may be furnished by now)
@@ -179,7 +180,8 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     carve(-15.54, 0.6, -9.75, -13.31, 0.82, -5.49); // the closet's floor
     hollow([
       { box: [-15.54, -2.2, -9.75, -13.31, 0.81, -5.49], floor: flags, ceil: beams, wall: stone, open: ['top'] },
-      { box: CELLAR, floor: flags, ceil: beams, wall: stone },
+      // (lid: the living room's floor is drawn at 0.8128; the shell's top at 0.91 stood players 10 cm above it)
+      { box: CELLAR, floor: flags, ceil: beams, wall: stone, lid: 0.8128 },
     ]);
     // 15 steps down, 0.2 m each, 0.33 m deep: steep enough to pass under the closet's south wall standing up
     for (let i = 0; i < 14; i++) {

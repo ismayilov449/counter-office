@@ -118,8 +118,8 @@ for (const y of [S[0], S[1], 2.0]) {
   const c = cabinSpot(E, y);
   ok(!overlapsAny(world.move(null, c, 2), c[0], c[1], c[2], PLAYER.radius, PLAYER.height) && inCabin(E, y, c), `hatch at ${y}: back down into the cabin's middle`);
 }
-// walking out and in at each stop with the doors open; the closed doors hold. (The living room's floor is 0.91 to walk
-// on: the cellar's ceiling under it is 10 cm higher than the floor you see; the cabin's floor is the one you see.)
+// walking out and in at each stop with the doors open; the closed doors hold. (Every landing's floor is the one you
+// see; until the integration's floor fix the living room's was 0.91 to walk on, 10 cm over the cabin's.)
 const floorAt = (x, y, z) => { const h = world.raycast([x, y + 0.4, z], [0, -1, 0], 1, 'solid'); return y + 0.4 - h.t; };
 for (let st = 0; st < 3; st++) {
   const y = S[st], land = floorAt(mid[0], y, E.out.z2 + 1);

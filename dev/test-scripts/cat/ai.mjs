@@ -52,7 +52,7 @@ ok(`round start: in its basket (${f2(C().p)}), asleep`, d2(C().p, CAT.basket) < 
 ok('the snapshot part: cat: [x, y, z, yaw, state, purring]', Array.isArray(cat.snap().cat) && cat.snap().cat.length === 6);
 
 // ---- following: a player stands still 2 m from it
-const A = player(1, [-20.6, 0.91, 3.6]);
+const A = player(1, [-20.6, 0.813, 3.6]);
 sounds.length = 0;
 ok('a player standing still next to it: after ~3 s it follows him ("mrrp")', run(6000, () => C().follow === 1) && heard('mrrp').length === 1);
 run(4000);
@@ -64,7 +64,7 @@ run(1000);
 ok(`he steps right up to it (${d2(C().p, A.p).toFixed(2)} m): it purrs (${cat.snap().cat[5]})`, cat.snap().cat[5] === 1);
 A.p = by;
 run(1000);
-A.p = [-20.0, 0.91, -1.5];
+A.p = [-20.0, 0.813, -1.5];
 ok('he walks off 5 m and stands: it walks after him', run(1000, () => C().path > 0 && (C().state === CAT_STATE.walk || C().state === CAT_STATE.trot)));
 run(8000);
 ok(`and catches up (${d2(C().p, A.p).toFixed(2)} m, ${STATE[C().state]})`, d2(C().p, A.p) < CAT.follow.keep + 0.6 && C().follow === 1);
@@ -202,7 +202,7 @@ cat.reset();
 run(500);
 const cellar = cat.spots().find(s => s.id === 'cellar');
 deep = null;
-const guide = player(6, [-21.2, 0.91, 3.0]);
+const guide = player(6, [-21.2, 0.813, 3.0]);
 run(8000, () => C().follow === 6);
 guide.p = cellar.at.slice();
 const inCellar = run(60000, () => d2(C().p, guide.p) < 2 && Math.abs(C().p[1] - guide.p[1]) < 0.3);

@@ -51,12 +51,12 @@ const setup = `(async () => {
   setGlow(map.theme.roomGlow, new Set([...(map.switches || []).map(s => s.group), ...(map.theme.glowRooms || [])]));
   setRooms(map.rooms, {});
   C.catLoadMap(scene, map); // (the basket and the bowl; the live cat stays hidden with no snapshots)
-  // a cat in every pose, in a row on the living-room floor (y 0.91), facing the camera (east, +x)
+  // a cat in every pose, in a row on the living-room floor (y 0.813), facing the camera (east, +x)
   const cats = new THREE.Group();
   const poses = ['sit', 'walk', 'trot', 'run', 'wash', 'stretch', 'hide', 'air', 'sleep', 'loaf'];
   poses.forEach((name, i) => {
     const m = C.createCatModel();
-    m.position.set(-21.3, 0.91 + (name === 'air' ? 0.5 : 0), -3.6 + i * 0.62);
+    m.position.set(-21.3, 0.813 + (name === 'air' ? 0.5 : 0), -3.6 + i * 0.62);
     m.rotation.y = -Math.PI / 2;
     C.catPoseModel(m, CAT_STATE[name], 1.3, 1.1);
     m.userData.eyes.visible = !!map.night && name !== 'sleep';

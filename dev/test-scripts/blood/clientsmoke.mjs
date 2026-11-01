@@ -184,8 +184,8 @@ function survey(gridStep) {
 {
   const g = bt.floor(-45.2, 0.25, 0.3);
   ok(`the gazebo: a drop lies on its floor, not on the lawn under it (y ${g?.y.toFixed(3)})`, g && Math.abs(g.y - 0.25) < 0.01);
-  const l = bt.floor(-19, 0.91, -2);
-  ok(`the living room over the cellar: on the drawn floor (y ${l?.y.toFixed(3)}), under the collision's 0.91`, l && Math.abs(l.y - 0.813) < 0.01);
+  const l = bt.floor(-19, 0.813, -2);
+  ok(`the living room over the cellar: on the drawn floor (y ${l?.y.toFixed(3)}), the collision's too since the floor fix`, l && Math.abs(l.y - 0.813) < 0.01);
 }
 for (const id of ['cs_mansion', 'cs_mansion_night']) {
   if (id !== map.id) {

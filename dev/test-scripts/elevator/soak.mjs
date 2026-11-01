@@ -25,7 +25,7 @@ c.on.elevState = m => { if (m.m[1] !== lastY1 && m.m[0] !== m.m[1]) trips++; las
 c.id = c.log.find(m => m.t === 'welcome')?.id;
 const doorX = (E.door.x1 + E.door.x2) / 2, t0 = Date.now();
 for (let k = 0; Date.now() - t0 < secs * 1000; k++) {
-  const s = k % 3, y = s === 1 ? 0.91 : E.stops[s];
+  const s = k % 3, y = E.stops[s];
   c.at([doorX + 0.2, y, E.out.z2 + 0.8], 0);
   await sleep(200);
   c.send({ t: 'elevAim', a: 'c' + s }); await sleep(40);

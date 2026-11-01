@@ -40,7 +40,7 @@ await tp([-14.0, 0.81, -10.67], Math.PI / 2); await sleep(300);
 // (E would spark: the gas is over the threshold by now? only look at the HUD here)
 console.log('HUD by the switch:', JSON.stringify(await text('gas-msg')));
 // set it off with a shot from the doorway of the living room
-const FROM = [-18, 0.91, -1.5]; // (the living room's floor is at 0.91: lower, the player is inside it and the blast's push throws them out through the wall)
+const FROM = [-18, 0.813, -1.5]; // (the living room's floor, 0.813: lower, the player is inside it and the blast's push throws them out through the wall)
 await tp(FROM, ...lookAt(FROM, [-18, 2.0, -13.9])); await sleep(700);
 await msgs();
 await click(0, 250); await sleep(250);

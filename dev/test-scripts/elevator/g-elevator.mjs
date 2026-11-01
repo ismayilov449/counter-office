@@ -61,9 +61,9 @@ const park = () => { t.at([-17.5, S[0], -6.5], 0); fixer.at([-17.5, S[0], -7.5],
 park();
 
 // ---- 1. the shaft in the living room; call it, ride up, out
-await tp([doorX + 2.6, 0.91, E.out.z2 + 4.2], Math.atan2(2.6, 4.2) , 0); await sleep(1500);
+await tp([doorX + 2.6, 0.813, E.out.z2 + 4.2], Math.atan2(2.6, 4.2) , 0); await sleep(1500);
 await shot(P + '_living.png'); // (the shaft standing out into the living room, its doors and call button)
-const landing = [doorX + 0.2, 0.91, E.out.z2 + 0.8];
+const landing = [doorX + 0.2, 0.813, E.out.z2 + 0.8];
 await lookAt(landing, E.call[1]);
 const h1 = await waitHint(/call the lift/);
 check('hint at the call button: ' + h1, /Press E to call the lift/.test(h1));

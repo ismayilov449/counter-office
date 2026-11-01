@@ -47,7 +47,7 @@ const frame = (ms = 1000 / 60) => {
 // standing in front of the ground floor's call button, looking at it
 state([S[1], S[1], clock, 0]);
 const c = E.call[1];
-Object.assign(me, { p: [c[0] + 0.2, 0.91, E.out.z2 + 0.8], yaw: 0 });
+Object.assign(me, { p: [c[0] + 0.2, 0.813, E.out.z2 + 0.8], yaw: 0 });
 const eye = [me.p[0], me.p[1] + PLAYER.eye, me.p[2]], dv = [c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]];
 me.yaw = Math.atan2(-dv[0], -dv[2]); me.pitch = Math.asin(dv[1] / Math.hypot(...dv));
 frame();

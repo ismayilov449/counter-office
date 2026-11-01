@@ -20,7 +20,7 @@ const { motionAt, doorAt, roofAt, inCabin, ELEV } = await G('shared/elevator.js'
 const MAP = MAPS[process.env.MAP || 'cs_mansion'], E = MAP.elevator, S = E.stops;
 const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if (!cond) process.exitCode = 1; };
 const doorX = (E.door.x1 + E.door.x2) / 2, mid = [(E.cabin.x1 + E.cabin.x2) / 2, (E.cabin.z1 + E.cabin.z2) / 2 - 0.1];
-const LANDING_Z = E.out.z2 + 0.8, landingY = s => (s === 1 ? 0.91 : S[s]); // (the living room's floor is 0.91 to walk on)
+const LANDING_Z = E.out.z2 + 0.8, landingY = s => S[s]; // (the floors you walk on are the stops: the living room's is 0.813 since the integration's floor fix)
 
 const a = await player('Rider', 'CT'), b = await player('Cutter', 'T');
 const AID = a.log.find(m => m.t === 'welcome')?.id;
