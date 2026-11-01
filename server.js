@@ -2163,9 +2163,9 @@ function hostageInReach(p, h) {
 
 // E's order (integration 2026-11-01; main.js's hint chain follows it exactly): the drone's controls; off a gadget (the
 // zip line, the CCTV desk, a car: E on a gadget beats a revive); a revive (body: a teammate in danger beats a hostage);
-// a lift target the player aims at (button, hatch, doors: aiming beats the shield's and the hostage's nearness); the
-// hostage shield; a dead enemy's uniform (except where E plants or defuses the bomb); the valves (floodgate, gas); then
-// the old uses.
+// letting go of a hostage held as a shield; a lift target the player aims at (button, hatch, doors: aiming beats the
+// shield's and the hostage's nearness); grabbing a hostage; a dead enemy's uniform (except where E plants or defuses the
+// bomb); the valves (floodgate, gas); then the old uses.
 function onUse(p, m, t) {
   if (!m.on) { p.act = null; return; }
   if (p.piloting != null) { const d = game.drones.find(x => x.id === p.piloting); if (d) loseDrone(d, 'released'); else p.piloting = null; return; }
