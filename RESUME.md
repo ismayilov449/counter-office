@@ -45,10 +45,10 @@ Then: the links between them, E's order, and the fixes found on the way (section
 `integration/links.mjs`, walls/nav/walk, 60 s with `BOTS=4` on both Mansion maps, all 7 maps start, and the browser
 tests of every feature on both Mansion maps plus zip line, CCTV, buyhover and the drone.
 
-**Open questions for the user:** a fine for only *hurting* a held hostage (now just a message)? Should a downed player
-at round end lose a "survive" bet (now he wins it)?
+**The user's answers (2026-11-02):** no fine for only *hurting* a held hostage (only killing it costs $1500); a downed
+player at round end counts as alive, so he wins a "survive" bet. Both are how the code already works.
 
-**When `main` has it:** the feature branches (`feature/blood` … `feature/bet`, `fix/hostages`) can be deleted, and the
+**`main` has it** (fast-forwarded to the integration on 2026-11-02). The feature branches (`feature/blood` … `feature/bet`, `fix/hostages`) can be deleted, and the
 worktrees in `.claude/worktrees/` removed (`git worktree remove`; never delete a `node_modules` that is a link).
 
 ---
@@ -653,7 +653,7 @@ file before changing a feature. The short version, and what the integration adde
 - **Bet on yourself** (`bet.md`): F3 panel in freeze/buy time, targets 1/2/3+ kills or survive, stake $200–$2000 taken
   at once; `lib/bet.js` counts kills in `killPlayer` (after `body.died`, so a downed player's death credits the
   finisher or the downer; play dead calls no `killPlayer`, so it's no kill) and settles after `endRound`. Survive =
-  `p.alive` at the end (a downed player counts as alive: the user's open question). Best gambler award. Tests:
+  `p.alive` at the end (a downed player counts as alive: the user's rule, 2026-11-02). Best gambler award. Tests:
   `bet/unit.mjs`, `tws.mjs`, `tmatch.mjs`, `tsoak.mjs`, browser `gbet.mjs`, `gaward.mjs`, `gdraw.mjs`, `footer.mjs`.
 
 ### What the integration added (2026-11-01)
@@ -690,8 +690,8 @@ file before changing a feature. The short version, and what the integration adde
 - **A testing lesson:** a background `bash` loop stopped with the task tool keeps running its children; two test batches
   then shared one server and wrecked each other's results (admin restarts, server restarts mid-test). Run one batch at
   a time and stop a batch by its PID (`regress.pid`), never by a command-line pattern (another agent's tests match too).
-- **Open questions for the user:** a fine for only *hurting* a held hostage (now just a message)? Should a downed player
-  at round end lose a "survive" bet (now he wins it)?
+- **The user's answers (2026-11-02):** no fine for only *hurting* a held hostage (just the message); a downed player at
+  round end wins a "survive" bet.
 - **Known, not fixed:** see each docs/features file's gaps. In short: the sounds of every feature are unchecked by ear;
   frame times on a real laptop unmeasured (swiftshader only); disguise's `t3.mjs` set-up is flaky; a play-dead body
   still shows the uniform hint to an enemy (the server refuses quietly: the hint can't tell him apart without leaking).
