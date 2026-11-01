@@ -28,6 +28,7 @@ import { rankIndex } from './shared/ranks.js';
 import { ACHIEVEMENTS } from './shared/achievements.js';
 import { EMOTE } from './shared/emotes.js';
 import { createHostages, updateHostages, HOSTAGE_STATE } from './lib/hostages.js';
+import { initShield } from './lib/shield.js'; // shield: a Terrorist holds a hostage as a human shield
 import { BotManager, BOT_LEVELS } from './lib/bots.js';
 import { createBlood } from './lib/blood.js'; // blood trails
 import { createCat } from './lib/cat.js'; // the mansion's cat
@@ -1509,6 +1510,8 @@ const bots = new BotManager({
 const bleed = createBlood({ players, now, send, sendMe, inTeam }); // blood trails (lib/blood.js)
 // The mansion's cat (lib/cat.js, Mansion maps only): walks the bots' nav grid; scared by shots and blasts; sets off mines.
 const cat = createCat({ map: () => MAP, world: () => world, nav: () => bots.nav(), players: () => players, game: () => game, now, broadcast, detonateMine: m => detonateMine(m) });
+// shield: the human shield (lib/shield.js)
+const shield = initShield({ players, game, now, send, broadcast, world: () => world, map: () => MAP });
 
 function addBot(team) {
   let p = null;
@@ -2084,6 +2087,7 @@ function onUse(p, m, t) {
   if (p.zip) { zipOff(p, t, 'letgo'); return; }
   if (p.cctv) { cctvOff(p, 'left'); return; }
   if (p.driving != null || p.riding != null) { exitCar(p); return; }
+  if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   if (game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p)) {
     p.act = { type: 'plant', start: t, pos: p.p.slice(), dur: CFG.plantTime * 1000 };
     return;
@@ -2195,6 +2199,7 @@ function onShoot(p, m) {
   const rawDirs = def.pellets ? (Array.isArray(m.ds) ? m.ds.slice(0, def.pellets) : []) : [m.d];
   const dirs = rawDirs.map(vec3).filter(Boolean).map(norm).filter(Boolean);
   if (!dirs.length) return;
+  if (shield.blocksShot(p, w, o, dirs)) return; // shield: a holder fires only his pistol; bots don't shoot through a held hostage
 
   let item = null;
   if (def.mounted) {
@@ -2240,6 +2245,7 @@ function onShoot(p, m) {
     }
     for (const h of game.hostages) {
       if (h.state === 'dead' || h.state === 'rescued') continue;
+      if (h.heldBy != null) { const hit = shield.rayHostage(h, p, o, d, m.rt, best ? best.t : wallT); if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit }; continue; } // shield: a held hostage's own hitboxes
       const hit = rayPlayer(o, d, h.p, false, best ? best.t : wallT);
       if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit };
     }
@@ -2297,6 +2303,7 @@ function onShoot(p, m) {
     if (h.hostage) {
       const dmg = def.melee ? (alt ? def.altDamage : def.damage) : def.damage * Math.pow(def.rangeMod, h.t / 12.7);
       hurtHostage(h.hostage, p, dmg * ({ head: 4, stomach: 1.25, legs: 0.75 }[h.part] ?? 1), w);
+      shield.hostageHit(h.hostage, p); // shield: a CT who hits a held hostage is told so
       info.any = true;
       continue;
     }
@@ -2954,6 +2961,7 @@ function onNade(p, m) {
   const k = GRENADES.includes(m.k) ? m.k : 'he';
   if (!p.alive || p.inv[k] <= 0 || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
   if (bleed.busy(p)) return; // blood trails: no throwing while bandaging
+  if (p.shield != null) return; // shield: no grenades while holding a hostage
   const o = vec3(m.o), v = vec3(m.v);
   if (!o || !v || Math.hypot(...v) > 30 || dist3(o, eyeOf(p)) > 2.5) return;
   p.inv[k]--;
@@ -3825,6 +3833,7 @@ function tick() {
     }
     for (const h of game.hostages) if (h.state === 'follow' && inRescueZone(MAP, h.p)) rescueHostage(h);
   }
+  shield.update(t); // shield: held hostages go with their holders; holds end on death, a new round...
 
   for (let i = game.nades.length - 1; i >= 0; i--) {
     if (t >= game.nades[i].at) explodeNade(game.nades.splice(i, 1)[0]);
@@ -3850,6 +3859,7 @@ function tick() {
     ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0, d.hp]) } : {}),
     ...bleed.snap(), // blood trails: who is bleeding, bl: [id, level, flags]
     ...cat.snap(), // cat: [x, y, z, yaw, state, purring] on the Mansion maps (see shared/cat.js)
+    ...shield.snap(), // shield: sh: [[hostage id, holder id], ...] while someone holds a hostage
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.
