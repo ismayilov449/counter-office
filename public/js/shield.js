@@ -83,9 +83,11 @@ export function shieldPoseRemote(r) {
   const on = r.alive && holderOf(r.id);
   if (on) {
     u.shieldPose = true;
-    // the left forearm across the hostage's throat (longer, to reach round it; kept level whatever the aim)
-    u.lArm.rotation.set(0.24 - u.arms.rotation.x, -0.31, 0);
-    u.lArm.scale.set(1, 1, 1.4);
+    // the left forearm across the hostage's throat (longer, to reach round it; kept level whatever the aim; seen in
+    // the browser, 0.24 / -0.31 / 1.4 left only a 3-4 cm stub half behind the hostage's hand: this shows about twice
+    // as much at its throat)
+    u.lArm.rotation.set(0.30 - u.arms.rotation.x, -0.40, 0);
+    u.lArm.scale.set(1, 1, 1.6);
     u.rArm.rotation.set(0.28, -0.2, 0);
     u.hand.position.set(0.3, 0.08, -0.45);
   } else if (u.shieldPose) {
@@ -102,8 +104,14 @@ export function shieldPoseRemote(r) {
 export function shieldPoseHostage(h) {
   const u = h.model.userData;
   const by = held.get(h.id);
+  const own = by != null && h.state === 0 && by === C.me.id && C.me.alive;
+  // In the holder's own view its leaning head is a hand's breadth from his eyes: it filled a third of the screen (a
+  // big flat block cut by the near plane, dark at night), so he doesn't see it; its shoulders still show. Everyone
+  // else sees it as before.
+  if (own && u.headG.visible) { u.headG.visible = false; u.shieldHeadHidden = true; }
+  else if (!own && u.shieldHeadHidden) { u.shieldHeadHidden = false; if (!u.torn) u.headG.visible = true; }
   if (by != null && h.state === 0) {
-    if (by === C.me.id && C.me.alive) {
+    if (own) {
       const me = C.me, y = Number.isFinite(me.viewY) ? me.viewY : me.p[1];
       h.p = heldSpot([me.p[0], y, me.p[2]], me.yaw, blocked);
       h.yaw = me.yaw;
