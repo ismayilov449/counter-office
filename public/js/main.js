@@ -1965,9 +1965,16 @@ function nearestHostage() {
   for (const h of hostages.values()) {
     if (h.state > 1) continue;
     const d = Math.hypot(me.p[0] - h.p[0], me.p[1] - h.p[1], me.p[2] - h.p[2]);
-    if (d < bd) { bd = d; best = h; }
+    if (d < bd && hostageInSight(h)) { bd = d; best = h; }
   }
   return best;
+}
+// (as the server's hostageInReach: from the eyes to its chest, not through a wall, a shut door or a window)
+function hostageInSight(h) {
+  const e = eyePos(), c = [h.p[0], h.p[1] + 1.1, h.p[2]], d = [c[0] - e[0], c[1] - e[1], c[2] - e[2]], len = Math.hypot(...d);
+  if (len < 0.05) return true;
+  const hit = coll.raycast(e, d.map(v => v / len), len, 'move');
+  return !hit || hit.t >= len - 0.2;
 }
 
 // ---------------------------------------------------------------- heavy kills: the body bursts apart
@@ -3153,6 +3160,7 @@ const net = new Net({
     bleed.clear(); // blood trails
     me.daze = null;
     fx.clearFires();
+    fx.clearSmoke(); // (the last round's smoke mustn't hang under the ceiling into the new one)
     if (me.roundBuys.length) me.lastBuys = me.roundBuys;
     me.roundBuys = [];
     if (performance.now() - (me.halftimeAt || 0) < 2000) {
@@ -3225,9 +3233,9 @@ const net = new Net({
   },
   ...disguise.handlers, // Disguise: disguiseOn / disguiseOff / disguiseFx
 });
-const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map }); // blood trails (public/js/blood.js)
+const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map, downed: () => body.downed() }); // blood trails (public/js/blood.js)
 initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
-initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio }); // body
+initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone }); // body
 
 // The Mansion's gadgets: the zip line (see gadgets.js).
 const gadgets = createGadgets({
@@ -3262,7 +3270,7 @@ function updateLocal(dt, now) {
   }
   const moveBoxes = coll.move(null, me.p, 2);
   const id = current(), def = WEAPONS[id];
-  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || atFuseBox() || !!satchelToDefuse() || gadgets.holdSpot());
+  const localUse = (me.usingKey || me.usingMouse) && (canPlantHere() || canDefuseHere() || !!mineToDefuse() || atFuseBox() || !!satchelToDefuse() || gadgets.holdSpot() || !!flood.hint() || !!gas.hint()); // (Floodgate, gas: their valves too)
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar || body.frozen(); // body: playing dead
 
   shieldLimitKeys(keys); // shield: no ducking or jumping while holding a hostage
@@ -3618,7 +3626,6 @@ function updateHud(now) {
     } else if (me.mortar) hint = '';
     else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : mortarCanSetUp(me.p) ? 'Click to set up the mortar (the first shell blasts through the roof)' : NO_SKY;
     else if (me.riding) hint = 'Press E to get out of the car';
-    else if (elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server)
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if ((gh = gadgets.hint())) hint = gh;
@@ -3626,7 +3633,6 @@ function updateHud(now) {
     else if (current() === 'jammer') hint = 'Click to put the signal jammer down — no enemy radar, pings or drones within 15 m';
     else if (jammedHere()) hint = JAM_HINT;
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
-    else if (gas.hint()) hint = gas.hint(); // gas: by a leaking pipe's valve
     else if (atFuseBox()) hint = game.lights.power === false ? (me.team === 'CT' ? 'Hold E to bring the power back (5 s)' : 'The power is off') : me.team === 'T' ? 'Hold E to cut the power to the house (3 s)' : 'The fuse box — the Terrorists can cut the power here';
     else if (satchelToDefuse()) hint = `Hold E to defuse the satchel charge (${me.kit ? SATCHEL.kitDefuse : SATCHEL.defuse} s)`;
     else if (current() === 'phone') hint = 'Click to set off your satchel charge';
@@ -3642,10 +3648,15 @@ function updateHud(now) {
   } else if (!me.alive && me.team !== 'SPEC' && game.phase !== 'warmup') {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
-  if (me.alive && !me.act) hint = shieldHint(hint); // shield: grab / let go / held
-  // Disguise: crouched over a dead enemy, E takes their uniform (unless E does something that comes first here)
-  hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere() || !!mineToDefuse() || !!satchelToDefuse() || atFuseBox() || (me.team === 'CT' && !!nearestHostage()));
-  if (me.alive && !me.act && flood.hint()) hint = flood.hint(); // Floodgate: the valve in the storm drain
+  // The new features' E uses go over the old ones above, in the server's order (onUse): a revive (body.js, at hud.hint)
+  // > a lift target aimed at > the hostage shield > a uniform > the valves > the old uses. On a gadget, in a car, flying
+  // the drone or with the mortar, E does that first.
+  if (me.alive && !me.act && me.driving == null && !me.riding && !me.drone && !me.mortar && !gadgets.busy()) {
+    if ((gh = flood.hint()) || (gh = gas.hint())) hint = gh; // Floodgate, gas: their valves
+    hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere()); // Disguise: crouched over a dead enemy (not where E plants or defuses)
+    hint = shieldHint(hint); // shield: grab / let go / held
+    if (elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server)
+  }
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
   else if (me.act && elevator.progress(me.act.a)) hud.progress(elevator.progress(me.act.a), me.act.pr); // elevator

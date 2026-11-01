@@ -55,6 +55,11 @@ export const FLOOD_AREAS = [
   [-14.8, 4.5, -13.5, 5.0, -2.2, -0.2],
   [-14.8, 5.0, 14.8, 6.3, -2.2, -0.2],
   [13.5, 6.3, 14.8, 16.8, -2.2, -0.2],
+  // flood → elevator: the lift shaft's pit under the cellar stop (inside the shaft's walls). Its only way in is the
+  // cellar's doorway (sill -2.2), so it stays dry until the cellar's water reaches the sill, then fills at once (the 7th
+  // number: the level the water must pass first). Above -2.2 the cellar's row holds the shaft, so the cabin and the
+  // shaft over the pit fill with the cellar.
+  [-21.45, -5.34, -19.80, -3.60, -3.4, -2.2, -2.2],
 ];
 
 // Is the flood on this map? (both Mansions: the night map is the same map object spread)
@@ -64,8 +69,8 @@ export const floodMap = map => !!map?.mansion2;
 // is full while the cellar's water is lower). -Infinity where there's no water.
 export function waterTop(level, p) {
   if (level <= FLOOD.base + 0.02) return -Infinity;
-  for (const [x1, z1, x2, z2, floor, ceil] of FLOOD_AREAS) {
-    if (p[0] <= x1 || p[0] >= x2 || p[2] <= z1 || p[2] >= z2 || p[1] <= floor - 0.3 || p[1] >= ceil + 0.05 || level <= floor) continue;
+  for (const [x1, z1, x2, z2, floor, ceil, from = -Infinity] of FLOOD_AREAS) {
+    if (p[0] <= x1 || p[0] >= x2 || p[2] <= z1 || p[2] >= z2 || p[1] <= floor - 0.3 || p[1] >= ceil + 0.05 || level <= floor || level <= from) continue;
     return level >= ceil ? ceil + 0.05 : level;
   }
   return -Infinity;
@@ -80,8 +85,8 @@ export function makeFloodBoxes() {
   return FLOOD_AREAS.map(([x1, z1, x2, z2, floor]) => ({ min: [x1, floor - 0.3, z1], max: [x2, -1e9, z2], flood: true }));
 }
 export function setFloodBoxes(boxes, level) {
-  FLOOD_AREAS.forEach(([, , , , floor, ceil], i) => {
-    boxes[i].max[1] = level <= FLOOD.base + 0.02 || level <= floor ? -1e9 : level >= ceil ? ceil + 0.05 : level + 0.1;
+  FLOOD_AREAS.forEach(([, , , , floor, ceil, from = -Infinity], i) => {
+    boxes[i].max[1] = level <= FLOOD.base + 0.02 || level <= floor || level <= from ? -1e9 : level >= ceil ? ceil + 0.05 : level + 0.1;
   });
 }
 

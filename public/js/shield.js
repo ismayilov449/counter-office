@@ -49,6 +49,15 @@ export function shieldRay(hs, o, d, maxT) {
 }
 
 // ---- hints
+// In sight, as the server's grab needs (lib/shield.js seen: from the eyes to its chest, what stops a bullet in between).
+function seen(h) {
+  const me = C.me, eye = [me.p[0], me.p[1] + (me.crouch ? PLAYER.crouchEye : PLAYER.eye), me.p[2]], chest = [h.p[0], h.p[1] + 1.1, h.p[2]];
+  const d = chest.map((v, i) => v - eye[i]), len = Math.hypot(...d);
+  if (len < 0.05) return true;
+  const hit = C.coll().raycast(eye, d.map(v => v / len), len, 'bullet');
+  return !hit || hit.t >= len - 0.2;
+}
+
 export function shieldHint(hint) {
   if (!C || !C.me.alive) return hint;
   if (shieldHolding()) return 'Press E to let the hostage go';
@@ -58,7 +67,7 @@ export function shieldHint(hint) {
   if (me.team === 'T' && !me.act && (C.game.phase === 'live' || C.game.phase === 'warmup')) {
     for (const h of C.hostages.values()) {
       if (h.state > 1 || held.has(h.id)) continue;
-      if (Math.hypot(me.p[0] - h.p[0], me.p[1] - h.p[1], me.p[2] - h.p[2]) < SHIELD.reach && Math.abs(me.p[1] - h.p[1]) < 1) return 'Press E to grab the hostage as a human shield';
+      if (Math.hypot(me.p[0] - h.p[0], me.p[1] - h.p[1], me.p[2] - h.p[2]) < SHIELD.reach && Math.abs(me.p[1] - h.p[1]) < 1 && seen(h)) return 'Press E to grab the hostage as a human shield';
     }
   }
   if (me.team === 'CT') {

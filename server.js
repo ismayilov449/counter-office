@@ -37,6 +37,7 @@ import { createDisguise } from './lib/disguise.js'; // Disguise
 import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
+import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out of deep water
 import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -1105,12 +1106,11 @@ function cctvTick(t) {
   sendGadgets();
 }
 
-// elevator: the lift in the Mansion (lib/elevator.js). motorStart is the gas system's hook: when it's merged, it becomes
-// (pos, by) => sparkAt(pos, 'motor', by) — the motor sparks each time it starts.
+// elevator: the lift in the Mansion (lib/elevator.js). motorStart: the motor sparks each time it starts (gas).
 const elevator = createElevator({
   map: () => MAP, world: () => world, now, players, game, send, broadcast, sendMines, sendSatchels,
   power: () => game.lights?.power !== false,
-  motorStart: (pos, by) => {}, // elevator → gas: sparkAt(pos, 'motor', by)
+  motorStart: (pos, by) => sparkAt(pos, 'motor', by), // elevator → gas: a spark over the cabin's roof
 });
 
 function nearestSwitch(p) {
@@ -1209,6 +1209,7 @@ function checkVotes() {
 }
 
 function startMatch() {
+  game.pendingStart = 0; // (an admin restart during warmup's "Game commencing" countdown: the countdown mustn't start it again)
   game.endVote = null;
   game.halftimePending = false;
   game.halftimeDone = false;
@@ -1548,7 +1549,9 @@ const bots = new BotManager({
 });
 const bleed = createBlood({ players, now, send, sendMe, inTeam }); // blood trails (lib/blood.js)
 // The mansion's cat (lib/cat.js, Mansion maps only): walks the bots' nav grid; scared by shots and blasts; sets off mines.
-const cat = createCat({ map: () => MAP, world: () => world, nav: () => bots.nav(), players: () => players, game: () => game, now, broadcast, detonateMine: m => detonateMine(m) });
+const cat = createCat({ map: () => MAP, world: () => world, nav: () => bots.nav(), players: () => players, game: () => game, now, broadcast, detonateMine: m => detonateMine(m),
+  deepWater: p => waterTop(flood.state.level, p) - p[1] > 0.12, // cat × flood: no paths, goals or hiding spots in deep water
+});
 // shield: the human shield (lib/shield.js)
 const shield = initShield({ players, game, now, send, broadcast, world: () => world, map: () => MAP });
 // Disguise: a dead enemy's uniform (lib/disguise.js)
@@ -1561,7 +1564,11 @@ body.init({
 });
 // body: going down or playing dead takes you off the zip line (you fall) and up from the CCTV desk
 body.onDown(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'hurt'); });
+body.onDown(p => { shield.letGo(p, 'downed'); p.elevAim = null; }); // body × shield: let go of the hostage; × elevator: no lift target (prying stops with p.act)
 body.onPlayDead(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'left'); });
+// body × shield: a corpse holds no hostage (let go as a real death would: 'died'); × disguise: a wearer who drops is
+// seen through ('went down'); × elevator: no lift target
+body.onPlayDead(p => { shield.letGo(p, 'died'); disguise.reveal(p, 'downed'); p.elevAim = null; });
 
 // bet feature: F3 bet on yourself (lib/bet.js)
 const bet = createBets({ players, game, cfg: CFG, now, send, broadcast, sendMe, mates, inTeam });
@@ -2145,23 +2152,44 @@ function updateActions(t) {
   }
 }
 
+// E on a hostage: within 2.2 m and in sight (from the eyes to its chest, not through a wall, a shut door or a window)
+function hostageInReach(p, h) {
+  if (dist3(p.p, h.p) >= 2.2) return false;
+  const e = eyeOf(p), c = [h.p[0], h.p[1] + 1.1, h.p[2]], d = [c[0] - e[0], c[1] - e[1], c[2] - e[2]], len = Math.hypot(...d);
+  if (len < 0.05) return true;
+  const hit = world.raycast(e, d.map(v => v / len), len, 'move');
+  return !hit || hit.t >= len - 0.2;
+}
+
+// E's order (integration 2026-11-01; main.js's hint chain follows it exactly): the drone's controls; off a gadget (the
+// zip line, the CCTV desk, a car: E on a gadget beats a revive); a revive (body: a teammate in danger beats a hostage);
+// a lift target the player aims at (button, hatch, doors: aiming beats the shield's and the hostage's nearness); the
+// hostage shield; a dead enemy's uniform (except where E plants or defuses the bomb); the valves (floodgate, gas); then
+// the old uses.
 function onUse(p, m, t) {
   if (!m.on) { p.act = null; return; }
-  if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
   if (p.piloting != null) { const d = game.drones.find(x => x.id === p.piloting); if (d) loseDrone(d, 'released'); else p.piloting = null; return; }
+  if (p.alive && !p.act) {
+    if (p.zip) { zipOff(p, t, 'letgo'); return; }
+    if (p.cctv) { cctvOff(p, 'left'); return; }
+    if (p.driving != null || p.riding != null) { exitCar(p); return; }
+  }
+  if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
   if (!p.alive || p.act) return;
-  if (p.zip) { zipOff(p, t, 'letgo'); return; }
-  if (p.cctv) { cctvOff(p, 'left'); return; }
-  if (p.driving != null || p.riding != null) { exitCar(p); return; }
   if (MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at)
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
-  if (game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p)) {
+  const plantHere = game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p);
+  const defuseHere = game.phase === 'live' && p.team === 'CT' && game.bomb.state === 'planted' && dist3(p.p, game.bomb.p) < 1.8;
+  if (!plantHere && !defuseHere && disguise.tryStart(p, t)) return; // Disguise: crouched over a dead enemy, hold E to put on their uniform
+  if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
+  if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
+  if (plantHere) {
     p.act = { type: 'plant', start: t, pos: p.p.slice(), dur: CFG.plantTime * 1000 };
     return;
   }
   if (p.team === 'CT' && game.phase !== 'end') {
     const h = game.hostages
-      .filter(x => (x.state === 'idle' || x.state === 'follow') && dist3(p.p, x.p) < 2.2)
+      .filter(x => (x.state === 'idle' || x.state === 'follow') && hostageInReach(p, x))
       .sort((a, b) => dist3(p.p, a.p) - dist3(p.p, b.p))[0];
     if (h) {
       if (h.state === 'follow' && h.leader === p.id) {
@@ -2181,7 +2209,7 @@ function onUse(p, m, t) {
       return;
     }
   }
-  if (game.phase === 'live' && p.team === 'CT' && game.bomb.state === 'planted' && dist3(p.p, game.bomb.p) < 1.8) {
+  if (defuseHere) {
     p.act = { type: 'defuse', start: t, pos: p.p.slice(), dur: (p.kit ? CFG.kitDefuseTime : CFG.defuseTime) * 1000 };
     broadcast({ t: 'sfx', s: 'defusing' }, q => q.team === 'CT');
     return;
@@ -2197,8 +2225,6 @@ function onUse(p, m, t) {
     p.act = { type: 'satchel', satchel: sat.id, start: t, pos: p.p.slice(), dur: (p.kit ? SATCHEL.kitDefuse : SATCHEL.defuse) * 1000 };
     return;
   }
-  if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
-  if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
   if (atFuseBox(p) && (game.phase === 'live' || game.phase === 'warmup')) {
     // Terrorists cut the power (3 s), CTs bring it back (5 s)
     const off = game.lights.power === false;
@@ -2217,7 +2243,6 @@ function onUse(p, m, t) {
     if (st) { zipOn(p, st, t); return; }
   }
   if (MAP.cctv && !p.bot && atDesk(p)) { cctvOn(p); return; }
-  if (disguise.tryStart(p, t)) return; // Disguise: crouched over a dead enemy, hold E to put on their uniform
   const sw = nearestSwitch(p), door = nearestDoor(p);
   if (door && (!sw || door.dist < dist2(p.p, sw.p))) { useDoor(p, door.i); return; }
   if (sw && game.lights.power === false && MAP.fusebox.groups.includes(sw.group)) {
@@ -3284,7 +3309,8 @@ function hurtHostage(h, attacker, dmg, weapon) {
     sendMe(attacker);
   }
   broadcast({ t: 'hostageKilled', k: attacker ? attacker.id : null, w: weapon });
-  notify(`${attacker ? attacker.name : 'Someone'} killed a hostage! (-$1500)`);
+  // (nobody to fine — drowned or electrocuted in the flood, a blast nobody set off: no "-$1500")
+  notify(attacker ? `${attacker.name} killed a hostage! (-$1500)` : `A hostage ${weapon === 'drowned' ? 'drowned' : weapon === 'electrocuted' ? 'was electrocuted' : 'was killed'}!`);
   checkRoundEnd();
 }
 

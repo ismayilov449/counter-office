@@ -85,12 +85,40 @@ function eyeMaterial() {
   });
 }
 
+// The cat casts the sun's (or the moon's) shadow only, not a room lamp's: in a point light's cube shadow map it cost
+// a draw call per cube face it was in, up to 6 per lamp (+13.7 a frame under the living room's lamp). A shadow pass draws
+// into its light's shadow map, so castShadow answers false while the renderer's target is a shadow map that isn't a
+// directional light's (found once per map in the scene, then remembered).
+let R = null; // the renderer (handed to onBeforeRender / onBeforeShadow)
+const sunMap = new WeakMap(); // render target -> is it a directional light's shadow map
+function isSunMap(rt, mesh) {
+  if (sunMap.has(rt)) return sunMap.get(rt);
+  let root = mesh;
+  while (root.parent) root = root.parent;
+  let found = null;
+  root.traverse(o => { if (o.isLight && o.shadow?.map === rt) found = o; });
+  if (!found) return true; // (not a shadow map we know: leave it be)
+  sunMap.set(rt, !!found.isDirectionalLight);
+  return !!found.isDirectionalLight;
+}
+function sunShadowOnly(mesh) {
+  let cast = true;
+  Object.defineProperty(mesh, 'castShadow', {
+    configurable: true,
+    get() { if (!cast) return false; const rt = R?.getRenderTarget(); return !rt || isSunMap(rt, this); },
+    set(v) { cast = v; },
+  });
+  mesh.onBeforeRender = r => { R = r; };
+  mesh.onBeforeShadow = r => { R = r; };
+}
+
 export function createCatModel() {
   const bones = rig();
   sharedMat ||= new THREE.MeshLambertMaterial({ vertexColors: true });
   const mesh = new THREE.SkinnedMesh(catGeometry(), sharedMat);
   mesh.add(bones.root);
   mesh.bind(new THREE.Skeleton(BONES.map(n => bones[n])));
+  sunShadowOnly(mesh);
   mesh.castShadow = true;
   mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.2, 0), 0.75); // (bent any way it still fits)
   const eyes = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(EYES.flat(), 3)), eyeMaterial());

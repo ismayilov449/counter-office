@@ -277,7 +277,7 @@ export function update(dt, now, camera) {
   const wet = st.level > FLOOD.base + 0.03;
 
   // the surface: the areas the water's top is in (rebuilt only when that changes)
-  const list = wet ? FLOOD_AREAS.filter(([, , , , floor, ceil]) => st.level > floor + 0.02 && st.level < ceil - 0.02) : [];
+  const list = wet ? FLOOD_AREAS.filter(([, , , , floor, ceil, from = -Infinity]) => st.level > floor + 0.02 && st.level < ceil - 0.02 && st.level > from) : [];
   const key = list.map(a => FLOOD_AREAS.indexOf(a)).join(',');
   if (key !== surfKey) {
     surfKey = key;

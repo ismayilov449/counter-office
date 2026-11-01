@@ -240,7 +240,7 @@ export class BloodTrails {
     for (const [id, b] of this.bleeders) if (b.n !== n) this.bleeders.delete(id);
     const was = this.mine, mine = this.bleeders.get(this.ctx.me.id);
     this.mine = mine ? mine.lv : 0;
-    if (this.mine && !was && this.ctx.me.alive && !(mine.fl & BL_BANDAGING)) {
+    if (this.mine && !was && this.ctx.me.alive && !(mine.fl & BL_BANDAGING) && !this.ctx.downed?.()) { // (downed, body's: no P)
       this.ctx.hud.small(this.left > 0 ? 'You are bleeding — press P to bandage' : 'You are bleeding (no bandages left)', 3);
     }
   }
@@ -345,11 +345,12 @@ export class BloodTrails {
   updateHud(now) {
     const me = this.ctx.me;
     const lv = me.alive ? this.mine : 0;
-    const k = this.bandaging ? 'b' : lv ? `${lv}:${this.left}` : '';
+    const down = !!this.ctx.downed?.(); // (downed, the body feature's: you can't bandage yourself)
+    const k = this.bandaging ? 'b' : lv ? `${lv}:${this.left}:${down}` : '';
     if (k !== this.hudKey) {
       this.hudKey = k;
       this.badge.classList.toggle('hidden', !lv || !!this.bandaging);
-      if (lv) this.badge.textContent = `${lv === 3 ? 'BLEEDING HEAVILY' : 'BLEEDING'} · ${this.left > 0 ? `P bandage (${this.left})` : 'no bandages'}`;
+      if (lv) this.badge.textContent = `${lv === 3 ? 'BLEEDING HEAVILY' : 'BLEEDING'}${down ? '' : ` · ${this.left > 0 ? `P bandage (${this.left})` : 'no bandages'}`}`;
       this.bar.classList.toggle('hidden', !this.bandaging);
     }
     if (this.bandaging) {

@@ -194,7 +194,8 @@ function wrapHud() {
     const me = A.me;
     let h = null;
     if (me.alive && (st.downed || st.pd)) h = '';
-    else if (me.alive && !me.act && me.driving == null && !me.riding && st.down.size) {
+    // (on a gadget or flying the drone E does that first: the server's order, integration 2026-11-01)
+    else if (me.alive && !me.act && me.driving == null && !me.riding && !A.busy?.() && st.down.size) {
       const r = reviveTarget();
       if (r) h = `Hold E to revive ${r.name} (${BODY.revive} s)`;
     }
@@ -353,6 +354,9 @@ export const body = {
   frozen: () => st.pd || performance.now() < st.riseUntil,
   // down: always ducked (the crawl)
   crouched: () => st.downed,
+  // me down / playing dead (for the other features: blood hides P, the hints)
+  downed: () => st.downed,
+  playingDead: () => st.pd,
   // the walking speed: a crawl while down; no jumping from the floor
   move(speed) {
     if (st.downed || st.pd) A.me.jumpQueued = false;
