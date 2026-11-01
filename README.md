@@ -91,8 +91,9 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
 - **cs_mansion** — hostage rescue, converted from the original CS 1.6 `cs_mansion.bsp` (same walls, rooms,
   stairs, furniture, fountain plaza, hedges, shed and street), on a bright sunny day.
   - Terrorists start **upstairs** in the mansion with the hostages; CTs start on the **street** east of
-    the estate. A CT presses **E** on a hostage to make it follow and leads it to the street (rescue
-    zone); E again tells it to wait.
+    the estate. A CT presses **E** on a hostage (within reach and in sight: not through a
+    wall, a shut door or a window) to make it follow and leads it to the street (rescue zone); E again tells it to
+    wait. Hostages follow round door frames and corners without getting stuck.
   - CTs win by rescuing every living hostage or eliminating the Terrorists; Terrorists win by
     eliminating the CTs or running out the clock. Rescue: +$1000 for the rescuer, +$150 for the other
     CTs. Killing a hostage costs $1500.
@@ -130,6 +131,28 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - **Wine cellar** under the living room: the walled-up closet off the kitchen (by the doorway to the hall) is open
     now, and a steep wooden stair goes down into a low stone cellar with wine racks, barrels and a table, lit by one
     bulb (its switch is at the foot of the stairs). The ground floor above it never breaks.
+  - **The lift** links the wine cellar, the living room and the Terrorists' room upstairs. Its shaft stands in the
+    living room's north-west corner, by the doorway to the kitchen (upstairs, built into the bookcase wall).
+    - **Calling it:** look at the button beside the lift's doors and press **E**. The button lights up while it's on
+      its way; when it arrives it rings and the doors slide open.
+    - **Riding it:** inside, the panel is on the wall to your right as you step in: look at a button (top: upper
+      floor, middle: ground floor, bottom: cellar) and press **E**. The doors shut and it goes at about walking pace
+      (1 m/s; the ground floor to upstairs takes 4.5 s); you hear its motor hum. Dropped weapons, mines, satchel
+      charges and bodies on its floor ride along too.
+    - **Doors:** they stay open a few seconds; anyone standing in the doorway keeps them open. It only moves with
+      every door shut.
+    - **Blackout:** with the power cut at the fuse box it stops dead where it is, maybe between floors, in the dark,
+      and the buttons do nothing. Within about a metre of a floor, **hold E** looking at the doors to pry them open
+      (3 s, loud). Anywhere, look up at the **hatch** in the ceiling and press **E** to climb onto the cabin's roof;
+      there's a ladder up the shaft: look at a landing's doors and hold **E** to pry them open from inside, then
+      press **E** again to climb out. E on the hatch from the roof drops you back in. With the power off a landing's
+      doors can be pried from outside too (mind the empty shaft). When the power comes back, open doors shut and it
+      carries on to where it was going.
+    - **Safety:** it won't come down onto someone in the shaft below it, and won't go to the top floor with someone
+      on its roof; it brakes if that changes on the way. Explosions don't hurt it; a satchel stuck to it rides along
+      until it goes off.
+    - Its motor **sparks** each time it starts: with enough gas in the room (see Gas below), that sets it off.
+    - Every round it starts on the ground floor, doors and hatch shut. Bots don't use it.
   - **Smugglers' tunnel** from the cellar to the **shed**: a low opening in the cellar's south-east corner leads
     into a narrow timber-shored passage (about 40 m) east under the lawn and south to below the shed, where a ladder
     goes up to a **trapdoor** in the shed's floor. **E** opens it (from the ladder or from above); it creaks open
@@ -138,6 +161,27 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     loud clank) onto a ladder down into a concrete drain with a trickle of dirty water. It runs west under the lawn
     and the fountain, with a jog half way, to a ladder up through a second grate in the **cellar's floor**. With the
     smugglers' tunnel it makes a loop under the estate.
+  - **Floodgate**: a big red **valve wheel** on the storm drain's wall, a few steps from the ladder down from the
+    street grate. Anyone can **hold E for 3 seconds** to open it: water gushes out of a pipe by the ceiling, loud
+    enough to hear along the drain, and the underground floods in about 40 seconds — first the drain (after about
+    14 seconds there's no air left in it), then up through the cellar's grate into the **cellar**, its stairs, the
+    **smugglers' tunnel** and the lift's pit, until the cellar is full to a metre under its ceiling and only a hand's
+    breadth of air is left under the tunnel's. **Hold E 3 seconds again** to close it, and the water drains away
+    slowly (about a minute and a half from full).
+    - You **swim** in it like in the pool: slower, and hold **Space** to come up. Keep your head under too long and
+      you **drown**: you hold your breath for 10 seconds (the **AIR** bar), then lose 10 health a second (someone
+      who is down runs out of breath three times as fast and drowns twice as fast). The screen goes murky green
+      under the water.
+    - **Electrocution**: if the water reaches the **fuse box** in the cellar while the power is on, everyone in the
+      water — the drain, the cellar, the tunnel — gets a heavy shock (the deeper you are, the worse: knee-deep is
+      likely death, and a fatal shock kills outright, nobody goes down), with sparks and a crackle, the lights
+      flicker, and the fuse blows: the house goes dark as if the lever had been pulled. The spark sets off gas in the
+      cellar. Bring the power back while the fuse box is still under water and it happens again. Cut the power at
+      the fuse box first and nobody in the water is hurt — but the house is dark.
+    - The water puts out fires under it and anyone burning who jumps in. A Molotov, flashbang or smoke grenade
+      that lands in the water fizzles out; an HE grenade going off under water hurts only those in the water near
+      it (walls don't break).
+    - Every round starts dry.
   - **Garage** against the house's north wall, between the manhole and the ladder: a steel **roller door** opens onto
     the north lawn. **E** rolls it up (2 seconds, a loud rattle; it comes down at once, but not on someone or a car in
     the way), and a blast nearby tears it out. Inside stands a **car** you can drive out (see Cars below), with tool
@@ -196,6 +240,43 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     hears the power die. A CT **holds E for 5 seconds** to bring it back; the lights flicker on. The light switches
     do nothing while the power is off. It can be cut and restored any number of times; each round starts with the
     power on.
+  - **Gas**: a yellow **gas pipe with a meter** runs up the kitchen's north wall (the one the garage is behind), and
+    a **boiler** stands against the cellar's east wall with its own pipe and meter. **Shoot a pipe** and it's holed:
+    gas hisses out of it and fills the room, then spreads to the rooms next door through whatever is open between
+    them — doorways, open doors, doors blown off, broken windows, holes blown in the walls. A closed door holds it
+    back; open doors, windows and holes to the outside let it out (the wind takes it), so opening up a room clears it.
+    - **You smell gas** (the HUD says so) where there's some; thicker, the room shimmers faintly; thick enough and
+      you **choke**: you cough and lose a few HP a second.
+    - **Any spark sets it off** once there's enough of it (the HUD warns you: *"One spark and it goes up!"*): a
+      gunshot in the room or into it (the muzzle flash, or where the bullet hits), a grenade (HE, flashbang,
+      Molotov), any explosion, a fire, **someone flipping a light switch**, **the fuse box's lever** (or the flooded
+      fuse box shorting) in the cellar, or **the lift's motor** starting. The more gas and the bigger the room, the
+      bigger the blast: everyone in the room is hurt (more the thicker the gas; armour doesn't help), people near it
+      in sight too; it breaks the room's walls and furniture, blows its doors off and its windows out, and leaves it
+      burning for a moment. The rooms next to it with enough gas go off right after, one after the other. A kill by
+      the blast counts for whoever made the spark.
+    - **The valve**: hold **E** for 2 seconds at the red lever under a leaking meter to shut the gas off. What's in
+      the air stays until it's vented (or set off).
+    - The pipes are mended and the air is clean at the start of each round (with no rounds — warmup, Deathmatch,
+      Gun Game — a holed pipe is mended after a minute).
+    - Rough times: a holed kitchen pipe makes the kitchen (doorways open, doors and windows shut) explosive in about
+      25 seconds, and choking after a little over a minute; with the back door open it takes about 40 seconds; with
+      the back door and both windows open it never gets there.
+  - **The cat**: a ginger cat lives in the house. Every round it starts asleep in its basket by the living-room sofa,
+    and the server moves it, so everyone sees it in the same place.
+    - **It wanders** between its favourite spots: the sofa, its basket, the food bowl in the kitchen, the stairs, the
+      sunny window sill, the upstairs window, the bedroom, the terrace, the cellar, the back garden, the gazebo, the
+      lawn and the shed. There it sits, loafs, sleeps or washes. It goes through open doors but can't open shut ones,
+      and it keeps out of deep water when the cellar floods.
+    - **It likes company.** Stand still next to it for a few seconds and it chirps, follows you about and sits at your
+      feet looking up. Right next to it, it purrs.
+    - **It gives people away.** Now and then it walks up to someone who is trying not to be seen and meows at them a
+      few times: ghillie camo on, crouched in a room with the lights off, or **playing dead**. The meow comes from
+      where the cat is, so listen.
+    - **It hates guns.** Gunfire or an explosion nearby makes it hiss and bolt, and it hides for a while (under
+      something if it can). A PMN it steps on or a MON-50 tripwire it walks into goes off, whoever laid it.
+    - **It can't die.** A bullet or a blast throws it through the air with a screech, and then it runs off to hide.
+    - At night its eyes glow in the dark. Bots pay it no attention.
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and
@@ -250,7 +331,7 @@ a match anyone can also vote from the Esc menu: more than half the players votin
 - **Announcer** — First blood, Double/Triple/Ultra kill, Unstoppable, Headshot, Humiliation (knife)
   and Ace (wipe out a team of 3+), with a voice (can be turned off in Esc menu).
 - **Round MVP** after every round and an **end-of-match summary** with awards (Match MVP, Top fragger,
-  Headshot machine, Damage dealer, Hostage hero).
+  Headshot machine, Damage dealer, Hostage hero, Best gambler).
 - **Ranks** — Silver I up to The Global Elite, from your leaderboard rating (you climb by playing well over time).
   You are ranked after 15 rounds. The badge shows next to your name on the scoreboard (Tab) and on the leaderboard;
   everyone sees it when someone ranks up. Esc menu → *Your rank & achievements* shows the rating you need for the next rank.
@@ -378,6 +459,93 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   ghillie camo only within 4 m. When sight is lost, a hollow red ring stays where they were last seen and fades over
   3 seconds. The server decides who is spotted and sends each team only its own spotted enemies; it checks each pair
   of players a few times a second, up to 70 m. Dead players and spectators see every enemy, like on the team bar.
+- **Downed, not dead** (classic mode on bomb and hostage maps; not on aim_map, in warmup, Deathmatch, Gun Game, Zombie
+  or Hide and Seek). At 0 HP you don't die: you drop to the floor and **crawl** (about 1 m/s) with only your pistol
+  (the knife if you have none). You can still shoot it. You bleed out in **30 seconds** — a red bar at the bottom of
+  the screen counts down.
+  - A teammate gets you up by **holding E on you for 5 seconds** (they can't shoot meanwhile; it stops if either of
+    you moves away, and your bleeding pauses while they work). You get up with **30 HP**. Your teammates see a pulsing
+    red cross on their radar where you lie, and "Hold E to revive …" when they stand over you.
+  - Any damage while you're down kills you (an enemy "finishes" you). On the floor you're a low target: shots at
+    chest height go over you.
+  - **No downed state** when you're killed by a **headshot**, by anything that blows the body apart (RPG-7, RPG-26,
+    mortar, HE grenade, C4, a car blowing up, a mine, the satchel, a drone dive; an AWP or M249 hit; a Scout or Desert
+    Eagle headshot), by the flooded cellar's electric shock, or when nobody else on your team is still on their feet.
+    Fire: going down puts the flames out, but lying in the fire burns you to death.
+  - When nobody on your team is left standing, the downed bleed out at once, so the round ends as usual.
+  - The kill feed shows "Name (down)", then "Name (finished)" or "Name (bled out)", and "[revived]". The kill goes to
+    whoever finishes you; if you bleed out (or the world finishes you), to whoever downed you. Being downed and revived
+    isn't a death.
+  - Going down lets go of a hostage you hold, takes you off the zip line (you fall) and up from the CCTV desk; you
+    bleed (a trail of blood, see below) and can't bandage yourself.
+  - Downed when the round ends and not finished: you survive (you keep your weapons, like any survivor).
+  - Bots go down too (they crawl with the pistol) and finish downed enemies; they don't revive.
+- **Play dead** (classic mode, in rounds and warmup; once a round): press **K** and you drop exactly like a real corpse,
+  for up to **10 seconds**. Your weapons fall out of your hands like a real death's (anyone can take them; whatever is
+  still there you pick up again when you get up).
+  - The other team sees a real death: a kill in the feed (credited to the last enemy who hit you in the last 5 seconds),
+    you're dead on their scoreboard and team bar, and you're never a red dot on their radar. Your teammates are told
+    ("… is playing dead") and still see you alive. It's no kill for anyone's bet, leaves no blood trail, and nobody can
+    take your uniform. A hostage you hold is let go as at a real death; a disguise you wear is seen through.
+  - You can't shoot, and your view is darkened at the edges (eyes half closed). **K** again, moving or shooting gets
+    you up (1 second); so does a hit — the damage counts — the end of the round, or the 10 seconds running out.
+  - Not as the last one standing on your team (the round wouldn't end, so it would fool nobody); if your teammates all
+    fall while you're playing dead, you get up. Only team chat while playing dead. Only with your feet on the ground
+    (not in mid-air, on a ladder or swimming). The cat may come and meow at you.
+- **Blood trails** — a player hit by a **bullet, a knife or shrapnel** (any explosion except fire) starts to
+  **bleed**: drops of blood fall on the floor behind him as he moves, about one every 0.7 m, and now and then while
+  he stands still. It's for tracking a wounded enemy, not for killing him: bleeding costs little or no health.
+  - It lasts **20 seconds** from the last wound, or until bandaged. Heavier wounds bleed more: under 30 damage (added
+    up while you bleed) a light bleed (a drop every ~0.85 m, one every ~4 s standing still, no health lost), from 30 a
+    medium one (every ~0.7 m, ~2 s still, 1 HP every 5 s), from 60 a heavy one (every ~0.5 m, ~1 s still, bigger
+    drops, 1 HP every 2.5 s). Bleeding alone never takes you below 10 HP. Someone who is down bleeds heavily (no HP
+    lost) until revived.
+  - **P bandages** you: it takes **2 seconds**, you walk slowly and can't shoot or throw meanwhile, and the bleeding
+    stops. **Two bandages a life.** Not while driving, flying the drone, on the zip line or downed. A BLEEDING badge
+    next to your HP shows how many you have left.
+  - The drops are seen by everyone. They lie on floors, stairs, slopes and roofs (not in water), darken as they dry,
+    fade out after about 40 seconds and are cleared every round. At most 600 are on the map at once (the oldest go
+    first). No drops from someone in a car.
+  - Zombie mode: humans bleed (a zombie's claws on armor draw blood), zombies never do. Deathmatch and Gun Game: the
+    same as a classic round, with two fresh bandages each life. Hide and Seek: a knifed hider who gets away leaves a
+    trail. Bots bleed like anyone but never bandage and don't follow trails.
+  - A camouflaged player still drips: blood can give a hiding place away. A disguised player's trail is his
+    disguise's to the other team.
+- **Disguise** (classic matches, in a live round — not in warmup, Deathmatch, Gun Game, Zombie or Hide and Seek):
+  **crouch over a dead enemy and hold E** for 3 seconds to put on their uniform. Stay crouched and still: standing up,
+  moving or being hit stops it. It rustles, so anyone within about 12 m hears someone changing. Standing over a body,
+  E still picks up its guns as before — crouching is what makes it the uniform (where E plants or defuses the bomb,
+  that comes first). Not from a body blown apart, one already stripped, or someone who's only down or playing dead.
+  One uniform per life.
+  - From then on the other team takes you for the dead player: they see their own team's model and colours with **the
+    dead player's name** over your head ("I thought he was dead…"), you're a teammate on their radar and never a red
+    dot, and their bots don't shoot you. Your own team sees you as you are, with a small mask over your head; you see
+    the enemy's sleeves on your arms and a DISGUISED badge.
+  - It **breaks** the moment you fire (any gun, the mortar too), knife someone, throw a grenade or a satchel, start
+    planting or defusing, get hit by one of them, go down or play dead — or when one of them **sees you up close**:
+    within 3 m, with you in front of him (within 1 m he notices whichever way he looks — so you can still sneak up
+    behind someone with the knife). You and the enemies within 20 m hear a sting and get the message ("IMPOSTOR: …"),
+    and from then on everyone sees you as yourself again. Your team gets a line too.
+  - It's lost when you die and cleared every round. The scoreboard and the team bar still list you on your own team
+    (they never showed where anyone is), and the dead player is still listed as dead there — the one clue.
+  - The dead player himself sees you as you are (nobody can be shown his own body walking about). Bots don't take
+    uniforms.
+- **Human shield** (hostage maps: cs_mansion, Mansion at night, cs_assault): a Terrorist presses **E** on a hostage
+  next to him (in sight) to grab it as a shield: an arm round its neck, the hostage held in front of him. E again lets
+  it go; so does dying, going down or playing dead.
+  - While he holds it he only walks (no running, jumping or ducking) and only uses his pistol (it comes out by
+    itself). Climbing a ladder or losing the pistol makes him let go.
+  - The hostage covers him from the front. His head shows past the hostage's, and he's open from the sides and
+    behind. Bullets that hit the hostage hurt it: a CT who hits it is told so, and killing it costs $1500 as usual.
+  - CTs can't lead a hostage away while a Terrorist holds it. Once it's let go it's an ordinary hostage again and can
+    be rescued.
+  - Everyone sees it, hears a muffled scream when a hostage is grabbed, and the CTs get the message "A hostage is
+    being used as a shield!". Bots don't grab hostages; bots hold their fire while a held hostage is in the way.
+- **What E does first**, where several things are in reach: getting off the zip line, up from the CCTV desk or out of
+  a car; reviving a downed teammate; a lift button, hatch or door you're looking at; grabbing or letting go of a
+  hostage (Terrorists); a dead enemy's uniform (crouched); the floodgate's and gas valves; then the rest (planting,
+  hostages, defusing, mines, the fuse box, the zip line, the CCTV desk, doors, switches, cars, guns on the floor). The
+  hint on screen always says what E will do.
 - **Molotov** (buy menu → 6 Equipment, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor
@@ -394,6 +562,22 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   (full price, while you can still buy; a gun you had before comes back if it's still on the ground). The bottom row:
   ammo (**,** **.**), auto-buy (**F1**), re-buy (**F2**), close (**B** / **Esc**). The mouse is free while it's open.
   The mouse stays captured, so you can keep moving.
+- **Bet on yourself** (classic rounds; not in warmup, Deathmatch, Gun Game, Zombie or Hide and Seek): during freeze
+  time and buy time press **F3** (or click **F3 Bet** at the bottom of the buy menu) and bet some of your money on your
+  own round: at least **1 kill** (×1.5), **2 kills** (×3), **3+ kills** (×5), or **survive** the round (×2). Pick the
+  target (**1**–**4**, or click it), the stake (**5**–**9**: $200, $500, $1000, $1500, $2000; **0** for the most you
+  can — at most $2000, and never more than you have) and press **Enter** (or click *Place bet*). The stake is taken at
+  once, so you can't spend it on guns; one bet a round, and it can't be changed. Everyone sees it in the chat
+  ("Rufat bets $1000 on 3 kills!"), and a line at the bottom of your screen tracks it (●●○ 2/3 kills, or alive /
+  dead); in buy time, before you bet, the same spot reminds you: "F3 Bet on yourself · 18 s". When the round is decided
+  the chat tells everyone how it went ("…and won $5000!" / "…and lost $1000."). A win pays the stake × the odds, up to
+  the $16000 cap: whatever would go over it is lost, and the chat says so. Only kills of enemies count (bots too; team
+  kills don't), made before the round is decided: someone you down counts when he dies — your kill if you finish him
+  or he bleeds out, the finisher's if someone else does; a fake death (play dead) is no kill. "Survive" means alive
+  when it's decided (the bomb that ends the round still counts; someone down but not finished survives). Switching
+  teams in the middle of a round loses the bet. A round decided during freeze time (a team left) calls the bets off
+  and gives the stakes back. Bots don't bet. The end-of-match summary names the **Best gambler**: whoever won the most
+  from bets that match.
 - **Graffiti:** draw your own spray (join screen or Esc menu → *Draw graffiti*), then press **T**
   in game to spray it on the wall you are looking at.
 - **Auto team balance:** you can't join a team that would then have two players more than the other (you land on the
@@ -417,7 +601,7 @@ scoreboard shows BOT instead of a ping. Bots don't count in the leaderboard, ran
   an RPG — plus armor, grenades, a Molotov and a defuse kit), pick up weapons, reload, throw HE grenades and Molotovs,
   and can't see through smoke or when flashed. They turn towards gunfire and towards whoever shoots them.
 - They **play the objective**: the Terrorists pick a site and plant, the CTs watch the sites, retake and defuse; on
-  hostage maps the CTs fetch the hostages and lead them out (around crawl spaces, which hostages can't get through)
+  hostage maps the CTs fetch the hostages and lead them out (around crawl spaces and ladders, which hostages can't get through or climb, and by the stairs rather than off a ledge)
   and the Terrorists guard them. In Deathmatch and Gun Game they roam, as zombies they hunt the humans, in Hide and Seek
   they hide in corners or search. They walk the real map: stairs, jumps, crouch spots, ladders and doors.
 - **When every person is dead, the round ends right away** — nobody has to watch the bots finish it. The team with
@@ -502,17 +686,18 @@ The HUD shows the active party modes under the timer.
 | Ctrl | duck | Shift | walk (silent) |
 | Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
-| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, zip line on/off, CCTV desk | G | drop weapon |
+| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, zip line on/off, CCTV desk, lift, valves; hold: revive a teammate, a uniform (crouched); hostage shield (T) | G | drop weapon |
 | 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |
 | Q | last weapon | Wheel | switch weapon |
 | B | buy menu | O | buy equipment |
-| , / . | buy primary / secondary ammo | F1 / F2 | autobuy / rebuy |
+| , / . | buy primary / secondary ammo | F1 / F2 / F3 | autobuy / rebuy / bet on yourself |
 | Z X C | radio menus | T | spray graffiti |
 | F | flashlight | N | nightvision |
 | J | emotes | V | call in a mortar target |
 | Y / U | chat / team chat | Tab | scores |
 | M | choose team | F5 | screenshot |
 | H | ghillie camo on / off | Middle click | ping "!" on the team radar |
+| K | play dead / get up | P | bandage (when bleeding) |
 | Esc | menu (settings, map vote) | 0–9 | pick in menus (1–4 at the CCTV desk: cameras) |
 
 Ducking makes you 0.9 m tall, as in CS, so you fit through vents and crawl spaces. Duck in mid-air (jump, then
@@ -609,6 +794,19 @@ public/js/billboards.js Smoke, fireballs and flames: every particle of a kind in
 public/js/autoquality.js Automatic quality: steps resolution, shadows and effects down and up to hold the frame rate
 public/js/teambar.js The CS2-style team bar: player cards, pictures and weapon silhouettes
 public/admin.html    The admin panel (/admin)
+
+The features added on 2026-11-01 each keep to their own files (plus small marked hooks in server.js and main.js):
+shared/blood.js, lib/blood.js, public/js/blood.js         Blood trails and the bandage (P)
+shared/cat.js, lib/cat.js, public/js/cat.js               The Mansion's cat
+shared/shield.js, lib/shield.js, public/js/shield.js      Human shield
+shared/disguise.js, lib/disguise.js, public/js/disguise.js Disguise
+shared/body.js, lib/body.js, public/js/body.js            Downed (revive) and play dead (K)
+shared/gas.js, lib/gas.js, public/js/gas.js               The gas system; shared/maps/mansion_gas.js its pipes and boiler
+shared/flood.js, lib/flood.js, public/js/flood.js         The floodgate; shared/maps/mansion_flood.js its valve and pipes
+shared/elevator.js, lib/elevator.js, public/js/elevator.js The lift; shared/maps/mansion_elevator.js its shaft
+shared/bet.js, lib/bet.js, public/js/bet.js, public/css/bet.css  Bet on yourself (F3)
+lib/hostages.js      Hostages following a CT (breadcrumbs, side steps round corners)
+docs/features/       One file per feature: its notes, tests and what is left
 ```
 
 To make a new map, copy `shared/maps/dust.js`, change the `box(...)` calls and register it in
