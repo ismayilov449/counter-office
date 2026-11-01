@@ -33,6 +33,7 @@ import { BloodTrails } from './blood.js'; // blood trails
 import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, shieldSpeed, shieldRay, shieldHint, shieldPoseRemote, shieldPoseHostage } from './shield.js'; // shield: the human shield
 import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
+import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -129,6 +130,7 @@ function loadMap(id) {
   catLoadMap(scene, map); // the mansion's cat (only on its maps)
   gadgets.load(map);
   fx.reset();
+  gas.setMap(map); // gas: this map's pipes (Mansion)
   for (const d of drops.values()) scene.remove(d);
   drops.clear();
   if (plantedBomb) { scene.remove(plantedBomb); plantedBomb = null; }
@@ -238,6 +240,8 @@ const game = {
   bomb: { s: 'none', p: null, tl: 0 }, cfg: { roundTime: 115, buyTime: 25, freezeTime: 3 }, roster: [], carrier: null, maps: [],
   lights: {}, broken: [], doors: [],
 };
+// gas (Mansion): see gas.js
+const gas = createGasClient({ scene, camera, fx, audio, me, brk: () => game.brk, indoors: p => indoors(p), shellShock: s => shellShock(s), realBlast: m => realBlast(m) });
 
 const remotes = new Map();
 const drops = new Map();
@@ -2872,6 +2876,7 @@ const net = new Net({
     syncHostages(m.hs, m.time);
     catSync(m.cat, m.time); // the mansion's cat
     shieldSnap(m.sh); // shield: who holds which hostage
+    gas.snapshot(m.gs); // gas: the pipes and the gas in each room (none: clean air)
   },
   catMeow(m) {
     catSound(m); // the mansion's cat: meow, mrrp, screech or hiss
@@ -3211,6 +3216,7 @@ const gadgets = createGadgets({
   scene, me, net, audio, hud, fx, remotes, serverNow, stopEmote: () => stopEmote(),
   power: () => game.lights.power !== false, jammers: () => [...jammerModels.values()].map(e => e.p),
 });
+Object.assign(net.handlers, gas.handlers); // gas: gasLeak, gasBoom, gasCough
 
 // ---------------------------------------------------------------- per-frame updates
 
@@ -3596,6 +3602,7 @@ function updateHud(now) {
     else if (current() === 'jammer') hint = 'Click to put the signal jammer down — no enemy radar, pings or drones within 15 m';
     else if (jammedHere()) hint = JAM_HINT;
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
+    else if (gas.hint()) hint = gas.hint(); // gas: by a leaking pipe's valve
     else if (atFuseBox()) hint = game.lights.power === false ? (me.team === 'CT' ? 'Hold E to bring the power back (5 s)' : 'The power is off') : me.team === 'T' ? 'Hold E to cut the power to the house (3 s)' : 'The fuse box — the Terrorists can cut the power here';
     else if (satchelToDefuse()) hint = `Hold E to defuse the satchel charge (${me.kit ? SATCHEL.kitDefuse : SATCHEL.defuse} s)`;
     else if (current() === 'phone') hint = 'Click to set off your satchel charge';
@@ -3620,6 +3627,7 @@ function updateHud(now) {
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
   if (me.act?.a === 'disguise') hud.progress(disguise.progressLabel(), me.act.pr); // Disguise
+  if (me.act?.a === 'gasValve') hud.progress('Closing the gas valve...', me.act.pr); // gas
 
   let target = null;
   if (me.alive) {
@@ -3971,6 +3979,7 @@ function frame() {
   updateZombieGrowls(now);
   bleed.update(dt, now, !!killcam); // blood trails
   fx.update(dt, camera);
+  gas.update(dt, now); // gas: the shimmer, the hiss, "You smell gas"
   world?.update(dt, camera.position);
   updateViewModel(dt, now);
   if (vm && body.frozen()) vm.visible = false; // body: nothing in your hands while playing dead

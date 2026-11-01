@@ -14,6 +14,7 @@
 //   - a zip line from a deck on the neighbour's roof down to the roof terrace
 //   - CCTV: four cameras and a security desk upstairs
 import { clip } from './breakables.js';
+import { addGasPipes } from './mansion_gas.js'; // gas: the kitchen's gas pipe and the cellar's boiler
 
 const IN = 0.0254; // a texel, in metres
 
@@ -583,6 +584,7 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     ];
     cctv = { cams, seat: [cx, y + 0.45, cz], yaw: 0, floor: y, monitors: mons, screen: [0.5, 0.36] };
   }
+  addGasPipes({ decor, solids }); // gas: pipes you can shoot (see shared/maps/mansion_gas.js)
 
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
   return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv };
