@@ -29,14 +29,16 @@ export function addElevator({ carve, unface, face, decor, rooms, keep, solid }) 
   unface(OUT.x1, -2.2, OUT.z1 - 0.005, OUT.x2, 0.61, OUT.z1 + 0.005); // the cellar's north wall, now inside the shaft's
   unface(IN.x1, TOP - 0.005, IN.z1, IN.x2, TOP + 0.005, IN.z2); // the ceiling (only partly there: drawn whole below)
   // the three barrels that stood here: one just east of the shaft (where the third was: it keeps the bots' grid from
-  // linking the kitchen doorway's floor down through the floor to the cellar), two onto the stack by the stairs
+  // linking the kitchen doorway's floor down through the floor to the cellar), two onto the stack by the stairs (the
+  // second hard against the stack's west side: at -16.85, -3.25 it left a 0.45 m gap to the first that the bots' grid
+  // took for a way through and a hostage following a CT got wedged in; integration 2026-11-01)
   const moved = [[-20.9, -4.9], [-20.2, -4.9], [-19.5, -4.9]];
   for (const [x, z] of moved) {
     carve(x - 0.3, -2.2, z - 0.3, x + 0.3, -1.15, z + 0.3);
     const i = decor.findIndex(d => d.type === 'barrel' && Math.abs(d.p[0] - x) < 1e-6 && Math.abs(d.p[2] - z) < 1e-6);
     if (i >= 0) decor.splice(i, 1);
   }
-  for (const [x, z] of [[-19.3, -4.9], [-16.2, -2.2], [-16.85, -3.25]]) {
+  for (const [x, z] of [[-19.3, -4.9], [-16.2, -2.2], [-16.85, -2.55]]) {
     solid([x - 0.3, -2.2, z - 0.3, x + 0.3, -1.15, z + 0.3]);
     decor.push({ type: 'barrel', p: [x, -2.2, z], color: '#6a4424' });
   }
