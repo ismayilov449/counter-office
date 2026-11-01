@@ -30,6 +30,7 @@ import { EMOTE } from './shared/emotes.js';
 import { createHostages, updateHostages, HOSTAGE_STATE } from './lib/hostages.js';
 import { BotManager, BOT_LEVELS } from './lib/bots.js';
 import { createBlood } from './lib/blood.js'; // blood trails
+import { createCat } from './lib/cat.js'; // the mansion's cat
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -543,6 +544,7 @@ function resetWorld() {
   world.setDoors([]);
   game.hostages = isHostageMap() && CFG.gameMode === 'classic' ? createHostages(MAP) : [];
   clearMines();
+  cat.reset(); // cat: back asleep in its basket
   game.zipCut = false;
   game.camsDown = new Set();
   game.camDownAt = {};
@@ -654,6 +656,7 @@ function hurtPiece(pc, dmg, out) {
 // thing; nothing behind something that can't break (a floor, the stairs). Runs after the blast has hurt people,
 // so a wall it breaks still shielded them.
 function blastMap(at, weapon) {
+  cat.blast(at, weapon); // cat: thrown or scared by every explosion
   const B = BREAK.blast[weapon];
   if (!MAP.breakables || !B) return;
   const round = game.round;
@@ -1504,6 +1507,8 @@ const bots = new BotManager({
   doors: () => (MAP.doors || []).map((d, i) => ({ i, box: world.doorBoxes[i], open: world.doorStates[i] !== 0 })),
 });
 const bleed = createBlood({ players, now, send, sendMe, inTeam }); // blood trails (lib/blood.js)
+// The mansion's cat (lib/cat.js, Mansion maps only): walks the bots' nav grid; scared by shots and blasts; sets off mines.
+const cat = createCat({ map: () => MAP, world: () => world, nav: () => bots.nav(), players: () => players, game: () => game, now, broadcast, detonateMine: m => detonateMine(m) });
 
 function addBot(team) {
   let p = null;
@@ -2208,6 +2213,7 @@ function onShoot(p, m) {
   if (isHNS() && p.team === 'CT' && game.phase === 'live' && t < (game.hideUntil || 0)) return;
   p.lastShot = t;
   if (!def.melee) bots.heard(p, o);
+  cat.shot(p, o, def.rocket ? [] : dirs, !!def.melee); // cat: a bullet throws it, gunfire scares it (a rocket: its blast)
   if (item) item.mag--;
   if (def.rocket) {
     launchRocket(p, o, dirs[0], def, w);
@@ -2989,6 +2995,7 @@ function explodeNade(n) {
   const owner = players.get(n.owner) || null;
   const o = [n.end[0], n.end[1] + 0.1, n.end[2]];
   broadcast({ t: 'boom', p: n.end, k: n.k, id: n.id });
+  if (n.k !== 'he') cat.blast(o, n.k); // cat: a flashbang, smoke or a Molotov scares it too (an HE: see blastMap)
   if (n.k === 'smoke') {
     (game.smokes ||= []).push({ p: o, until: now() + 17000 }); // bots can't see through it
     // Smoke puts out Molotov fires it lands in.
@@ -3801,6 +3808,7 @@ function tick() {
   updateActions(t);
   updatePickups();
   updateMines(t);
+  cat.tick(t); // the mansion's cat
   updateSatchels();
   if (game.drones.length) updateDrones(t);
   updateCamo(t);
@@ -3841,6 +3849,7 @@ function tick() {
     // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb, hits it can still take]
     ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0, d.hp]) } : {}),
     ...bleed.snap(), // blood trails: who is bleeding, bl: [id, level, flags]
+    ...cat.snap(), // cat: [x, y, z, yaw, state, purring] on the Mansion maps (see shared/cat.js)
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.
