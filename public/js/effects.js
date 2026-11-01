@@ -856,6 +856,14 @@ export class Effects {
     else f.life = Math.min(f.life, f.t + 0.6);
   }
 
+  // A new round: the smoke still hanging from the last one (fires's and blasts' puffs, smoke grenades) goes at once.
+  clearSmoke() {
+    for (const sp of this.sprites) this.dropSprite(sp.s);
+    this.sprites = [];
+    for (const sm of this.smokes) for (const p of sm.parts) this.dropSprite(p);
+    this.smokes = [];
+  }
+
   clearFires() {
     for (const f of this.fires) this.removeFire(f);
     this.fires = [];
