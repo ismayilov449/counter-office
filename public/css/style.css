@@ -156,6 +156,7 @@ kbd { background: #2a2a24; border: 1px solid #444; border-radius: 3px; padding: 
 body.teambar #killfeed { top: 150px; }
 body.teambar #phase { top: 140px; }
 body.teambar #small-msg { top: 168px; } /* (the short messages under the phase line, not over the cards' money row) */
+body.teambar #center-msg { top: max(24%, 196px); } /* (and the big centre message under them, not over them or the cards) */
 .avatar-pick { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
 .avatar-pick img { width: 40px; height: 40px; border-radius: 3px; object-fit: cover; background: #222; }
 .avatar-pick img:not([src]) { visibility: hidden; }
