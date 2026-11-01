@@ -164,7 +164,8 @@ ok(`it stays where it was let go (${f2(rel)} -> ${f2(hpos())})`, Math.hypot(rel[
 ct.at(add(hpos(), fwd(plan.yaw), 1.0), plan.yaw + Math.PI); await sleep(250);
 ct.use(); await sleep(100); ct.use(false); await sleep(300);
 ok('a CT leads it again', H()?.[5] === 1);
-ct.at(plan.front, plan.yaw + Math.PI); await sleep(100);
+// (the CT stays within 2.2 m until the grab: walking off first, the hostage followed him out of the T's reach — since
+// the hostages fix it sets off at once)
 
 // grab again, then a head shot from the front (his head shows past the hostage's) kills him: it's let go
 t.at(add(hpos(), fwd(plan.yaw), -1), plan.yaw); plan.T = add(hpos(), fwd(plan.yaw), -1); await sleep(250);

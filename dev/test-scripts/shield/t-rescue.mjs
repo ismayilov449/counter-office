@@ -34,7 +34,9 @@ const ground = M.spawns.CT[0].p[1];
 // (on cs_mansion: out of the south door, which is wide; the hostage sticks at narrower doorways' corners, as it does
 // without the shield)
 // (and round the south side of the plaza: the grid passes too close to the fountain's low walls for a body)
-const VIAS = process.env.VIAS ? [JSON.parse(process.env.VIAS)] : MAPID.startsWith('cs_mansion') ? [[[-14.6, 0.3, 13.4], [-3, 0, 19.5], [10, 0, 19.5]]] : [[], [[0, ground, 0]]];
+const VIAS = process.env.VIAS ? [JSON.parse(process.env.VIAS)] : MAPID.startsWith('cs_mansion') ? [[[-9.5, 0.81, 6.0], [-14.6, 0.3, 13.4], [-3, 0, 19.5], [10, 0, 19.5]]] : [[], [[0, ground, 0]]];
+// (the via in the hall east of the stairs, since the hostages fix: the bots' grid now takes the stairs down from the
+// hostages upstairs, and its nodes then hug the staircase; the walker, a body with the game's physics, climbed back onto it)
 let plan = null;
 for (const [hi, h] of M.hostages.entries()) {
   let pts = null;
