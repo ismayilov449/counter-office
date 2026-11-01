@@ -296,7 +296,7 @@ const t6 = Date.now();
 C1.use(true); await sleep(80); C1.use(false);
 await sleep(Math.max(0, 1400 - (Date.now() - t6)));
 C1.send({ t: 'bodyPlayDead' });
-ok('the T browser gets the kill message', await until(() => has(m => m.t === 'kill' && m.v === c1), 2000));
+ok('the T browser gets the kill message', await until(() => has(m => m.t === 'kill' && m.v === c1), 5000)); // (5 s: on the night map the page reads its messages only every second or so, headless)
 // (read before the screenshot: the fall takes 0.6 s, a headless screenshot can take that long)
 const falling6 = !C1.landed, onGround6 = usps().length;
 if (falling6) ok(`falling, his pistol is still with him (${onGround6} USP on the ground)`, !onGround6);

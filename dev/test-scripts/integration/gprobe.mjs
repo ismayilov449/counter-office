@@ -18,7 +18,7 @@ await g.ev(`(async () => {
   const THREE = await import('three');
   window.__scenes = new Set();
   const umw = THREE.Object3D.prototype.updateMatrixWorld;
-  THREE.Object3D.prototype.updateMatrixWorld = function (f) { if (this.isScene) window.__scenes.add(this); return umw.call(this, f); };
+  THREE.Object3D.prototype.updateMatrixWorld = function (f) { if (this.isScene) window.__scenes.add(this); if (this.isPerspectiveCamera) (window.__cams ||= new Set()).add(this); return umw.call(this, f); };
   window.__meshesIn = (min, max) => {
     const b = new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max)), out = [];
     for (const s of __scenes) s.traverse(o => {
@@ -36,6 +36,31 @@ await g.ev(`(async () => {
 })()`);
 await sleep(500);
 for (const [i, yaw] of YAWS.entries()) { await g.tp(AT, yaw, 0); await sleep(2500); await g.shot(`${PREFIX}_${i}.png`); }
+// what the screen shows at a few points of the last view (PICK: [[x, y] in -1..1, ...]): the first object a ray from
+// the camera through that point hits
+const PICK = JSON.parse(process.env.PICK || '[[0.15,0],[0.2,-0.2],[0.05,0.05],[0.3,-0.1]]');
+console.log('picks:', await g.ev(`(async () => {
+  const THREE = await import('three');
+  // (the game's camera: the perspective camera nearest our eyes; the scene it draws: the one with the most meshes)
+  const eye = new THREE.Vector3(${AT[0]}, ${AT[1] + 1.62}, ${AT[2]});
+  let cam = null, cd = Infinity;
+  const cams = []; window.__cams?.forEach?.(c => cams.push(c));
+  for (const s of __scenes) s.traverse(o => { if (o.isPerspectiveCamera) cams.push(o); });
+  for (const c of cams) { c.updateMatrixWorld(); const d = c.getWorldPosition(new THREE.Vector3()).distanceTo(eye); if (d < cd) { cd = d; cam = c; } }
+  const out = [];
+  for (const s of __scenes) {
+    if (!cam) break;
+    for (const [x, y] of ${JSON.stringify(PICK)}) {
+      const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(x, y), cam);
+      const h = rc.intersectObjects(s.children, true).find(h => h.object.visible !== false && h.distance > 0.3 && !h.object.material?.isShaderMaterial && !h.object.isPoints && !h.object.isSprite);
+      if (!h) { out.push([x, y, 'nothing']); continue; }
+      const m = Array.isArray(h.object.material) ? h.object.material[h.face?.materialIndex || 0] : h.object.material;
+      const chain = []; for (let o = h.object; o && o !== s; o = o.parent) chain.push((o.name || o.type) + (o.userData?.type ? '<' + o.userData.type + '>' : ''));
+      out.push([x, y, h.point.toArray().map(v => +v.toFixed(2)), h.distance.toFixed(2), m?.type, m?.color?.getHexString?.(), m?.map?.name || (m?.map ? 'map' : ''), chain.join(' < '), Object.keys(h.object.userData || {}).join(',')]);
+    }
+  }
+  return JSON.stringify({ camDist: +cd.toFixed(2), out });
+})()`));
 const list = JSON.parse(await g.ev(`JSON.stringify(__meshesIn(${JSON.stringify(BOX.slice(0, 3))}, ${JSON.stringify(BOX.slice(3))}))`));
 for (const m of list.filter(m => m.box[3] - m.box[0] < 40 && m.box[5] - m.box[2] < 40)) console.log(JSON.stringify(m));
 console.log(`(${list.length} meshes meet the box; the big merged level meshes not listed)`);

@@ -20,6 +20,11 @@ const { tp, keyDown, keyUp, shot, msgs, errors, ev, look } = g;
 const [VW, VH] = (process.env.VIEW || '960x540').split('x').map(Number);
 await g.cmd('Emulation.setDeviceMetricsOverride', { width: VW, height: VH, deviceScaleFactor: 1, mobile: false });
 await sleep(500);
+// (on a cold page the team buttons may not take the first click: click again until the join goes through, before the
+// CT joins and the round starts, or the page's T sits the round out dead)
+for (let i = 0; i < 8 && !(await ev('document.getElementById("join").classList.contains("hidden")')); i++) {
+  await ev('document.querySelector(\'#join .team-btn[data-team="T"]\').click(), 1'); await sleep(1500);
+}
 const checks = [];
 const check = (ok, what) => { checks.push(ok); console.log(ok ? 'PASS' : 'FAIL', what); };
 const dbg = async () => JSON.parse(await ev("import('/js/flood.js').then(m => JSON.stringify(m.debug()))"));
