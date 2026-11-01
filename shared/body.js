@@ -15,6 +15,7 @@ export const BODY = {
   rise: 1, // getting up from playing dead, seconds
   deadEye: 0.2, // camera height while playing dead (the head on the floor)
   fakeBy: 5, // seconds: the last enemy who hit you in that time is shown as having "killed" you
+  outright: ['electrocuted'], // deaths with no downed state (the floodgate's shock: the water would finish you anyway)
 };
 
 // Body parts lying on the floor, in the body's own frame: x to the side, y up, z backwards (the player faces -z).
