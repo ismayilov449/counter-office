@@ -2176,7 +2176,7 @@ function onUse(p, m, t) {
   }
   if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
   if (!p.alive || p.act) return;
-  if (MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at)
+  if (p.shield == null && MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at; a hostage held lets go first)
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   const plantHere = game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p);
   const defuseHere = game.phase === 'live' && p.team === 'CT' && game.bomb.state === 'planted' && dist3(p.p, game.bomb.p) < 1.8;

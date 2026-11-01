@@ -542,8 +542,8 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   - Everyone sees it, hears a muffled scream when a hostage is grabbed, and the CTs get the message "A hostage is
     being used as a shield!". Bots don't grab hostages; bots hold their fire while a held hostage is in the way.
 - **What E does first**, where several things are in reach: getting off the zip line, up from the CCTV desk or out of
-  a car; reviving a downed teammate; a lift button, hatch or door you're looking at; grabbing or letting go of a
-  hostage (Terrorists); a dead enemy's uniform (crouched); the floodgate's and gas valves; then the rest (planting,
+  a car; reviving a downed teammate; letting go of a hostage you hold; a lift button, hatch or door you're looking at;
+  grabbing a hostage (Terrorists); a dead enemy's uniform (crouched); the floodgate's and gas valves; then the rest (planting,
   hostages, defusing, mines, the fuse box, the zip line, the CCTV desk, doors, switches, cars, guns on the floor). The
   hint on screen always says what E will do.
 - **Molotov** (buy menu → 6 Equipment, $400, both teams): the bottle breaks on the first floor it lands on and sets a

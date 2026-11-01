@@ -31,7 +31,7 @@ import { Net } from './net.js';
 import { catLoadMap, catSync, catUpdate, catSound, catWarmModel } from './cat.js'; // the mansion's cat
 import { createGadgets } from './gadgets.js';
 import { BloodTrails } from './blood.js'; // blood trails
-import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, shieldSpeed, shieldRay, shieldHint, shieldPoseRemote, shieldPoseHostage } from './shield.js'; // shield: the human shield
+import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, shieldSpeed, shieldRay, shieldHint, shieldHolding, shieldPoseRemote, shieldPoseHostage } from './shield.js'; // shield: the human shield
 import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
@@ -3655,7 +3655,7 @@ function updateHud(now) {
     if ((gh = flood.hint()) || (gh = gas.hint())) hint = gh; // Floodgate, gas: their valves
     hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere()); // Disguise: crouched over a dead enemy (not where E plants or defuses)
     hint = shieldHint(hint); // shield: grab / let go / held
-    if (elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server)
+    if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
   }
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
