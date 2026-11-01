@@ -1,24 +1,62 @@
-# RESUME POINT — Counter-Office (latest: 2026-10-31, evening)
+# RESUME POINT — Counter-Office (latest: 2026-11-01)
 
-**To continue:** check out `main` and tell Claude Code:
+**To continue:** check out `main` (once the user has had it fast-forwarded to `integration/2026-11-01`; until then
+that branch) and tell Claude Code:
 *"Read RESUME.md and continue from the resume point (section 0)."*
 
-## 0. Resume point 2026-10-31: 9 new features on branches, waiting to be finished and merged
+## 0. Resume point 2026-11-01: everything merged on `integration/2026-11-01`; next: ROADMAP.md
 
-The session ran out of budget mid-way through a parallel build, so everything was stopped at safe points and pushed.
-**`main` only has finished, tested work.** Each new feature is on its own branch on GitHub, not merged yet:
-merging untested features would put them on the server the players use.
+**To continue:** the 9 features and the hostage fix of 2026-10-31 are merged, wired together and tested on the branch
+**`integration/2026-11-01`** (pushed). `main` is untouched: it is fast-forwarded to the integration branch **only when
+the user says so** (the players' server runs from the main checkout). After that, the next work is **ROADMAP.md** (33
+approved features in 10 groups; start with wave 1, groups 1–5).
 
-**On `main`:**
-- the tunnel-hole fix and night-room lighting fix (66ac0d9);
-- the buy-menu hover fix (cf4922a);
-- the drone taking 4 hits (14f3acf);
-- the zip line (7498ad3);
-- CCTV (7db3a67). The browser tests for the zip line and CCTV ran before the user's no-browser rule; recheck them
-  with the rest.
+**What the integration branch has** (on top of `main` cad9dad), merged in this order, each one's server tests run
+after its merge:
 
-**The feature branches.** Every branch has `docs/features/<name>.md`, with a STATUS section (done / half-done / next
-steps / browser checks still to do), the player-facing README text and RESUME notes. **Read it first.**
+| # | Branch | Feature | Notes |
+|---|---|---|---|
+| 1 | `feature/blood` 451896c | Blood trails + bandage (P) | `docs/features/blood.md` |
+| 2 | `feature/cat` 8cf87e8 | The mansion's cat | `cat.md` |
+| 3 | `feature/shield` fbc487c | Human shield | `shield.md` |
+| 4 | `feature/disguise` 88aa52b | Disguise | `disguise.md` |
+| 5 | `feature/body` 20c2bcb | Downed (revive) + play dead (K) | `body.md` |
+| 6 | `feature/gas` fc218ee | Gas system | `gas.md` |
+| 7 | `feature/flood` ec884dd | Floodgate | `flood.md` |
+| 8 | `feature/elevator` eae942a | The lift | `elevator.md` |
+| 9 | `fix/hostages` 206964a | Hostages reach the street | `hostages.md` |
+| 10 | `feature/bet` a76b98d | Bet on yourself (F3) | `bet.md` |
+
+Then: the links between them, E's order, and the fixes found on the way (section 8 has the details):
+- **Links:** the lift's motor sparks the gas; the flood fills the lift's pit; the flooded fuse box sparks the gas; the
+  cat keeps out of deep water and casts no room-lamp shadow; a downed player bleeds (no "P bandage"), lets go of a
+  hostage, drowns faster, can't give a uniform, and his death credits the right killer in bets; playing dead lets go of a
+  hostage, breaks a disguise, gives no bet kill and no blood trail; the lift carries corpses; a disguised player's
+  blood trail is under the dead player's id for the fooled team.
+- **E's order** (server and hints alike): drone → off the zip line / CCTV desk / car → revive → letting go of a held
+  hostage → an aimed lift target → grabbing a hostage → uniform → valves → the old uses.
+- **Fixes:** the living room is walked on at its drawn height (0.813, was 0.91); short HUD messages sit under the team
+  bar; one match start after an admin restart in the warmup countdown; the last round's smoke is cleared; the cellar
+  stairwell's see-through seams are closed; E on a hostage needs line of sight; a revive gives the full 30 HP;
+  electrocution kills outright; no "-$1500" for a hostage nobody killed; a barrel by the cellar stairs no longer leaves a
+  gap a hostage gets wedged in.
+
+**Tests on the integrated build** (numbers in section 8 and in the report of 2026-11-01): every feature's server tests,
+`integration/links.mjs`, walls/nav/walk, 60 s with `BOTS=4` on both Mansion maps, all 7 maps start, and the browser
+tests of every feature on both Mansion maps plus zip line, CCTV, buyhover and the drone.
+
+**Open questions for the user:** a fine for only *hurting* a held hostage (now just a message)? Should a downed player
+at round end lose a "survive" bet (now he wins it)?
+
+**When `main` has it:** the feature branches (`feature/blood` … `feature/bet`, `fix/hostages`) can be deleted, and the
+worktrees in `.claude/worktrees/` removed (`git worktree remove`; never delete a `node_modules` that is a link).
+
+---
+
+## (Earlier resume point, 2026-10-31: the 9 features on branches)
+
+The parallel build of 2026-10-31 stopped with the 9 features on their own branches (table below, the state then). All of
+them were finished, browser-tested and merged on `integration/2026-11-01` (section 0, section 8).
 
 | Branch | Feature | State at the stop |
 |---|---|---|
@@ -31,50 +69,6 @@ steps / browser checks still to do), the player-facing README text and RESUME no
 | `feature/elevator` | Elevator (cellar, ground and upper floor; the blackout traps it) | **Designed, not built** (8bf488e, main merged in): shaft at x −21.6…−19.65, z −5.49…−3.45, stops −2.2 / 0.81 / 4.27, doors face south, pit to −3.4 (move 3 cellar barrels, close an upstairs wall gap); no game code yet. Next steps in its STATUS |
 | `feature/blood` | Blood trails + bandage (P) | Written, not tested (WIP commit; no STATUS section: read the code and tests) |
 | `feature/cat` | The mansion's cat (never dies; meows at hidden players; sets off mines) | Written, not tested (WIP commit; no STATUS section) |
-
-Each branch has its own worktree in `.claude/worktrees/agent-*` (gitignored, with `node_modules` installed). Locally
-just `git worktree list`; on another PC, check the branches out fresh and run `npm ci`.
-
-**How the parallel build was set up.** Keep to these rules so the branches stay mergeable:
-- **Feature code in new files:** `lib/<name>.js`, `public/js/<name>.js`, `shared/<name>.js`, and Mansion geometry in
-  `shared/maps/mansion_<name>.js` via one call in `remodel()`.
-- **Hooks in shared files:** only small lines in `server.js`, `main.js` etc., each marked with the feature's name.
-- **Snapshots:** each feature has its own optional key (bd, bl, gs, fl, sh, cat, dg, el); no existing tuple changed.
-- **Ports per branch, for tests:** body 4010, blood 4020, gas 4030, flood 4040, shield 4050, cat 4060,
-  disguise 4070, bet 4080, elevator 4090. Headless Edge on 9410…9490.
-- **Keys:** K play dead · P bandage · F3 bet · E for the context actions. Order E carefully when merging: shield grab
-  (taken first, only next to a hostage) → revive (hold 5 s) → uniform (hold 3 s) → floodgate valve → the old uses.
-- **Shared fields:** `p.downed` and `p.playingDead` (body), `p.bleeding` (blood; it also bleeds when `p.downed`),
-  `p.disguise`, and `p.shield` (a hostage id or null; ids start at 0, so test `!= null`). The gas system exports
-  `sparkAt(pos, kind)`. Power is the existing `game.lights.power`.
-
-**The user's rules from this session:**
-- At most **5 agents at once**. When one finishes, start a new agent on the next stopped job.
-- **No headless Edge or browser tests until every agent has finished.** Then the architect runs all the browser tests.
-- Never kill the user's own Edge.
-
-**Next steps:**
-1. Finish the unfinished branches, one agent per branch, at most 5 at once. Each continues in its worktree from its
-   STATUS: body, gas, disguise, elevator, blood, cat, shield.
-2. When all of them are done, run the browser tests for every feature, plus `buyhover.mjs`, `walls.mjs` and
-   `g15.mjs`.
-3. Merge into `main` one branch at a time: bet → blood → cat → shield → disguise → body → gas → flood → elevator.
-   After each merge, run its tests and the general checks: all 7 maps start, 60 s with `BOTS=4`, no page errors.
-4. Wire the links between features:
-   - elevator motor → `sparkAt`; flood → the elevator shaft (one row in `FLOOD_AREAS`, `shared/flood.js`);
-   - downed → bleeds, drops the hostage, isn't a body for disguise, drowns faster, and bet "survive" (`settle()` in
-     `lib/bet.js`: a downed player at round end counts as alive now) plus kill credit (`bet.onKill`);
-   - play dead → the cat meows at them, no uniform from them, not a kill for bets;
-   - the cat avoids flood water.
-5. Merge every `docs/features/*.md` into README.md and here, commit, push `main`. Remove the worktrees when merged
-   (never delete `node_modules` through a link).
-
-**Open questions for the user:** a fine for only *hurting* a held hostage (now just a message)? Should a downed
-player at round end lose a "survive" bet?
-
-**Ideas approved and now being built:** gas system, blood trails, human shield, the cat, floodgate, disguise, play
-dead, downed-not-dead (hold E 5 s; a headshot can't be revived), bet on yourself. Ideas suggested and *not* chosen are
-listed in the session's memory; don't suggest them again unless asked.
 
 ---
 
@@ -583,3 +577,144 @@ zip line, 2 sitting at the CCTV desk). `busy(p)` on the server (someone on a gad
 - **Not verified:** the sounds by ear; how readable the infrared picture is on the players' screens.
 - **Choices:** one watcher at a time; being hurt gets you up; both teams use it; cameras are neutral (anyone breaks them,
   friendly fire or not); the pan is small, so each camera keeps its blind spots.
+
+## 8. The features merged on 2026-11-01 (integration branch `integration/2026-11-01`)
+
+Nine features and one fix were built on their own branches (2026-10-31 to 11-01), browser-tested there, then merged
+together on `integration/2026-11-01` and tested again as one build. **Each one's full notes stay in
+`docs/features/<name>.md`** (STATUS, the README text, files, hooks, protocol, what was verified, the gaps): read that
+file before changing a feature. The short version, and what the integration added, is here.
+
+### How they're built (the rules the branches kept; keep them)
+- Feature code in its own files: `lib/<name>.js` (server), `public/js/<name>.js` (browser), `shared/<name>.js` (both),
+  Mansion geometry in `shared/maps/mansion_<name>.js` called once from `remodel()` in `mansion2.js`.
+- Hooks in the shared files (`server.js`, `main.js`, `bots.js`, `collision.js`, `audio.js`) are single lines, each
+  marked with the feature's name (`// blood trails`, `// cat`, `// shield:`, `// Disguise`, `// body:`, `// gas`,
+  `// Floodgate`, `// elevator`, `// bet feature`). `grep` the marker to find every hook of a feature.
+- Snapshot keys (optional, top level, only while there's something to say): `bl` blood, `cat` the cat, `sh` shield,
+  `dg` disguise (only to the wearer's team), `bd` body, `gs` gas, `fl` flood. The lift has no key (`el` is the round
+  time): it sends `elevState` messages. Bet uses messages only (`bet*`). No existing tuple changed.
+- Shared player fields: `p.downed`, `p.playingDead` (body), `p.bleeding` (blood), `p.disguise`, `p.shield` (a hostage
+  id or null: ids start at 0, test `!= null`), `p.elevAim` (the lift target the browser says E aims at). The gas
+  system's spark hook is `sparkAt(pos, kind, by)` in server.js (a wrapper of `gas.sparkAt`).
+- Keys: **K** play dead, **P** bandage, **F3** bet, **E** for every context action (the order below).
+
+### The features (one paragraph each; details in docs/features)
+- **Blood trails + bandage** (`blood.md`): bullets, knives and shrapnel start a bleed (3 levels by damage, 20 s from the
+  last wound, small HP drain never below 10); each browser drops the drops itself behind the players `bl` lists (one
+  InstancedMesh, aged in the shader, 600 max, cleared each round). P bandages (2 s, 2 a life). A downed player is listed
+  as bleeding heavily (no drain; the drain's clock waits, so a revive gives the full 30 HP); someone playing dead isn't
+  listed. Tests: `blood/unit.mjs`, `clientsmoke.mjs`, `floorindex.mjs`, `tblood.mjs`, `soak.mjs`, `gblood.mjs`.
+- **The cat** (`cat.md`): server AI in `lib/cat.js` (A* over the bots' nav grid with its own rules, flee by Dijkstra,
+  thrown by bullets and blasts, sets off mines), snapshot `cat: [x, y, z, yaw, state, purring]`, `catMeow` messages.
+  Meows at hidden players (camo, crouched in the dark, `p.playingDead`). `deepWater` (the flood's level) keeps it out
+  of the flooded cellar. Browser: one SkinnedMesh (1 draw call), eyes at night; it casts the sun's/moon's shadow only,
+  never a room lamp's (its `castShadow` reads false while the renderer draws a point light's shadow map: that cost
+  +13.7 draw calls under the living room's lamp). Tests: `cat/sim.mjs`, `ai.mjs`, `t1.mjs`, `clientsmoke.mjs`,
+  `soak.mjs`, `maps.mjs`, browser `catview.mjs`, `g1.mjs`.
+- **Human shield** (`shield.md`): a T grabs a hostage with E (within 1.6 m, in sight, a pistol); `lib/shield.js` holds
+  it 0.42 m in front each tick, held-hostage hitboxes with their own lag compensation, pistol only, no grenades, bots
+  hold fire. Ends on death, going down, play dead (`shield.letGo`, 'downed' / 'died'), team change, round end, no
+  pistol, car/drone/ladder. Tests: `shield/t-shield.mjs`, `t-rescue.mjs`, browser `g-shield.mjs`, `g-cost.mjs`.
+- **Disguise** (`disguise.md`): crouch + hold E 3 s on a dead enemy (the round's bodies from `killPlayer`: downed and
+  play-dead players are never bodies). The fooled team's copy of the snapshot head (`headFor`) swaps the wearer's `pl`
+  row for the dead player's id and team, and (integration) renames him in `bl` too; `dg` goes only to his team. Breaks
+  on firing, knifing, grenades, plant/defuse, an enemy's hit, going down, playing dead, or an enemy within 3 m in
+  front (1 m any way). Bots don't target him (`canSee`). Tests: `disguise/unit.mjs`, `clientsmoke.mjs`, `t1`–`t3.mjs`
+  (`t3` is flaky on aim_map: the set-up, not the check), `soak.mjs`, browser `g1.mjs`.
+- **Downed + play dead** (`body.md`): `lib/body.js` owns `p.downed`/`p.playingDead`; `tryDown` in `applyDamage` (not on
+  a headshot, a gib, the flood's electrocution (`BODY.outright`), or with nobody standing), `died` in `killPlayer`
+  reassigns the killer (the finisher, or the downer after a bleed-out), revive with E 5 s (30 HP). Play dead: real
+  drops, a fake kill to the other side, snapshot/roster/team bar say dead (their team undoes it from `bd`), pinned on
+  the server. `onDown`/`onPlayDead` hooks release the zip line, the CCTV desk, a held hostage, a disguise, the lift
+  target. Tests: `body/t1.mjs`, `gadgets.mjs`, `obj.mjs`, `hostage.mjs`, `bots.mjs`, browser `g1.mjs`, `g2.mjs`.
+- **Gas** (`gas.md`): kitchen pipe and cellar boiler (`mansion_gas.js`); `lib/gas.js` builds rooms (= `map.rooms`) and
+  their openings once per map, leaks, spreads (open doors, broken glass, holes), vents outside, chokes, and any spark
+  over 0.2 sets a room off (blast scaled by gas and volume, chains to neighbours). Sparks: shots/impacts, grenades,
+  blasts, fire, light switches, the fuse box lever, the flood's shorting fuse box ('electric'), the lift's motor
+  ('motor'). Valve: hold E 2 s. Tests: `gas/graph.mjs`, `t_gas.mjs` (GAS_LEAK_X=3), `client_smoke.mjs`, `maps.mjs`,
+  `botgas.mjs`, browser `g_gas.mjs`, `g_gas2.mjs`.
+- **Floodgate** (`flood.md`): the valve in the storm drain (hold E 3 s) floods drain, shafts, cellar, stairwell, tunnel
+  and the lift's pit over 40 s (`FLOOD_AREAS`, one level for all; an area's optional 7th number is the level the water
+  must pass first: the pit fills only once the cellar's water reaches its doorway sill). Swimming, breath 10 s,
+  drowning (a downed swimmer 3x faster, 2x harder), electrocution at the fuse box with the power on (kills outright;
+  the fuse blows; sparks the gas), fires and grenades doused. Tests: `flood/t1.mjs`, `t2.mjs`, `t3.mjs`, `swim.mjs`,
+  browser `g1.mjs`.
+- **The lift** (`elevator.md`): shaft in the living room's north-west corner (`mansion_elevator.js`, inside x
+  −21.45…−19.80, z −5.34…−3.60, pit −3.4, stops −2.2 / 0.813 / 4.267); the server owns motion, doors, calls, hatch,
+  blackout, prying, crush safety, and carries whatever is in the cabin or on its roof (players, corpses, hostages,
+  drops, mines, satchels); browsers ride it from the clock (`elevState`). E aims (`elevAim`). The motor sparks the
+  gas (`motorStart`). Tests: `elevator/unit.mjs`, `client-node.mjs`, `t-elev.mjs`, `soak.mjs`, browser
+  `g-elevator.mjs`.
+- **Hostages fix** (`hostages.md`): `lib/hostages.js` (crumbs done at 0.3 m or 0.7 m with a clear walk on, side steps
+  round corners it clips, a stuck rule, thin boards, a jump guard) and `lib/nav.js` (a bot leading a hostage takes no
+  ladders and avoids drops; drop links need a clear fall, on every map). On cs_mansion all four hostages now reach the
+  street (0/4 before). Tests: `hostages/rescue.mjs`, `sim.mjs`, `botsoak.mjs`, browser `g-hostages.mjs`.
+- **Bet on yourself** (`bet.md`): F3 panel in freeze/buy time, targets 1/2/3+ kills or survive, stake $200–$2000 taken
+  at once; `lib/bet.js` counts kills in `killPlayer` (after `body.died`, so a downed player's death credits the
+  finisher or the downer; play dead calls no `killPlayer`, so it's no kill) and settles after `endRound`. Survive =
+  `p.alive` at the end (a downed player counts as alive: the user's open question). Best gambler award. Tests:
+  `bet/unit.mjs`, `tws.mjs`, `tmatch.mjs`, `tsoak.mjs`, browser `gbet.mjs`, `gaward.mjs`, `gdraw.mjs`, `footer.mjs`.
+
+### What the integration added (2026-11-01)
+- **E's order** in `onUse` (server.js) and the same order for the hints (main.js `updateHud`, body.js's revive hint):
+  the drone's controls → off the zip line / CCTV desk / car → revive → letting go of a held hostage → a lift target
+  the player aims at (button, hatch, doors: aiming beats nearness) → grabbing a hostage (and a CT's refusal by a held
+  one) → a uniform (crouched; not where E plants or defuses the bomb) → the floodgate and gas valves → the old uses
+  (plant, hostages, defuse, mines, satchel, fuse box, zip line, CCTV desk, doors, switches, cars, drops). `localUse` in main.js freezes you at the valves too.
+- **Links:** elevator → gas (`motorStart` → `sparkAt(pos, 'motor', by)`); flood → the lift's pit (a `FLOOD_AREAS` row);
+  flood → gas (`sparkAt(fuseBox, 'electric')`, typeof-guarded); cat × flood (`deepWater`); downed × blood (heavy bleed,
+  no "P bandage" while down, the drain waits); downed × shield, play dead × shield (`letGo`); play dead × disguise
+  (it breaks); downed/play dead × the lift (`p.elevAim` cleared; the cabin carries corpses: the server's `carry` moves
+  every alive player in it); disguise × blood (`bl` renamed in the fooled copy); downed × bet (kill credit through
+  `killPlayer`); downed × flood (drowning faster); electrocution kills outright (`BODY.outright`).
+- **Fixes:** the living room over the cellar is walked on at the drawn 0.813 (it was 0.91: `hollow()`'s `lid`); E on a
+  hostage needs line of sight (server `hostageInReach`, browser `hostageInSight`; the shield's grab hint too); an
+  admin restart during warmup's countdown no longer starts the match twice (`startMatch` clears `pendingStart`); the
+  last round's smoke is cleared at round start (`fx.clearSmoke`); `#small-msg` sits under the team bar (168 px);
+  a hostage that drowns or is electrocuted no longer says "-$1500".
+  One of the barrels the lift moved onto the stack by the cellar stairs left a 0.45 m gap the bots' grid took for a
+  way through: hostage 3, led through the cellar in the browser test, got wedged there; that barrel now stands hard
+  against the stack (`mansion_elevator.js`, -16.85, -2.55). With the team bar on, the big centre message sits at
+  max(24 %, 196 px), so the short messages (168 px) never overlap it.
+  The cellar stairwell's see-through seams (the "thin bright line" from the stairs, day and night) are closed: its
+  hollow box and the kitchen doorway's sill now reach the floors' 0.8128 (they stopped at 0.81: a 2.8 mm slit over the
+  walls, and a 4 cm strip of the kitchen floor at the doorway was carved away). A ray test from the steps against every
+  drawn face found 18 escaping rays of 37,584; none now.
+- **Tests:** `dev/test-scripts/integration/links.mjs` (server, parts a–h; h needs `GAS_LEAK_X=6`);
+  `integration/gviews.mjs` (browser: draw calls in the living room, kitchen, cellar and street; the bug spots);
+  `integration/rounds.mjs` (round starts and phases as players join). Two older tests changed with the hostages fix:
+  shield's `t-shield.mjs` (the CT stays by the hostage until the T grabs it again: a following hostage now sets off at
+  once) and `t-rescue.mjs` (a via in the hall east of the stairs, because the bots' grid now takes the stairs and its
+  nodes hug the staircase; run it with `ROUND_TIME=600`, the walk is longer than a default round).
+- **A testing lesson:** a background `bash` loop stopped with the task tool keeps running its children; two test batches
+  then shared one server and wrecked each other's results (admin restarts, server restarts mid-test). Run one batch at
+  a time and stop a batch by its PID (`regress.pid`), never by a command-line pattern (another agent's tests match too).
+- **Open questions for the user:** a fine for only *hurting* a held hostage (now just a message)? Should a downed player
+  at round end lose a "survive" bet (now he wins it)?
+- **Known, not fixed:** see each docs/features file's gaps. In short: the sounds of every feature are unchecked by ear;
+  frame times on a real laptop unmeasured (swiftshader only); disguise's `t3.mjs` set-up is flaky; a play-dead body
+  still shows the uniform hint to an enemy (the server refuses quietly: the hint can't tell him apart without leaking).
+  Draw cost: inside the house +5…+8 draw calls a frame against `main`; looking at the house from the street +17 (no
+  occlusion culling: the gas pipes (4 + 6 calls), the lift's models, the cat, its basket and bowl are drawn whenever
+  they're in the view's frustum, walls or not). Merging the two gas pipes' meshes by material would save about 6 of those.
+  The "two black blocks" in the street are the original level's: two solid cabinets textured `black` (the BSP's own
+  texture) against the estate wall at x 24.1…24.7, z 5.7…6.7 and 7.7…8.7, 1.83 m tall; left as they are.
+- **Tested on the integrated build (2026-11-01; test server 4110, headless Edge 9510):**
+  - Server: tblood 33/33, cat t1 32/32, t-shield 28/28 (day and night), t-rescue 5/5 (day and night), body t1 57/57,
+    body gadgets 38/38 (day and night), t_gas 20/20, flood t1 18/18, t2 7/7, t-elev 35/35 (day and night), hostages
+    rescue 4/4 (day and night), bet tws 38/38 and tmatch 4/4, t16zip 14/14, t17cctv 17/17, disguise t1 64/64 and t2
+    13/13, links a–g 36/36 and h 4/4; no server errors in any. Node: elevator unit 694/694 and client 15/15, cat ai 38
+    (one randomized failure in 28 runs), cat sims 0 bad ticks, blood unit 35 and client 46, disguise unit 36 and client
+    27, bet unit 49, gas client 14, flood swim 7/7, hostages sim 4/4 and 100/100 tours, walls 0/0, nav 0 links through
+    floors. BOTS=4 for 60 s on both Mansion maps: no errors, tick ~3 ms steady (main's code the same). All 7 maps load.
+  - Browser (both Mansion maps): g-elevator, g-hostages (4/4), gblood, g_gas2, cat g1 and catview, body g1 and g2, flood
+    g1 (21/21), disguise g1, g-shield (42/42), gbet, gaward, g16zip, g17cctv, g15, buyhover (900x560 scrolls, as before);
+    no page errors. Flaky in headless runs (passed on a rerun or on the other map; test timing, not the game): cat g1,
+    g_gas2's last check (the lone T died in the blast's fire, so a new round mended the pipe), body g2's kill message at
+    night (5 s now), flood g1 when the PC's clock jumped. Test tweaks: g-hostages and flood g1 click the team button
+    again on a cold page, g-shield times full speed over 1.5 s (1 s was mostly the speed-up at 1–2 fps).
+  - Draw calls a frame (median of 40 frames, the light frames; `integration/gviews.mjs`), integration vs `main`: day
+    living room 243 / 236, kitchen 116 / 111, cellar 136 / 130, street 408 / 391; night 262 / 255, 123 / 118, 151 /
+    143, 431 / 413. The cat's shadow with a shadow-casting point light over it, 20 frames: 0 point-light casts now (9
+    the old way), 7 into the sun's map.
