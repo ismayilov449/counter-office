@@ -15,6 +15,7 @@
 //   - CCTV: four cameras and a security desk upstairs
 import { clip } from './breakables.js';
 import { addGasPipes } from './mansion_gas.js'; // gas: the kitchen's gas pipe and the cellar's boiler
+import { floodWorks } from './mansion_flood.js'; // Floodgate: the valve in the storm drain
 
 const IN = 0.0254; // a texel, in metres
 
@@ -269,6 +270,7 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     // one lighting box for the three legs (deep underground: nothing else is drawn in it)
     rooms.push({ group: 'tunnel', amb: 0.4, min: [-19.65, -5.1, -2.65], max: [26.95, -2.95, 1.05] });
   }
+  floodWorks({ brush, decor }); // Floodgate: the valve that floods the drain (shared/maps/mansion_flood.js)
 
   // ---------------------------------------------------------------- 10. the roof terrace
   // The porch roof (4.27 m, the top floor's level, behind a waist-high parapet) was always there, through the opening

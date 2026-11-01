@@ -35,6 +35,7 @@ import { createCat } from './lib/cat.js'; // the mansion's cat
 import { createDisguise } from './lib/disguise.js'; // Disguise
 import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
+import { createFlood } from './lib/flood.js'; // Floodgate
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -330,6 +331,11 @@ const gas = createGas({
   breakGlass: ids => breakGlass(ids), blowDoor: i => blowDoor(i), lineOfSight: (a, b) => lineOfSight(a, b),
   roundless: () => game.phase === 'warmup' || isDM() || isGG(),
 });
+// gas: the spark hook other features call (flood's fuse box, the elevator's motor): true when it set gas off
+function sparkAt(pos, kind, by = null) { return gas.sparkAt(pos, kind, by); }
+// Floodgate (Mansion): the storm drain's valve floods the underground (see lib/flood.js)
+const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
+  sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -564,6 +570,7 @@ function resetWorld() {
   game.camsDown = new Set();
   game.camDownAt = {};
   gas.reset(); // gas: the pipes are mended and the air is clean again
+  flood.reset(); // Floodgate: drained every round
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
   sendGadgets();
 }
@@ -2057,6 +2064,7 @@ function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
+    if (a.type === 'flood') { flood.updateAct(p, a, t); continue; } // Floodgate: turning the valve
     if (a.type === 'gasValve') { gas.valve(p, a, t); continue; } // gas: shutting a valve
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'disguise') { disguise.act(p, a, t); continue; } // Disguise: changing into a dead enemy's uniform
@@ -2167,6 +2175,7 @@ function onUse(p, m, t) {
     return;
   }
   if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
+  if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
   if (atFuseBox(p) && (game.phase === 'live' || game.phase === 'warmup')) {
     // Terrorists cut the power (3 s), CTs bring it back (5 s)
     const off = game.lights.power === false;
@@ -3050,6 +3059,7 @@ function lineOfSight(a, b) {
 }
 
 function explodeNade(n) {
+  if (flood.douse(n)) return; // Floodgate: under water a grenade fizzles (an HE's blast stays in the water)
   const owner = players.get(n.owner) || null;
   const o = [n.end[0], n.end[1] + 0.1, n.end[2]];
   broadcast({ t: 'boom', p: n.end, k: n.k, id: n.id });
@@ -3881,6 +3891,7 @@ function tick() {
   // and moving by a fixed step made bots and hostages stutter on everyone's screen
   const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
   tick.prev = t;
+  flood.tick(t, dt); // Floodgate: the water level, drowning, electrocution
   bots.update(dt);
   if (game.hostages.length) {
     for (const ev of updateHostages(game.hostages, players, dt, p => world.move(null, p, 2), t)) {
@@ -3918,6 +3929,7 @@ function tick() {
     ...cat.snap(), // cat: [x, y, z, yaw, state, purring] on the Mansion maps (see shared/cat.js)
     ...shield.snap(), // shield: sh: [[hostage id, holder id], ...] while someone holds a hostage
     ...gas.snap(), // gas: { gs: { p: pipe states, r: [room, concentration 0..250, ...] } } while there is any
+    ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

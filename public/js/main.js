@@ -34,6 +34,7 @@ import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, sh
 import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
+import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -136,6 +137,7 @@ function loadMap(id) {
   if (plantedBomb) { scene.remove(plantedBomb); plantedBomb = null; }
   renderMapVotes();
   world.setShadowSize(qlevel.shadowSize);
+  flood.setMap(map); // Floodgate
   prewarm();
 }
 
@@ -2877,6 +2879,7 @@ const net = new Net({
     catSync(m.cat, m.time); // the mansion's cat
     shieldSnap(m.sh); // shield: who holds which hostage
     gas.snapshot(m.gs); // gas: the pipes and the gas in each room (none: clean air)
+    flood.onSnapshot(m.fl); // Floodgate: the water level and the valve
   },
   catMeow(m) {
     catSound(m); // the mansion's cat: meow, mrrp, screech or hiss
@@ -3621,6 +3624,7 @@ function updateHud(now) {
   if (me.alive && !me.act) hint = shieldHint(hint); // shield: grab / let go / held
   // Disguise: crouched over a dead enemy, E takes their uniform (unless E does something that comes first here)
   hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere() || !!mineToDefuse() || !!satchelToDefuse() || atFuseBox() || (me.team === 'CT' && !!nearestHostage()));
+  if (me.alive && !me.act && flood.hint()) hint = flood.hint(); // Floodgate: the valve in the storm drain
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
   else if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
@@ -3628,6 +3632,7 @@ function updateHud(now) {
   else hud.progress(null);
   if (me.act?.a === 'disguise') hud.progress(disguise.progressLabel(), me.act.pr); // Disguise
   if (me.act?.a === 'gasValve') hud.progress('Closing the gas valve...', me.act.pr); // gas
+  if (me.act?.a === 'flood') hud.progress(flood.actLabel(), me.act.pr); // Floodgate
 
   let target = null;
   if (me.alive) {
@@ -3965,6 +3970,7 @@ function frame() {
   updateBomb(now);
   updateCamera(dt, now);
   body.camera(camera); // body: the view from the floor
+  flood.update(dt, now, camera); // Floodgate
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -3995,6 +4001,7 @@ function frame() {
   }
   if (shotRequested) saveScreenshot();
 }
+flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();
