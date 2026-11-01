@@ -75,6 +75,7 @@ export class BuyMenu {
     else if (a === 'auto') this.ctx.autobuy();
     else if (a === 're') this.ctx.rebuy();
     else if (a === 'close') this.ctx.close();
+    else if (a === 'bet') this.ctx.bet?.open(); // bet feature: the footer's "F3 Bet" opens the bet panel
   }
 
   // A number key: pick a column, then an item in it. Returns true when it was used.
@@ -120,6 +121,7 @@ export class BuyMenu {
         <span data-act="ammo2"><b>.</b> Secondary ammo <i>${ammo('ammo2')}</i></span>
         <span data-act="auto"><b>F1</b> Auto-buy</span>
         <span data-act="re"><b>F2</b> Re-buy previous</span>
+        ${c.bet?.shown() ? '<span data-act="bet"><b>F3</b> Bet</span>' : ''}<!-- bet feature -->
         <span data-act="close"><b>B</b> Close</span>
       </div>`;
     if (!force && html === this.html) return;

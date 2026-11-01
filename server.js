@@ -37,6 +37,7 @@ import { createDisguise } from './lib/disguise.js'; // Disguise
 import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
+import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -1224,6 +1225,7 @@ function startMatch() {
     p.level = 0;
     resetLoadout(p);
   }
+  bet.onMatchStart(); // bet feature: a new match, new gambling records
   if (isGG()) startGunGame();
   else if (isDM()) startDeathmatch();
   else startRound();
@@ -1341,6 +1343,7 @@ function startRound() {
     sendMe(c);
     send(c, { t: 'msg', text: 'You have the bomb! Plant it at site A or B.' });
   }
+  bet.onRoundStart(); // bet feature: a new round, no bets yet
   broadcast({ t: 'round', n: game.round, score: game.score });
   sendRoster();
 }
@@ -1560,6 +1563,9 @@ body.init({
 body.onDown(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'hurt'); });
 body.onPlayDead(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff(p, 'left'); });
 
+// bet feature: F3 bet on yourself (lib/bet.js)
+const bet = createBets({ players, game, cfg: CFG, now, send, broadcast, sendMe, mates, inTeam });
+
 function addBot(team) {
   let p = null;
   const ws = { readyState: 3, send() {}, close() { if (p) leave(p); } };
@@ -1763,6 +1769,7 @@ function matchSummary(winner) {
     top('dmg', 'Damage dealer', 'damage'),
     isHostageMap() ? top('rescues', 'Hostage hero', 'rescues') : null,
   ].filter(Boolean);
+  const betAward = bet.award(); if (betAward) awards.push(betAward); // bet feature: Best gambler
   return { winner, score: game.score, players: isGG() ? list : list.sort((a, b) => b.k - a.k), awards };
 }
 
@@ -1835,6 +1842,7 @@ function endRound(winner, reason, bonus = 3250) {
     notify('Halftime! The teams switch sides next round.', true);
   }
   broadcast({ t: 'roundEnd', winner, reason, score: game.score, matchMsg, mvp, halftime: !!game.halftimePending });
+  bet.onRoundEnd(); // bet feature: pay out or keep the bets
   if (matchMsg) openMatchEnd(winner);
   sendRoster();
 }
@@ -1916,6 +1924,7 @@ function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
   const gib = gibOf(weapon, hs, how);
   disguise.onDeath(v, gib); // Disguise: the body is kept for the round; a disguise is lost
   if (!silent) broadcast({ t: 'kill', k: killer ? killer.id : null, v: v.id, w: weapon, hs: !!hs, streak, first, ace, gib: gib && { ...gib, p: v.p.map(r2), c: v.c, yaw: r2(v.yaw) } });
+  bet.onKill(killer, v); // bet feature: the bettors' kills and deaths
   if (!silent && isGG() && game.phase === 'live') ggOnKill(killer, v, weapon);
   if (!silent && isDM() && game.phase === 'live' && killer && killer !== v && killer.kills >= CFG.dmFrags) dmWin(killer);
   // Clutch: the last one alive on a team facing two or more.
@@ -3698,6 +3707,9 @@ function handle(p, m) {
       break;
     case 'sell':
       onSell(p, m.item);
+      break;
+    case 'betPlace': // bet feature: F3 bet on yourself
+      bet.place(p, m);
       break;
     case 'drop':
       onDrop(p, m.w);
