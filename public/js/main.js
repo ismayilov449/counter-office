@@ -38,6 +38,7 @@ import { initWounds, wounds } from './wounds.js'; // wounds: drag a downed mate,
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 import { createElevator } from './elevator.js'; // elevator
+import { createPower } from './power.js'; // power: the breaker panel, the generator, the lift's winch, bulbs bursting (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -134,6 +135,8 @@ function loadMap(id) {
   catLoadMap(scene, map); // the mansion's cat (only on its maps)
   gadgets.load(map);
   elevator.load(map); // elevator
+  circuits.load(map); // power
+  world.setLampFilter?.(circuits.lampFilter); // power: in the house, only the camera's storey's lamps shine (no light through the floors)
   fx.reset();
   gas.setMap(map); // gas: this map's pipes (Mansion)
   for (const d of drops.values()) scene.remove(d);
@@ -3246,11 +3249,14 @@ initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, 
 // The Mansion's gadgets: the zip line (see gadgets.js).
 const gadgets = createGadgets({
   scene, me, net, audio, hud, fx, remotes, serverNow, stopEmote: () => stopEmote(),
-  power: () => game.lights.power !== false, jammers: () => [...jammerModels.values()].map(e => e.p),
+  power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
 Object.assign(net.handlers, gas.handlers); // gas: gasLeak, gasBoom, gasCough
 // elevator: the lift in the Mansion (see elevator.js)
 const elevator = createElevator({ scene, me, net, audio, serverNow, coll: () => coll, mines: mineModels, satchels: satchelModels });
+// power: the breakers, the generator, the lift's cable (see power.js); circuits.powered(c) / poweredAt(pos) for others
+const circuits = createPower({ scene, me, net, audio, fx, game, serverNow, coll: () => coll });
+Object.assign(net.handlers, circuits.handlers); // power: power, pwPop, pwSfx
 Object.assign(net.handlers, betUI.handlers); // bet feature: betOk, betNo, betNew, betTrack, betEnd, betRound
 
 // ---------------------------------------------------------------- per-frame updates
@@ -3659,6 +3665,7 @@ function updateHud(now) {
   // > a lift target aimed at > the hostage shield > a uniform > the valves > the old uses. On a gadget, in a car, flying
   // the drone or with the mortar, E does that first.
   if (me.alive && !me.act && me.driving == null && !me.riding && !me.drone && !me.mortar && !gadgets.busy()) {
+    hint = circuits.hint(hint); // power: aimed at a breaker, the generator or the lift's winch (after the valves, before the old uses); a dead switch says why
     if ((gh = flood.hint()) || (gh = gas.hint())) hint = gh; // Floodgate, gas: their valves
     hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere()); // Disguise: crouched over a dead enemy (not where E plants or defuses)
     hint = shieldHint(hint); // shield: grab / let go / held
@@ -3673,6 +3680,7 @@ function updateHud(now) {
   if (me.act?.a === 'disguise') hud.progress(disguise.progressLabel(), me.act.pr); // Disguise
   if (me.act?.a === 'gasValve') hud.progress('Closing the gas valve...', me.act.pr); // gas
   if (me.act?.a === 'flood') hud.progress(flood.actLabel(), me.act.pr); // Floodgate
+  if (me.act && circuits.progress(me.act.a)) hud.progress(circuits.progress(me.act.a), me.act.pr); // power
 
   let target = null;
   if (me.alive) {
@@ -4005,6 +4013,7 @@ function frame() {
   updateRemotes(dt);
   gadgets.update(dt, now);
   elevator.update(dt, now); // elevator
+  circuits.update(dt, now); // power: the generator running, what E is aimed at
   body.frame(dt, now); // body: bodies on the floor, overlays
   updateCars(dt);
   updateHostageModels(dt);

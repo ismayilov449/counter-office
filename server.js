@@ -24,6 +24,7 @@ import { skyOf } from './shared/maps/sky.js';
 import { doorBox, doorCenter, doorReach, openingSide, GONE } from './shared/doors.js';
 import { ZIP, zipFeet, zipPoint, zipDir, zipRide, fallDamage, CCTV, camView, camHalfFov } from './shared/gadgets.js';
 import { createElevator } from './lib/elevator.js'; // elevator
+import { createPower } from './lib/power.js'; // power: circuits and breakers, the generator, the surge, the lift's cable (Mansion)
 import { Stats, rating } from './lib/stats.js';
 import { rankIndex } from './shared/ranks.js';
 import { ACHIEVEMENTS } from './shared/achievements.js';
@@ -339,6 +340,7 @@ const gas = createGas({
 function sparkAt(pos, kind, by = null) { return gas.sparkAt(pos, kind, by); }
 // Floodgate (Mansion): the storm drain's valve floods the underground (see lib/flood.js)
 const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
+  live: () => circuits.powered('cellar'), // power: the water at the fuse box is live only with the cellar's circuit
   sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
@@ -564,6 +566,7 @@ function resetWorld() {
   game.lights = {};
   for (const g of lightGroups()) game.lights[g] = true;
   if (MAP.fusebox) game.lights.power = true; // (Mansion's blackout: see the fuse box)
+  circuits.reset(); // power: breakers on, the generator off and full, no burst bulbs, the lift's cable whole (game.lights.dead)
   for (const p of players.values()) { p.driving = null; p.riding = null; }
   world.cars = (MAP.vehicles || []).map((v, id) => freshCar(v, id));
   world.setDoors([]);
@@ -933,6 +936,7 @@ function mansionTick(t) {
   if (MAP.zip) zipTick(t);
   if (MAP.cctv) cctvTick(t);
   if (MAP.elevator) elevator.tick(t); // elevator
+  circuits.tick(t); // power: the flood blowing the fuse, the generator's fuel, bulbs bursting
   for (const [i, o] of Object.entries(game.doorOpening || {})) {
     if (t < o.at) continue;
     delete game.doorOpening[i];
@@ -957,6 +961,7 @@ function atFuseBox(p) {
 }
 
 function setPower(on, by) {
+  if (circuits.setMains(on, by)) return; // power: the circuits work out every lamp (lib/power.js)
   game.lights.power = on;
   for (const g of MAP.fusebox.groups) game.lights[g] = on;
   broadcast({ t: 'lights', lights: game.lights, power: on ? 'on' : 'off', p: MAP.fusebox.p });
@@ -1051,7 +1056,7 @@ function zipTick(t) {
 // the enemies it sees go on your team's radar. E (or Esc in the browser) gets you up; so does being hurt. A camera
 // breaks to one bullet or a blast (back each round, without rounds after CCTV.mend s); a jammer near one blinds it;
 // the blackout turns them all off.
-const camLive = i => game.lights.power !== false && !game.camsDown.has(i) && !jammedAt(MAP.cctv.cams[i].p);
+const camLive = i => circuits.powered('cctv') && !game.camsDown.has(i) && !jammedAt(MAP.cctv.cams[i].p); // (power: the CCTV's circuit)
 const atDesk = p => !!MAP.cctv && Math.hypot(p.p[0] - MAP.cctv.seat[0], p.p[2] - MAP.cctv.seat[2]) < CCTV.reach && Math.abs(p.p[1] - MAP.cctv.floor) < 0.7;
 
 function cctvOn(p) {
@@ -1110,8 +1115,15 @@ function cctvTick(t) {
 // elevator: the lift in the Mansion (lib/elevator.js). motorStart: the motor sparks each time it starts (gas).
 const elevator = createElevator({
   map: () => MAP, world: () => world, now, players, game, send, broadcast, sendMines, sendSatchels,
-  power: () => game.lights?.power !== false,
+  power: () => circuits.liftWorks(), // (power: the lift's circuit, and its cable whole)
   motorStart: (pos, by) => sparkAt(pos, 'motor', by), // elevator → gas: a spark over the cabin's roof
+  broken: () => circuits.broken(), landed: e => circuits.landed(e), // power: out of order (cable cut); the fall has ended
+});
+// power: circuits and breakers, the generator, the surge, the lift's cable (lib/power.js). Others ask
+// circuits.powered(circuit) / circuits.poweredAt(pos); the fuel cans call circuits.refuel(seconds).
+const circuits = createPower({
+  map: () => MAP, game, players, now, send, broadcast, notify, sparkAt: (pos, kind, by) => sparkAt(pos, kind, by),
+  applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), mates: (a, b) => mates(a, b), elevator: () => elevator,
 });
 
 function nearestSwitch(p) {
@@ -2098,6 +2110,7 @@ function updateActions(t) {
     if (a.type === 'flood') { flood.updateAct(p, a, t); continue; } // Floodgate: turning the valve
     if (a.type === 'gasValve') { gas.valve(p, a, t); continue; } // gas: shutting a valve
     if (a.type === 'elevforce') { elevator.act(p, a, t); continue; } // elevator: prying the lift's doors (any phase)
+    if (a.type.startsWith('pw')) { circuits.act(p, a, t); continue; } // power: a breaker, the generator, cutting the lift's cable
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'disguise') { disguise.act(p, a, t); continue; } // Disguise: changing into a dead enemy's uniform
     if (a.type === 'fuse') {
@@ -2187,6 +2200,7 @@ function onUse(p, m, t) {
   if (!plantHere && !defuseHere && disguise.tryStart(p, t)) return; // Disguise: crouched over a dead enemy, hold E to put on their uniform
   if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
   if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
+  if (circuits.use(p, t)) return; // power: aimed at a breaker, the generator or the lift's winch (before the old uses)
   if (plantHere) {
     p.act = { type: 'plant', start: t, pos: p.p.slice(), dur: CFG.plantTime * 1000 };
     return;
@@ -2249,6 +2263,7 @@ function onUse(p, m, t) {
   if (MAP.cctv && !p.bot && atDesk(p)) { cctvOn(p); return; }
   const sw = nearestSwitch(p), door = nearestDoor(p);
   if (door && (!sw || door.dist < dist2(p.p, sw.p))) { useDoor(p, door.i); return; }
+  if (sw && circuits.onSwitch(p, sw)) return; // power: a switch on the house's power (its circuit, a burst bulb)
   if (sw && game.lights.power === false && MAP.fusebox.groups.includes(sw.group)) {
     send(p, { t: 'msg', text: 'No power — someone pulled the lever at the fuse box in the cellar.' });
     return;
@@ -3643,6 +3658,7 @@ function handle(p, m) {
   if (body.handle(p, m)) return; // body: play dead (K); a "corpse" doesn't move, emote or all-chat
   if (wounds.handle(p, m)) return; // wounds: E held (drag), wdDrag, wdEnd (K while down); a dragged body doesn't move itself
   if (m.t.startsWith('elev')) { elevator.message(p, m); return; } // elevator
+  if (m.t.startsWith('pw')) { circuits.message(p, m); return; } // power: pwAim
   switch (m.t) {
     case 'join': {
       if (p.joined) break;
@@ -4106,6 +4122,7 @@ wss.on('connection', ws => {
   sendSatchels(p);
   sendGadgets(p);
   elevator.send(p); // elevator
+  circuits.send(p); // power: the breakers, the generator, burst bulbs, the lift's cable
   sendRoster();
   ws.on('message', data => {
     let m;

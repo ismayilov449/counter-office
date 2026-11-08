@@ -9,6 +9,7 @@ import * as BSP from './cs_mansion_bsp.js';
 import { breakUp } from './breakables.js';
 import { remodel, NEW_TEX } from './mansion2.js';
 import { moveSwitches } from './mansion_elevator.js'; // elevator
+import { POWER } from './mansion_power.js'; // power: where the breaker panel, the generator and the lift's machine room are
 
 const m = createBuilder();
 
@@ -225,6 +226,7 @@ export default {
   // CCTV: four cameras and the security desk with their monitors (see mansion2.js and shared/gadgets.js).
   cctv: RM.cctv,
   elevator: RM.elevator, // elevator: the lift (see mansion_elevator.js and shared/elevator.js)
+  power: POWER, // power: the breaker panel, the generator, the machine room (see mansion_power.js and shared/power.js)
   theme: {
     skyTop: '#3f7fc4', skyHorizon: '#cfe0ec', fog: ['#d8e2e8', 90, 300],
     sun: { color: '#fff4e2', intensity: 2.8, dir: [35, 75, 25] },

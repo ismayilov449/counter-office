@@ -9,6 +9,7 @@
 // Riding: whatever is inside the cabin (or stands on its roof) moves up and down with it, by the cabin's change of height
 // since the last step — the server does that for bots, hostages, drops, mines and satchels, each browser for its own
 // player (so it's smooth at any frame rate) and for the others it draws (who are drawn a little in the past).
+import { fallAt } from './power.js'; // power: a motion with `fall` set is the cut cable's fall
 
 // v, a: top speed (m/s) and acceleration (m/s²); brake: the emergency brake (m/s²); door: seconds for the doors to slide;
 // forced: the same, pried open; hold: seconds they stay open (soon: when someone is waiting); force: seconds of holding
@@ -19,6 +20,7 @@ export const ELEV = { v: 1, a: 1, brake: 2.5, door: 1.0, forced: 1.6, hold: 3.0,
 
 // Where the cabin's floor is at time t (ms): { y, v (m/s, + up), moving }.
 export function motionAt(m, t) {
+  if (m.fall) return fallAt(m, t); // power: the cut cable's fall (shared/power.js)
   const d = Math.abs(m.y1 - m.y0), s = m.y1 > m.y0 ? 1 : -1;
   if (d < 1e-9) return { y: m.y0, v: 0, moving: false };
   const A = ELEV.a;

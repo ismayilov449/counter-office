@@ -100,7 +100,8 @@ export function createElevator(ctx) {
   }
 
   // ---------------------------------------------------------------- the state, the boxes, things riding along
-  const motion = () => ({ y0: st.m[0], y1: st.m[1], t0: st.m[2], tb: st.m[3] });
+  const motion = () => ({ y0: st.m[0], y1: st.m[1], t0: st.m[2], tb: st.m[3], fall: st.m[4], tc: st.m[5] }); // (power: fall, tc: the cut cable)
+  let fellAt = -1e9; const falling = () => !!st.m[4] || serverNow() - fellAt < 1500; // power: falling, or just landed (the landing's state can come with the fall's last frame)
   const atStop = () => { const n = nearestStop(E, y); return n.d < 0.002 ? n.s : -1; };
   function fresh() {
     const t = serverNow();
@@ -116,7 +117,8 @@ export function createElevator(ctx) {
     yPrev = y;
     y = motionAt(motion(), t).y;
     dy = y - yPrev;
-    if (Math.abs(dy) > 0.5) dy = 0; // (a jump, not a ride: a new round put it back on the ground floor)
+    if (st.m[4]) fellAt = t;
+    if (Math.abs(dy) > (falling() ? 3 : 0.5)) dy = 0; // (a jump, not a ride: a new round put it back on the ground floor; power: falling, up to 3 m a frame)
     if (dy) {
       for (const id of st.rm) { const e = ctx.mines.get(id); if (e) { e.obj.position.y += dy; if (e.m) e.m.p[1] += dy; } }
       for (const id of st.rs) { const e = ctx.satchels.get(id); if (e && e.obj.parent === scene) e.obj.position.y += dy; }
@@ -194,10 +196,11 @@ export function createElevator(ctx) {
   function hintFor(a) {
     const power = !!st.p, r = motionAt(motion(), serverNow()), inside = inCabin(E, y, me.p, 0.3);
     if (!a) {
-      if (inside && !r.moving && atStop() < 0) return power ? 'The lift has stopped between floors' : 'The lift is stuck in the dark — pry the doors open near a floor, or look up: the roof hatch';
+      if (inside && !r.moving && atStop() < 0) return st.x ? 'The lift is wrecked — pry the doors open near a floor, or look up: the roof hatch' : power ? 'The lift has stopped between floors' : 'The lift is stuck in the dark — pry the doors open near a floor, or look up: the roof hatch'; // (power: st.x, its cable cut)
       return null;
     }
     const s = +a[1];
+    if (st.x && (a[0] === 'c' || a[0] === 'b')) return 'Out of order — someone cut the lift\'s cable'; // power
     switch (a[0]) {
       case 'c': return !power ? 'The lift has no power (the fuse box is in the cellar)' : st.q.includes(s) ? 'The lift is on its way' : 'Press E to call the lift';
       case 'b': return !power ? 'No power — the buttons are dead' : `Press E to go to ${E.names[s]}`;
@@ -209,7 +212,7 @@ export function createElevator(ctx) {
         if (r.moving) return null;
         if (power && atStop() >= 0) return doorAt(st.d[0], serverNow()) > 0.9 ? null : 'Press E to open the doors';
         const n = nearestStop(E, y);
-        if (doorAt(st.d[0], serverNow()) > 0.9 && doorAt(st.d[1 + n.s], serverNow()) > 0.9) return null;
+        if (doorAt(st.d[0], serverNow()) > 0.9 && doorAt(st.d[1 + n.s], serverNow()) > 0.9) return E.stops[n.s] - y > 0.3 ? 'Press E to climb out' : null; // (power: the floor too high to step up to, as lib/elevator.js)
         return n.d > ELEV.near ? 'Too far from a floor to get out this way — look up: the roof hatch' : `Hold E to pry the doors open (${ELEV.force} s, loud)`;
       }
       case 'l': {
@@ -241,6 +244,7 @@ export function createElevator(ctx) {
     onState(m) {
       last = m;
       if (E) st = m;
+      if (m.m?.[4]) fellAt = serverNow(); // (power: a short fall can end before any frame sees it)
     },
     onSfx(m) {
       if (!E) return;
@@ -289,7 +293,7 @@ export function createElevator(ctx) {
     remote(p, rt) {
       if (!E || !st) return;
       const yr = motionAt(motion(), rt).y;
-      if (Math.abs(yr - y) > 1e-4 && Math.abs(yr - y) < 1 && (inCabin(E, yr, p, 0.2) || onRoof(E, yr, p, 0.2))) p[1] += y - yr;
+      if (Math.abs(yr - y) > 1e-4 && Math.abs(yr - y) < (falling() ? 8 : 1) && (inCabin(E, yr, p, 0.2) || onRoof(E, yr, p, 0.2))) p[1] += y - yr; // (power: falling, far further)
     },
     update(dt, now) {
       if (!E) return;
