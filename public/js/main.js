@@ -40,6 +40,7 @@ import * as flood from './flood.js'; // Floodgate: the storm drain's valve flood
 import { createElevator } from './elevator.js'; // elevator
 import { createPower } from './power.js'; // power: the breaker panel, the generator, the lift's winch, bulbs bursting (Mansion)
 import * as stealth from './stealth.js'; // stealth: the chimney, the creaking boards, hiding in a car's trunk
+import * as ug from './underground.js'; // underground: no radar underground, the echo, the air vents (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -147,6 +148,7 @@ function loadMap(id) {
   world.setShadowSize(qlevel.shadowSize);
   flood.setMap(map); // Floodgate
   stealth.setMap(map); // stealth: the chimney's rungs, the creaky spots
+  ug.setMap(map); // underground
   prewarm();
 }
 
@@ -460,6 +462,7 @@ function fireBullet(id, def, now) {
   ejectCasing();
   net.send(def.pellets ? { t: 'shoot', o, ds: dirs, w: id, rt: serverNow() - interpMs } : { t: 'shoot', o, d: dirs[0], w: id, rt: serverNow() - interpMs });
   audio.play('shot', null, id === 'm4a1' ? 'm4a1s' : id);
+  ug.shot(o, id); // underground: its echo
 
   me.punchP = Math.min(0.075, me.punchP + def.recoil * 0.45 * (1 + Math.min(me.shotsFired, 6) * 0.07));
   if (me.shotsFired > 3) me.punchY = clamp(me.punchY + (Math.random() - 0.5) * def.recoil * 0.5, -0.025, 0.025);
@@ -1018,6 +1021,7 @@ function radarEnemies(now) {
 // Pings: the middle mouse button puts a "!" on the team's radar where we're looking.
 const pings = [];
 function sendPing() {
+  if (ug.blocked()) return; // underground: no signal down there
   const o = eyePos(), d = aimDir(me.yaw, me.pitch);
   const t = coll.raycast(o, d, PING.range, 'bullet')?.t ?? 60;
   net.send({ t: 'mark', p: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] });
@@ -1174,6 +1178,7 @@ function aimMortar(dBearing, dElev) {
 
 // Calling in a target (V): the spot you're looking at, for the team's mortar.
 function spotTarget() {
+  if (ug.blocked()) return; // underground: no signal down there
   const o = eyePos(), d = aimDir(me.yaw, me.pitch);
   const hit = coll.raycast(o, d, 250, 'bullet');
   if (!hit) { hud.small('Look at a spot on the ground to call in a target', 2); return; }
@@ -2925,6 +2930,7 @@ const net = new Net({
       return;
     }
     audio.play('shot', m.o, m.w === 'm4a1' ? 'm4a1s' : m.w);
+    ug.shot(m.o, m.w); // underground: its echo
     let from = m.o;
     const muzzle = r?.model.userData.gun?.userData.muzzle;
     if (muzzle && r.model.visible) {
@@ -3060,9 +3066,9 @@ const net = new Net({
     if (m.owner !== me.id) audio.play('shot', m.o, m.w || 'rpg');
   },
   nade(m) {
-    fx.nade(m.k, m.o, m.v, nadeFuse(m.k), p => audio.play('bounce', p));
+    fx.nade(m.k, m.o, m.v, m.fu ?? nadeFuse(m.k), p => audio.play('bounce', p)); // underground: (m.fu: up to an air vent's grille, or what's left coming out of one)
     // 'Fire in the hole!' goes out on the thrower's team radio.
-    if (settings.radioVoice && m.k !== 'dronebomb' && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole');
+    if (m.vent == null && settings.radioVoice && m.k !== 'dronebomb' && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole'); // underground: (not again out of a vent)
   },
   boom(m) {
     audio.muffled = !!map.realism && indoors(me.p) !== indoors(m.p);
@@ -3072,6 +3078,7 @@ const net = new Net({
       audio.muffled = false;
     }
     realBlast(m);
+    ug.boom(m.p, m.k); // underground: its echo
   },
   boomInner(m) {
     if (m.k === 'flash') { fx.flashPop(m.p); audio.play('flashpop', m.p); return; }
@@ -3676,6 +3683,7 @@ function updateHud(now) {
     hint = shieldHint(hint); // shield: grab / let go / held
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
   }
+  if (!hint && (gh = ug.hint())) hint = gh; // underground: by an air vent (no E use: only when nothing else is said)
   if ((gh = stealth.inside())) hint = gh; // stealth: in a trunk, E jumps out (before anything else, as on the server)
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
@@ -3710,7 +3718,7 @@ function updateHud(now) {
     bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
   }
   const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
-  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere());
+  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
   drawMortarMap(performance.now(), mates);
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
@@ -4030,6 +4038,7 @@ function frame() {
   wounds.frame(dt, now, camera); // wounds: drag/suicide input, being dragged, the limp, sway and blur, remote poses, badges
   flood.update(dt, now, camera); // Floodgate
   stealth.frame(dt, now, camera); // stealth: the fire, the sooty footprints, creaks, the trunk's view
+  ug.update(dt, now, camera); // underground
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -4063,6 +4072,7 @@ function frame() {
 }
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
 stealth.init({ scene, me, net, hud, fx, game, remotes, cars, coll: () => coll, map: () => map, replay: () => !!killcam }); // stealth: its browser side (public/js/stealth.js)
+ug.init({ scene, net, me, hud, fx, coll: () => coll, indoors: p => indoors(p) }); // underground
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();

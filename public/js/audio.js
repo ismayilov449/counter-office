@@ -469,6 +469,7 @@ export const audio = {
   play(name, pos = null, arg = null) {
     if (!ctx || ctx.state !== 'running') return;
     const t = ctx.currentTime;
+    if (pos && this.vent) pos = this.vent(pos) || pos; // underground: heard through an air vent, it comes out of the grille (public/js/underground.js)
     const out = this.out(pos, FAR[name], this.muffled);
     switch (name) {
       case 'shot': {
