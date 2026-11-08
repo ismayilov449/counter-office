@@ -2847,6 +2847,9 @@ const net = new Net({
     world?.setBrokenGlass(game.broken);
   },
   lights(m) {
+    // (the same fuse box state again — power's circuits repeat the flood's blown fuse with the lamps worked out —
+    // only the lamps: no second power-down sound; integration 2026-11-08)
+    if (m.power && (m.power === 'off') === (game.lights?.power === false)) { applyLights(m.lights); return; }
     if (m.power) { powerChange(m); return; }
     applyLights(m.lights);
     audio.play('switch', m.p);

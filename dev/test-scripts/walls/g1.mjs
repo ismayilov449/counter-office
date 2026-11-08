@@ -81,8 +81,16 @@ const HALL = [-10, 0.813, -2.5], WALL_X = -12.9, EYEY = 0.813 + EYE;
 // the brightness (0..255) of the few pixels in the middle of the picture, read right after the next frame is drawn
 const probe = () => ev(`new Promise(res => { const raf = window.requestAnimationFrame; window.requestAnimationFrame = cb => raf(t => { cb(t); window.requestAnimationFrame = raf;
   const c = document.querySelector('#game canvas'), gl = c.getContext('webgl2'), n = 3, px = new Uint8Array(4 * n * n);
-  gl.readPixels((c.width >> 1) - 1, (c.height >> 1) - 1, n, n, gl.RGBA, gl.UNSIGNED_BYTE, px);
-  let s = 0; for (let i = 0; i < n * n; i++) s += px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2]; res(Math.round(s / (n * n * 3))); }); })`);
+  // (integration 2026-11-08: the brightest of five 3x3 spots, the middle and 12 px each way, all inside a hole at
+  // these distances: with lamps lighting only their own rooms the middle alone often fell on a dark door or a night
+  // window behind the hole)
+  let best = 0;
+  for (const [dx, dy] of [[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12]]) {
+    gl.readPixels((c.width >> 1) - 1 + dx, (c.height >> 1) - 1 + dy, n, n, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let s = 0; for (let i = 0; i < n * n; i++) s += px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2];
+    best = Math.max(best, Math.round(s / (n * n * 3)));
+  }
+  res(best); }); })`);
 const cutOn = on => ev(`import('/js/walls.js').then(m => (m.debugCut(${on}), 1))`);
 // looking at a hole's middle from where you stand: the picture there with the holes cut out, and with none cut
 async function throughHole(label) {

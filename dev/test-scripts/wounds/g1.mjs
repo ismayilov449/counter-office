@@ -140,7 +140,7 @@ const upd = await until(async () => {
   return g.has(m => m.t === 'bodyUp' && m.v === me);
 }, 10000); // (the rest of the 5 s revive; it missed twice in fast runs, 2026-11-08: the trace below says where)
 ok('Mate revives the browser after the drag', upd);
-if (!upd) console.log('     ' + trace.filter((x, i) => i % 3 === 0).slice(0, 12).join('\n     '));
+if (!upd) console.log('     ' + trace.filter((x, i) => i % 8 === 0 || i === trace.length - 1).join('\n     ')); // (integration: the whole wait, every 8th)
 M.use(false);
 await sleep(500);
 ok(`the browser stays where it was dragged to (${flat(posOf(me), b1).toFixed(2)} m off)`, flat(posOf(me), b1) < 0.3);

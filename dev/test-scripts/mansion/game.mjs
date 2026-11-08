@@ -41,6 +41,11 @@ export async function open(team = 'T', name = 'Tester', keep = ['msg', 'doors', 
   for (let i = 0; i < 80; i++) { await sleep(500); if (/Connected/.test(await ev("document.getElementById('conn-status')?.textContent") || '')) break; }
   await ev(`document.getElementById('name').value = '${name}'; document.querySelector('#join .team-btn[data-team="${team}"]').click(); 'ok'`);
   await sleep(3500);
+  // (a cold page sometimes misses the first click: click the team again while the join screen still shows; the
+  // integration of 2026-11-08 lost g-elevator's whole first part to it)
+  for (let i = 0; i < 5 && !(await ev("document.getElementById('join')?.classList.contains('hidden')")); i++) {
+    await ev(`document.querySelector('#join .team-btn[data-team="${team}"]')?.click(), 1`); await sleep(2000);
+  }
   await ev("Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => document.querySelector('#game canvas') }); document.dispatchEvent(new Event('pointerlockchange')); document.getElementById('paused').classList.add('hidden'); 'ok'");
   const mouse = (type, o) => ev(`document.dispatchEvent(new MouseEvent('${type}', ${JSON.stringify(o)})), 1`);
   const click = async (button = 0, hold = 300) => { await mouse('mousedown', { button }); await sleep(hold); await mouse('mouseup', { button }); };
@@ -48,7 +53,9 @@ export async function open(team = 'T', name = 'Tester', keep = ['msg', 'doors', 
   const keyUp = code => cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: code.slice(-1), code, windowsVirtualKeyCode: code.charCodeAt(code.length - 1) });
   const key = async (code, hold = 60) => { await keyDown(code); await sleep(hold); await keyUp(code); };
   const send = m => ev(`__ws.send(${JSON.stringify(JSON.stringify(m))}), 1`);
-  const msgs = async (clear = true) => { const r = JSON.parse(await ev('JSON.stringify(__in)')); if (clear) await ev('__in.length = 0, 1'); return r; };
+  // (read and emptied in one go: as two calls, a message the page got in between was emptied unread; at 1-3 fps that
+  // dropped a one-off message now and then: wounds' g1 missed 'bodyUp' and 'wdReveal' so. Integration 2026-11-08)
+  const msgs = async (clear = true) => JSON.parse(await ev(clear ? 'JSON.stringify(__in.splice(0))' : 'JSON.stringify(__in)'));
   // stand at p looking along yaw (0: north, -z), then tilt the view by pitch (radians, up +) with the mouse
   const tp = async (p, yaw = 0, pitch = 0) => {
     await ev(`__onmsg({ data: JSON.stringify({ t: 'spawn', p: ${JSON.stringify(p)}, yaw: ${yaw}, sq: __sq }) }), 1`);

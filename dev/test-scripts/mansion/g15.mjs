@@ -28,6 +28,9 @@ await shot('g15_after.png');
 console.log('errors (pilot):', errors.length ? errors.slice(0, 5).join('\n') : 'none');
 
 // ---- part 2: the browser is a CT; a scripted T flies a drone in front of him
+// (the old connection closed first: left open, the page's Terrorist and the new CT started the match before the
+// scripted pilot joined, who then sat out the round dead and couldn't buy. Integration 2026-11-08)
+await g.ev('window.__ws && __ws.close(), 1'); await sleep(1500);
 g = await open('CT', 'Watcher', ['msg', 'droneHit', 'droneDown', 'droneEnd']); // (the browser's Terrorist leaves first)
 ({ tp, key, click, shot, msgs, errors, ev, look } = g);
 const pilot = await player('Flyer', 'T');
