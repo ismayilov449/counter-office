@@ -4,6 +4,7 @@
 // drawn. Made while a map loads (see prewarm in main.js), so opening the menu never stutters.
 import * as THREE from 'three';
 import { buildGun, buildMortarSetup, buildPlacedMine, buildDrone } from './guns.js';
+import { drawSyringe } from './wounds.js'; // wounds: the adrenaline syringe's picture
 
 const GOLD = '#e7b350', W = 256, H = 128;
 const icons = new Map();
@@ -74,7 +75,8 @@ function drawn(kind) {
     g.lineWidth = 6; g.beginPath(); g.moveTo(56, 48); g.quadraticCurveTo(100, 6, 144, 48); g.stroke();
     g.fillStyle = 'rgba(0,0,0,0.45)';
     g.beginPath(); g.arc(78, 52, 11, 0, 7); g.arc(122, 52, 11, 0, 7); g.fill();
-  } else if (kind === 'camo') {
+  } else if (kind === 'adren') drawSyringe(g); // wounds
+  else if (kind === 'camo') {
     // a ghillie suit: a shaggy cloak of strips
     g.beginPath(); g.ellipse(100, 30, 18, 16, 0, 0, 7); g.fill();
     for (let i = 0; i < 46; i++) {
@@ -100,7 +102,7 @@ export function makeBuyIcons(renderer, ids) {
   scene.add(key, fill, new THREE.HemisphereLight(0xfff4e0, 0x6a5030, 1.4));
   const prev = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
   for (const id of ids) {
-    if (['vest', 'vesthelm', 'kit', 'nvg', 'camo'].includes(id)) { icons.set(id, drawn(id)); continue; }
+    if (['vest', 'vesthelm', 'kit', 'nvg', 'camo', 'adren'].includes(id)) { icons.set(id, drawn(id)); continue; } // wounds: + adren
     let obj;
     try {
       obj = id === 'mortar' ? buildMortarSetup(50) : id === 'pmn' || id === 'mon50' ? buildPlacedMine(id, 0.01, 0.01) : id === 'drone' ? buildDrone() : buildGun(id);

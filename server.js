@@ -35,6 +35,7 @@ import { createBlood } from './lib/blood.js'; // blood trails
 import { createCat } from './lib/cat.js'; // the mansion's cat
 import { createDisguise } from './lib/disguise.js'; // Disguise
 import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
+import { createWounds } from './lib/wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
 import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out of deep water
@@ -1569,6 +1570,7 @@ body.onPlayDead(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff
 // body × shield: a corpse holds no hostage (let go as a real death would: 'died'); × disguise: a wearer who drops is
 // seen through ('went down'); × elevator: no lift target
 body.onPlayDead(p => { shield.letGo(p, 'died'); disguise.reveal(p, 'downed'); p.elevAim = null; });
+const wounds = createWounds({ players, game, cfg: CFG, map: () => MAP, now, send, broadcast, sendMe, killPlayer, inTeam, busy, disguise }); // wounds: (lib/wounds.js)
 
 // bet feature: F3 bet on yourself (lib/bet.js)
 const bet = createBets({ players, game, cfg: CFG, now, send, broadcast, sendMe, mates, inTeam });
@@ -1969,6 +1971,7 @@ function applyDamage(v, attacker, dmg, part, weapon, pen, hitInfo, from = null) 
   }
   v.hp -= d;
   bleed.wound(v, d, weapon, part); // blood trails: the wound starts bleeding
+  wounds.hurt(v, attacker, d, part, weapon); // wounds: a leg, arm or head wound (if he's still on his feet)
   if (v.cctv && v.hp > 0) cctvOff(v, 'hurt'); // (hurt at the desk: you jump up)
   disguise.onHurt(v, attacker); // Disguise: a hit stops the changing; a hit from the fooled team gives you away
   if (v.bot) bots.hurt(v, attacker);
@@ -2175,6 +2178,7 @@ function onUse(p, m, t) {
     if (p.driving != null || p.riding != null) { exitCar(p); return; }
   }
   if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
+  if (wounds.use(p, t)) return; // wounds: interrogate a downed enemy (hold E 3 s)
   if (!p.alive || p.act) return;
   if (p.shield == null && MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at; a hostage held lets go first)
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
@@ -2285,6 +2289,7 @@ function onShoot(p, m) {
   if (!p.alive || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
   if (bleed.busy(p)) return; // blood trails: no shooting while bandaging
   if (body.noFire(p, m.w)) return; // body: down (pistol only), playing dead, reviving
+  if (wounds.noFire(p, m.w)) return; // wounds: dragging (pistol only), interrogating, the downed suicide
   p.protectUntil = 0;
   const w = m.w, def = WEAPONS[w];
   if (!def || def.grenade || def.mortar || w === 'c4') return; // (the mortar fires with a 'mortar' message)
@@ -2411,6 +2416,7 @@ function onShoot(p, m) {
     else if (def.melee) applyDamage(h.q, p, alt ? def.altDamage : def.damage, 'chest', w, def.pen, info);
     else if (CFG.party.headshotsOnly && h.part !== 'head') continue;
     else {
+      wounds.shotAt(h.q, o, h.d, h.t, rewind(h.q, m.rt).p); // wounds: where it struck (an arm?)
       const dealt = applyDamage(h.q, p, def.damage * Math.pow(def.rangeMod, h.t / 12.7) * (h.through ?? 1), h.part, w, def.pen, info, eyeOf(p));
       // Bullets push zombies back.
       if (h.q.zombie && dealt) {
@@ -3069,6 +3075,7 @@ function onNade(p, m) {
   if (bleed.busy(p)) return; // blood trails: no throwing while bandaging
   if (p.shield != null) return; // shield: no grenades while holding a hostage
   if (body.noFire(p, k)) return; // body: no throwing from the floor
+  if (wounds.noFire(p, k)) return; // wounds: nor while dragging, interrogating or ending it
   const o = vec3(m.o), v = vec3(m.v);
   if (!o || !v || Math.hypot(...v) > 30 || dist3(o, eyeOf(p)) > 2.5) return;
   p.inv[k]--;
@@ -3409,6 +3416,7 @@ function onBuy(p, id) {
   } else if (id === 'camo') {
     if (p.camo) return fail('You already have camouflage.');
   }
+  if (id === 'adren' && wounds.cantBuy(p)) return fail(wounds.cantBuy(p)); // wounds: the adrenaline syringe (one, classic rounds)
   if (isDM()) price = 0;
   if (p.money < price) return fail('You have insufficient funds!');
 
@@ -3431,6 +3439,7 @@ function onBuy(p, id) {
   else if (id === 'kit') p.kit = true;
   else if (id === 'nvg') p.nvg = true;
   else if (id === 'camo') p.camo = true;
+  if (id === 'adren') p.inv.adren = 1; // wounds: the syringe (in the inventory: kept by a survivor, lost with a death)
   send(p, { t: 'sfx', s: 'buy' });
   sendMe(p);
 }
@@ -3471,6 +3480,7 @@ function onSell(p, id) {
   } else if (id === 'kit') p.kit = false;
   else if (id === 'nvg') p.nvg = false;
   else if (id === 'camo') { p.camo = false; p.camoOn = false; }
+  if (id === 'adren') { if (!p.inv.adren) return fail('You don\'t have it any more.'); p.inv.adren = 0; } // wounds: the syringe
   p.buys.splice(i, 1);
   if (wdef?.perTeam) countTeamBuy(p.team, id, -1);
   p.money += b.price;
@@ -3631,6 +3641,7 @@ function handleAdmin(req, res) {
 function handle(p, m) {
   const t = now();
   if (body.handle(p, m)) return; // body: play dead (K); a "corpse" doesn't move, emote or all-chat
+  if (wounds.handle(p, m)) return; // wounds: E held (drag), wdDrag, wdEnd (K while down); a dragged body doesn't move itself
   if (m.t.startsWith('elev')) { elevator.message(p, m); return; } // elevator
   switch (m.t) {
     case 'join': {
@@ -3955,6 +3966,7 @@ function tick() {
     for (const h of game.hostages) if (h.state === 'follow' && inRescueZone(MAP, h.p)) rescueHostage(h);
   }
   shield.update(t); // shield: held hostages go with their holders; holds end on death, a new round...
+  wounds.tick(t, dt); // wounds: drags, interrogations, the downed suicide, wounds, the syringe
 
   for (let i = game.nades.length - 1; i >= 0; i--) {
     if (t >= game.nades[i].at) explodeNade(game.nades.splice(i, 1)[0]);
@@ -3985,6 +3997,7 @@ function tick() {
     ...shield.snap(), // shield: sh: [[hostage id, holder id], ...] while someone holds a hostage
     ...gas.snap(), // gas: { gs: { p: pipe states, r: [room, concentration 0..250, ...] } } while there is any
     ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
+    ...wounds.snap(), // wounds: wd: { d: [[dragger, dragged, x, y, z]], k: [[id, 0..1]] ending it, i: [[asker, victim, 0..1]], a: [interrogated] }
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

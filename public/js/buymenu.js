@@ -15,6 +15,7 @@ const ABOUT = {
   kit: 'Defuses the bomb (and mines) twice as fast.',
   nvg: 'Nightvision (N): see in dark rooms and tunnels.',
   camo: 'Ghillie suit (H): enemies see only a shimmer of you while it\'s on; a shot shows you for a moment.',
+  adren: 'Adrenaline syringe: revive a downed teammate in 2 s instead of 5 (used up). He gets up with shaking aim and blurred sight for 20 s.', // wounds
   he: 'High-explosive grenade: heavy damage to everyone close to where it goes off.',
   flash: 'Blinds everyone who looks at it.',
   smoke: 'A thick cloud for 18 seconds; nobody sees through it, bots neither.',
