@@ -122,6 +122,10 @@ t.at(PANEL, 0); await sleep(200);
 await press(t, 'b2', 1300);
 await until(() => ct.pw.b[2] === 0, 2000);
 ok('the cellar\'s breaker: the cellar dark, the rest lit', ct.L.cellar === false && ct.L.dead.join() === 'cellar' && ct.L.lampa6 === true && ct.L.lampa9 === true);
+await press(t, 'b1', 1300);
+await until(() => ct.pw.b[1] === 0, 2000);
+const night = 'estate' in ct.L;
+ok(`the ground floor's breaker: its lamps (and the garage's${night ? ', the estate\'s lamps at night' : ''}) dark, upstairs lit`, GROUND.every(g => ct.L[g] === false && ct.L.dead.includes(g)) && (!night || (ct.L.estate === false && ct.L.dead.includes('estate'))) && UPPER.every(g => ct.L[g] === true));
 
 // ---- a restart
 ct.clear();
