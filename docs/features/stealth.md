@@ -4,22 +4,37 @@
 
 - **Done (built, server and node tests pass):**
   - **4.1 The chimney:** the fireplace and its flue to the roof, climbing it both ways, soot and black footprints,
-    lighting the fire (hold E 2 s), its harm, smoke out of the stack. `t1.mjs` 14/14 on both Mansion maps, `geom.mjs`
-    40/40, `clientsmoke.mjs` (chimney part), `unit.mjs` (chimney part).
+    lighting the fire (hold E 2 s), its harm, smoke out of the stack. `t1.mjs` 15/15 on both Mansion maps, `geom.mjs`
+    45/45 (with a climbing simulation), `clientsmoke.mjs` (chimney part), `unit.mjs` (chimney part).
   - **4.2 Creaking floorboards:** 17 creaky spots, heard by every browser like footsteps. `creaks.mjs` 42/42 (both
     maps), `clientsmoke.mjs` (creak part).
-  - **4.3 Hide in the car trunk:** the garage's car on the Mansion maps. `t2.mjs` 15/15 on both maps, `unit.mjs` 26/26,
-    `clientsmoke.mjs` 54/54 in all.
+  - **4.3 Hide in the car trunk:** the garage's car on the Mansion maps. `t2.mjs` 16/16 on both maps, `unit.mjs` 26/26,
+    `clientsmoke.mjs` 56/56 in all.
   - Regressions on this branch (test server 4240): `mansion/t16zip.mjs` and `t17cctv.mjs` (no failures),
     `integration/links.mjs` a–g 36/36 and h 4/4 (GAS_LEAK_X=6), `gas/t_gas.mjs` 20 OK (GAS_LEAK_X=3, no failures),
     `blood/tblood.mjs` (no failures), `mansion/walls.mjs` 0 missing / 0 twice, `navcheck` 0 links through floors
     (30,379 nodes) on both maps; `BOTS=4` for 60 s on both Mansion maps: no server errors, tick 0.7–1.0 ms average
     (one 34 ms spike at night); all 7 maps load (`stealth/maps.mjs`, no server errors).
+  - **Browser test** (`stealth/g1.mjs`, headless Edge on CDP 9640, a 960x540 page, server 4240 with BOTS=0
+    ROUND_TIME=600 FREEZE_TIME=1 AUTO_BALANCE=0; the page a CT, scripted a T and a second CT): cs_mansion 24/24,
+    cs_mansion_night 24/24, no page errors. Every screenshot looked at: the fireplace from the living room, the
+    breast in the Ts' room and the bookcases either side, the bedroom side, the stack on the roof (with its dark flue)
+    and from the west eave, the rungs from inside; up the flue and out over the south rim onto the roof (the soot
+    message), footprints on the roof's slope (tilted with it) and in the living room; E on the roof: hanging on the
+    rungs; down to the hearth; crawling out; the fire from the room, the smoke out of the stack seen from the back
+    garden, a climber falling into the flames (the burning screen, "Get out of the fire!", the kill [fireplace] when he
+    dies); the creaks (3 on the stairs' middle, none along the wall, the T heard on a floorboard, the page on another);
+    the trunk's dark view with its strip of light and no crosshair or gun, riding along as the T drives the car out of
+    the garage, out again, a hidden teammate not drawn, his teammate told, the T finding him.
+  - **Fixed after the browser test** (1a3470f; the server and node tests rerun): the chimney's ladder held a climber
+    against the flue's front wall, so near the top (E on the roof put you there) the climb's step-up stood him on the
+    front rim — its wall side is now 0.1 m behind the rungs (`geom.mjs` now simulates climbing with main.js's ladder
+    code); no footprints on the roof's slope (the feet stand on the highest step under the body, up to 0.3 m over the
+    box under a print); **a trunk's hider was run over by his own car** (downed by it: he's inside its boxes) — the
+    run-over loop in `onCar` skips him; E in the firebox toggled the south-west room's light through the wall (the
+    switch is 1.1 m away behind it) — E does nothing inside the chimney now, and the hint there says how to climb.
 - **Half-done:** nothing.
-- **Next (needs the browser, when allowed):** the browser test — the fireplace, climbing up and down the flue (the
-  rungs, stepping out over the rim at the top, E at the top), the footprints on the floor and the roof, the fire and
-  the smoke out of the stack, the creaks by ear, the trunk's dark view and riding along in it, a hider not drawn; no
-  page errors; and **the draw cost** with `views.mjs` against `main` (expected below).
+- **Next:** nothing left of the build; the sounds by ear on a real PC. Draw cost measured (below): +0 or +1 a frame.
 
 ## The fireplace and chimney: footprint (for the other wave-1 groups: please keep clear)
 
@@ -55,7 +70,9 @@ All in metres, y up (x east, z south; the house's ground floor is at 0.813, the 
 - **The fireplace (hold E 2 s to light it) and the chimney's top (E on the roof by the stack climbs in):** right after
   the valves (… uniform → floodgate valve → gas valve → **fireplace / chimney top** → plant → hostages → …). The hint:
   `stealth.hint(hint)` in the override block, just before the valves' line (so the valves, the uniform, the shield and
-  the lift, applied after it, beat it, as on the server).
+  the lift, applied after it, beat it, as on the server). Inside the chimney E does nothing (the same call returns
+  true, so E never reaches the light switch on the far side of its wall); standing in the firebox the hint says "The
+  chimney: look up and hold W to climb" ("Get out of the fire!" while it burns).
 - **Into a trunk (E behind a car, or beside its back end):** just before getting into a car (… doors → switches →
   **trunk** → cars → drops). The same `stealth.hint(hint)` gives it only over the cars' own hints and what comes after
   them (drive / get in / man the gun / pick up / swap / Press B / the ladder's), never over a door or a switch.
@@ -125,13 +142,16 @@ For the file list at the end:
   remotes, cars, coll(), map(), replay()`.
 - Tests in `dev/test-scripts/stealth/`: `t1.mjs` (chimney, server), `t2.mjs` (trunk, server), `unit.mjs`, `geom.mjs`,
   `creaks.mjs`, `clientsmoke.mjs` (`node --import ./dev/test-scripts/stealth/register.mjs …`), `srv.sh` (the test
-  server on 4240/4241, `DATA_DIR` in `$SP`), and the planning aids `plan.mjs` (a top-down ASCII plan at a height),
-  `slice.mjs` (a vertical section), `dump.mjs`.
+  server on 4240/4241, `DATA_DIR` in `$SP`), `maps.mjs` (all 7 maps load), the browser test `g1.mjs` (`edge.ps1`: the
+  headless Edge on CDP 9640; parts a–e, `PARTS=` to run some; `MAP=cs_mansion_night` for the night map), `views.mjs`
+  + `vstealth.json` (the draw cost: a 960x540 copy of mansion/views.mjs), and the planning aids `plan.mjs` (a top-down
+  ASCII plan at a height), `slice.mjs` (a vertical section), `dump.mjs`.
 
 ### Hooks in shared files (each marked `// stealth:`)
 - `shared/maps/mansion2.js` (2): the import; `addStealth({ carve, unface, face, brush, decor, keep })` after the lift.
-- `server.js` (14): the import; `createStealth(...)` after the flood's; `stealth.reset()` in `resetWorld`;
-  `stealth.carBlown(c, attacker)` in `explodeCar`; `busy` gets `|| p.trunk != null` (the one changed line);
+- `server.js` (15): the import; `createStealth(...)` after the flood's; `stealth.reset()` in `resetWorld`;
+  `stealth.carBlown(c, attacker)` in `explodeCar`; two changed lines: `busy` gets `|| p.trunk != null`, and `onCar`'s
+  run-over loop skips `q.trunk != null` (the hider is inside the car's boxes: his own car downed him);
   `fireplace` act in `updateActions`; `stealth.leave(p)` in `onUse`'s first group; `stealth.use(p, t)` after
   `gas.use`; `stealth.trunk(p, t)` before the cars; `stealth.unspot(list)` after `body.unspot`;
   `stealth.pinned(p, m, t)` in the 'state' handler after the CCTV line; `stealth.tick(t)` after `flood.tick`;
@@ -190,14 +210,31 @@ For the file list at the end:
   above (0.31 m²) and from the south-west room's (0.20 m²), and the bedroom's box venting out of the stack (0.58 m²). The
   living room's gas after 55 s: 0.042 instead of 0.043. Left as it is (a chimney does vent a room).
 
-### Draw cost (expected; to measure in the browser)
-- The level: no new static material (checked: the set of materials in `staticFaces` is the same as `main`'s, 32, and
-  the breakable pieces' too, 23; the rungs are faces in the level's metal, the bedroom niches' new backs in wood, not
-  the cabinet texture, which would have been a mesh of its own), so no new draw calls for the chimney. Static
-  triangles 6,152 → 6,402 (+250); breakable pieces 5,021 → 5,006 (the chimney replaced 15 wall and roof chunks).
-- In game: the footprints +1 draw call while any lie on the floor; the fire +1–2 while it burns (the Molotov's flame
-  billboards, shared, and one glow); its smoke shares the smoke billboards; the trunk's view is a page element. No new
-  lights.
+### Draw cost (measured)
+- The level: no new static material (the set of materials in `staticFaces` is the same as `main`'s, 32, and the
+  breakable pieces' too, 23; the rungs are faces in the level's metal, the bedroom niches' new backs in wood, not the
+  cabinet texture, which would have been a mesh of its own). Static triangles 6,152 → 6,402 (+250); breakable pieces
+  5,021 → 5,006 (the chimney replaced 15 wall and roof chunks).
+- `stealth/views.mjs` (the viewer's fixed views, a 960x540 page; `vstealth.json`), this branch / `main` (539ce42, a
+  copy served on the same port), draw calls (triangles +0.45k…+1.0k in every view):
+
+  | View | day | night |
+  |---|---|---|
+  | living room, facing the fireplace | 101 / 100 | 106 / 105 |
+  | living room, from the east | 102 / 101 | 112 / 111 |
+  | Ts' room, facing the breast | 83 / 82 | 88 / 87 |
+  | bedroom, facing the wall it's in | 182 / 182 | 195 / 195 |
+  | roof, south of the stack | 171 / 171 | 183 / 183 |
+  | roof, from the west eave | 171 / 171 | 190 / 189 |
+  | the back garden, facing the house | 319 / 319 | 339 / 339 |
+  | the garage (the car) | 90 / 90 | 103 / 103 |
+  | outside the garage door | 120 / 120 | 136 / 135 |
+
+  So +0 or +1 a frame.
+- In game (`g1.mjs`, this page's WebGL calls a frame, the median of 6 frames; noisy at 1–3 fps): facing the fireplace
+  out 140–153 / burning 143–148 (the fire: within the noise, at most +3: the Molotov's shared flame billboards, one
+  glow, the shared embers); footprints on the floor: one instanced mesh, +1 while any lie there; the trunk's view is a
+  page element (59–72 calls in the dark trunk: the car's surroundings through the strip). No new lights.
 
 ## Links to wire at merge
 - **Group 10 (Fire):** the lit fireplace becomes a real fire: `stealth.fireLit()`, `stealth.hearth()` (where you stand
@@ -216,7 +253,14 @@ For the file list at the end:
   chimney.
 
 ## Known gaps
-- The sounds (the creaks, the lid, lighting the fire) are unchecked by ear; the browser test is still to run.
+- The sounds (the creaks, the lid, lighting the fire) are unchecked by ear (headless: the creaks are checked from the
+  events they log).
+- Headless, the server burns in real time while the page falls at a few frames a second: in the browser test a
+  climber 1.75 m up the flue usually dies in the flames before crawling out. At a real frame rate the fall takes
+  half a second.
+- The south-west room's light switch (on its side of the living room's south wall, 17 cm west of the chimney) is still
+  reachable through the wall from the living room in front of the breast's west side, as it was before the chimney
+  (E finds switches by distance only); from inside the fireplace E no longer reaches it.
 - The trunk hider's pl row (his position inside the car) goes to every browser, as every player's does; only the
   browsers hide him.
 - In the warmup the cars go back home after 20 s unused; a hider goes with his car.
