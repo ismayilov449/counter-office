@@ -89,6 +89,35 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   ok(!bad.length, `${n} random bullets in the house: never more walls than the gun allows, never brick/stone/metal or a floor, damage always falls (${two} went through two walls; ${per.toFixed(3)} ms a bullet)${bad.length ? ' — ' + bad.slice(0, 5).join('; ') : ''}`);
 }
 
+// ---- the pipes and cables: every run lies in a wall a bullet can go through, and a bullet through it there cuts it
+{
+  const { wallRuns } = await import('../../../shared/maps/mansion_walls.js');
+  for (const id of ['cs_mansion', 'cs_mansion_night']) {
+    const map = MAPS[id], world = new CollisionWorld(map), runs = wallRuns(map);
+    const named = runs.filter(r => !r.name.startsWith('switch'));
+    ok(named.length === 10 && runs.length > named.length, `${id}: ${named.length} pipe and cable runs, ${runs.length - named.length} cables up from light switches`);
+    for (const run of named) {
+      const along = run.a[0] === run.b[0] ? 2 : 0, k = along === 0 ? 2 : 0, len = Math.abs(run.b[along] - run.a[along]), dir = Math.sign(run.b[along] - run.a[along]);
+      const at = s => { const p = run.a.slice(); p[along] += dir * s; return p; };
+      // the longest stretch of penetrable wall along it
+      let best = null, cur = null;
+      for (let s = 0.1; s < len - 0.05; s += 0.1) {
+        const b = boxAt(map, at(s));
+        if (b && MATERIALS[boxMaterial(map, b)].pen) { cur ||= { from: s, to: s }; cur.to = s; if (!best || cur.to - cur.from > best.to - best.from) best = { ...cur }; } else cur = null;
+      }
+      const mid = best && at((best.from + best.to) / 2);
+      const res = [];
+      if (mid) for (const s of [-1, 1]) {
+        const o = mid.slice(); o[k] += s * 1.2;
+        const d = [0, 0, 0]; d[k] = -s;
+        const r = penetrate(map, world, o, d, 250, 'ak47');
+        res.push(r.passes.length ? runHit(runs, r.passes[0])?.run.name : null);
+      }
+      ok(best && best.to - best.from >= 0.6 && res.every(n => n === run.name), `${id} ${run.name} (${run.kind}): ${best ? (best.to - best.from + 0.1).toFixed(1) : 0} m of plaster wall; shot through from both sides it's cut (${res.join(', ')})`);
+    }
+  }
+}
+
 // ---- the helpers
 const h = segSeg([0, 0, 0], [1, 0, 0], [0.5, 1, -1], [0.5, 1, 1]);
 ok(Math.abs(h.d - 1) < 1e-9 && Math.abs(h.s - 0.5) < 1e-9, 'segSeg: the closest points of two crossing segments');

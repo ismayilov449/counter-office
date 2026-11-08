@@ -2905,6 +2905,7 @@ const net = new Net({
     shieldSnap(m.sh); // shield: who holds which hostage
     gas.snapshot(m.gs); // gas: the pipes and the gas in each room (none: clean air)
     flood.onSnapshot(m.fl); // Floodgate: the water level and the valve
+    walls.onSnapshot(m.wa); // walls: wet patches, burst pipes' sprays, cut cables
   },
   catMeow(m) {
     catSound(m); // the mansion's cat: meow, mrrp, screech or hiss

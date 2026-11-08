@@ -39,6 +39,7 @@ globalThis.document = {
   body: element('body'),
 };
 
+globalThis.window = globalThis.window || {}; // (audio.js looks for speech; no sound here: floodKit() is null)
 await import('../../../public/js/roomlight.js'); // (the page has it: the room light on every Lambert material)
 const walls = await import('../../../public/js/walls.js');
 
@@ -121,13 +122,48 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   ok(walls.debug().cut === WALLS.cut, `the nearest ${WALLS.cut} are cut (${walls.debug().cut})`);
   walls.round();
   ok(walls.debug().holes === 0 && walls.debug().rings === 0 && walls.debug().cut === 0, 'a new round: no holes');
+
+  // ---- 2.2: burst pipes and cut cables from the snapshot's `wa`
+  dbg = walls.debug();
+  ok(dbg.hints > 200, `the hints on the walls (radiators, sockets) are one mesh (${dbg.hints} vertices)`);
+  const solidAt = p => map.boxes.some(b => !b.glass && [0, 1, 2].every(k => p[k] > b.min[k] + 0.005 && p[k] < b.max[k] - 0.005));
+  const rads = dbg.hintSpots.filter(h => h.kind === 'radiator'), socks = dbg.hintSpots.filter(h => h.kind === 'socket');
+  const badRad = rads.filter(h => solidAt(h.c)), badSock = socks.filter(h => solidAt(h.c));
+  console.log('  radiators:', rads.map(h => `${h.run} (${h.c.map(v => v.toFixed(2)).join(', ')})`).join('; '), `| ${socks.length} sockets`);
+  ok(rads.length === 4 && !badRad.length && socks.length >= 10 && !badSock.length, `the four radiators stand in the open by their walls, ${socks.length} sockets (${badRad.map(h => h.run).join(' ') || 'none inside anything'})`);
+  const wa = [
+    [[-7.8, 0.81, 6.15, 0.8, 2, 6.5, -1, 0], [-7.8, 0.81, 7.26, 0.8, 2, 6.91, 1, 1]],
+    [[-7.8, 1.66, 6.5, 0, -1, 0.9], [-7.8, 1.66, 6.91, 0, 1, 0.9]],
+    [[-7.65, 1.11, 6.5, 0, -1, 1], [-7.65, 1.11, 6.91, 0, 1, 0]],
+  ];
+  look([-9, 2.4, 4], [1, -0.3, 1]);
+  walls.onSnapshot(wa);
+  for (let i = 0; i < 30; i++) { T += 50; walls.update(0.05, T, camera); }
+  dbg = walls.debug();
+  ok(dbg.patches === 2 && dbg.wetMesh && dbg.sprays === 2 && dbg.sprayMesh && dbg.ends === 2, `the wet patches, the sprays and the cut cable's ends are drawn (${dbg.patches}, ${dbg.sprays}, ${dbg.ends})`);
+  const emitted = emits.length;
+  ok(emitted > 0, `drops splash and the live end sparks (${emitted} particles)`);
+  let threw = null;
+  try { net.handlers.waZap({ t: 'waZap', p: [-7.65, 1.11, 6.5], v: [[-8.3, 1.7, 5.85]] }); } catch (e) { threw = e; }
+  ok(!threw, `the electrocution's flash and crackle ('waZap')${threw ? ': ' + threw.message : ''}`);
+  walls.onSnapshot(undefined);
+  T += 50; walls.update(0.05, T, camera);
+  dbg = walls.debug();
+  ok(dbg.patches === 0 && !dbg.wetMesh && !dbg.sprayMesh && dbg.ends === 0, 'nothing in the snapshot: nothing drawn');
+  walls.onSnapshot(wa);
+  walls.round();
+  T += 50; walls.update(0.05, T, camera);
+  ok(walls.debug().patches === 0 && !walls.debug().sprayMesh, 'a new round clears them at once');
 }
 // other maps: nothing
 map = MAPS.de_dust2;
 coll = new CollisionWorld(map);
 walls.setMap(map);
 walls.localShot([0, 1.5, 0], [1, 0, 0], 'awp');
-ok(!walls.debug().on && walls.debug().holes === 0, 'de_dust2: off, no holes');
+ok(!walls.debug().on && walls.debug().holes === 0 && walls.debug().hints === 0, 'de_dust2: off, no holes, no hints');
+walls.onSnapshot([[[-7.8, 0.81, 6.15, 0.8, 2, 6.5, -1, 0]], [], []]);
+walls.update(0.05, T, camera);
+ok(walls.debug().patches === 0, 'de_dust2: a stray `wa` is ignored');
 
 console.log(`\n${passes} passed, ${fails} failed`);
 process.exitCode = fails ? 1 : 0;

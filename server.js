@@ -340,7 +340,7 @@ function sparkAt(pos, kind, by = null) { return gas.sparkAt(pos, kind, by); }
 // Floodgate (Mansion): the storm drain's valve floods the underground (see lib/flood.js)
 const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
   sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
-const walls = createWalls({ game, players, map: () => MAP, world: () => world, broadcast, send, notify, now, applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), sparkAt: (...a) => sparkAt(...a), shootDoor: (...a) => shootDoor(...a), hurtPiece: (...a) => hurtPiece(...a), breakPieces: (...a) => breakPieces(...a), mates, cfg: CFG, flood }); // walls: (lib/walls.js)
+const walls = createWalls({ game, players, map: () => MAP, world: () => world, broadcast, send, notify, now, applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), sparkAt: (...a) => sparkAt(...a), shootDoor: (...a) => shootDoor(...a), hurtPiece: (...a) => hurtPiece(...a), breakPieces: (...a) => breakPieces(...a), mates, cfg: CFG }); // walls: (lib/walls.js)
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -3953,6 +3953,7 @@ function tick() {
   const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
   tick.prev = t;
   flood.tick(t, dt); // Floodgate: the water level, drowning, electrocution
+  walls.tick(t, dt); // walls: burst pipes soak the floor, cut cables spark (gas, wet floors)
   bots.update(dt);
   if (game.hostages.length) {
     for (const ev of updateHostages(game.hostages, players, dt, p => world.move(null, p, 2), t)) {
@@ -3991,6 +3992,7 @@ function tick() {
     ...shield.snap(), // shield: sh: [[hostage id, holder id], ...] while someone holds a hostage
     ...gas.snap(), // gas: { gs: { p: pipe states, r: [room, concentration 0..250, ...] } } while there is any
     ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
+    ...walls.snap(), // walls: wa: [wet patches, sprays, cut cables' ends] while there are any (see lib/walls.js)
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

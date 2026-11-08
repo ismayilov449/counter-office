@@ -1,19 +1,28 @@
-// Walls & water in the browser (see shared/walls.js): the see-through bullet holes. Every bullet's way through the
-// walls is worked out here too, from the same shared code (penetrate) the server uses: for your own shots at once,
-// for everyone else's from the server's 'shot' message (its direction and where the bullet stopped). Each wall a
-// bullet went through gets a hole on both sides.
+// Walls & water in the browser (see shared/walls.js).
+// - The see-through bullet holes. Every bullet's way through the walls is worked out here too, from the same shared
+//   code (penetrate) the server uses: for your own shots at once, for everyone else's from the server's 'shot'
+//   message (its direction and where the bullet stopped). Each wall a bullet went through gets a hole on both sides.
 //   The holes are cut out of the walls themselves: the materials the penetrable walls are drawn with (and the bullet
 //   hole decals) get a few lines of shader that throw away every pixel inside a hole (a thin capsule along the
 //   bullet's way through the wall), so you see through them, and a lit room behind shines out of them in the dark.
 //   The nearest WALLS.cut holes in front of you are cut; the rest are drawn as dark holes. No new draw calls for the
 //   walls; the ring of splinters round each hole is one instanced mesh (one draw call while there are holes).
+// - Burst pipes and cut cables (the server's snapshot `wa`): water spraying out of the holes (one mesh for every
+//   spray), the wet patches on the floor (public/js/wetfloor.js, one mesh), sparks out of a cut cable's holes while
+//   the power is on, the electrocution's flash and crackle ('waZap'), and the hints on the walls where pipes and
+//   cables run: radiators and sockets (one mesh).
 // Only on the Mansion maps. main.js calls init() once, setMap() on every map load, update() every frame,
-// localShot() for each of your bullets, remoteShot() with each 'shot' message and round() at a new round.
+// onSnapshot() with the snapshot's `wa`, localShot() for each of your bullets, remoteShot() with each 'shot' message
+// and round() at a new round.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { penetrate, WALLS } from '/shared/walls.js';
-import { MATERIALS, PAINT_MATERIAL, pieceMaterial, materialsOn } from '/shared/materials.js';
+import { MATERIALS, PAINT_MATERIAL, pieceMaterial, boxMaterial, materialsOn } from '/shared/materials.js';
+import { wallRuns } from '/shared/maps/mansion_walls.js';
 import { WEAPONS } from '/shared/weapons.js';
 import { paintMaterial } from './world.js';
+import { createWetFloorView } from './wetfloor.js';
+import { audio, floodKit } from './audio.js';
 
 let D = null; // what it needs from main.js (see init)
 let map = null, on = false;
@@ -224,33 +233,289 @@ function wallPaints(m) {
   return keys;
 }
 
+// ---------------------------------------------------------------- burst pipes and cut cables
+
+let wet = null; // the wet floor's view (public/js/wetfloor.js)
+let sprays = [], ends = []; // from the snapshot: [x, y, z, nx, nz, flow] and [x, y, z, nx, nz, live]
+let sprayMesh = null, sprayTex = null, sprayKey = '', sprayAt = 0;
+let hints = null, hintSpots = []; // (hintSpots: where they are, for the tests)
+const sparkNext = new Map(); // a cable end ("x,y,z") -> when it sparks next (ms)
+let hiss = null; // the nearest spray's sound
+
+function waterTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#8fb4c4';
+  g.fillRect(0, 0, 64, 64);
+  g.strokeStyle = 'rgba(255,255,255,0.55)';
+  g.lineWidth = 1.5;
+  for (let i = 0; i < 18; i++) {
+    const x = Math.random() * 64, y = Math.random() * 64;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (Math.random() - 0.5) * 2, y + 10 + Math.random() * 14);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// The floor under a point (from the collision), or 2 m down.
+const floorCache = new Map();
+function floorUnder(p) {
+  const k = `${p[0]},${p[1]},${p[2]}`;
+  if (floorCache.has(k)) return floorCache.get(k);
+  const h = D.coll().raycast([p[0], p[1], p[2]], [0, -1, 0], 3, 'solid');
+  const y = h ? p[1] - h.t : p[1] - 2;
+  floorCache.set(k, y);
+  return y;
+}
+
+// Each spray: water thrown out of the hole and falling to the floor, two crossed ribbons along its arc (one mesh).
+function sprayGeometry() {
+  const parts = [];
+  for (const [x, y, z, nx, nz, f] of sprays) {
+    const v0 = 0.9 + 2.4 * f, floor = floorUnder([x + nx * 0.3, y, z + nz * 0.3]), fall = Math.max(0.2, y - floor);
+    const tEnd = Math.sqrt((2 * fall) / 9.8), n = 8, side = [-nz, 0, nx];
+    const pos = [], uv = [], idx = [];
+    for (const across of [side, [0, 1, 0]]) {
+      const base = pos.length / 3;
+      for (let i = 0; i <= n; i++) {
+        const t = (i / n) * tEnd, px = x + nx * v0 * t, py = y - 4.9 * t * t, pz = z + nz * v0 * t, w = 0.015 + 0.05 * (i / n);
+        pos.push(px - across[0] * w, py - across[1] * w, pz - across[2] * w, px + across[0] * w, py + across[1] * w, pz + across[2] * w);
+        uv.push(0, i / n * 2, 1, i / n * 2);
+        if (i < n) { const a = base + i * 2; idx.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    parts.push(g);
+  }
+  const g = parts.length ? mergeGeometries(parts) : new THREE.BufferGeometry();
+  for (const p of parts) p.dispose();
+  return g;
+}
+
+function buildSprays() {
+  sprayTex = waterTexture();
+  sprayTex.repeat.set(1, 2);
+  sprayMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshPhongMaterial({ map: sprayTex, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide, shininess: 80 }));
+  sprayMesh.visible = false;
+  sprayMesh.renderOrder = 1;
+  D.scene.add(sprayMesh);
+}
+
+// The hints where the pipes and cables run: a radiator on one side under each pipe, sockets on both sides along each
+// cable (where the wall is there). One mesh.
+function buildHints(m) {
+  if (hints) { D.scene.remove(hints); hints.geometry.dispose(); hints = null; }
+  hintSpots = [];
+  if (!materialsOn(m)) return;
+  const boxes = m.boxes.filter(b => !b.glass && MATERIALS[boxMaterial(m, b)]?.pen);
+  const inWall = p => boxes.some(b => p[0] > b.min[0] && p[0] < b.max[0] && p[1] > b.min[1] && p[1] < b.max[1] && p[2] > b.min[2] && p[2] < b.max[2]);
+  // the wall's two faces at a point inside it, across axis k
+  const facesAt = (p, k) => {
+    const out = [];
+    for (const s of [-1, 1]) {
+      const q = p.slice();
+      let i = 0;
+      while (i < 40 && inWall(q)) { q[k] += s * 0.02; i++; }
+      if (i >= 40) return null;
+      out.push([q[k] - s * 0.01, s]);
+    }
+    return out;
+  };
+  const parts = [];
+  const box = (c, size, k, color) => {
+    const sz = k === 0 ? [size[2], size[1], size[0]] : size;
+    const g = new THREE.BoxGeometry(...sz).translate(...c);
+    const col = new Float32Array(g.attributes.position.count * 3);
+    for (let i = 0; i < col.length; i += 3) col.set(color, i);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    parts.push(g);
+  };
+  for (const run of wallRuns(m)) {
+    if (run.name.startsWith('switch')) continue;
+    const along = run.a[0] === run.b[0] ? 2 : 0, k = along === 0 ? 2 : 0, len = Math.abs(run.b[along] - run.a[along]), dir = Math.sign(run.b[along] - run.a[along]);
+    const at = s => { const p = run.a.slice(); p[along] += dir * s; return p; };
+    if (run.kind === 'cable') {
+      for (let s = 0.6; s < len - 0.3; s += 2.2) {
+        const p = at(s);
+        if (!inWall(p)) continue;
+        const fs = facesAt(p, k);
+        if (!fs) continue;
+        for (const [f, sg] of fs) { const c = p.slice(); c[k] = f + sg * 0.03; hintSpots.push({ run: run.name, kind: 'socket', c: c.slice() }); c[k] = f + sg * 0.006; box(c, [0.075, 0.075, 0.012], k, [0.93, 0.91, 0.86]); c[k] = f + sg * 0.013; box(c, [0.03, 0.04, 0.004], k, [0.3, 0.29, 0.27]); }
+      }
+    } else {
+      // the radiator: in the middle of the longest stretch of wall along the pipe
+      let best = null, cur = null;
+      for (let s = 0.1; s < len - 0.05; s += 0.1) {
+        if (inWall(at(s))) { cur ||= { from: s, to: s }; cur.to = s; if (!best || cur.to - cur.from > best.to - best.from) best = { ...cur }; } else cur = null;
+      }
+      if (!best || best.to - best.from < 0.65) continue;
+      const p = at((best.from + best.to) / 2), fs = facesAt(p, k);
+      if (!fs) continue;
+      const [f, sg] = fs.find(([, s]) => s === run.side) || fs[0];
+      const c = p.slice();
+      c[k] = f + sg * 0.06;
+      c[1] = run.a[1] - 0.42;
+      box(c, [0.6, 0.55, 0.07], k, [0.85, 0.84, 0.8]);
+      hintSpots.push({ run: run.name, kind: 'radiator', c: c.slice() });
+      for (const e of [-0.26, 0.26]) { const s2 = c.slice(); s2[along] += e; s2[1] = run.a[1] - 0.08; s2[k] = f + sg * 0.03; box(s2, [0.035, 0.09, 0.06], k, [0.66, 0.6, 0.5]); }
+    }
+  }
+  if (!parts.length) return;
+  hints = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  for (const p of parts) p.dispose();
+  hints.receiveShadow = true;
+  D.scene.add(hints);
+}
+
+export function onSnapshot(wa) {
+  if (!on) return;
+  wet.set(wa?.[0]);
+  sprays = wa?.[1] || [];
+  ends = wa?.[2] || [];
+}
+
+// Electrocution in a wet patch: a blue flash, sparks on whoever was hit, a crackle and the mains' buzz.
+function waZap(m) {
+  if (!on) return;
+  const { fx } = D;
+  wet.zap(performance.now());
+  fx.flashLight(m.p, 40, 0.35, 0x9fd8ff);
+  for (let i = 0; i < 3; i++) fx.sparks(m.p, [0, 0.4, 0]);
+  for (const v of m.v || []) {
+    for (let i = 0; i < 12; i++) fx.emit(v, [(Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4], [0.7, 0.85, 1], 0.2 + Math.random() * 0.25);
+    if (Math.hypot(v[0] - D.me.p[0], v[2] - D.me.p[2]) < 0.6) D.me.shake = Math.max(D.me.shake || 0, 0.6);
+  }
+  const k = floodKit();
+  if (!k) return;
+  const { ctx, burst, tone } = k, t = ctx.currentTime, out = audio.out(m.p, [8, 0.7]);
+  burst(out, t, { dur: 0.25, freq: 1400, gain: 1.1 });
+  tone(out, t, { freq: 50, freqEnd: 90, dur: 0.6, type: 'sawtooth', gain: 0.28 });
+  for (let i = 0; i < 18; i++) burst(out, t + Math.random() * 0.6, { dur: 0.02 + Math.random() * 0.03, type: 'highpass', freq: 2500 + Math.random() * 4000, gain: 0.55 });
+}
+
+function updateSprays(dt, now, camera) {
+  // the ribbons: rebuilt when the sprays change (their flow a few times a second)
+  const k = sprays.map(s => `${s[0]},${s[1]},${s[2]},${Math.round(s[5] * 10)}`).join(';');
+  if (k !== sprayKey && now - sprayAt > 200) {
+    sprayKey = k;
+    sprayAt = now;
+    sprayMesh.geometry.dispose();
+    sprayMesh.geometry = sprayGeometry();
+  }
+  sprayMesh.visible = sprays.length > 0;
+  if (sprayMesh.visible) sprayTex.offset.y -= dt * 3;
+  // drops splashing where they land, the hiss of the nearest
+  const cam = camera.position;
+  let near = null, nd = 14 * 14;
+  for (const [x, y, z, nx, nz, f] of sprays) {
+    const d2 = (x - cam.x) ** 2 + (y - cam.y) ** 2 + (z - cam.z) ** 2;
+    if (d2 < nd) { nd = d2; near = [x, y, z, f]; }
+    if (d2 < 400 && Math.random() < dt * 25) {
+      const v0 = 0.9 + 2.4 * f, floor = floorUnder([x + nx * 0.3, y, z + nz * 0.3]), tEnd = Math.sqrt((2 * Math.max(0.2, y - floor)) / 9.8);
+      D.fx.emit([x + nx * v0 * tEnd, floor + 0.03, z + nz * v0 * tEnd], [(Math.random() - 0.5) * 1.2, 0.8 + Math.random(), (Math.random() - 0.5) * 1.2], [0.75, 0.85, 0.92], 0.3 + Math.random() * 0.2);
+    }
+  }
+  sprayHiss(near);
+}
+
+function sprayHiss(near) {
+  const k = floodKit();
+  if (!near || !k) { if (hiss) { const { src, g, ctx } = hiss, t = ctx.currentTime; g.gain.setTargetAtTime(0, t, 0.15); src.stop(t + 0.6); hiss = null; } return; }
+  const { ctx, noise } = k;
+  if (!hiss) {
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), panner = audio.out(near, [3, 1.1]);
+    src.buffer = noise;
+    src.loop = true;
+    f.type = 'bandpass';
+    f.frequency.value = 2600;
+    f.Q.value = 0.6;
+    g.gain.value = 0;
+    src.connect(f).connect(g).connect(panner);
+    src.start();
+    hiss = { src, g, ctx, panner };
+  }
+  hiss.g.gain.setTargetAtTime(0.25 + 0.35 * near[3], ctx.currentTime, 0.2);
+  if (hiss.panner.positionX) { hiss.panner.positionX.value = near[0]; hiss.panner.positionY.value = near[1]; hiss.panner.positionZ.value = near[2]; }
+}
+
+// A cut cable's ends spark at random while the power is on (the server's sparks, the ones that count, keep their own time).
+function updateWires(now, camera) {
+  const cam = camera.position, k = floodKit();
+  for (const [x, y, z, nx, nz, live] of ends) {
+    if (!live) continue;
+    const key = `${x},${y},${z}`, next = sparkNext.get(key) ?? now;
+    if (now < next) continue;
+    sparkNext.set(key, now + 300 + Math.random() * 1100);
+    const d2 = (x - cam.x) ** 2 + (y - cam.y) ** 2 + (z - cam.z) ** 2;
+    if (d2 > 900) continue;
+    const p = [x + nx * 0.02, y, z + nz * 0.02];
+    D.fx.sparks(p, [nx, 0.2, nz]);
+    for (let i = 0; i < 6; i++) D.fx.emit(p, [nx * 1.5 + (Math.random() - 0.5) * 2, Math.random() * 1.5, nz * 1.5 + (Math.random() - 0.5) * 2], [0.75, 0.9, 1], 0.15 + Math.random() * 0.2);
+    if (d2 < 100 && Math.random() < 0.35) D.fx.flashLight(p, 8, 0.07, 0x9fd8ff);
+    if (k && d2 < 400) {
+      const t = k.ctx.currentTime, out = audio.out(p, [3, 1.2]);
+      for (let i = 0; i < 6; i++) k.burst(out, t + Math.random() * 0.15, { dur: 0.015 + Math.random() * 0.025, type: 'highpass', freq: 3000 + Math.random() * 3500, gain: 0.45 });
+    }
+  }
+}
+
 // ---------------------------------------------------------------- set-up
 
-// deps: { scene, net, fx, me, game, coll() (the collision world), remotes, hud }
+// deps: { scene, net, fx, me, game, coll() (the collision world), remotes, hud, map() }
 export function init(deps) {
   D = deps;
   buildRings();
+  buildSprays();
+  wet = createWetFloorView(D.scene);
   patch(D.fx.decalMat);
+  Object.assign(D.net.handlers, { waZap });
 }
 
 export function setMap(m) {
   map = m;
   on = materialsOn(m);
   clearHoles();
+  clearWater();
+  floorCache.clear();
+  buildHints(m);
   if (!on) return;
   for (const key of wallPaints(m)) patch(paintMaterial(key));
 }
 
+function clearWater() {
+  wet?.clear();
+  sprays = [];
+  ends = [];
+  sparkNext.clear();
+  sprayHiss(null);
+}
+
 export function round() {
   clearHoles();
+  clearWater();
 }
 
 // every frame
 export function update(dt, now, camera) {
-  if (!on) return;
+  if (!on) { if (sprayMesh) sprayMesh.visible = false; if (wet) wet.mesh.visible = false; return; }
   pickHoles(camera);
+  wet.update(dt, now);
+  updateSprays(dt, now, camera);
+  updateWires(now, camera);
 }
 
 // (for the tests)
 export const debug = () => ({ on, holes: holes.length, cut: U.wallsN.value, rings: rings?.count ?? 0, patched: patched.size,
-  list: holes.map(h => ({ a: h.a, b: h.b, r: h.r })) });
+  list: holes.map(h => ({ a: h.a, b: h.b, r: h.r })),
+  patches: wet?.list().length ?? 0, wetMesh: !!wet?.mesh.visible, sprays: sprays.length, sprayMesh: !!sprayMesh?.visible, ends: ends.length,
+  hints: hints ? hints.geometry.attributes.position.count : 0, hintSpots });
