@@ -110,7 +110,7 @@ function buildRings() {
   rings = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), ringMat, WALLS.keep * 2);
   rings.count = 0;
   rings.visible = false;
-  rings.frustumCulled = false;
+  // (culled like anything else: its bounding sphere is worked out from the holes each time they change)
   rings.renderOrder = 1;
   patch(ringMat);
   D.scene.add(rings);
@@ -134,6 +134,7 @@ function redrawRings() {
   rings.count = holes.length * 2;
   rings.visible = holes.length > 0;
   rings.instanceMatrix.needsUpdate = true;
+  if (holes.length) rings.computeBoundingSphere();
 }
 
 // A bullet went through a wall (a pass from penetrate): a hole in it, bigger where it's already shot full of holes.
@@ -175,9 +176,9 @@ function bullet(o, d, range, w, dust) {
 }
 
 // Your own bullet (main.js fireBullet): the server works out the same.
-export function localShot(o, d, w) {
+export function localShot(o, d, w, range = 250) {
   if (!on || WEAPONS[w]?.melee) return;
-  if (bullet(o, d, 250, w, { n: 1 }).passes.length) redrawRings();
+  if (bullet(o, d, range, w, { n: 1 }).passes.length) redrawRings();
 }
 
 // Someone else's shot (the 'shot' message): each bullet's direction and how far it really went.
@@ -228,7 +229,7 @@ function wallPaints(m) {
     if (!MATERIALS[pieceMaterial(m, pc)]?.pen) continue;
     for (const [tex, polys] of Object.entries(m.pieceFaces?.[pc.id] || {})) {
       const key = m.faceMats?.[tex];
-      if (!key || !MATERIALS[PAINT_MATERIAL[key]]) continue;
+      if (!key || !MATERIALS[PAINT_MATERIAL[key]]?.pen) continue;
       // (only a wall's sides: a hole never goes through a top or a bottom)
       if (polys.some(f => { let y0 = Infinity, y1 = -Infinity; for (let i = 1; i < f.length; i += 5) { y0 = Math.min(y0, f[i]); y1 = Math.max(y1, f[i]); } return y1 - y0 > 0.01; })) keys.add(key);
     }
@@ -639,8 +640,42 @@ export function round() {
   resetGun();
 }
 
+// main.js prewarm(): one of each of this module's own materials at the warm-up spot, so their shaders are compiled
+// while the map loads (not with the first hole, puddle or spray in a fight); the next update() takes them away.
+let warmed = null;
+export function warm(p) {
+  if (!on || !rings) return;
+  rings.count = 1;
+  rings.visible = true;
+  setRing(0, p, [0, 1, 0], 0.03);
+  rings.computeBoundingSphere();
+  rings.instanceMatrix.needsUpdate = true;
+  wet.set([[p[0], p[1], p[2] + 1, 0.5, -1, 0, 0, 0]]);
+  wet.update(0, 0);
+  sprays = [[p[0] + 1, p[1] + 1, p[2], 1, 0, 1]];
+  sprayMesh.geometry.dispose();
+  sprayMesh.geometry = sprayGeometry();
+  sprayMesh.visible = true;
+  sprayKey = 'warm';
+  warmed = hints ? new THREE.Mesh(hints.geometry, hints.material) : null;
+  if (warmed) {
+    if (!hints.geometry.boundingSphere) hints.geometry.computeBoundingSphere();
+    const c = hints.geometry.boundingSphere.center;
+    warmed.position.set(p[0] - c.x, p[1] - c.y + 0.5, p[2] - c.z);
+    D.scene.add(warmed);
+  } else warmed = true;
+}
+function unwarm() {
+  if (warmed?.isMesh) D.scene.remove(warmed);
+  warmed = null;
+  redrawRings();
+  wet.set([]);
+  sprays = [];
+}
+
 // every frame (after the other players are posed: the floating bodies)
 export function update(dt, now, camera) {
+  if (warmed) unwarm();
   updateGun(dt, now);
   if (!on) { if (sprayMesh) sprayMesh.visible = false; if (wet) wet.mesh.visible = false; return; }
   pickHoles(camera);

@@ -66,6 +66,13 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   walls.setMap(map);
   let dbg = walls.debug();
   ok(dbg.on && dbg.patched >= 6, `on, ${dbg.patched} materials patched (the walls' paints, the rubble, the decals, the rings)`);
+  const nScene = scene.children.length;
+  walls.warm([0, 15, 0]);
+  dbg = walls.debug();
+  ok(dbg.rings === 1 && dbg.patches === 1 && dbg.sprays === 1 && dbg.sprayMesh && scene.children.length === nScene + 1, 'warm-up: a ring, a wet patch, a spray and the hints at the warm-up spot');
+  T += 16; walls.update(0.016, T, camera);
+  dbg = walls.debug();
+  ok(dbg.rings === 0 && dbg.patches === 0 && dbg.sprays === 0 && scene.children.length === nScene, 'and gone at the next frame');
   // the patched shaders: both patches applied (the room light and the holes) on a Lambert and a basic material
   const lam = new THREE.MeshLambertMaterial();
   const sh = { uniforms: {}, vertexShader: THREE.ShaderLib.lambert.vertexShader, fragmentShader: THREE.ShaderLib.lambert.fragmentShader };
@@ -105,6 +112,8 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   ok(dbg.list.at(-1).r > dbg.list[0].r * 2, `a wall shot full of holes: the later holes are bigger (${dbg.list[0].r.toFixed(3)} → ${dbg.list.at(-1).r.toFixed(3)})`);
   // someone else's shots: AWP from the street through the front door and the hall's wall; a shotgun's pellets
   walls.round();
+  walls.localShot([-10, 2.0, -1], [-1, 0, 0], 'ak47', 1.5);
+  ok(walls.debug().holes === 0, 'your bullet that hit someone in front of the wall makes no hole in it');
   const o = [0, 2.0, -1], d = [-1, 0, 0];
   walls.remoteShot({ t: 'shot', id: 2, o, w: 'awp', tr: [[...d, 23.27, 0, 1]] });
   ok(walls.debug().holes === 2, `an AWP from the street: holes in the front door and the hall's wall (${walls.debug().holes})`);

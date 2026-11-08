@@ -176,6 +176,7 @@ function prewarm() {
   fx.crater(by(2, 0, -2), 1, false);
   fx.soot(by(0, 0.01, -1), [0, 1, 0], 1, null);
   fx.decal(by(0.5, 0.01, -1), [0, 1, 0]);
+  walls.warm(by(1.2, 0.01, -1)); // walls: a hole's ring, a wet patch, a spray, a radiator
   bleed.warm(by(0.8, 0.01, -1)); // blood trails
   fx.debris(by(-0.5, 0, -1), by(0.5, 1, 0), null, 4);
   fx.gib(createGibPieces('T', ['head', 'torso', 'rArm', 'lArm', 'lLeg', 'rLeg'], 4), by(0, 0, 1), 0, () => [0, 1, 0], true);
@@ -445,7 +446,7 @@ function fireBullet(id, def, now) {
   const muzzle = viewMuzzleWorld();
   for (const d of dirs) {
     const tr = localTrace(o, d, 250);
-    walls.localShot(o, d, id); // walls: holes in the walls it goes through
+    walls.localShot(o, d, id, tr.hitR ? tr.t : 250); // walls: holes in the walls it goes through (not past someone it hit)
     if (tr.hitR) fx.blood(tr.end);
     else if (tr.wall) { fx.decal(tr.end, tr.wall.n); if (!def.pellets || Math.random() < 0.4) fx.sparks(tr.end, tr.wall.n); }
     if (def.sniper || Math.random() < (def.pellets ? 0.25 : 0.5)) fx.tracer(muzzle, tr.end);
