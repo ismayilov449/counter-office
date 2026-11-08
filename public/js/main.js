@@ -41,6 +41,7 @@ import { createElevator } from './elevator.js'; // elevator
 import { createPower } from './power.js'; // power: the breaker panel, the generator, the lift's winch, bulbs bursting (Mansion)
 import * as stealth from './stealth.js'; // stealth: the chimney, the creaking boards, hiding in a car's trunk
 import * as ug from './underground.js'; // underground: no radar underground, the echo, the air vents (Mansion)
+import * as walls from './walls.js'; // walls: see-through bullet holes, burst pipes, live wires, wet guns, floating bodies (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -149,6 +150,7 @@ function loadMap(id) {
   flood.setMap(map); // Floodgate
   stealth.setMap(map); // stealth: the chimney's rungs, the creaky spots
   ug.setMap(map); // underground
+  walls.setMap(map); // walls:
   prewarm();
 }
 
@@ -182,6 +184,7 @@ function prewarm() {
   fx.crater(by(2, 0, -2), 1, false);
   fx.soot(by(0, 0.01, -1), [0, 1, 0], 1, null);
   fx.decal(by(0.5, 0.01, -1), [0, 1, 0]);
+  walls.warm(by(1.2, 0.01, -1)); // walls: a hole's ring, a wet patch, a spray, a radiator
   bleed.warm(by(0.8, 0.01, -1)); // blood trails
   fx.debris(by(-0.5, 0, -1), by(0.5, 1, 0), null, 4);
   fx.gib(createGibPieces('T', ['head', 'torso', 'rArm', 'lArm', 'lLeg', 'rLeg'], 4), by(0, 0, 1), 0, () => [0, 1, 0], true);
@@ -453,6 +456,7 @@ function fireBullet(id, def, now) {
   const muzzle = viewMuzzleWorld();
   for (const d of dirs) {
     const tr = localTrace(o, d, 250);
+    walls.localShot(o, d, id, tr.hitR ? tr.t : 250); // walls: holes in the walls it goes through (not past someone it hit)
     if (tr.hitR) fx.blood(tr.end);
     else if (tr.wall) { fx.decal(tr.end, tr.wall.n); if (!def.pellets || Math.random() < 0.4) fx.sparks(tr.end, tr.wall.n); }
     if (def.sniper || Math.random() < (def.pellets ? 0.25 : 0.5)) fx.tracer(muzzle, tr.end);
@@ -554,6 +558,7 @@ function tryFire(now) {
     if (item.res > 0) startReload();
     return;
   }
+  if (walls.jammed(id, def, now)) return; // walls: a wet gun jams (R clears it)
   item.mag--;
   me.nextShot = now + def.rate * 1000;
   me.lastFire = now;
@@ -2350,7 +2355,7 @@ document.addEventListener('keydown', e => {
     case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
-    case 'KeyR': startReload(); break;
+    case 'KeyR': if (!walls.clearJam()) startReload(); break; // walls: R clears a jammed gun first
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
     case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
@@ -2918,6 +2923,7 @@ const net = new Net({
     gas.snapshot(m.gs); // gas: the pipes and the gas in each room (none: clean air)
     flood.onSnapshot(m.fl); // Floodgate: the water level and the valve
     stealth.onSnapshot(m.st); // stealth: the fireplace's fire, who is sooty, who hides in a trunk
+    walls.onSnapshot(m.wa); // walls: wet patches, burst pipes' sprays, cut cables
   },
   catMeow(m) {
     catSound(m); // the mansion's cat: meow, mrrp, screech or hiss
@@ -2949,6 +2955,7 @@ const net = new Net({
         if (hit) { fx.decal(end, hit.n); if (m.tr.length === 1 || Math.random() < 0.4) fx.sparks(end, hit.n); }
       }
     }
+    walls.remoteShot(m); // walls: holes in the walls the bullets went through
   },
   hit(m) {
     hud.hitmarker(m.hs);
@@ -3173,6 +3180,7 @@ const net = new Net({
     spotted.clear();
     lostSpots.clear();
     fx.clearDecals();
+    walls.round(); // walls: the holes, pipes, cables and floors are as new
     fx.clearCraters();
     fx.clearGibs();
     bleed.clear(); // blood trails
@@ -4039,6 +4047,7 @@ function frame() {
   flood.update(dt, now, camera); // Floodgate
   stealth.frame(dt, now, camera); // stealth: the fire, the sooty footprints, creaks, the trunk's view
   ug.update(dt, now, camera); // underground
+  walls.update(dt, now, camera); // walls:
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -4073,6 +4082,7 @@ function frame() {
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
 stealth.init({ scene, me, net, hud, fx, game, remotes, cars, coll: () => coll, map: () => map, replay: () => !!killcam }); // stealth: its browser side (public/js/stealth.js)
 ug.init({ scene, net, me, hud, fx, coll: () => coll, indoors: p => indoors(p) }); // underground
+walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map, weapon: () => current() }); // walls:
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();
