@@ -77,17 +77,18 @@ export function circuitTable(map) {
 }
 export const circuitOf = (map, group) => circuitTable(map)[group] || null;
 
-// The circuit at a point: the house's lighting room it's in (within pad m of one), or null (not on the house's power).
+// The circuit at a point: the house's lighting room it's in (within pad m of one: a point inside a wall belongs to the
+// rooms either side), or null (not on the house's power). Where rooms overlap: the lift's shaft wins (it stands in the
+// living room and the room upstairs), then the lower room (a storey's room beats the two-storey stair hall, so a cable
+// in an upstairs wall is on the upper floor's circuit).
 export function circuitAt(map, pos, pad = 0.3) {
   const tab = circuitTable(map);
-  let best = null;
+  let best = null, bestH = Infinity;
   for (const r of map?.rooms || []) {
     const c = tab[r.group];
-    if (!c) continue;
-    if ([0, 1, 2].every(k => pos[k] > r.min[k] - pad && pos[k] < r.max[k] + pad)) {
-      // (the lift's shaft stands in the living room and the room upstairs: it wins where they overlap)
-      if (!best || c === 'lift') best = c;
-    }
+    if (!c || ![0, 1, 2].every(k => pos[k] > r.min[k] - pad && pos[k] < r.max[k] + pad)) continue;
+    const h = c === 'lift' ? -1 : r.max[1] - r.min[1];
+    if (h < bestH) { best = c; bestH = h; }
   }
   return best;
 }

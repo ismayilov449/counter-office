@@ -29,6 +29,7 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   ok(tab.cellar === 'cellar' && tab.elevator === 'lift' && !tab.tunnel && !tab.shed && !tab.neighbour, `${id}: the cellar, the lift; the tunnels, the shed, the neighbour's not on the house's power`);
   ok(id === 'cs_mansion' ? !('estate' in tab) : tab.estate === 'ground', `${id}: the estate's lamps (night only) on the ground floor's circuit`);
   ok(P.circuitAt(M, [-20.6, 1, -4.5]) === 'lift' && P.circuitAt(M, [-15, 5, 0]) === 'upper' && P.circuitAt(M, [-18, -1, 0]) === 'cellar' && P.circuitAt(M, [-19, 1, -17]) === 'ground' && P.circuitAt(M, [0, 0, 0]) === null, `${id}: circuitAt the lift, upstairs, the cellar, the garage, the lawn`);
+  ok(P.circuitAt(M, [-13.1, 1.11, -12]) === 'ground' && P.circuitAt(M, [-9, 4.57, -9.95]) === 'upper' && P.circuitAt(M, [-16.35, 4.57, -3]) === 'upper' && P.circuitAt(M, [-9.5, 5, -3]) === 'ground', `${id}: inside walls (group 2's cables): the kitchen's wall ground, upstairs walls upper (not the stair hall's), the open gallery the hall's (ground)`);
   ok(!!M.power, `${id}: map.power`);
 }
 for (const id of ['de_dust2', 'cs_assault', 'de_inferno', 'aim_map', 'de_dusty']) ok(!MAPS[id].power && Object.keys(P.circuitTable(MAPS[id])).length === 0, `${id}: no house power`);
