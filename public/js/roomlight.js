@@ -38,7 +38,7 @@ export function setRooms(list, lights) {
       uniforms.uRoomMin.value[i].set(r.min[0] - PAD, r.min[1] - PAD, r.min[2] - PAD);
       uniforms.uRoomMax.value[i].set(r.max[0] + PAD, r.max[1] + PAD, r.max[2] + PAD);
       const on = lights?.[r.group] !== false;
-      uniforms.uRoomAmb.value[i] = !on ? (lights.power === false && r.power ? BLACKOUT : DARK)
+      uniforms.uRoomAmb.value[i] = !on ? ((lights.power === false || lights.dead?.includes(r.group)) && r.power ? BLACKOUT : DARK) // (power: lights.dead, a circuit without power)
         : glow && (!glowGroups || glowGroups.has(r.group)) ? GLOW + glow : (r.amb ?? LIT);
     } else {
       uniforms.uRoomMin.value[i].set(1e5, 1e5, 1e5);

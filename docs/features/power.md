@@ -1,10 +1,12 @@
 # Power & machinery (ROADMAP group 3, branch `feature/power`)
 
-## STATUS (2026-11-08: spots chosen; building 3.1)
+## STATUS (2026-11-08: 3.1 built and server-tested; 3.2 and 3.3 written, their tests next)
 
-- **Done:** the spots (footprints below).
-- **Half-done:** 3.1 (circuits, breaker panel, generator).
-- **Next:** 3.2 power surge, 3.3 cut the lift's cable.
+- **Done:** 3.1 circuits, the breaker panel and the generator (server, browser, geometry); its server test `t1.mjs`
+  30/30, `unit.mjs` 55/55, `client-node.mjs` 37/37; t17cctv 17/17, t-elev 35/35, flood t1 18/18 still pass.
+- **Half-done:** 3.2 (the surge) and 3.3 (the cable) are in the code already (lib/power.js, the lift's `fall`), not yet
+  tested on a server.
+- **Next:** 3.2's test, 3.3's test, the docs below, BOTS=4, draw cost; the browser test when allowed.
 
 ## Footprints (for the other wave-1 groups: please keep clear)
 
