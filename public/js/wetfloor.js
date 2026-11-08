@@ -12,7 +12,7 @@ const SEG = 28;
 export function createWetFloorView(scene) {
   let patches = [], key = '', flashUntil = 0;
   const mat = new THREE.MeshPhongMaterial({
-    color: 0x1a232c, specular: 0xa8c4dc, shininess: 160, transparent: true, opacity: 0.62, depthWrite: false,
+    color: 0x2a3a48, specular: 0xc0d8ee, shininess: 180, transparent: true, opacity: 0.5, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, vertexColors: true,
   });
   const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);

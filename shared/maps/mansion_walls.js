@@ -5,7 +5,7 @@
 //   Pipes run at a radiator's top (0.85 m over the floor), cables at socket height (0.3 m); a cable also runs up from
 // every light switch in the house to the ceiling. The ground floor is at 0.81, the upper floor at 4.27.
 // Kept away from the living room (the fireplace), the lift's shaft and roof, and the cellar.
-const R = 0.07; // how close a bullet must pass (a pipe or cable and a bit)
+const R = 0.1; // how close a bullet must pass (a pipe or cable, and a margin: a shot a little high or low still finds it)
 const G = 0.81, UP = 4.27, PIPE = 0.85, SOCKET = 0.3;
 const run = (name, kind, a, b, side = 0) => ({ name, kind, a, b, r: R, side });
 

@@ -100,6 +100,10 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   look([-10, 2, -1], [-1, 0, 0]);
   walls.update(1 / 60, T, camera);
   ok(walls.debug().cut === 1, 'cut out of the walls while it\'s in front of you');
+  walls.debugCut(false); walls.update(1 / 60, T, camera);
+  const off = walls.debug().cut;
+  walls.debugCut(true); walls.update(1 / 60, T, camera);
+  ok(off === 0 && walls.debug().cut === 1, '(the tests\' switch: none cut, then cut again)');
   look([-10, 2, -1], [1, 0, 0]);
   walls.update(1 / 60, T, camera);
   ok(walls.debug().cut === 0, 'not while you look away (beyond 2 m)');

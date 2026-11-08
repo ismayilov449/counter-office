@@ -33,7 +33,9 @@ let map = null, on = false;
 // ---------------------------------------------------------------- the see-through holes
 
 const N = WALLS.cut;
-// shared by every patched material: the holes cut out this frame, [a.xyz, radius] and [b.xyz, 1 / |b - a|²]
+// shared by every patched material: the holes cut out this frame, [a.xyz, radius at the faces] and [b.xyz, radius inside
+// the wall]. A hole is a capsule from a to b (4 cm past each face); inside the wall (from 3 cm in) it widens to the
+// inner radius, so you see through it at an angle too (nothing in there is seen except through a hole).
 const U = {
   wallsN: { value: 0 },
   wallsA: { value: Array.from({ length: N }, () => new THREE.Vector4()) },
@@ -61,8 +63,10 @@ uniform vec4 wallsB[ ${N} ];
   for ( int i = 0; i < ${N}; i ++ ) {
     if ( i >= wallsN ) break;
     vec3 wd = vWallsPos - wallsA[ i ].xyz, wab = wallsB[ i ].xyz - wallsA[ i ].xyz;
-    vec3 wq = wd - wab * clamp( dot( wd, wab ) * wallsB[ i ].w, 0.0, 1.0 );
-    if ( dot( wq, wq ) < wallsA[ i ].w * wallsA[ i ].w ) discard;
+    float wl2 = dot( wab, wab ), wt = clamp( dot( wd, wab ) / max( wl2, 1e-6 ), 0.0, 1.0 );
+    vec3 wq = wd - wab * wt;
+    float wr = mix( wallsA[ i ].w, wallsB[ i ].w, clamp( ( min( wt, 1.0 - wt ) * sqrt( wl2 ) - 0.07 ) * 20.0, 0.0, 1.0 ) );
+    if ( dot( wq, wq ) < wr * wr ) discard;
   }`);
 }
 
@@ -84,9 +88,9 @@ function ringTexture() {
   const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   grad.addColorStop(0, 'rgba(8,6,4,1)');
   grad.addColorStop(0.36, 'rgba(8,6,4,1)');
-  grad.addColorStop(0.42, 'rgba(60,48,36,0.9)');
-  grad.addColorStop(0.7, 'rgba(120,104,84,0.35)');
-  grad.addColorStop(1, 'rgba(120,104,84,0)');
+  grad.addColorStop(0.42, 'rgba(52,42,32,0.9)');
+  grad.addColorStop(0.7, 'rgba(96,84,68,0.3)');
+  grad.addColorStop(1, 'rgba(96,84,68,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
   // splinters
@@ -106,7 +110,8 @@ function ringTexture() {
 const RING = 0.39; // the dark middle's radius, as a share of the ring's half size
 
 function buildRings() {
-  ringMat = new THREE.MeshBasicMaterial({ map: ringTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+  // (Lambert: lit like the wall, so the room light darkens it in a dark room)
+  ringMat = new THREE.MeshLambertMaterial({ map: ringTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
   rings = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), ringMat, WALLS.keep * 2);
   rings.count = 0;
   rings.visible = false;
@@ -193,7 +198,9 @@ export function remoteShot(m) {
   if (any) redrawRings();
 }
 
-// The holes to cut this frame: the nearest ones in front of the camera.
+// The holes to cut this frame: the nearest ones in front of the camera. (cutOff: the tests compare with none cut)
+let cutOff = false;
+export const debugCut = on => { cutOff = !on; };
 const _f = new THREE.Vector3();
 function pickHoles(camera) {
   const c = camera.position;
@@ -206,11 +213,11 @@ function pickHoles(camera) {
     list.push([dd, h]);
   }
   list.sort((p, q) => p[0] - q[0]);
-  const n = Math.min(N, list.length);
+  const n = cutOff ? 0 : Math.min(N, list.length);
   for (let i = 0; i < n; i++) {
-    const h = list[i][1], ab2 = (h.b[0] - h.a[0]) ** 2 + (h.b[1] - h.a[1]) ** 2 + (h.b[2] - h.a[2]) ** 2;
+    const h = list[i][1];
     U.wallsA.value[i].set(h.a[0], h.a[1], h.a[2], h.r);
-    U.wallsB.value[i].set(h.b[0], h.b[1], h.b[2], ab2 > 1e-9 ? 1 / ab2 : 0);
+    U.wallsB.value[i].set(h.b[0], h.b[1], h.b[2], Math.min(h.r * WALLS.inner, h.r + 0.1));
   }
   U.wallsN.value = n;
 }
@@ -278,11 +285,13 @@ function floorUnder(p) {
   return y;
 }
 
+// How fast the water leaves the hole (m/s) at a flow (0..1): it lands about where the server's puddle starts (0.5 m out).
+const sprayV = f => 0.5 + 1.3 * f;
 // Each spray: water thrown out of the hole and falling to the floor, two crossed ribbons along its arc (one mesh).
 function sprayGeometry() {
   const parts = [];
   for (const [x, y, z, nx, nz, f] of sprays) {
-    const v0 = 0.9 + 2.4 * f, floor = floorUnder([x + nx * 0.3, y, z + nz * 0.3]), fall = Math.max(0.2, y - floor);
+    const v0 = sprayV(f), floor = floorUnder([x + nx * 0.3, y, z + nz * 0.3]), fall = Math.max(0.2, y - floor);
     const tEnd = Math.sqrt((2 * fall) / 9.8), n = 8, side = [-nz, 0, nx];
     const pos = [], uv = [], idx = [];
     for (const across of [side, [0, 1, 0]]) {
@@ -388,6 +397,20 @@ export function onSnapshot(wa) {
   ends = wa?.[2] || [];
 }
 
+// You're the one shocked: the screen flashes electric blue for a moment.
+let flashEl = null;
+function zapFlash() {
+  if (!flashEl) {
+    flashEl = document.createElement('div');
+    flashEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;transition:opacity 0.45s;' +
+      'background:radial-gradient(ellipse at center, rgba(170,220,255,0.25) 20%, rgba(60,140,255,0.6) 100%)';
+    (document.getElementById('game') || document.body).after?.(flashEl);
+  }
+  flashEl.style.transition = 'none';
+  flashEl.style.opacity = '1';
+  setTimeout(() => { flashEl.style.transition = 'opacity 0.7s'; flashEl.style.opacity = '0'; }, 300);
+}
+
 // Electrocution in a wet patch: a blue flash, sparks on whoever was hit, a crackle and the mains' buzz.
 function waZap(m) {
   if (!on) return;
@@ -397,7 +420,7 @@ function waZap(m) {
   for (let i = 0; i < 3; i++) fx.sparks(m.p, [0, 0.4, 0]);
   for (const v of m.v || []) {
     for (let i = 0; i < 12; i++) fx.emit(v, [(Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4], [0.7, 0.85, 1], 0.2 + Math.random() * 0.25);
-    if (Math.hypot(v[0] - D.me.p[0], v[2] - D.me.p[2]) < 0.6) D.me.shake = Math.max(D.me.shake || 0, 0.6);
+    if (D.me.alive && Math.hypot(v[0] - D.me.p[0], v[2] - D.me.p[2]) < 0.6) { D.me.shake = Math.max(D.me.shake || 0, 0.6); zapFlash(); }
   }
   const k = floodKit();
   if (!k) return;
@@ -425,7 +448,7 @@ function updateSprays(dt, now, camera) {
     const d2 = (x - cam.x) ** 2 + (y - cam.y) ** 2 + (z - cam.z) ** 2;
     if (d2 < nd) { nd = d2; near = [x, y, z, f]; }
     if (d2 < 400 && Math.random() < dt * 25) {
-      const v0 = 0.9 + 2.4 * f, floor = floorUnder([x + nx * 0.3, y, z + nz * 0.3]), tEnd = Math.sqrt((2 * Math.max(0.2, y - floor)) / 9.8);
+      const v0 = sprayV(f), floor = floorUnder([x + nx * 0.3, y, z + nz * 0.3]), tEnd = Math.sqrt((2 * Math.max(0.2, y - floor)) / 9.8);
       D.fx.emit([x + nx * v0 * tEnd, floor + 0.03, z + nz * v0 * tEnd], [(Math.random() - 0.5) * 1.2, 0.8 + Math.random(), (Math.random() - 0.5) * 1.2], [0.75, 0.85, 0.92], 0.3 + Math.random() * 0.2);
     }
   }
@@ -688,7 +711,7 @@ export function update(dt, now, camera) {
 // (for the tests)
 export const debug = () => ({ on, holes: holes.length, cut: U.wallsN.value, rings: rings?.count ?? 0, patched: patched.size,
   list: holes.map(h => ({ a: h.a, b: h.b, r: h.r })),
-  patches: wet?.list().length ?? 0, wetMesh: !!wet?.mesh.visible, sprays: sprays.length, sprayMesh: !!sprayMesh?.visible, ends: ends.length,
+  patches: wet?.list().length ?? 0, patchList: wet?.list().map(p => ({ p: p.p, r: p.r, live: p.live })) ?? [], wetMesh: !!wet?.mesh.visible, sprays: sprays.length, sprayMesh: !!sprayMesh?.visible, ends: ends.length,
   hints: hints ? hints.geometry.attributes.position.count : 0, hintSpots,
   gun: { wet: gun.wet, jams: [...gun.jams], clearing: !!gun.clearing, shown: gun.shown },
   floating: [...D.remotes.values()].filter(r => r.waFloat).map(r => ({ id: r.id, y: r.model.position.y })) });

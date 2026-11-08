@@ -10,12 +10,19 @@
   `t-shield.mjs` 28/28 (cs_mansion), body `t1.mjs` 57/57 (cs_mansion), gas `t_gas.mjs` 20/20 (GAS_LEAK_X=3),
   `walls/maps.mjs`: all 7 maps load and shoot (no `wa` anywhere), `BOTS=4` for 60 s on cs_mansion and cs_mansion_night
   (and 180 s on cs_mansion): no server errors, tick 0.8–1.3 ms average (max 8.3 ms at the start).
-- **Not done yet (needs the browser, when allowed):** the browser test — the holes seen from both sides (day, night,
-  the blackout: light through them), peeking through a shot-up wall, the rings, the dust out of the far side; a burst
-  pipe's spray and the wet patch growing; the sparks, the zap; the radiators and sockets on the walls; WET / JAMMED
-  over the ammo and R clearing it; a drowned body floating in the cellar; no page errors; and **the draw cost**
-  (expected below) measured with `views.mjs` / `integration/gviews.mjs` against `main`.
-- **Next:** the browser test, then the draw-cost numbers here.
+- **Browser test (2026-11-08, headless Edge, swiftshader, 960×540): passes on both Mansion maps.** `walls/g1.mjs`
+  23/23 on cs_mansion_night; on cs_mansion 22/23 in the full run (the one miss was the test's own dark-room set-up,
+  then fixed) and the holes part again 7/7 after the fix; no page errors. Screenshots looked at: the holes from the
+  hall and the living room (you see the other room through them; at night the window behind), at a 24° angle, from
+  a pitch-dark living room into the lit hall (its middle 155–163 against 0–28 for the dark wall), a shot-up wall from
+  5 m; brick stopping bullets (square decals only); the four radiators and the sockets; the spray arcing out of the
+  hole and the puddle spreading (r 0.41 → 1.15–1.17 m in 10 s); the zap on the T in the puddle (blue glow, sparks) and
+  the victim's view (35 a shock, the blue flash, WET); the wall whole again next round; WET, JAMMED - TAP R, CLEARING
+  (R clears it, no reload); a body floating in the pool (−0.34…−0.44, the surface at −0.25) and in the flooded cellar
+  (−0.54…−0.58, the water at −0.45). The draw cost: see "Draw cost" below (`walls/gcost.mjs`, against `main`).
+- **Fixed in the browser test:** see "Browser" in the RESUME notes; after the fixes `t1.mjs` 13/13, `t2.mjs` 21/21
+  on both maps, `unit.mjs` 78/78, `clientsmoke.mjs` 104/104, BOTS=4 60 s: no errors (tick 0.7–0.8 ms).
+- **Left:** the sounds by ear (the spray's hiss, the sparks' crackle, the zap); the frame time on a real Intel laptop.
 
 ## Where the hidden pipes and cables are (for the other wave-1 groups)
 All inside existing interior plaster walls of the house; no geometry is added for them (only small sockets and
@@ -67,8 +74,8 @@ For the cs_mansion section (it works the same on cs_mansion_night):
     (WET shows over your ammo) and sometimes **jams** when you fire — the wetter, the more often. A jammed gun won't
     fire (JAMMED - TAP R): **tap R** to clear it (about a second) instead of reloading. It dries by itself: half a
     minute after a swim, a few seconds after a puddle.
-  - **Bodies float up**: in the flooded cellar (and the pool) the dead rise to the surface and bob there face up, with
-    their name over them — you can tell who drowned down there.
+  - **Bodies float up**: in the flooded cellar (and the pool) the dead rise to the surface and bob there face up (a
+    teammate with his name over him) — you can tell who drowned down there.
 
 Keys table: **R** reloads, or clears a jammed gun when it's jammed — no new key.
 
@@ -100,7 +107,8 @@ Keys table: **R** reloads, or clears a jammed gun when it's jammed — no new ke
   against its wall), the blue flash.
 - Tests in `dev/test-scripts/walls/`: `srv.sh` (test server on 4220/4221, fresh `DATA_DIR` in `$SP/testdata`, BOTS=0,
   MAP=cs_mansion, FREEZE_TIME=1 unless given; `srv.sh stop`), `unit.mjs`, `clientsmoke.mjs` (with `register.mjs` +
-  `loader.mjs`), `t1.mjs`, `t2.mjs`, `maps.mjs`, `soak.mjs`.
+  `loader.mjs`), `t1.mjs`, `t2.mjs`, `maps.mjs`, `soak.mjs`; in the browser `edge.ps1` (the headless Edge on CDP 9620,
+  a fresh profile, no extensions or sync; `edge.ps1 stop`), `g1.mjs` (see Browser), `gcost.mjs` (the draw cost).
 
 ### Hooks in existing files (each marked `// walls:`)
 - `server.js`: the import; `const walls = createWalls({...})` right after the flood's; `walls.reset()` in
@@ -134,20 +142,57 @@ Keys table: **R** reloads, or clears a jammed gun when it's jammed — no new ke
   1.0, paper 1.2, fabric 1.4. Boxes within 3 cm along the bullet are one wall (a wall is several 0.5 m chunks; the
   hall's wall is two 0.2 m slabs). Floors, ceilings and anything hit on its top or bottom stop bullets.
 - Holes: radius 2.2 cm in plaster (×0.85…1.15 by the gun's damage), up to 2.6× bigger in a cluster (each hole within
-  12 cm adds 30 %); 320 kept, the nearest 24 within 28 m in front of you are cut out.
-- Pipes: hit within 7 cm; 40 s of spray (flow 1 → 0.35), each side's patch soaks 0.25 m²/s × flow, from r 0.3 m to at
+  12 cm adds 30 %); 320 kept, the nearest 24 within 28 m in front of you are cut out. Inside the wall (from 3 cm in)
+  a hole is 3× wider (at most 10 cm more), so you see through it at an angle too (24° in the browser test).
+- Pipes: hit within 10 cm; 40 s of spray (flow 1 → 0.35; out of the hole at 0.5 + 1.3 × flow m/s, so it lands about
+  0.5–0.8 m out), each side's patch starts 0.5 m out from the wall and soaks 0.25 m²/s × flow, from r 0.3 m to at
   most 2.2 m. Cables: sparks every 0.35–1.4 s; a spark reaches a patch within its radius + 0.6 m and 2.2 m above its
   floor (on its side of the wall); 35 per shock, at most every 0.6 s per person.
 - Wet guns: swim 30 s, wade 14 s, puddle 6 s of wetness (a second dries a second); jam chance 4 % damp → 14 % soaked;
   clearing 0.7 s.
 - Floating: under 0.5 m or more of water; rises 0.6 m/s to 12 cm under the surface; bobs ±3.5 cm.
 
-### Draw cost (expected; to measure in the browser)
+### Draw cost (measured 2026-11-08, `walls/gcost.mjs`, the real game on cs_mansion, 960×540)
+Draw calls per frame over 40 frames, min (frames without a shadow-map redraw) / median, `main` (539ce42) → this
+branch; then the same shots on both (on main they leave decals; here 10 holes in the hall's wall, the pipe and the
+cable in its south wall: 2 sprays, 2 puddles, 2 sparking ends):
+
+| View | Plain, main → branch | After the shots, main → branch |
+|---|---|---|
+| hall, at its wall to the living room | 222/223 → 223/224 (+1) | 223/224 → 226/227 (+3) |
+| hall, its south wall (radiator, spray, puddle) | 121/123 → 122/124 (+1) | 122/124 → 127/130 (+5/+6) |
+| kitchen, at its radiator | 139/142 → 140/144 (+1/+2) | 142/144 → 142/147 (0/+3) |
+| living room, east at the hall's wall | 229/231 → 230/233 (+1/+2) | 230/232 → 234/237 (+4/+5) |
+| street, at the house | 405/408 → 406/409 (+1) | 406/409 → 409/412 (+3) |
+
 - The holes in the walls: **0** draw calls (a few shader lines in the wall materials: a loop over at most 24 holes,
   with an early stop; nothing when there are none).
-- The rings: +1 while holes are in view (one InstancedMesh, culled by its bounds). The hints (radiators and sockets):
-  +1 in views with the house (one mesh, 1,440 vertices). The wet patches: +1 while one is in view. The sprays: +1
-  while one is in view. No shadow casters, no new lights (the sparks borrow the effects' one flash light).
+- The hints (radiators and sockets, one mesh, 1,440 vertices): the +1 in every house view. The rings: +1 while holes
+  are in view (one InstancedMesh, culled by its bounds). The wet patches: +1, the sprays: +1 while one is in view; a
+  cut cable's sparks use the effects' particles and smoke puffs (+1 while puffs are up). No shadow casters, no new
+  lights (the sparks borrow the effects' one flash light).
+
+### Browser (2026-11-08)
+- `walls/g1.mjs` (GAME_PORT=4220, CDP_PORT=9620; `srv.sh START_MONEY=16000 ROUND_TIME=600 AUTO_BALANCE=0 [MAP=...]`
+  and `edge.ps1` first; ~10 minutes; `ONLY=a` runs just the holes): the page is a CT, three scripted Ts. It looks
+  through a hole by reading the pixels in the middle of the picture right after a frame is drawn, with the holes cut
+  and with them not cut (`walls.debugCut`), and compares. Screenshots in OUT (`wd_*` day, `wn_*` night).
+- **Fixed in the browser test:**
+  - At an angle the holes weren't see-through in the hall's 0.41 m wall (two slabs: the inner rubble of the second
+    showed): a hole is now 3× wider inside the wall (at most 10 cm more), from 3 cm in, so you see through it at 24°
+    (and the faces' holes stay as they were).
+  - The hole rings were unlit (MeshBasic): in a dark room they glowed. Now Lambert (the room light darkens them), with
+    darker chips.
+  - Pipes and cables were hard to hit: a shot at the wall's face just above a radiator passed 9 cm from the pipe in
+    the middle of the wall (7 cm counted). Now 10 cm.
+  - A burst pipe's water flew 1.4 m out while its puddle started 0.35 m from the wall: the spray is gentler (lands
+    0.5–0.8 m out) and the puddle starts 0.5 m out.
+  - The victim of a shock saw nothing special: the screen now flashes electric blue (a fixed div, 1 s).
+  - The wet patch was so dark it looked like a shadow: a little lighter and glossier.
+- Seen: the lamps' light goes through walls and floors (the renderer's, not this feature's), so switching one room's
+  light off leaves it lit by its neighbours' lamps (the cellar's from below); the test turns every lamp off but the
+  hall's to get a dark living room. Enemies have no name tags in this game, so a floating enemy shows no name (a
+  teammate does).
 
 ### Shared-state contracts
 - Reads `game.lights.power` (in `powerAt` only), `map.rooms`, `p.alive`, `h.state`, the gas's `sparkAt(pos, 'electric',
@@ -179,7 +224,8 @@ Keys table: **R** reloads, or clears a jammed gun when it's jammed — no new ke
   `round` and `shot` handlers, `tryFire()` and the `KeyR` case.
 
 ## Not verified / known gaps
-- Everything in the browser (see STATUS); the sounds by ear; the frame time on a real Intel laptop.
+- The sounds by ear; the frame time on a real Intel laptop (swiftshader draws 1–3 fps).
+- A hole close to a wall's end (within its inner radius, ≤ 16 cm) can notch the doorway's side face inside the wall.
 - The holes come from each browser's own trace of the `shot` messages: someone who joins mid-round doesn't see the
   holes made before. Your own shot's holes don't know about an enemy hidden behind the first wall (the server's
   damage is right; at worst a hole shows in a second wall the bullet never reached).
@@ -188,6 +234,6 @@ Keys table: **R** reloads, or clears a jammed gun when it's jammed — no new ke
 - Jams are the browser's own rule (no server check); bots never jam and ignore wet floors, pipes and cables (they
   walk into a live patch and get shocked like anyone).
 - Floating bodies are only drawn so: the server's body (for a uniform, for the lift) stays where he died; dead
-  hostages don't float.
+  hostages don't float; a downed (not dead) player stays on the bottom until he drowns.
 - `t1.mjs` d (the weak door) relies on the kitchen's back door (`weak`); the door's 260 hp is the existing
   `shootDoor`'s.

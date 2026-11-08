@@ -13,6 +13,7 @@ export const WALLS = {
   // the browser's holes: how many are kept (oldest go first), how many are cut out at once (the nearest), how close
   // holes count as a cluster (a cluster's new holes come out bigger, up to `grow` x), and the furthest one is cut
   keep: 320, cut: 24, cluster: 0.12, grow: 2.6, far: 28,
+  inner: 3, // inside the wall a hole is this much wider (at most 10 cm more): you see through it at an angle too
 };
 
 // The share of a bullet's damage left after `len` metres of material `mat`, for a gun of armour penetration `pen`
