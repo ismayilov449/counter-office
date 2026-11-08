@@ -101,6 +101,7 @@ export function createElevator(ctx) {
 
   // ---------------------------------------------------------------- the state, the boxes, things riding along
   const motion = () => ({ y0: st.m[0], y1: st.m[1], t0: st.m[2], tb: st.m[3], fall: st.m[4], tc: st.m[5] }); // (power: fall, tc: the cut cable)
+  let fellAt = -1e9; const falling = () => !!st.m[4] || serverNow() - fellAt < 1500; // power: falling, or just landed (the landing's state can come with the fall's last frame)
   const atStop = () => { const n = nearestStop(E, y); return n.d < 0.002 ? n.s : -1; };
   function fresh() {
     const t = serverNow();
@@ -116,7 +117,8 @@ export function createElevator(ctx) {
     yPrev = y;
     y = motionAt(motion(), t).y;
     dy = y - yPrev;
-    if (Math.abs(dy) > (st.m[4] ? 3 : 0.5)) dy = 0; // (a jump, not a ride: a new round put it back on the ground floor; power: falling, up to 3 m a frame)
+    if (st.m[4]) fellAt = t;
+    if (Math.abs(dy) > (falling() ? 3 : 0.5)) dy = 0; // (a jump, not a ride: a new round put it back on the ground floor; power: falling, up to 3 m a frame)
     if (dy) {
       for (const id of st.rm) { const e = ctx.mines.get(id); if (e) { e.obj.position.y += dy; if (e.m) e.m.p[1] += dy; } }
       for (const id of st.rs) { const e = ctx.satchels.get(id); if (e && e.obj.parent === scene) e.obj.position.y += dy; }
@@ -242,6 +244,7 @@ export function createElevator(ctx) {
     onState(m) {
       last = m;
       if (E) st = m;
+      if (m.m?.[4]) fellAt = serverNow(); // (power: a short fall can end before any frame sees it)
     },
     onSfx(m) {
       if (!E) return;
@@ -290,7 +293,7 @@ export function createElevator(ctx) {
     remote(p, rt) {
       if (!E || !st) return;
       const yr = motionAt(motion(), rt).y;
-      if (Math.abs(yr - y) > 1e-4 && Math.abs(yr - y) < (st.m[4] ? 8 : 1) && (inCabin(E, yr, p, 0.2) || onRoof(E, yr, p, 0.2))) p[1] += y - yr; // (power: falling, far further)
+      if (Math.abs(yr - y) > 1e-4 && Math.abs(yr - y) < (falling() ? 8 : 1) && (inCabin(E, yr, p, 0.2) || onRoof(E, yr, p, 0.2))) p[1] += y - yr; // (power: falling, far further)
     },
     update(dt, now) {
       if (!E) return;
