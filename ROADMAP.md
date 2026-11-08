@@ -6,8 +6,8 @@ that share a game system or the same code are in the same group, so two agents n
 **State (2026-11-08): wave 1 is done.** Groups 1–5 (wounds, walls, power, stealth, underground) were built and
 browser-tested on their branches, then merged, linked and tested together on **`integration/2026-11-08`** (RESUME.md
 sections 0 and 9; each group's notes stay in `docs/features/<group>.md`). **Next: wave 2, groups 6–10** (hostages,
-explosives, close combat, sight, fire). All of wave 1 is in, so every wave 2 group can start: from `main` once the
-user has had it fast-forwarded to the integration branch (until then, from the integration branch).
+explosives, close combat, sight, fire). All of wave 1 is in `main` (fast-forwarded 2026-11-09), so every wave 2
+group can start from `main`.
 
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)

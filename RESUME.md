@@ -1,15 +1,13 @@
 # RESUME POINT — Counter-Office (latest: 2026-11-08)
 
-**To continue:** check out `main` (once the user has had it fast-forwarded to `integration/2026-11-08`; until then
-that branch) and tell Claude Code:
+**To continue:** check out `main` and tell Claude Code:
 *"Read RESUME.md and continue from the resume point (section 0)."*
 
-## 0. Resume point 2026-11-08: ROADMAP wave 1 merged on `integration/2026-11-08`; next: wave 2 (groups 6–10)
+## 0. Resume point 2026-11-08: ROADMAP wave 1 merged (`main` has it); next: wave 2 (groups 6–10)
 
 **To continue:** the five wave 1 groups of ROADMAP.md are merged, linked and tested together on the branch
-**`integration/2026-11-08`** (pushed). `main` is untouched: it is fast-forwarded to the integration branch **only when
-the user says so** (the players' server runs from the main checkout). After that, the next work is **ROADMAP.md wave
-2**: groups 6 Hostages, 7 Explosives, 8 Close combat, 9 Sight, 10 Fire. All the groups they wait for are in, so all
+**`integration/2026-11-08`**, and **`main` has it** (fast-forwarded to 9ff3bb7 with the user's go-ahead on
+2026-11-09). The next work is **ROADMAP.md wave 2**: groups 6 Hostages, 7 Explosives, 8 Close combat, 9 Sight, 10 Fire. All the groups they wait for are in, so all
 five can start (at most 5 agents building, at most 2 testing in a browser; ROADMAP.md "Rules for the agents").
 
 **What the integration branch has** (on top of `main` 539ce42), merged in this order, each one's server tests run
@@ -47,14 +45,13 @@ g-underground, walls g1 ×2), the HUD (`integration/ghud.mjs`) and the lamp mask
 blood, gas, flood, the lift, zip line, CCTV, the drone and buyhover; no page errors. Draw calls against `main`: +0…+4 a
 frame in the six key views (living room, kitchen, cellar, street, garage, roof; by day and at night).
 
-**Open questions for the user** (the current behaviour is kept until he answers):
+**The user's answers (2026-11-09): all four rules stay as built.**
 1. **The trunk:** a teammate opening an occupied trunk is told who's inside (and stays out); an enemy opening it finds
-   the hider, who tumbles out. Keep both?
-2. **The fireplace's fire can't be put out** until the round ends (no rounds: 90 s). Keep it so (wave 2's fire hose
-   could put it out)?
-3. **On the Mansion maps brick walls now stop bullets fully:** the walls feature replaced the old realism rule (half
-   damage through any thin breakable wall or door, brick included). Keep it?
-4. **A player underground can't spot enemies for his team** (no signal), nor be spotted. Keep it?
+   the hider, who tumbles out. **Kept.**
+2. **The fireplace's fire can't be put out** until the round ends (no rounds: 90 s). **Kept**; group 10's fire hose
+   will be able to put it out.
+3. **On the Mansion maps brick walls stop bullets fully** (the old half-damage-through-brick rule stays off). **Kept.**
+4. **A player underground can't spot enemies for his team** (no signal), nor be spotted. **Kept.**
 
 **Left / known:** the sounds by ear and the frame time on a real Intel laptop (the lamp mask adds a box
 test per point light per pixel); each group's own gaps in its docs/features file; a 2 mm seam in the roof's collision
