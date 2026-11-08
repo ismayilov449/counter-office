@@ -136,6 +136,12 @@ if (!CATCH) {
   await pressElev(rider, 'f', 3300);
   await until(() => door(0) > 0.99, 3000);
   ok(`the Rider pries the doors open near the upper floor (${door(0).toFixed(2)}, ${door(3).toFixed(2)})`, door(0) > 0.99 && door(3) > 0.99 && rider.got('elevSfx').some(m => m.s === 'forced'));
+  // the floor is 0.84 m over the cabin's: no stepping up into it under the cabin's ceiling, so E climbs out
+  rider.clear();
+  await pressElev(rider, 'f');
+  await until(() => rider.got('elevTo').length > 0, 2000);
+  const to = rider.got('elevTo')[0];
+  ok(`E on the open doors climbs him out onto the upper landing (${JSON.stringify(to?.p)})`, to && Math.abs(to.p[1] - S[2]) < 0.05 && to.p[2] > E.out.z2);
 }
 
 for (const c of all) c.close();

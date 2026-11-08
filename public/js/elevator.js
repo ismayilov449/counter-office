@@ -210,7 +210,7 @@ export function createElevator(ctx) {
         if (r.moving) return null;
         if (power && atStop() >= 0) return doorAt(st.d[0], serverNow()) > 0.9 ? null : 'Press E to open the doors';
         const n = nearestStop(E, y);
-        if (doorAt(st.d[0], serverNow()) > 0.9 && doorAt(st.d[1 + n.s], serverNow()) > 0.9) return null;
+        if (doorAt(st.d[0], serverNow()) > 0.9 && doorAt(st.d[1 + n.s], serverNow()) > 0.9) return E.stops[n.s] - y > 0.3 ? 'Press E to climb out' : null; // (power: the floor too high to step up to, as lib/elevator.js)
         return n.d > ELEV.near ? 'Too far from a floor to get out this way — look up: the roof hatch' : `Hold E to pry the doors open (${ELEV.force} s, loud)`;
       }
       case 'l': {

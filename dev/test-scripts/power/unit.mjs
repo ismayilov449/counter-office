@@ -31,6 +31,11 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   ok(P.circuitAt(M, [-20.6, 1, -4.5]) === 'lift' && P.circuitAt(M, [-15, 5, 0]) === 'upper' && P.circuitAt(M, [-18, -1, 0]) === 'cellar' && P.circuitAt(M, [-19, 1, -17]) === 'ground' && P.circuitAt(M, [0, 0, 0]) === null, `${id}: circuitAt the lift, upstairs, the cellar, the garage, the lawn`);
   ok(P.circuitAt(M, [-13.1, 1.11, -12]) === 'ground' && P.circuitAt(M, [-9, 4.57, -9.95]) === 'upper' && P.circuitAt(M, [-16.35, 4.57, -3]) === 'upper' && P.circuitAt(M, [-9.5, 5, -3]) === 'ground', `${id}: inside walls (group 2's cables): the kitchen's wall ground, upstairs walls upper (not the stair hall's), the open gallery the hall's (ground)`);
   ok(!!M.power, `${id}: map.power`);
+  const L = (g, cam) => P.lampLights(M, g, cam), GR = [-17, 2.4, 0], UP = [-19, 5.9, 0], CE = [-18, -0.6, 0], LAWN = [0, 1.7, 0];
+  ok(L('lampa7', GR) && !L('lampa10', GR) && !L('cellar', GR) && L('lampa5', GR) && L('elevator', GR), `${id}: lamps from the ground floor: its own, the stair hall's, the lift's; not upstairs', not the cellar's`);
+  ok(L('lampa10', UP) && !L('lampa7', UP) && L('lampa5', UP), `${id}: from upstairs: upstairs' and the stair hall's, not the ground floor's`);
+  ok(L('cellar', CE) && !L('lampa7', CE) && !L('lampa10', CE), `${id}: from the cellar: only the cellar's`);
+  ok(L('lampa7', LAWN) && L('lampa10', LAWN) && L('neighbour', GR) && L(undefined, GR) && (id === 'cs_mansion' || L('estate', GR)), `${id}: outside the house every lamp; the street's, the neighbour's${id === 'cs_mansion' ? '' : ', the estate\'s'} always`);
 }
 for (const id of ['de_dust2', 'cs_assault', 'de_inferno', 'aim_map', 'de_dusty']) ok(!MAPS[id].power && Object.keys(P.circuitTable(MAPS[id])).length === 0, `${id}: no house power`);
 

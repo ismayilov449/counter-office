@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLAYER } from '/shared/physics.js';
-import { CIRCUITS, CIRCUIT_NAMES, LABELS, BREAKER, GEN, CABLE, freshState, genFuel, genRunning, live, circuitAt, aimAt } from '/shared/power.js';
+import { CIRCUITS, CIRCUIT_NAMES, LABELS, BREAKER, GEN, CABLE, freshState, genFuel, genRunning, live, circuitAt, circuitOf, aimAt, lampLights } from '/shared/power.js';
 
 const aimDir = (yaw, pitch) => [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
 const WHITE_UV = [0.97, 0.03]; // (a white texel of the panel's canvas, for the parts that only have a colour)
@@ -20,7 +20,8 @@ export function createPower(ctx) {
   const { scene, me, net, audio, fx, serverNow } = ctx;
   let map = null, P = null, st = freshState(), aim = null, sentAim, last = null;
   let panel = null, gen = null, winch = null, panelTex = null, drawn = '';
-  let engine = null, engineTry = 0, grindUntil = 0, puffAt = 0;
+  let engine = null, engineTry = 0, grindUntil = 0, puffAt = 0, lampKey = '';
+  const lampMemo = new Map();
   const mats = [];
   const col = new THREE.MeshLambertMaterial({ vertexColors: true });
   mats.push(col);
@@ -267,6 +268,16 @@ export function createPower(ctx) {
     return T ? `Hold E to cut the lift's cable (${CABLE.hold} s) — the cabin falls with everyone in it` : 'The lift\'s winch — the Terrorists could cut its cable here';
   }
 
+  // The light switch the hint is about (the nearest, as main.js's nearestSwitch): why E does nothing there, if so.
+  function switchNote() {
+    let sw = null, bd = 1.8;
+    for (const s of map.switches || []) { const d = Math.hypot(me.p[0] - s.p[0], me.p[2] - s.p[2]); if (d < bd && Math.abs(me.p[1] + 1.2 - s.p[1]) < 1.6) { bd = d; sw = s; } }
+    const c = sw && circuitOf(map, sw.group);
+    if (!c) return null;
+    if (!live(st, c, serverNow())) return st.b[CIRCUITS.indexOf(c)] ? 'No power — the fuse box in the cellar is off' : `No power here — the breaker for ${CIRCUIT_NAMES[c]} is off (the panel is in the cellar)`;
+    return st.burst.includes(sw.group) ? 'The bulb here has burst — no light until the next round' : null;
+  }
+
   // ---------------------------------------------------------------- the state
   function onState(m) {
     last = m;
@@ -341,7 +352,14 @@ export function createPower(ctx) {
       aim = a;
       if (aim !== sentAim) { sentAim = aim; net.send({ t: 'pwAim', a: aim }); }
     },
-    hint() { return P && me.alive && !me.act && okPhase() ? hintFor(aim) : null; },
+    // The help line: aimed at one of ours, what E does (as the server's use()); otherwise the hint so far (prev), except
+    // a light switch's 'Press E to switch the lights on/off' where E does nothing: a burst bulb, no power.
+    hint(prev = '') {
+      if (!P || !me.alive || me.act) return prev;
+      const h = okPhase() ? hintFor(aim) : null;
+      if (h) return h;
+      return /^Press E to switch the lights (on|off)$/.test(prev) ? switchNote() || prev : prev;
+    },
     progress(a) {
       if (a === 'pwBreaker') return 'Switching the breaker...';
       if (a === 'pwGen') return genRunning(st, serverNow()) ? 'Switching the generator off...' : 'Starting the generator...';
@@ -352,6 +370,16 @@ export function createPower(ctx) {
     powered(c) { return P ? live(st, c, serverNow()) : ctx.game.lights?.power !== false; },
     // Is there power at this point? (The circuit of the house's room it's in; true elsewhere.)
     poweredAt(pos) { if (!P) return ctx.game.lights?.power !== false; const c = circuitAt(map, pos); return !c || live(st, c, serverNow()); },
+    // world.js's lamp pick (setLampFilter): may this lamp shine for a camera at cam? In the house only the camera's
+    // storey's lamps (shared/power.js lampLights); the answer is kept per camera spot and lamp for the 0.1 s between picks.
+    lampFilter: (l, cam) => {
+      if (!map?.fusebox) return true;
+      const key = cam.x.toFixed(2) + ',' + cam.y.toFixed(2) + ',' + cam.z.toFixed(2);
+      if (key !== lampKey) { lampKey = key; lampMemo.clear(); }
+      const g = l.userData.group;
+      if (!lampMemo.has(g)) lampMemo.set(g, lampLights(map, g, [cam.x, cam.y, cam.z]));
+      return lampMemo.get(g);
+    },
     // (tests) the state, what E is aimed at
     debug: () => ({ st, aim, engine: !!engine }),
   };

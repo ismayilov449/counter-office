@@ -49,7 +49,8 @@ Text for the README's Mansion section (cs_mansion and cs_mansion_night), after t
   - Look at a breaker and **hold E (1 s)**. Terrorists switch breakers off, CTs switch them back on. Cutting one darkens
     or stops only that floor or system: cut UPPER and the upper floor goes pitch dark while the rest stays lit; cut LIFT
     and the lift stops dead (like in a blackout); cut CCTV and the cameras show NO POWER.
-  - A light switch on a floor with no power does nothing ("No power on the upper floor — its breaker is off").
+  - A light switch on a floor with no power does nothing (its hint says "No power here — the breaker for the upper
+    floor is off").
   - When the power comes back, every lamp comes back as its switch was.
 - **The generator** in the garage (against the wall by the kitchen steps): if the Terrorists cut the power, a **CT** can
   look at it and **hold E (3 s)** to start it. It's loud: you hear it roar from far across the estate. While it runs
@@ -69,7 +70,8 @@ Text for the README's Mansion section (cs_mansion and cs_mansion_night), after t
     deadly, from the ground floor about 40, from the cellar nothing. Hostages too. Anyone in the pit under it is
     crushed. The crash sparks (gas).
   - The lift is out of order until the round ends (the buttons say so; its breaker doesn't help). Get out by prying
-    the doors open (near a floor) or through the roof hatch.
+    the doors open (hold E, 3 s; the cabin ends up just under a floor) and then **E** again to climb out, or through
+    the roof hatch.
   - Killing an enemy this way counts as your kill; teammates riding it get hurt too, but it's not a team kill.
 - Bots don't use any of it.
 
@@ -124,7 +126,8 @@ For the file list at the end of the README:
   room, the winch and its ropes, the ladder, the buffers) and `addPower` (the geometry, one call in `remodel()`).
 - `lib/power.js`: `createPower(ctx)` → `reset`, `on`, `powered(c)`, `poweredAt(pos)`, `liftWorks`, `broken`,
   `setMains`, `onSwitch`, `message`, `use`, `act`, `tick`, `send`, `landed`, `refuel(seconds)`, `debug`. Test-only env:
-  `GEN_TANK` (seconds in a full tank), `POWER_SURGE` (a bulb's chance; 0 never), `POWER_CATCH` (the brake's chance).
+  `GEN_TANK` (seconds in a full tank), `POWER_SURGE` (a bulb's chance; 0 never), `POWER_CATCH` (the brake's chance, or a
+  list like `0,0,1`: the outcomes of the cuts in turn, the last one from then on).
 - `public/js/power.js`: `createPower(ctx)` → `load`, `handlers` (`power`, `pwPop`, `pwSfx`), `update`, `hint`,
   `progress`, `powered(c)`, `poweredAt(pos)`, `debug`. The panel (one mesh, a 256×128 canvas for its labels, rebuilt
   when a breaker flips), the generator (one mesh, shakes while running, exhaust puffs within 30 m), the winch (one mesh,
@@ -142,10 +145,20 @@ For the file list at the end of the README:
   `circuits.send(p)`.
 - `public/js/main.js`: the import; `circuits.load(map)` in `loadMap`; the gadgets' `power: () => circuits.powered('cctv')`
   (the monitors); `const circuits = createPower({...})` and its handlers after the lift; `circuits.update(dt, now)` after
-  the lift's; the hint: `if ((gh = circuits.hint())) hint = gh;` first in the block of the new features' E uses
-  (before the valves' line); the progress line after the flood's.
+  the lift's; the hint: `hint = circuits.hint(hint);` first in the block of the new features' E uses (before the
+  valves' line: aimed at one of ours it's that hint; a light switch's "Press E to switch the lights on/off" where E does
+  nothing says why: "No power here — the breaker for … is off", "No power — the fuse box in the cellar is off", "The
+  bulb here has burst — no light until the next round"; anything else passes through); the progress line after the
+  flood's.
 - `public/js/roomlight.js`: a room with no light is BLACKOUT when `lights.power === false` **or its group is in
   `lights.dead`** (and it's a power room).
+- `public/js/world.js` (three lines): each lamp's point light keeps its `group` (`userData.group`); the lamp pick
+  (`lightNearest`) also asks `lampOk(lamp, camPos)` when one is set; `setLampFilter(fn)` on the world. `main.js` sets it
+  to `circuits.lampFilter` in `loadMap`. (Found in the browser test: point lights cast no shadows, so with one floor's
+  breaker off the lamps of the floor above lit its floor through the slab, and the living room's lamps the cellar.
+  Now, with the camera inside the house, only the lamps of its storey shine — `lampLights` in shared/power.js; the stair
+  hall's and the lift's count for every storey they span; outside the house every lamp, as before. It also leaves the
+  pick fewer lamps to choose from.)
 - `shared/maps/mansion.js`: the import of `POWER`; `power: POWER` on the map.
 - `shared/maps/mansion2.js`: the import; `addPower({...})` before the fuse box's line.
 - `lib/flood.js`: the electrocution's check is `deps.live()` when given (else the mains, as before).
@@ -194,6 +207,12 @@ car (look at the car).
 - `public/js/elevator.js`: `motion()` passes `fall`/`tc`; a frame's ride may be up to 3 m while falling (0.5 otherwise);
   others drawn in the past are put in a falling cabin up to 8 m away (1 otherwise); the hints say "Out of order" on the
   buttons and "The lift is wrecked" stuck between floors.
+- **Climbing out of a sunken cabin (a fix found in the browser test, both files):** with the cabin's doors and a
+  landing's doors open and that floor more than 0.3 m (`CLIMB`) above the cabin's, E on the doors (`f`) puts you on the
+  landing (`place(p, landingSpot(s))`, an `elevTo`), and the hint says "Press E to climb out". Before, a cabin stopped
+  0.5–0.9 m below a floor (where the crash, the brake and a blackout near a floor leave it) could be pried open but not
+  left: under the cabin's 2.2 m ceiling a jump (even a crouch-jump) can't get you up onto the floor; only the roof hatch
+  and the shaft's ladder led out.
 
 ## Links to wire at merge
 - **The `powered()` API** (one function both sides): server `circuits.powered(circuit)` /

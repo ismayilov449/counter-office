@@ -93,6 +93,21 @@ export function circuitAt(map, pos, pad = 0.3) {
   return best;
 }
 
+// ---- which lamps may light what a camera sees (the browsers' lamp pick, world.js): point lights cast no shadows here,
+// so with only one floor's breaker off the lamps of the floor above lit it through the slab (and the living room's the
+// cellar). Inside the house only the lamps of the camera's storey shine (a group whose rooms span storeys — the stair
+// hall, the lift — counts for each); outside the house, or a lamp not on the house's power, always.
+const STOREYS = [[-6, 0.65], [0.65, 4.15], [4.15, 8]]; // the cellar, the ground floor, the upper floor (y)
+export function lampLights(map, group, cam) {
+  const tab = circuitTable(map), rooms = map?.rooms || [];
+  if (!group || !tab[group]) return true;
+  const inHouse = rooms.some(r => tab[r.group] && [0, 1, 2].every(k => cam[k] > r.min[k] && cam[k] < r.max[k]));
+  if (!inHouse) return true;
+  const band = STOREYS.find(([lo, hi]) => cam[1] >= lo && cam[1] < hi) || STOREYS[1];
+  const own = rooms.filter(r => r.group === group);
+  return !own.length || own.some(r => r.min[1] < band[1] && r.max[1] > band[0]);
+}
+
 // The light groups that have no power now (for the rooms' darkness in the browsers: lights.dead).
 export function deadGroups(map, s, t) {
   const tab = circuitTable(map);

@@ -67,13 +67,13 @@ me.team = 'T';
 ok(pw.hint() === 'The breaker for the upper floor is off', `T, off: ${pw.hint()}`);
 me.act = { a: 'pwBreaker', pr: 0.5 };
 frame();
-ok(sent.at(-1)?.a === null && pw.hint() === null, 'busy (holding E): no target, no hint');
+ok(sent.at(-1)?.a === null && !pw.hint(), 'busy (holding E): no target, no hint');
 ok(pw.progress('pwBreaker') === 'Switching the breaker...', 'the progress label');
 me.act = null;
 ok(look([-16.95, -2.2, -2.0], [colX(2), py, pn.max[2]]) === null, 'too far from the panel (2.6 m): nothing');
 game.phase = 'freeze';
 look(SPOT, [colX(2), py, pn.max[2]]);
-ok(pw.hint() === null, 'in the freeze time: no hint (the server does nothing)');
+ok(!pw.hint(), 'in the freeze time: no hint (the server does nothing)');
 game.phase = 'live';
 
 // ---- the generator
@@ -112,6 +112,26 @@ ok(scene.children[2].geometry !== wg && /has been cut/.test(pw.hint()), `cut: th
 ok(look([-22.7, 8.0, -4.47], wc) === null, 'from the roof outside its west wall: nothing (through the wall)');
 ok(look([-6.0, 4.27, -3.9], wc) === null, 'from the terrace: nothing');
 
+// ---- a light switch where E does nothing: the hint says why (and leaves every other hint alone)
+const LS = 'Press E to switch the lights on';
+look([-16.0, 4.27, 1.32], [-17, 5, 1.32]); // (by the upper floor's switch for lampa10, aimed at nothing of ours)
+state();
+ok(pw.hint(LS) === LS && pw.hint('Press E to open the door') === 'Press E to open the door', 'all live: the switch\'s hint as it was; other hints untouched');
+state({ b: [0, 1, 1, 1, 1] });
+ok(pw.hint(LS) === 'No power here — the breaker for the upper floor is off (the panel is in the cellar)', `its breaker off: ${pw.hint(LS)}`);
+state({ main: 0 });
+ok(pw.hint(LS) === 'No power — the fuse box in the cellar is off', `the mains off: ${pw.hint(LS)}`);
+state({ main: 0, g: [1, 50, clock] });
+ok(pw.hint(LS) === LS, 'the mains off but the generator feeding the floor: as it was');
+state({ burst: ['lampa10'] });
+ok(pw.hint(LS) === 'The bulb here has burst — no light until the next round', `its bulb burst: ${pw.hint(LS)}`);
+state();
+
+// ---- world.js's lamp pick: from the ground floor the upstairs lamps don't shine (through the slab); outside, all do
+const V = (x, y, z) => new THREE.Vector3(x, y, z), lamp = g => ({ userData: { group: g } });
+ok(pw.lampFilter(lamp('lampa7'), V(-17, 2.4, 0)) && !pw.lampFilter(lamp('lampa10'), V(-17, 2.4, 0)) && pw.lampFilter(lamp('lampa10'), V(-19, 5.9, 0)) && pw.lampFilter(lamp('lampa10'), V(0, 1.7, 0)) && pw.lampFilter(lamp(undefined), V(-17, 2.4, 0)),
+  'lampFilter: the ground floor lamps from the ground floor, not the upstairs ones; upstairs ones from upstairs and from outside; others always');
+
 // ---- the messages
 let threw = null;
 try {
@@ -125,7 +145,7 @@ ok(!threw, `every message handled without an error (no sound in node) ${threw ? 
 pw.load(MAPS.de_dust2);
 ok(scene.children.length === 0, 'Dust II: the models gone');
 game.lights = { power: false };
-ok(!pw.powered('upper') && pw.hint() === null, 'Dust II: powered() is the blackout\'s, no hint');
+ok(!pw.powered('upper') && !pw.hint(), 'Dust II: powered() is the blackout\'s, no hint');
 game.lights = {};
 pw.load(MAPS.cs_mansion_night);
 ok(scene.children.length === 3, 'the night Mansion: the models again');

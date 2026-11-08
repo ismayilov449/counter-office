@@ -1516,6 +1516,7 @@ function buildDecor(d, ctx) {
       obj = new THREE.PointLight(new THREE.Color(d.color), d.intensity, d.distance, 2);
       obj.position.set(...d.p);
       obj.userData.on = d.intensity;
+      obj.userData.group = d.group; // (power: which lamp it is, for lampOk)
       lights.push(obj);
       if (d.group) ctx.groupOf(d.group).lights.push(obj);
       break;
@@ -1822,13 +1823,13 @@ export function buildWorld(scene, map, qualityName) {
       pool.push(l);
     }
   } else lamps.length = 0;
-  let pickAt = 0;
+  let pickAt = 0, lampOk = null; // (power: lampOk(lamp, camPos), which lamps may shine from where the camera is)
   const shown = l => {
     for (let o = l; o; o = o.parent) if (!o.visible) return false;
     return l.intensity > 0;
   };
   function lightNearest(camPos) {
-    const cands = lamps.filter(l => shown(l) && (!l.distance || l.userData.at.distanceTo(camPos) < l.distance + 15))
+    const cands = lamps.filter(l => shown(l) && (!l.distance || l.userData.at.distanceTo(camPos) < l.distance + 15) && (!lampOk || lampOk(l, camPos))) // (power: lampOk)
       .sort((x, y) => x.userData.at.distanceToSquared(camPos) - y.userData.at.distanceToSquared(camPos));
     pool.forEach((p, i) => {
       const l = cands[i];
@@ -1887,6 +1888,7 @@ export function buildWorld(scene, map, qualityName) {
   return {
     group,
     setLights,
+    setLampFilter(fn) { lampOk = fn; pickAt = 0; }, // power: see public/js/power.js lampFilter
     setBrokenGlass,
     setBrokenPieces,
     setDoors,

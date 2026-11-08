@@ -135,6 +135,7 @@ function loadMap(id) {
   gadgets.load(map);
   elevator.load(map); // elevator
   circuits.load(map); // power
+  world.setLampFilter?.(circuits.lampFilter); // power: in the house, only the camera's storey's lamps shine (no light through the floors)
   fx.reset();
   gas.setMap(map); // gas: this map's pipes (Mansion)
   for (const d of drops.values()) scene.remove(d);
@@ -3657,7 +3658,7 @@ function updateHud(now) {
   // > a lift target aimed at > the hostage shield > a uniform > the valves > the old uses. On a gadget, in a car, flying
   // the drone or with the mortar, E does that first.
   if (me.alive && !me.act && me.driving == null && !me.riding && !me.drone && !me.mortar && !gadgets.busy()) {
-    if ((gh = circuits.hint())) hint = gh; // power: aimed at a breaker, the generator or the lift's winch (after the valves, before the old uses)
+    hint = circuits.hint(hint); // power: aimed at a breaker, the generator or the lift's winch (after the valves, before the old uses); a dead switch says why
     if ((gh = flood.hint()) || (gh = gas.hint())) hint = gh; // Floodgate, gas: their valves
     hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere()); // Disguise: crouched over a dead enemy (not where E plants or defuses)
     hint = shieldHint(hint); // shield: grab / let go / held
