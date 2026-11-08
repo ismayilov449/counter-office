@@ -39,6 +39,7 @@ import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas i
 import { createFlood } from './lib/flood.js'; // Floodgate
 import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out of deep water
 import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
+import { createStealth } from './lib/stealth.js'; // stealth: the chimney, hiding in a car's trunk
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -339,6 +340,7 @@ function sparkAt(pos, kind, by = null) { return gas.sparkAt(pos, kind, by); }
 // Floodgate (Mansion): the storm drain's valve floods the underground (see lib/flood.js)
 const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
   sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
+const stealth = createStealth({ game, players, map: () => MAP, world: () => world, broadcast, send, now, applyDamage: (...a) => applyDamage(...a), killPlayer: (...a) => killPlayer(...a), mates: (a, b) => mates(a, b), groundY: (...a) => groundY(...a), roundless: () => game.phase === 'warmup' || isDM() || isGG(), sparkAt: (pos, kind, by) => sparkAt(pos, kind, by) }); // stealth: the chimney, the trunk (lib/stealth.js)
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -574,6 +576,7 @@ function resetWorld() {
   game.camDownAt = {};
   gas.reset(); // gas: the pipes are mended and the air is clean again
   flood.reset(); // Floodgate: drained every round
+  stealth.reset(); // stealth: the fire out, the trunks empty, nobody sooty
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
   sendGadgets();
   elevator.reset(); // elevator: the cabin back on the ground floor, doors shut
@@ -2093,6 +2096,7 @@ function updateActions(t) {
     const a = p.act;
     if (!a) continue;
     if (a.type === 'flood') { flood.updateAct(p, a, t); continue; } // Floodgate: turning the valve
+    if (a.type === 'fireplace') { stealth.updateAct(p, a, t); continue; } // stealth: lighting the fireplace
     if (a.type === 'gasValve') { gas.valve(p, a, t); continue; } // gas: shutting a valve
     if (a.type === 'elevforce') { elevator.act(p, a, t); continue; } // elevator: prying the lift's doors (any phase)
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
@@ -2183,6 +2187,7 @@ function onUse(p, m, t) {
   if (!plantHere && !defuseHere && disguise.tryStart(p, t)) return; // Disguise: crouched over a dead enemy, hold E to put on their uniform
   if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
   if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
+  if (stealth.use(p, t)) return; // stealth: hold E at the hearth to light the fire; E on the roof by the stack climbs into the chimney
   if (plantHere) {
     p.act = { type: 'plant', start: t, pos: p.p.slice(), dur: CFG.plantTime * 1000 };
     return;
@@ -3947,6 +3952,7 @@ function tick() {
   const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
   tick.prev = t;
   flood.tick(t, dt); // Floodgate: the water level, drowning, electrocution
+  stealth.tick(t); // stealth: soot, the fireplace's fire, the hiders kept in their cars
   bots.update(dt);
   if (game.hostages.length) {
     for (const ev of updateHostages(game.hostages, players, dt, p => world.move(null, p, 2), t)) {
@@ -3985,6 +3991,7 @@ function tick() {
     ...shield.snap(), // shield: sh: [[hostage id, holder id], ...] while someone holds a hostage
     ...gas.snap(), // gas: { gs: { p: pipe states, r: [room, concentration 0..250, ...] } } while there is any
     ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
+    ...stealth.snap(), // stealth: st: { f: the fireplace burns, s: sooty players, k: who hides in which trunk }, only while there's any
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

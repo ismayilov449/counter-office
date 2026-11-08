@@ -2,7 +2,7 @@
 
 ## STATUS
 
-- **4.1 The chimney:** footprint chosen (below); building.
+- **4.1 The chimney:** built (geometry, climbing, soot and footprints, lighting the fire, its harm); server test t1 14/14, geom, clientsmoke pass. Browser test still to run.
 - **4.2 Creaking floorboards:** next.
 - **4.3 Hide in the car trunk:** next.
 

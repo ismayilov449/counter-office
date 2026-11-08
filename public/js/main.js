@@ -37,6 +37,7 @@ import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play 
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 import { createElevator } from './elevator.js'; // elevator
+import * as stealth from './stealth.js'; // stealth: the chimney, the creaking boards, hiding in a car's trunk
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -141,6 +142,7 @@ function loadMap(id) {
   renderMapVotes();
   world.setShadowSize(qlevel.shadowSize);
   flood.setMap(map); // Floodgate
+  stealth.setMap(map); // stealth: the chimney's rungs, the creaky spots
   prewarm();
 }
 
@@ -2902,6 +2904,7 @@ const net = new Net({
     shieldSnap(m.sh); // shield: who holds which hostage
     gas.snapshot(m.gs); // gas: the pipes and the gas in each room (none: clean air)
     flood.onSnapshot(m.fl); // Floodgate: the water level and the valve
+    stealth.onSnapshot(m.st); // stealth: the fireplace's fire, who is sooty, who hides in a trunk
   },
   catMeow(m) {
     catSound(m); // the mansion's cat: meow, mrrp, screech or hiss
@@ -3652,6 +3655,7 @@ function updateHud(now) {
   // > a lift target aimed at > the hostage shield > a uniform > the valves > the old uses. On a gadget, in a car, flying
   // the drone or with the mortar, E does that first.
   if (me.alive && !me.act && me.driving == null && !me.riding && !me.drone && !me.mortar && !gadgets.busy()) {
+    if ((gh = stealth.hint(hint))) hint = gh; // stealth: the fireplace and the chimney's top (under the valves, as on the server), a trunk (under the doors and switches, over the cars)
     if ((gh = flood.hint()) || (gh = gas.hint())) hint = gh; // Floodgate, gas: their valves
     hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere()); // Disguise: crouched over a dead enemy (not where E plants or defuses)
     hint = shieldHint(hint); // shield: grab / let go / held
@@ -3666,6 +3670,7 @@ function updateHud(now) {
   if (me.act?.a === 'disguise') hud.progress(disguise.progressLabel(), me.act.pr); // Disguise
   if (me.act?.a === 'gasValve') hud.progress('Closing the gas valve...', me.act.pr); // gas
   if (me.act?.a === 'flood') hud.progress(flood.actLabel(), me.act.pr); // Floodgate
+  if (me.act && stealth.progressLabel(me.act.a)) hud.progress(stealth.progressLabel(me.act.a), me.act.pr); // stealth: lighting the fireplace
 
   let target = null;
   if (me.alive) {
@@ -4005,6 +4010,7 @@ function frame() {
   updateCamera(dt, now);
   body.camera(camera); // body: the view from the floor
   flood.update(dt, now, camera); // Floodgate
+  stealth.frame(dt, now, camera); // stealth: the fire, the sooty footprints, creaks, the trunk's view
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -4036,6 +4042,7 @@ function frame() {
   if (shotRequested) saveScreenshot();
 }
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
+stealth.init({ scene, me, net, hud, fx, game, remotes, cars, coll: () => coll, map: () => map }); // stealth (public/js/stealth.js)
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();
