@@ -1,10 +1,72 @@
-# RESUME POINT — Counter-Office (latest: 2026-11-01)
+# RESUME POINT — Counter-Office (latest: 2026-11-08)
 
-**To continue:** check out `main` (once the user has had it fast-forwarded to `integration/2026-11-01`; until then
+**To continue:** check out `main` (once the user has had it fast-forwarded to `integration/2026-11-08`; until then
 that branch) and tell Claude Code:
 *"Read RESUME.md and continue from the resume point (section 0)."*
 
-## 0. Resume point 2026-11-01: everything merged on `integration/2026-11-01`; next: ROADMAP.md
+## 0. Resume point 2026-11-08: ROADMAP wave 1 merged on `integration/2026-11-08`; next: wave 2 (groups 6–10)
+
+**To continue:** the five wave 1 groups of ROADMAP.md are merged, linked and tested together on the branch
+**`integration/2026-11-08`** (pushed). `main` is untouched: it is fast-forwarded to the integration branch **only when
+the user says so** (the players' server runs from the main checkout). After that, the next work is **ROADMAP.md wave
+2**: groups 6 Hostages, 7 Explosives, 8 Close combat, 9 Sight, 10 Fire. All the groups they wait for are in, so all
+five can start (at most 5 agents building, at most 2 testing in a browser; ROADMAP.md "Rules for the agents").
+
+**What the integration branch has** (on top of `main` 539ce42), merged in this order, each one's server tests run
+after its merge:
+
+| # | Branch | Group | Notes |
+|---|---|---|---|
+| 1 | `feature/wounds` fd8fbd7 | 1 Downed & wounds: drag, interrogate + downed suicide, wounds, adrenaline syringe | `docs/features/wounds.md` |
+| 2 | `feature/power` c557feb | 3 Power & machinery: breakers per circuit, garage generator, surge, cutting the lift's cable | `power.md` |
+| 3 | `feature/stealth` 7d7ad34 | 4 Stealth & hiding: the chimney, creaking floorboards, the car trunk | `stealth.md` |
+| 4 | `feature/underground` 17f54c0 | 5 Underground & vents: no radar underground, echo, air vents | `underground.md` |
+| 5 | `feature/walls` a02a5af | 2 Walls & water: bullets through walls + see-through holes, pipes/wires/wet floors, wet guns, floating bodies | `walls.md` |
+
+Then the links between them, E's order and the fixes (section 9 has the details):
+- **Links:** walls' live wires follow power's circuits; the chimney is brick for the bullets; a trunk hider is out of
+  the bullets' reach (the car's body stops them); getting into a trunk ends a drag; the interrogation gives away a
+  teammate who isn't underground; `crushed` is an outright death in shared/body.js; stealth's creaks come through the
+  air vents.
+- **E's order** (server and hints alike): drone → off the zip line / CCTV desk / car / out of a trunk → revive (walking
+  with E held drags) → interrogate → letting go of a held hostage → an aimed lift target → grabbing a hostage → a
+  uniform → the valves → power's aimed uses → the fireplace / the chimney's top → the old uses (… switches, into a
+  trunk, cars, drops) → the vents' hint.
+- **Fixes:** the BLEEDING badge in a row above the health (it overlapped the bet's F3 line in buy time); the gas pipes
+  one mesh each (4 draw calls, was 10); the revive right after a drag no longer dropped; a light switch can't be used
+  from behind its wall; a lamp lights only its own room (a room switched off is no longer lit by its neighbours'
+  lamps through the walls).
+
+**Tests on the integrated build** (numbers in section 9): every group's server, unit and node tests on both
+Mansion maps (wounds t1–t4, power t1–t4, stealth t1/t2, underground t-radar/t-echo/t-vents, walls t1/t2, and their
+unit/clientsmoke tests), **`integration/links2.mjs` 40/40 on both maps** (the new links, live), every earlier
+feature's tests (`integration/links.mjs` a–h, blood, cat, shield, body, gas, flood, the lift, hostages, bet, zip line,
+CCTV, disguise), `mansion/walls.mjs`, the nav check, 60 s with `BOTS=4` on both Mansion maps (no server errors), all 7
+maps start; in the browser every group's test (wounds g1 ×2 and g2, power gpower-a/b, stealth g1, underground
+g-underground, walls g1 ×2), the HUD (`integration/ghud.mjs`) and the lamp mask (`integration/glamps.mjs`) checks,
+blood, gas, flood, the lift, zip line, CCTV, the drone and buyhover; no page errors. Draw calls against `main`: +0…+4 a
+frame in the six key views (living room, kitchen, cellar, street, garage, roof; by day and at night).
+
+**Open questions for the user** (the current behaviour is kept until he answers):
+1. **The trunk:** a teammate opening an occupied trunk is told who's inside (and stays out); an enemy opening it finds
+   the hider, who tumbles out. Keep both?
+2. **The fireplace's fire can't be put out** until the round ends (no rounds: 90 s). Keep it so (wave 2's fire hose
+   could put it out)?
+3. **On the Mansion maps brick walls now stop bullets fully:** the walls feature replaced the old realism rule (half
+   damage through any thin breakable wall or door, brick included). Keep it?
+4. **A player underground can't spot enemies for his team** (no signal), nor be spotted. Keep it?
+
+**Left / known:** the sounds by ear and the frame time on a real Intel laptop (the lamp mask adds a box
+test per point light per pixel); each group's own gaps in its docs/features file; a 2 mm seam in the roof's collision
+(power's machine room carve, harmless). The feature branches (`feature/wounds`, `power`, `stealth`, `underground`,
+`walls`) can be deleted once `main` has the integration.
+
+---
+
+## (Earlier resume point, 2026-11-01: everything merged on `integration/2026-11-01`)
+
+That integration (the 9 features of 2026-10-31 and the hostage fix) went into `main` on 2026-11-02 (6da2dc4, with the
+user's answers 539ce42). Its resume point, as it was:
 
 **To continue:** the 9 features and the hostage fix of 2026-10-31 are merged, wired together and tested on the branch
 **`integration/2026-11-01`** (pushed). `main` is untouched: it is fast-forwarded to the integration branch **only when
@@ -718,3 +780,182 @@ file before changing a feature. The short version, and what the integration adde
     living room 243 / 236, kitchen 116 / 111, cellar 136 / 130, street 408 / 391; night 262 / 255, 123 / 118, 151 /
     143, 431 / 413. The cat's shadow with a shadow-casting point light over it, 20 frames: 0 point-light casts now (9
     the old way), 7 into the sun's map.
+
+## 9. The ROADMAP wave 1 groups merged on 2026-11-08 (integration branch `integration/2026-11-08`)
+
+The five wave 1 groups of ROADMAP.md were built on their own branches (2026-11-02 to 11-08), browser-tested there, then
+merged together on `integration/2026-11-08` and tested again as one build. **Each group's full notes stay in
+`docs/features/<group>.md`** (STATUS, the README text, files, hooks, protocol, what was verified, the gaps, the links
+for wave 2): read that file before changing a group. The short version, and what the integration added, is here.
+
+### How they're built (the same rules as section 8; keep them)
+- Feature code in its own files (`lib/`, `public/js/`, `shared/`, Mansion geometry in `shared/maps/mansion_<name>.js`
+  called once from `remodel()`); hooks in shared files are single marked lines: `// wounds:`, `// power`,
+  `// stealth:`, `// underground`, `// walls:`.
+- Snapshot keys: `wd` wounds, `st` stealth, `wa` walls (only while there's something to say). Power and underground
+  have none (power sends `power`/`pwPop`/`pwSfx` messages; the vents are events). Checked live in
+  `integration/links2.mjs` d: with a drag, the fire and a burst pipe on at once, `wd`, `st`, `wa`, `bd`, `bl`, `cat`, `el`
+  each appear once in a snapshot.
+- Shared player fields: `wd…` (wounds: `wdUse` E held, `wd` the wounds, `wdAd` the syringe's after-effect, `wdHeldUntil`
+  see the fixes), `p.trunk` / `p.sootUntil` (stealth), `p.inv.adren` (the syringe). Power's state is `game.lights` +
+  `lights.dead`; walls writes `p.wetShockAt`.
+- Keys: **K** held while down = shoot yourself (5 s); **R** clears a jammed gun; everything else is **E** (the order below).
+
+### The groups (one paragraph each; details in docs/features)
+- **Downed & wounds** (`wounds.md`, branch fd8fbd7): drag a downed teammate (E held + walking; `lib/drag.js` is the
+  generic drag engine for wave 2's hostage carry and booby-trapped bodies: `wounds.drag`), interrogate a downed enemy
+  (3 s, one of his standing teammates on your team's radar 5 s), the downed suicide (K 5 s, the kill to the downer),
+  wounds (leg limp, arm sway, head blur; a bandage halves them), the adrenaline syringe ($400, a 2 s revive with
+  after-effects). Tests: `wounds/unit.mjs`, `unit2.mjs`, `clientsmoke.mjs`, `t1`–`t4.mjs`, browser `g1.mjs`, `g2.mjs`.
+- **Power & machinery** (`power.md`, c557feb): five breakers on a panel by the fuse box (upper, ground, cellar, CCTV,
+  lift; the fuse box's lever is the master), the garage's generator (CTs start it, it lights both floors 90 s), the
+  surge (lit bulbs burst on a restore: sparks, gas), cutting the lift's cable in a new machine room on the roof (a
+  ladder up from the terrace; the cabin falls, the brake catches 1 in 3, crash damage by height, crushed in the pit).
+  Changed `world.js` (with the camera in the house only the lamps of its storey shine: `setLampFilter`) and the lift
+  (`lib/elevator.js` fall, out of order, climbing out of a sunken cabin). API: `circuits.powered(c)` /
+  `circuits.poweredAt(pos)` both sides, `circuits.refuel(s)` for wave 2's fuel cans. Tests: `power/unit.mjs`, `lib.mjs`,
+  `client-node.mjs`, `fall-node.mjs`, `t1`–`t4.mjs`, `maps.mjs`, browser `gpower-a.mjs`, `gpower-b.mjs`.
+- **Stealth & hiding** (`stealth.md`, 7d7ad34): a brick fireplace in the living room and its chimney to the roof
+  (climb the flue on rungs, soot and black footprints 20 s, light the fire: E 2 s, it burns till the round ends and
+  closes the flue), 17 creaking floorboards and stair treads (heard like footsteps), hiding in the garage car's trunk
+  (unseen, carried along, E out; a teammate opening it is told, an enemy finds you; blown up with the car). Tests:
+  `stealth/unit.mjs`, `geom.mjs`, `creaks.mjs`, `clientsmoke.mjs`, `t1.mjs`, `t2.mjs`, `maps.mjs`, browser `g1.mjs`.
+- **Underground & vents** (`underground.md`, 17f54c0): no radar underground (cellar, tunnels, drain: static, no pings,
+  never spotted), shots and blasts underground echo through the house, three air vents (listen at a grille, grenades
+  through a duct, gas through the vent graph). Tests: `underground/unit.mjs`, `clientsmoke.mjs`, `t-radar.mjs`,
+  `t-echo.mjs`, `t-vents.mjs`, browser `g-underground.mjs`.
+- **Walls & water** (`walls.md`, a02a5af): bullets through wood and plaster (`shared/materials.js` classifies every
+  Mansion box; brick, stone, metal and floors stop them), see-through bullet holes (a shader patch, 0 draw calls),
+  burst pipes and live wires in the walls (sprays, wet floors, electrocution, sparks set off gas), wet guns jam (R
+  clears), bodies float up in the flood. On the Mansion maps this replaces the old realism rule (half damage through a
+  thin wall or door, brick too). Tests: `walls/unit.mjs`, `clientsmoke.mjs`, `t1.mjs`, `t2.mjs`, `maps.mjs`, browser
+  `g1.mjs`, `gcost.mjs`.
+
+### What the integration added (2026-11-08)
+- **Merge order** wounds, power, stealth, underground, walls (each one's server tests after its merge). Conflicts, all
+  resolved by keeping both sides: `server.js` (the factories after the flood's, `resetWorld`, `tick`, `onUse`, the
+  snapshot head), `main.js` (imports, `loadMap`, the `s` handler, the hint block, the progress lines, `frame`, the
+  inits), `mansion2.js` (imports, `remodel()`: `addPower` then `addStealth`). `lib/blood.js` and `lib/bots.js`
+  auto-merged (wounds and stealth changed different lines there). No hook landed in another feature's handler
+  (checked: the `s` handler, `catMeow`, `shot`, `round`, `tick`).
+- **E's order** (server `onUse` and main.js's hints alike; both files say it in a comment): drone → off the zip line /
+  CCTV desk / car / **out of a trunk** → revive (walking with E held = **drag**) → **interrogate** → letting go of a held
+  hostage → a lift target aimed at → grabbing a hostage → a uniform → the valves → **power's aimed uses** (breaker,
+  generator, winch) → **the fireplace / the chimney's top** → the old uses (… doors, switches, **into a trunk**, cars,
+  drops) → the vents' hint (no E use). In a trunk body.js's revive hint and wounds' hints stay off (E gets out first).
+- **Links:**
+  - walls ↔ power: `lib/walls.js` `powerAt()` asks `circuits.poweredAt(pos)` (the floor's breaker, the mains, the
+    generator): a cut cable goes dead with its circuit and sparks again when it's back;
+  - walls ↔ stealth: the chimney's four walls are **brick** (`shared/materials.js`: their faces also carry the cap's
+    concrete, the mouth's stone and the flue's soot, which read as stone or metal); a trunk hider is never reached by
+    bullets (they stop at the car's metal body, through a wall first or not; 12 shots from round the car in
+    links2 c), only by the car blowing up, as designed;
+  - wounds ↔ stealth: the trunk counts as "in a car" for the drag (server `busy` has `p.trunk`, which wounds' drag
+    checks): getting into a trunk ends a drag;
+  - wounds ↔ underground: the interrogation gives away the nearest standing teammate who is **not underground**; with
+    all of them underground he's told "X talked, but his teammates are all underground — no signal down there.";
+  - power ↔ body: `crushed` is in `shared/body.js`'s `BODY.outright` (lib/power.js no longer pushes it);
+  - stealth ↔ underground: the creaks, the trunk's lid and the fire's sounds come through an air vent like
+    `audio.play`'s (`audio.vent`, public/js/stealth.js `heard`).
+- **Fixes:**
+  1. **HUD:** the BLEEDING badge (blood.js) and the wound badges (wounds.js) share a row above the health
+     (`#hud-badges` in index.html, left 18 px, bottom 64 px: over the health row, under the chat): in the bottom row the
+     BLEEDING badge ran into the bet's "F3" line in buy time (as on `main`). `integration/ghud.mjs` measures it at six
+     window sizes (on `main` "BLEEDING HEAVILY · P bandage (2)" overlaps the line at 960×540 and 1024×640).
+  2. **Gas pipes:** each pipe is one mesh (every fixed part, vertex-coloured, the dial on a 128×64 texture whose right
+     half is white) plus its valve lever: 4 draw calls for the two pipes, was 10 (they're drawn whenever they're in the
+     view's frustum, walls or not).
+  3. **The revive right after a drag** (wounds' intermittent browser miss). Two causes found:
+     - **the test harness** (the main one): `mansion/game.mjs` `msgs()` read the page's kept messages and emptied them
+       in two calls, so a message the page got in between was thrown away unread; at 1–3 fps that now and then lost a
+       one-off message. In this integration's first run of wounds' g1 it lost `bodyUp` at night (the trace showed the
+       revive running from 0 to the end, and the browser was up for the next part) and `wdReveal` by day. Now one call
+       (`__in.splice(0)`): every browser test that uses `g.msgs()` gains from it;
+     - **a real race** behind it: the dragged browser smooths towards where the server puts the body, so when the drag
+       stopped its position was up to ~0.7 m behind at a few frames a second; sent as its own, the body "moved" and
+       body.js dropped the revive the dragger had just started by standing still (its 0.6 m check). Now the server keeps
+       the body where the drag left it for up to 0.8 s while that revive runs, until the browser agrees (`wdHeldUntil`,
+       `WOUNDS.drag.hold`), and the dragged browser snaps to the server's last position when the drag ends. links2 g
+       replays it (a position 0.7 m back for 0.5 s: the revive still gets him up).
+  4. **Light switches through walls:** a switch is used only from its own side of the wall (its `rot` is the side it
+     faces; every switch on both Mansion maps faces open floor), on the server and in the hint: the south-west room's
+     switch by the chimney can't be used from the living room any more (nor the Ts' room's from the upper corridor:
+     power's t1/t2 stood there and now stand in the room).
+  5. **A lamp lights only its own room** (the walls tester's note): point lights cast no shadows, so a room with its
+     light off stayed lit by its neighbours' lamps through the walls (power's storey filter only stopped it between
+     storeys). Each lamp now carries its room's boxes (map.rooms by its light group, at most two; `world.js`), and the
+     Lambert/Phong shaders drop a point light's contribution outside them (`roomlight.js` `lampBoxes`, filled in
+     three.js's light order from the main scene's `onBeforeRender`; 0 draw calls, a box test per light per pixel).
+     Lights with no room (the effects' flash, fires, the estate's lamps, the lift) light everything as before. Light
+     through a see-through bullet hole still works (the lit room's surfaces are in its lamp's box): walls' g1 passes.
+     `window.__noLampMask = true` turns it off (the A/B in `integration/glamps.mjs`).
+  6. **The flood's blown fuse** (power × flood, found by flood's browser test): power's circuits repeated it as a lamps
+     message with no fuse-box state, so every browser played a light switch's click from nowhere; now power's tick sends
+     `power: 'off'` and the fuse box's spot, and a page that already has that state only updates the lamps.
+  7. A 2 mm seam in the roof's collision at x −19.2, all along the roof (power's machine-room carve: a body can't fall
+     through it): stealth's clientsmoke rays step 1 cm aside there. Left as it is.
+- **Tests added:** `integration/links2.mjs` (parts a–h: the links above, E's order with a trunk, the snapshot keys, the
+  drag-revive race, crushed); `integration/glamps.mjs` (browser: the lamp mask A/B); `integration/gviews.mjs` has the
+  garage and the roof too.
+- **Tested on the integrated build (2026-11-08/09; test server 4260, headless Edge 9660 at 960×540):**
+  - Server, every group (both Mansion maps where marked ×2): wounds t1 30/30 ×2, t2 28/28 ×2, t3 17/17 ×2, t4 23/23
+    ×2; power t1 31/31 ×2, t2 19/19, t2 random (1–2 of 5 bulbs burst), t3 15/15 and caught 11/11, t4 9/9, maps 7/7; stealth t1
+    15/15 ×2, t2 16/16 ×2, maps 7/7; underground t-radar 12/12 ×2, t-echo 3/3 ×2, t-vents 32/32 ×2; walls t1 13/13 ×2,
+    t2 21/21 ×2, maps 7/7 (no `wa`); **links2 40/40 ×2**; no server errors in any.
+  - Node: wounds unit 26, unit2 14, clientsmoke 52; power unit 65, lib 29, client-node 43, fall-node 8; stealth unit 26,
+    geom 45, creaks 42, clientsmoke 56; underground unit 112, clientsmoke 84; walls unit 78, clientsmoke 104; all pass.
+  - The earlier features: links a–g 36/36 and h 4/4 (GAS_LEAK_X=6), tblood 33/33, cat t1 32/32, t-shield 28/28 ×2,
+    t-rescue 6/6 ×2, body t1 57/57, body gadgets 38/38 ×2, t_gas 20/20, flood t1 18/18 and t2 7/7, t-elev 35/35 ×2,
+    hostages rescue 4/4 ×2, bet tws 38/38 and tmatch 4/4, t16zip 14/14, t17cctv 17/17, disguise t1 64/64 (aim_map) and
+    t2 13/13 (de_dust2); node: elevator unit 694 and client 15, cat ai 38, sim (0 failed paths), clientsmoke 34, blood
+    unit 35 and clientsmoke 46, disguise unit 36 and clientsmoke 27, bet unit 49, gas client 14 and graph, flood swim
+    7/7, hostages sim 4/4, `mansion/walls.mjs` 0 missing / 0 twice, navcheck 0 links through floors on both maps.
+  - BOTS=4 for 60 s on both Mansion maps (`body/bots.mjs`): no server errors (day 2 downs, 5 kills; night 1 down, 9
+    kills, a round ended). All 7 maps load (`stealth/maps.mjs`).
+  - The first run had 5 failures, all fixed and rerun: wounds t1 e ×2 (the drag hold also held a body dropped at a
+    ladder: now only while the revive runs), power t1 ×2 and t2 (they used the Ts' room's switch from the corridor,
+    through the wall: now from the room).
+  - Browser (headless Edge, swiftshader, 960×540; a fresh server and a fresh Edge for each test; every failing
+    check's screenshots looked at):
+    - wounds g1 39/39 by day and at night, g2 24/24 (the first runs missed 4 and 1 checks: the harness's lost
+      messages, fix 3; rerun after the fix: 39/39 both maps; "Mate revives the browser after the drag" passed in all
+      three runs where the message wasn't lost);
+    - power gpower-a 44/44, gpower-b 35/35; stealth g1 24/24; underground g-underground 22/22 (with the real throws);
+    - walls g1: the full run by day 22/23 and at night 21/23, then the holes part (ONLY=a) 7/7 on both maps after the
+      probe change (the misses were the middle pixel landing on the hall's dark front door or the night window behind
+      the hole, darker now that lamps light only their own rooms; the screenshots show the lit hall through the holes);
+      the rest (brick, radiators, pipe, cable, zap, wet gun, floating bodies) passed in the full runs;
+    - `integration/ghud.mjs` 7/7 (the badges clear of the bet's line, the health and the chat at 6 sizes; `main` fails
+      at 960×540 and 1024×640); `integration/glamps.mjs` 7/7 by day and at night (a room switched off, mask on / off:
+      living room 24.1 / 36.4, kitchen 27.5 / 42.6, bedroom 16.8 / 26.6 by day; 4.8 / 15.1, 8.8 / 24.5, 0.9 / 11.2 at
+      night; lit, 128–146 with the mask against 131–149 without);
+    - the earlier features: gblood 20/20, g_gas2 12/12 (the kitchen pipe now costs 2 draw calls), g16zip and g17cctv
+      (hints right, no page errors, screenshots looked at), g15 (the drone; its second part needed the old connection
+      closed first: then the scripted drone is shot down), g-elevator all checks (23; its first run lost the whole first
+      part to a cold page's missed team click: `game.mjs` now clicks again), flood g1 21/21 (the third run; the first
+      run's miss, "the fuse blew: power off", was power's: fixed below; the second run's, the outlet's gush at 10 s, is
+      the known flaky timing), buyhover 42 items stay put at 10 sizes, 900×560 the 5 known failures, as on `main`;
+    - no page errors in any run.
+  - Fixed from the browser runs: (a) the flood blowing the fuse: power's circuits repeated it as a lamps message with
+    no fuse-box state, so every browser played a light switch's click from nowhere and the last message said nothing of
+    the mains; now power's tick says `power: 'off'` with the fuse box's spot, and a page that already has that state
+    only updates the lamps (no second power-down sound); (b) the test harness (`game.mjs`): messages read and emptied in
+    one call, and the team clicked again on a cold page.
+  - **Draw calls a frame** (median of 40 frames, `integration/gviews.mjs`), integration / `main` (539ce42): by day
+    living room 247 / 243, kitchen 118 / 116, cellar 140 / 136, street 409 / 408, garage 125 / 122, roof 207 / 204; at
+    night 266 / 262, 125 / 123, 153 / 150, 432 / 431, 138 / 135, 218 / 218. So +0…+4: the walls' radiators and sockets
+    (+1 in the house), the grilles (+1 where one is in view), power's panel/generator/winch models where they're in the
+    frustum, stealth +0/1; the gas pipes' merge took 6 back wherever both pipes are in the frustum (the street, the
+    kitchen, the cellar). The lamp mask adds no draw call.
+- **Known, not fixed:**
+  - The sounds of every wave-1 group are unchecked by ear (headless has no sound); frame times on a real Intel laptop
+    unmeasured (swiftshader draws 1–3 fps). The lamp mask adds a box test per point light per pixel (no draw call):
+    worth a look on a real laptop.
+  - A lamp no longer lights the floor just outside its room's open door (the light stops at the room's box); rooms
+    with more than two boxes for one light group (none in the house) light everything as before.
+  - The 2 mm seam in the roof's collision (x −19.2), see fix 7.
+  - Each group's own gaps stay in its docs/features file (e.g. walls: holes made before you joined aren't shown; stealth:
+    the cat may meow at a trunk hider in the dark; power: the machine room has no room light of its own).
+- **Open questions for the user** (section 0; the current behaviour is kept until he answers): the trunk (a teammate is
+  told, an enemy finds you), the fireplace's fire that can't be put out, brick walls stopping bullets fully on the
+  Mansion maps, and no spotting from underground.
