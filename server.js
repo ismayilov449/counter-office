@@ -974,7 +974,7 @@ function gadgetState() {
 }
 const sendGadgets = (to = null) => { if (!MAP.mansion2) return; if (to) send(to, gadgetState()); else broadcast(gadgetState()); };
 // Someone on a gadget can't shoot, throw or use their items.
-const busy = p => !!p.zip || !!p.cctv || p.trunk != null; // (stealth: + hiding in a car's trunk)
+const busy = p => !!p.zip || !!p.cctv || p.trunk != null; // stealth: + hiding in a car's trunk
 
 // ---- Zip line: E at either end hooks you on; the server moves you along the cable (your browser works out the same
 // from the start time, see zipRide) and the snapshot shows you hanging there. E or Space lets go (CS 1.6's fall damage
