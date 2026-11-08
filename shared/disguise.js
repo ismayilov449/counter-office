@@ -24,6 +24,7 @@ export const DISGUISE_WHY = {
   hurt: 'an enemy hit you',
   downed: 'you went down',
   gone: 'its owner is back on his feet or has left',
+  drag: 'you dragged a wounded man', ask: 'you interrogated a wounded man', // wounds: (lib/wounds.js)
 };
 
 // For the enemies who see through it: how they found out.
@@ -36,6 +37,7 @@ export const DISGUISE_THEY = {
   near: 'was recognised up close',
   hurt: 'took a hit from your side',
   downed: 'went down',
+  drag: 'dragged a wounded man away', ask: 'interrogated a wounded man', // wounds: (lib/wounds.js)
 };
 
 // Disguises exist only in classic matches' live rounds (not warmup, Deathmatch, Gun Game, Zombie or Hide and Seek).
