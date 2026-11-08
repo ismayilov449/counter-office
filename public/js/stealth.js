@@ -6,7 +6,7 @@
 //   4.2 the creaking boards (each browser hears whoever steps on a creaky spot, like footsteps);
 //   4.3 the trunk: hiders aren't drawn; in one yourself, a dark view through the gap under the lid.
 import * as THREE from 'three';
-import { STEALTH, stealthOf, chimneyLadder, inFlue, atHearth, atTop, creakAt } from '/shared/stealth.js';
+import { STEALTH, stealthOf, chimneyLadder, inFlue, atHearth, atTop, creakAt, atTrunk, hasTrunk, trunkPos, trunkEye } from '/shared/stealth.js';
 import { PLAYER, inWater } from '/shared/physics.js';
 import { audio, floodKit } from './audio.js';
 
@@ -18,6 +18,9 @@ let lit = false; // the fireplace burns
 const soot = new Map(); // player id -> performance.now() when their soot is gone
 let prints = null; // the footprints (see Prints)
 let smokeAt = 0, sootTold = false;
+const hiders = new Map(); // player id -> the car whose trunk they hide in (the snapshot's st.k)
+let trunkSeq = null; // our spawn when we got into a trunk (a new life is out of it)
+let cover = null; // the dark view in a trunk (a page element over the game, under the HUD)
 
 // ---------------------------------------------------------------- sounds (made like the flood's: audio.js's parts)
 function sound(name, pos) {
@@ -284,6 +287,7 @@ const handlers = {
   // the server put us somewhere (into the chimney from the top, out of a trunk)
   stTo(m) {
     const { me } = ctx;
+    if (me.trunk != null) setTrunk(null); // (out of a trunk: before the next snapshot says so)
     me.p = m.p.slice();
     me.v = [0, 0, 0];
     me.onGround = !m.c;
@@ -310,11 +314,70 @@ export function onSnapshot(st) {
     if (!sootTold && me.alive) ctx.hud.small(`You're covered in soot: you leave black footprints for ${STEALTH.soot} s`, 4);
     sootTold = true;
   } else if (!soot.has(me.id)) sootTold = false;
+  // who hides in a trunk: not drawn (see frame); ourselves: the view from inside
+  hiders.clear();
+  for (const [id, car] of st?.k || []) hiders.set(id, car);
+  for (const r of ctx.remotes.values()) r.inTrunk = hiders.has(r.id);
+  const mine = hiders.get(me.id) ?? null;
+  if (mine !== (me.trunk ?? null)) setTrunk(mine);
 }
 
+// Into a trunk (the car's id) or out of it (null).
+function setTrunk(id) {
+  const { me } = ctx;
+  const car = id != null ? ctx.cars.get(id) : null;
+  me.trunk = id;
+  if (id != null) {
+    trunkSeq = me.spawnSeq;
+    me.crouch = false; // (the camera is ours; crouched, a dead enemy's uniform would show its hint)
+    me.v = [0, 0, 0];
+    if (car) { me.yaw = car.yaw + Math.PI; me.pitch = 0; }
+  }
+  showCover(id != null);
+}
+
+// The dark view in a trunk: black but for the strip of daylight under the lid, and no crosshair.
+function showCover(on) {
+  if (!cover && on && typeof document !== 'undefined' && document.body) {
+    cover = document.createElement('div');
+    cover.id = 'stealth-trunk';
+    Object.assign(cover.style, {
+      position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, zIndex: 9, pointerEvents: 'none', display: 'none',
+      background: 'linear-gradient(to right, #000 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 78%, #000 100%), ' +
+        'linear-gradient(to bottom, #000 0%, #000 46%, rgba(0,0,0,0.3) 48.6%, rgba(0,0,0,0.3) 51.4%, #000 54%, #000 100%)',
+    });
+    document.body.appendChild(cover);
+  }
+  if (cover) cover.style.display = on ? 'block' : 'none';
+  const ch = typeof document !== 'undefined' ? document.getElementById('crosshair') : null;
+  if (ch) ch.style.visibility = on ? 'hidden' : '';
+}
+
+// In a trunk you don't move: you go where the car goes (true: updateLocal does nothing else — no walking, no shooting).
+export function local() {
+  const { me } = ctx;
+  if (me.trunk == null) return false;
+  if (me.spawnSeq !== trunkSeq) { setTrunk(null); return false; } // (a new life)
+  const car = ctx.cars.get(me.trunk);
+  if (car) me.p = trunkPos(car);
+  me.v = [0, 0, 0];
+  me.onGround = true;
+  return true;
+}
+
+export const inTrunk = () => !!ctx && ctx.me.trunk != null && ctx.me.alive;
+
 // Every frame (after the camera is placed; vm: the gun in your hands).
-export function frame(dt, now) {
+export function frame(dt, now, camera) {
   if (!ctx) return;
+  // hiders in a trunk: not drawn, no name over them, no footsteps from the moving car
+  for (const r of ctx.remotes.values()) {
+    if (!r.inTrunk) continue;
+    r.model.visible = false;
+    if (r.tag) r.tag.visible = false;
+    r.stepAcc = 0;
+  }
+  if (inTrunk() && camera) trunkView(camera);
   if (C && lit) fire(now);
   prints.update(now);
   if (S?.creaks?.length && !ctx.replay?.()) creaks();
@@ -361,15 +424,43 @@ function fire(now) {
   }
 }
 
+// The view from the trunk: under the lid at the back, looking out behind the car, turning a little.
+const angleDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+function trunkView(camera) {
+  const { me } = ctx, car = ctx.cars.get(me.trunk);
+  if (!car) return;
+  const back = car.yaw + Math.PI, rel = Math.max(-0.7, Math.min(0.7, angleDiff(back, me.yaw)));
+  me.yaw = back + rel;
+  me.pitch = Math.max(-0.4, Math.min(0.3, me.pitch));
+  camera.position.set(...trunkEye(car));
+  camera.rotation.set(me.pitch, me.yaw, 0);
+}
+
 // ---- E: the hint for what E does here, over `hint` (main.js's so far), in the server's order (onUse): the fireplace
 // comes after the valves (main.js applies them after this), the chimney's top likewise. Null: nothing of ours here.
-export function hint() {
-  if (!C || !ctx) return null;
+export function hint(current = '') {
+  if (!ctx) return null;
   const { me } = ctx;
-  if (!me.alive || me.act) return null;
+  if (!me.alive || me.act || me.trunk != null) return null;
+  const ch = chimneyHint(me);
+  if (ch) return ch;
+  // behind a car (not the pickup), where the trunk works (the Mansion maps): over the cars' own hints and what comes
+  // after them, as on the server (the same words whether someone hides in it or not)
+  if (S && ctx.game.phase !== 'freeze' && /^(Press E to (drive|get in|man|pick up|swap)|Press B|Ladder:)/.test(current || 'Press B')) {
+    for (const c of ctx.cars.values()) if (hasTrunk(c) && !c.wrecked && atTrunk(c, me.p)) return 'Press E to open the trunk and hide in it';
+  }
+  return null;
+}
+function chimneyHint(me) {
+  if (!C) return null;
   if (atTop(C, me.p)) return lit ? 'Smoke and heat pour out of the chimney: the fire below is lit' : 'Press E to climb down the chimney';
   if (atHearth(C, me.p) && !lit) return `Hold E to light the fire (${STEALTH.light} s): nobody gets up or down the chimney until the round ends`;
   return null;
+}
+
+// In a trunk: E jumps out (over everything, as on the server).
+export function inside() {
+  return inTrunk() ? 'In the trunk: nobody sees you, whoever drives takes you along. Press E to jump out' : null;
 }
 
 // The progress bar's label while holding E for one of ours (null: not ours).

@@ -3256,6 +3256,7 @@ function updateLocal(dt, now) {
   if (!me.alive) return;
   elevator.local(dt, now); // elevator: in the lift we ride up and down with it (before we move)
   if (gadgets.local(dt, now)) return;
+  if (stealth.local(dt, now)) return; // stealth: in a car's trunk you go where it goes (no walking, no shooting)
   if (me.drone) { updateDroneFlight(dt, now); return; }
   if (me.driving != null && me.car) { updateDriving(dt, now); return; }
   if (me.riding) {
@@ -3661,6 +3662,7 @@ function updateHud(now) {
     hint = shieldHint(hint); // shield: grab / let go / held
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
   }
+  if ((gh = stealth.inside())) hint = gh; // stealth: in a trunk, E jumps out (before anything else, as on the server)
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
   else if (me.act && elevator.progress(me.act.a)) hud.progress(elevator.progress(me.act.a), me.act.pr); // elevator
@@ -4029,6 +4031,7 @@ function frame() {
   world?.update(dt, camera.position);
   updateViewModel(dt, now);
   if (vm && body.frozen()) vm.visible = false; // body: nothing in your hands while playing dead
+  if (vm && stealth.inTrunk()) vm.visible = false; // stealth: nothing in your hands in a trunk
   updateHud(now);
   sendState(now);
 

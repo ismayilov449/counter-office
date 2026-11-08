@@ -13,7 +13,7 @@ let T = 100000;
 Object.defineProperty(globalThis, 'performance', { value: { now: () => T }, configurable: true, writable: true });
 const element = tag => ({ tag, style: {}, children: [], appendChild(c) { this.children.push(c); return c; }, classList: { toggle() {}, add() {}, remove() {} } });
 const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => {}) });
-const els = new Map();
+const els = new Map([['crosshair', element('div')]]);
 globalThis.document = {
   createElement: tag => (tag === 'canvas' ? { width: 0, height: 0, getContext: () => ctx2d } : element(tag)),
   getElementById: id => els.get(id) || null,
@@ -37,7 +37,8 @@ const fx = {
   puff(p) { puffs.push(p); },
 };
 const scene = new THREE.Scene();
-stealth.init({ scene, me, net, hud, fx, game: {}, remotes, cars, coll: () => coll, map: () => map });
+const game = { phase: 'live' };
+stealth.init({ scene, me, net, hud, fx, game, remotes, cars, coll: () => coll, map: () => map });
 const step = (dt = 1 / 60) => { T += dt * 1000; stealth.frame(dt, T); };
 const setMap = id => { map = MAPS[id]; coll = new CollisionWorld(map); stealth.setMap(map); };
 
@@ -188,4 +189,54 @@ me.onGround = false;
 for (let i = 0; i < 40; i++) { me.p = [-19.5 + i * 0.02, 0.813, 3.3]; step(); }
 ok('not in the air', heard().length === 0);
 me.onGround = true;
+
+// ---- 4.3 the trunk
+setMap('cs_mansion');
+const gcar = { id: 1, type: 'car', p: [-19.75, 0, -17.9], yaw: -Math.PI / 2, wrecked: false };
+const pickup = { id: 0, type: 'pickup', p: [-4, 0, 17], yaw: -Math.PI / 2, wrecked: false };
+cars.set(0, pickup); cars.set(1, gcar);
+me.p = [-21.6, 0, -16.6]; // beside the back end of the garage's car
+ok('beside the back of the car: E opens the trunk', stealth.hint('Press E to drive the car') === 'Press E to open the trunk and hide in it' && stealth.hint('') === 'Press E to open the trunk and hide in it');
+ok('not over a door or a switch (they come first on the server)', stealth.hint('Press E to open the door') === null && stealth.hint('Press E to switch the lights off') === null);
+game.phase = 'freeze';
+ok('not in freeze time', stealth.hint('Press B to buy') === null);
+game.phase = 'live';
+me.p = [-19.75, 0, -16.3];
+ok('beside its doors: nothing of ours (E gets in)', stealth.hint('Press E to drive the car') === null);
+me.p = [-4 - 2.8, 0, 17];
+ok('behind the pickup: nothing', stealth.hint('Press E to drive the car') === null);
+// someone else in it: not drawn, no name, no footsteps from the car
+const hid = { id: 3, alive: true, buf: [1], p: [-21.35, -0.2, -17.9], c: 1, model: { visible: true }, tag: { visible: true }, stepAcc: 2 };
+remotes.set(3, hid);
+stealth.onSnapshot({ k: [[3, 1]] });
+step();
+ok('a hider: not drawn, no name over him, no footsteps', hid.inTrunk && !hid.model.visible && !hid.tag.visible && hid.stepAcc === 0);
+stealth.onSnapshot({});
+hid.model.visible = true; step();
+ok('out again: drawn (main.js shows him; we leave him alone)', !hid.inTrunk && hid.model.visible);
+remotes.delete(3);
+// ourselves in it
+me.spawnSeq = 4;
+stealth.onSnapshot({ k: [[1, 1]] });
+const cover = document.body.children.find(e => e.id === 'stealth-trunk');
+ok('in the trunk: the dark view (black but a strip of light), no crosshair', me.trunk === 1 && stealth.inTrunk() && cover && cover.style.display === 'block' && /linear-gradient/.test(cover.style.background) && els.get('crosshair').style.visibility === 'hidden');
+ok('looking out the back', Math.abs(Math.atan2(Math.sin(me.yaw - (gcar.yaw + Math.PI)), Math.cos(me.yaw - (gcar.yaw + Math.PI)))) < 1e-9);
+ok('E jumps out (over everything); nothing else of ours', /Press E to jump out/.test(stealth.inside() || '') && stealth.hint('') === null);
+me.p = [0, 0, 0];
+ok('updateLocal: we go where the car goes, nothing else', stealth.local() === true && Math.hypot(me.p[0] - (-21.35), me.p[2] + 17.9) < 1e-6);
+const cam = new THREE.PerspectiveCamera();
+me.yaw = gcar.yaw + Math.PI + 1.5; me.pitch = -1;
+stealth.frame(1 / 60, T, cam);
+ok('the camera under the lid at the back, turning at most 0.7 rad, a little up and down', Math.abs(cam.position.x - (-19.75 - 1.95)) < 1e-6 && Math.abs(cam.position.y - 0.95) < 1e-6 && Math.abs(cam.rotation.y - (gcar.yaw + Math.PI + 0.7)) < 1e-6 && Math.abs(cam.rotation.x + 0.4) < 1e-6);
+gcar.p = [-11.75, 0, -17.9]; stealth.local();
+ok('driven away: still in it, where the car is', Math.abs(me.p[0] - (-13.35)) < 1e-6);
+net.handlers.stTo({ p: [-14.75, 0, -17.9], c: 0 });
+ok('out (stTo): where the server says, the view and the crosshair back', me.trunk == null && !stealth.inTrunk() && cover.style.display === 'none' && els.get('crosshair').style.visibility === '' && me.p[0] === -14.75 && stealth.local() === false);
+stealth.onSnapshot({ k: [[1, 1]] });
+me.spawnSeq = 5; me.p = [27, 0, 1]; // a new life (main.js's spawn put us on the street)
+ok('a new life: out of it (and where the spawn put us)', stealth.local() === false && me.trunk == null && me.p[0] === 27);
+stealth.onSnapshot({});
+setMap('de_dust2');
+me.p = [0, 0, 0];
+ok('de_dust2: no trunk hints (the trunk is the Mansion maps\' only)', stealth.hint('') === null);
 console.log(process.exitCode ? 'SOME FAILED' : 'all ok');
