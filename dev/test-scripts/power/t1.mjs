@@ -15,7 +15,7 @@ const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if 
 const until = async (cond, ms = 8000) => { const t0 = Date.now(); while (!cond() && Date.now() - t0 < ms) await sleep(50); return cond(); };
 const UPPER = ['lampa9', 'lampa3', 'lampa10', 'lampa11', 'lampa1'], GROUND = ['lampa6', 'lampa4', 'lampa5', 'lampa7', 'lampa8', 'lampa2', 'garage'];
 const PANEL = [-16.95, -2.2, -4.6], FUSE = [-18.3, -2.2, -4.5], GEN = [-19.6, 0, -16.0];
-const SW_UP = [-16.0, 4.27, 1.32], SW_LIVING = [-19.0, 0.813, -4.0];
+const SW_UP = [-17.0, 4.267, 1.32], SW_LIVING = [-19.0, 0.813, -4.0];
 
 const ct = await player('Sparky', 'CT'), t = await player('Cutter', 'T');
 for (const c of [ct, t]) {

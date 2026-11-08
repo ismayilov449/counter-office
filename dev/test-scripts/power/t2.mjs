@@ -23,7 +23,7 @@ const MAP = MAPS[process.env.MAP || 'cs_mansion'];
 const ok = (what, cond) => { console.log((cond ? 'OK   ' : 'FAIL ') + what); if (!cond) process.exitCode = 1; };
 const until = async (cond, ms = 8000) => { const t0 = Date.now(); while (!cond() && Date.now() - t0 < ms) await sleep(50); return cond(); };
 const UPPER = ['lampa9', 'lampa3', 'lampa10', 'lampa11', 'lampa1'];
-const PANEL = [-16.95, -2.2, -4.6], FUSE = [-18.3, -2.2, -4.5], GEN = [-19.6, 0, -16.0], SW_UP = [-16.0, 4.27, 1.32], SW_CELLAR = [-14.0, -2.2, -3.6];
+const PANEL = [-16.95, -2.2, -4.6], FUSE = [-18.3, -2.2, -4.5], GEN = [-19.6, 0, -16.0], SW_UP = [-17.0, 4.267, 1.32], SW_CELLAR = [-14.0, -2.2, -3.6];
 
 const ct = await player('Sparky', 'CT'), t = await player('Cutter', 'T');
 for (const c of [ct, t]) {
