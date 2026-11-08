@@ -146,4 +146,46 @@ ok('and you leave prints too', mesh.count > n1 + 2);
 // a new map clears them
 setMap('cs_mansion_night');
 ok('a new map: no prints', mesh.count === 0 && !mesh.visible);
+stealth.onSnapshot({});
+
+// ---- 4.2 creaks: whoever steps on a creaky spot is heard (the local player too), walking or crouching
+const log = stealth._debug().creakLog;
+const heard = () => log.splice(0, log.length);
+const top = (x, z, y) => { const h = coll.raycast([x, y + 0.5, z], [0, -1, 0], 1.5, 'solid'); return h ? y + 0.5 - h.t : y; };
+// a remote walking up the hall's south flight at walking (Shift) speed, 2.6 m/s, in the middle of the treads
+const climb = (who, x, z0, z1, speed, crouch = false) => {
+  let y = 0.813;
+  const n = Math.ceil((Math.abs(z1 - z0) / speed) * 60);
+  for (let k = 0; k <= n; k++) {
+    const z = z0 + ((z1 - z0) * k) / n, t = top(x, z, y + 0.45);
+    if (t <= y + 0.5) y = t;
+    who.p = [x, y, z]; who.c = crouch ? 1 : 0; who.crouch = crouch;
+    step();
+  }
+};
+heard();
+climb(r, -12.18, 0.0, 5.4, 2.6);
+let h = heard();
+ok(`a remote walking (Shift) up the middle of the south flight: 3 creaks (${h.length}), on the stairs, full`, h.length === 3 && h.every(c => c.kind === 'step' && c.g === 1));
+climb(r, -11.7, 5.4, 0.0, 5);
+ok('running down along the open side: none', heard().length === 0);
+climb(r, -12.18, 0.0, 5.4, 1.7, true);
+h = heard();
+ok(`crouching up the middle: still 3, quieter (${h.map(c => c.g).join(' ')})`, h.length === 3 && h.every(c => c.g < 0.7));
+// a floorboard: stepping on creaks once; standing still, nothing more; walking along it, again every 0.7 m
+r.p = [-17.0, 0.813, 1.0]; r.c = 0; step(); heard();
+for (let i = 0; i <= 30; i++) { r.p = [-17.0 - i * 0.04, 0.813, -4.5]; step(); } // into "by the doorway to the kitchen" (x -18.4..-17.4) and 0.8 m along it
+h = heard();
+ok(`along a floorboard 0.8 m: 2 creaks (${h.length}), board`, h.length === 2 && h.every(c => c.kind === 'board'));
+for (let i = 0; i < 60; i++) step();
+ok('standing still on it: no more', heard().length === 0);
+// the local player
+remotes.delete(2);
+me.p = [-17.0, 0.813, 3.3]; me.onGround = true; step(); heard();
+for (let i = 0; i < 40; i++) { me.p = [-18.5 - i * 0.02, 0.813, 3.3]; step(); } // in front of the fireplace (x -19.7..-18.9, z 3.0..3.6)
+ok('you hear your own creak (in front of the fireplace)', heard().length === 1);
+me.onGround = false;
+for (let i = 0; i < 40; i++) { me.p = [-19.5 + i * 0.02, 0.813, 3.3]; step(); }
+ok('not in the air', heard().length === 0);
+me.onGround = true;
 console.log(process.exitCode ? 'SOME FAILED' : 'all ok');

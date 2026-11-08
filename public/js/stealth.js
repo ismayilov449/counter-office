@@ -6,11 +6,11 @@
 //   4.2 the creaking boards (each browser hears whoever steps on a creaky spot, like footsteps);
 //   4.3 the trunk: hiders aren't drawn; in one yourself, a dark view through the gap under the lid.
 import * as THREE from 'three';
-import { STEALTH, stealthOf, chimneyLadder, inFlue, atHearth, atTop } from '/shared/stealth.js';
+import { STEALTH, stealthOf, chimneyLadder, inFlue, atHearth, atTop, creakAt } from '/shared/stealth.js';
 import { PLAYER, inWater } from '/shared/physics.js';
 import { audio, floodKit } from './audio.js';
 
-let ctx = null; // { scene, me, net, hud, fx, game, remotes, cars: Map, coll(), map() }
+let ctx = null; // { scene, me, net, hud, fx, game, remotes, cars: Map, coll(), map(), replay() (the kill cam is on) }
 let S = null; // the map's stealth data ({ chimney, creaks }) or null
 let C = null; // its chimney
 let ladder = null; // the chimney's rungs, in map.ladders
@@ -39,6 +39,23 @@ function sound(name, pos) {
     tone(out, t + 0.02, { freq: 900, dur: 0.15, type: 'triangle', gain: 0.05 });
     burst(out, t + 0.16, { dur: 0.03, type: 'highpass', freq: 3500, gain: 0.3 });
   }
+}
+
+// A board or a stair's tread giving under a foot: a dull knock and a squeak of dry wood rubbing (stick-slip), a
+// stair's higher and shorter; a little different every time. g: quieter for someone crouching.
+const creakLog = []; // (the last creaks played, for the node tests)
+function creak(kind, pos, g = 1) {
+  creakLog.push({ kind, pos, g });
+  if (creakLog.length > 50) creakLog.shift();
+  const k = floodKit();
+  if (!k) return;
+  const { ctx: ac, burst, tone } = k, t = ac.currentTime, out = audio.out(pos, [4, 1]);
+  const r = 0.9 + Math.random() * 0.2, step = kind === 'step';
+  const f = (step ? 980 : 620) * r, len = (step ? 0.2 : 0.32) * (0.85 + Math.random() * 0.3);
+  burst(out, t, { dur: 0.05, freq: step ? 420 : 300, gain: 0.22 * g });
+  burst(out, t + 0.02, { dur: len, type: 'bandpass', freq: f, freqEnd: f * 0.78, q: 14, gain: 0.32 * g });
+  tone(out, t + 0.02, { freq: (step ? 240 : 150) * r, freqEnd: (step ? 300 : 195) * r, dur: len * 0.9, type: 'sawtooth', gain: 0.045 * g });
+  for (let i = 0; i < 4; i++) burst(out, t + 0.03 + (i * len) / 4, { dur: 0.012, type: 'bandpass', freq: f * 1.6, q: 6, gain: 0.08 * g });
 }
 
 // ---------------------------------------------------------------- the footprints
@@ -300,6 +317,33 @@ export function frame(dt, now) {
   if (!ctx) return;
   if (C && lit) fire(now);
   prints.update(now);
+  if (S?.creaks?.length && !ctx.replay?.()) creaks();
+}
+
+// ---- 4.2 the creaking boards: each browser hears everyone (itself too) who steps onto a creaky spot, as it hears
+// their footsteps — but walking (Shift) or crouching creaks too (crouching a little quieter). Stepping on: a creak;
+// moving on along it, another every STEALTH.again metres; standing still on it, nothing.
+const treads = new Map(); // player id -> { spot, acc, last: [x, z] }
+function creaks() {
+  const { me, remotes } = ctx;
+  const seen = new Set();
+  const look = (id, p, crouch, ground) => {
+    seen.add(id);
+    let w = treads.get(id);
+    if (!w) treads.set(id, w = { spot: -1, acc: 0, last: [p[0], p[2]] });
+    const moved = Math.hypot(p[0] - w.last[0], p[2] - w.last[1]);
+    w.last = [p[0], p[2]];
+    const i = ground && moved < 1 && !inWater(ctx.map().water, p) ? creakAt(S.creaks, p) : -1;
+    if (i < 0) { w.spot = -1; return; }
+    if (moved < 0.004) return;
+    if (i !== w.spot) { w.spot = i; w.acc = 0; }
+    else if ((w.acc += moved) < STEALTH.again) return;
+    else w.acc = 0;
+    creak(S.creaks[i].k, [p[0], p[1] + 0.05, p[2]], crouch ? 0.55 : 1);
+  };
+  if (me.alive && me.driving == null && !me.riding && me.trunk == null) look(me.id, me.p, me.crouch, me.onGround);
+  for (const r of remotes.values()) if (r.alive && r.buf.length && !r.inTrunk && r.p) look(r.id, r.p, !!r.c, true);
+  for (const id of treads.keys()) if (!seen.has(id)) treads.delete(id);
 }
 
 // The fire in the hearth: the Molotov's flames and glow (and their crackle and burning screen, main.js's), no smoke in
@@ -336,4 +380,4 @@ export function progressLabel(a) {
 export const fireLit = () => lit;
 
 // (for the node tests: dev/test-scripts/stealth/clientsmoke.mjs)
-export const _debug = () => ({ dark: () => prints.dark.array, prints, soot, ladder: () => ladder });
+export const _debug = () => ({ dark: () => prints.dark.array, prints, soot, ladder: () => ladder, creakLog });

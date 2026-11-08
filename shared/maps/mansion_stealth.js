@@ -93,5 +93,27 @@ export function addStealth({ carve, unface, face, brush, decor, keep }) {
   decor.push({ type: 'stealth', chimney: { ...C }, creaks: CREAKS.map(c => ({ ...c })) });
 }
 
-// ---- 4.2 the floorboards and stairs that creak: { name, box: [x1, z1, x2, z2], y (the floor's height there) }
-export const CREAKS = [];
+// ---- 4.2 the floorboards and stairs that creak: { name, box: [x1, z1, x2, z2] (where your feet's middle is), y (the
+// floor's height there), k ('step': a stair's tread, 'board': a floorboard) }. Every one is on a wooden floor. On the
+// stairs only the middle of a tread creaks: keep to the wall (x -12.55 .. -12.38 on the hall stairs, the 17 cm your
+// body leaves) or to the open side (x -11.98 .. -11.48), or on the cellar stairs either side of the middle 45 cm.
+const HALL = [-12.38, -11.98], CELLAR = [-14.65, -14.2];
+export const CREAKS = [
+  { name: 'the hall stairs, north flight, 3rd step', box: [HALL[0], -5.28, HALL[1], -4.67], y: 2.032, k: 'step' },
+  { name: 'the hall stairs, north flight, 6th step', box: [HALL[0], -7.11, HALL[1], -6.50], y: 3.251, k: 'step' },
+  { name: 'the hall stairs, south flight, 2nd step', box: [HALL[0], 0.81, HALL[1], 1.42], y: 1.626, k: 'step' },
+  { name: 'the hall stairs, south flight, 5th step', box: [HALL[0], 2.64, HALL[1], 3.25], y: 2.845, k: 'step' },
+  { name: 'the hall stairs, south flight, 7th step', box: [HALL[0], 3.86, HALL[1], 4.47], y: 3.658, k: 'step' },
+  { name: 'the cellar stairs, 4th step', box: [CELLAR[0], -9.09, CELLAR[1], -8.76], y: 0.208, k: 'step' },
+  { name: 'the cellar stairs, 8th step', box: [CELLAR[0], -7.77, CELLAR[1], -7.44], y: -0.5947, k: 'step' },
+  { name: 'the cellar stairs, 12th step', box: [CELLAR[0], -6.45, CELLAR[1], -6.12], y: -1.3973, k: 'step' },
+  { name: 'the living room, by the doorway to the kitchen', box: [-18.4, -4.9, -17.4, -4.1], y: 0.813, k: 'board' },
+  { name: 'the living room, in front of the sofa', box: [-22.2, -0.6, -21.4, 0.6], y: 0.813, k: 'board' },
+  { name: 'the living room, in front of the fireplace', box: [-19.7, 3.0, -18.9, 3.6], y: 0.813, k: 'board' },
+  { name: 'the kitchen, by the back door', box: [-22.9, -9.2, -22.1, -8.2], y: 0.813, k: 'board' },
+  { name: 'the south-west room (ground floor), the middle', box: [-20.2, 6.4, -19.4, 7.2], y: 0.813, k: 'board' },
+  { name: 'the Terrorists\' room, the middle', box: [-20.0, -1.2, -19.2, -0.2], y: 4.267, k: 'board' },
+  { name: 'the Terrorists\' room, by the way into its east part', box: [-17.4, -0.3, -16.7, 0.6], y: 4.267, k: 'board' },
+  { name: 'the north room upstairs, the middle', box: [-19.5, -10.5, -18.7, -9.7], y: 4.267, k: 'board' },
+  { name: 'the bedroom, the middle', box: [-20.6, 6.4, -19.8, 7.2], y: 4.267, k: 'board' },
+];

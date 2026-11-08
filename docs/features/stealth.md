@@ -3,7 +3,7 @@
 ## STATUS
 
 - **4.1 The chimney:** built (geometry, climbing, soot and footprints, lighting the fire, its harm); server test t1 14/14, geom, clientsmoke pass. Browser test still to run.
-- **4.2 Creaking floorboards:** next.
+- **4.2 Creaking floorboards:** built (17 creaky spots, each browser hears them like footsteps); creaks.mjs and clientsmoke pass. Browser test (by ear) still to run.
 - **4.3 Hide in the car trunk:** next.
 
 ## The fireplace and chimney: footprint (for the other wave-1 groups: please keep clear)
