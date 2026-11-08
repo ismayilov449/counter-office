@@ -3,7 +3,11 @@
 ## STATUS
 - **5.1 No radar underground: done** (server and browser). Tests: `underground/t-radar.mjs` 12/12 on cs_mansion and
   cs_mansion_night, `underground/clientsmoke.mjs` 39/39, the old `jamtest.mjs` (de_dust2) still passes.
-- **Next:** 5.2 echo, then 5.3 vents.
+- **5.2 Echo: done** (browser; the server already sends every shot and blast to everyone). Tests:
+  `underground/clientsmoke.mjs` 59/59 (with a fake sound kit: the boom from below the same at 5 m and 40 m, one per
+  0.07 s, suppressed quieter, the tunnel echo underground, blasts, no echo above ground or on other maps),
+  `underground/t-echo.mjs` 3/3 on both Mansion maps. Not heard by ear yet (browser test).
+- **Next:** 5.3 vents.
 
 ## The vent grilles (chosen first, so the other wave-1 groups can avoid them)
 Three short ducts, a grille at each end (`shared/underground.js`, `GRILLES`/`DUCTS`). Every grille sits where nothing

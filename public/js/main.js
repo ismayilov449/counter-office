@@ -454,6 +454,7 @@ function fireBullet(id, def, now) {
   ejectCasing();
   net.send(def.pellets ? { t: 'shoot', o, ds: dirs, w: id, rt: serverNow() - interpMs } : { t: 'shoot', o, d: dirs[0], w: id, rt: serverNow() - interpMs });
   audio.play('shot', null, id === 'm4a1' ? 'm4a1s' : id);
+  ug.shot(o, id); // underground: its echo
 
   me.punchP = Math.min(0.075, me.punchP + def.recoil * 0.45 * (1 + Math.min(me.shotsFired, 6) * 0.07));
   if (me.shotsFired > 3) me.punchY = clamp(me.punchY + (Math.random() - 0.5) * def.recoil * 0.5, -0.025, 0.025);
@@ -2918,6 +2919,7 @@ const net = new Net({
       return;
     }
     audio.play('shot', m.o, m.w === 'm4a1' ? 'm4a1s' : m.w);
+    ug.shot(m.o, m.w); // underground: its echo
     let from = m.o;
     const muzzle = r?.model.userData.gun?.userData.muzzle;
     if (muzzle && r.model.visible) {
@@ -3065,6 +3067,7 @@ const net = new Net({
       audio.muffled = false;
     }
     realBlast(m);
+    ug.boom(m.p, m.k); // underground: its echo
   },
   boomInner(m) {
     if (m.k === 'flash') { fx.flashPop(m.p); audio.play('flashpop', m.p); return; }
