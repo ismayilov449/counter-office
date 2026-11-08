@@ -576,6 +576,7 @@ function resetWorld() {
   game.camDownAt = {};
   gas.reset(); // gas: the pipes are mended and the air is clean again
   flood.reset(); // Floodgate: drained every round
+  ug.reset(); // underground: no grenade left in the ducts
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
   sendGadgets();
   elevator.reset(); // elevator: the cabin back on the ground floor, doors shut
@@ -3050,6 +3051,7 @@ function updateSpotting(t) {
     for (const e of list) {
       const team = other(e.team);
       if (e.disguise === team) continue; // Disguise: in their uniform you're no red dot on their radar
+      if (ug.under(e.p)) continue; // underground: never a red dot, however he was spotted (other features set spotAt too)
       if (t - (e.spotAt?.[team] ?? -1e9) < SPOT.keep) seen[team].push([e.id, r2(e.p[0]), r2(e.p[2])]);
     }
   }
@@ -3088,6 +3090,7 @@ function onNade(p, m) {
   const path = [];
   const end = simulateNade(world.nade(), o, v, fuse, path, !!WEAPONS[k].impact);
   const flight = WEAPONS[k].impact ? path.length * NADE.dt : fuse;
+  const duct = ug.nade(id, k, p.id, path, fuse); // underground: into an air vent's grille: `path` is cut there, it comes out of the other end later (lib/underground.js)
   // Windows in the grenade's flight path shatter when it reaches them.
   const panes = new Map();
   for (let i = 0, prev = o; i < path.length; prev = path[i], i++) {
@@ -3099,8 +3102,8 @@ function onNade(p, m) {
     }
   }
   for (const [gid, i] of panes) setTimeout(() => breakGlass([gid]), (i + 1) * NADE.dt * 1000);
-  game.nades.push({ id, k, owner: p.id, at: now() + flight * 1000, end });
-  broadcast({ t: 'nade', id, k, o, v, owner: p.id });
+  game.nades.push({ id, k, owner: p.id, at: now() + flight * 1000, end, ...duct?.n }); // underground: (+ duct)
+  broadcast({ t: 'nade', id, k, o, v, owner: p.id, ...duct?.m }); // underground: (+ duct)
   sendMe(p);
 }
 
@@ -3961,6 +3964,7 @@ function tick() {
   }
   shield.update(t); // shield: held hostages go with their holders; holds end on death, a new round...
 
+  ug.tick(t); // underground: grenades dropping out of the air vents
   for (let i = game.nades.length - 1; i >= 0; i--) {
     if (t >= game.nades[i].at) explodeNade(game.nades.splice(i, 1)[0]);
   }

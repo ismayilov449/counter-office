@@ -17,7 +17,9 @@ export const UG = {
   listen: 2.2, // m from a grille (your ears: the camera) that you hear the room behind it
   via: 0.35, // a sound through a duct counts its way (duct + the far grille to the sound) this much: ducts carry sound well
   outside: 14, // m round an outside grille that it hears (it has no room)
-  mouth: 0.2, // m in front of a grille a grenade goes in
+  // m in front of a grille a grenade goes in: deeper than a thrown grenade moves in one step (21 m/s: 0.35 m in 1/60 s;
+  // it bounces off the wall from the step before, so a thinner mouth would miss it), and 5 cm wider than the plate
+  mouth: 0.5, mouthPad: 0.05,
   ductSpeed: 5, // m/s a grenade rattles through a duct
   ductMin: 0.3, // s at least
   pop: { wall: 2.4, floor: 3.2, ceiling: 0.8 }, // m/s a grenade comes out of a grille (out of a wall, up out of a floor, down from a ceiling)
@@ -53,10 +55,11 @@ export function isUnderground(map, p) {
 // can drop a grenade into it, it pops up out of it) or 'ceiling'. All of them sit where nothing ever breaks: the
 // cellar's walls, the house's foundation and the slab between the storeys. Names are what the HUD says.
 const GRILLES = [
-  // 0, 1: the cellar's air vent: high in the cellar's west wall (over the gap between two wine racks), out through the
-  // foundation to a grille at the foot of the house's west wall on the back lawn
-  { name: 'the cellar', kind: 'wall', axis: 0, n: 1, lo: [-22.9, 0.04, -2.5], hi: [-22.9, 0.4, -1.9] },
-  { name: 'the back lawn', kind: 'wall', axis: 0, n: -1, lo: [-23.67, 0.04, -2.5], hi: [-23.67, 0.4, -1.9], outside: true },
+  // 0, 1: the cellar's air vent: high in the cellar's west wall (over the gap between two wine racks, z 1.1-2.0), out
+  // through the foundation to a grille at the foot of the house's west wall on the back lawn (under the living room's
+  // south window; the crates by the wall stand further north, z -2.5 to -0.4)
+  { name: 'the cellar', kind: 'wall', axis: 0, n: 1, lo: [-22.9, 0.04, 1.2], hi: [-22.9, 0.4, 1.8] },
+  { name: 'the back lawn', kind: 'wall', axis: 0, n: -1, lo: [-23.67, 0.04, 1.2], hi: [-23.67, 0.4, 1.8], outside: true },
   // 2, 3: the kitchen's ceiling (west of its lamp) and the floor of the bedroom above it (the north-west room upstairs)
   { name: 'the kitchen', kind: 'ceiling', axis: 1, n: -1, lo: [-20.3, 4.06, -11.0], hi: [-19.8, 4.06, -10.5] },
   { name: 'the bedroom upstairs', kind: 'floor', axis: 1, n: 1, lo: [-18.6, 4.27, -11.0], hi: [-18.1, 4.27, -10.5] },
@@ -73,7 +76,7 @@ const BUILT = GRILLES.map((g, i) => {
   const c = center(g), nv = [0, 0, 0];
   nv[g.axis] = g.n;
   // the mouth: the box in front of the plate a grenade goes in through
-  const mlo = g.lo.slice(), mhi = g.hi.slice();
+  const mlo = g.lo.map((v, k) => (k === g.axis ? v : v - UG.mouthPad)), mhi = g.hi.map((v, k) => (k === g.axis ? v : v + UG.mouthPad));
   if (g.n > 0) mhi[g.axis] += UG.mouth; else mlo[g.axis] -= UG.mouth;
   return { i, ...g, c, nv, mouth: { min: mlo, max: mhi }, links: [] };
 });

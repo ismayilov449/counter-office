@@ -3055,9 +3055,9 @@ const net = new Net({
     if (m.owner !== me.id) audio.play('shot', m.o, m.w || 'rpg');
   },
   nade(m) {
-    fx.nade(m.k, m.o, m.v, nadeFuse(m.k), p => audio.play('bounce', p));
+    fx.nade(m.k, m.o, m.v, m.fu ?? nadeFuse(m.k), p => audio.play('bounce', p)); // underground: (m.fu: up to an air vent's grille, or what's left coming out of one)
     // 'Fire in the hole!' goes out on the thrower's team radio.
-    if (settings.radioVoice && m.k !== 'dronebomb' && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole');
+    if (m.vent == null && settings.radioVoice && m.k !== 'dronebomb' && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole'); // underground: (not again out of a vent)
   },
   boom(m) {
     audio.muffled = !!map.realism && indoors(me.p) !== indoors(m.p);
@@ -3664,6 +3664,7 @@ function updateHud(now) {
     hint = shieldHint(hint); // shield: grab / let go / held
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
   }
+  if (!hint && (gh = ug.hint())) hint = gh; // underground: by an air vent (no E use: only when nothing else is said)
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
   else if (me.act && elevator.progress(me.act.a)) hud.progress(elevator.progress(me.act.a), me.act.pr); // elevator
