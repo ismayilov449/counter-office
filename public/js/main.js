@@ -34,6 +34,7 @@ import { BloodTrails } from './blood.js'; // blood trails
 import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, shieldSpeed, shieldRay, shieldHint, shieldHolding, shieldPoseRemote, shieldPoseHostage } from './shield.js'; // shield: the human shield
 import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
+import { initWounds, wounds } from './wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 import { createElevator } from './elevator.js'; // elevator
@@ -316,6 +317,7 @@ function switchSlot(slot, silent = false) {
   if (!weaponOf(slot) || me.drone) return;
   if (!shieldSlotOk(slot)) return; // shield: only the pistol while holding a hostage
   if (body.blocksSlot(slot)) return; // body: only the pistol while down
+  if (wounds.blocksSlot(slot)) return; // wounds: only the pistol while dragging a teammate
   if (slot === me.slot && vmId === current()) return;
   if (slot !== me.slot) me.lastSlot = me.slot;
   me.slot = slot;
@@ -359,6 +361,7 @@ function computeSpread(def) {
   if (!me.onGround) s += (def.moveSpread || 0) * 1.5 + 0.03;
   else if (me.crouch) s *= 0.7;
   s += Math.min(me.shotsFired, 10) * (def.spreadInc || 0) * 0.55;
+  s = wounds.spread(s); // wounds: an arm wound (or adrenaline) spreads the shots
   return s;
 }
 
@@ -3235,6 +3238,7 @@ const net = new Net({
 });
 const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map, downed: () => body.downed() }); // blood trails (public/js/blood.js)
 initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
+initWounds({ net, me, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone, blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone }); // body
 
 // The Mansion's gadgets: the zip line (see gadgets.js).
@@ -3314,6 +3318,7 @@ function updateLocal(dt, now) {
   speed *= 1 - 0.45 * Math.min(1, dazed(performance.now()));
   speed *= bleed.speedMul(); // blood trails: slow while bandaging
   speed = body.move(speed); // body: a crawl while down, no jumping
+  speed = wounds.speed(speed); // wounds: a limp, dragging (slow), being dragged or ending it (still)
   // Swim up: hold Space in water to rise to the surface and climb out over the edge.
   if (wet && keys.has('Space') && !frozen) { me.v[1] = Math.max(me.v[1], 3.2); me.onGround = false; }
 
@@ -4004,6 +4009,7 @@ function frame() {
   updateBomb(now);
   updateCamera(dt, now);
   body.camera(camera); // body: the view from the floor
+  wounds.frame(dt, now, camera); // wounds: drag/suicide input, being dragged, the limp, sway and blur, remote poses, badges
   flood.update(dt, now, camera); // Floodgate
   updateDaze(now);
   updateMortarHud();

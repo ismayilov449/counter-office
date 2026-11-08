@@ -73,7 +73,7 @@ function onKill(m, orig) {
   if (!how) { orig(m); return; }
   // "(finished)" or "(bled out)" after the name in the kill feed
   const hud = A.hud, kf = hud.killfeed;
-  hud.killfeed = function (k, v, w, hs, mine) { return kf.call(this, k, { ...v, name: `${v.name} (${how === 'bled' ? 'bled out' : 'finished'})` }, w, hs, mine); };
+  hud.killfeed = function (k, v, w, hs, mine) { return kf.call(this, k, { ...v, name: `${v.name} (${how === 'bled' ? 'bled out' : how === 'suicide' ? 'shot himself' : 'finished'})` }, w, hs, mine); }; // wounds: 'suicide'
   try { orig(m); } finally { hud.killfeed = kf; }
 }
 
@@ -375,7 +375,7 @@ export const body = {
     const me = A.me, now = performance.now();
     if (!me.alive || me.drone || me.driving != null || me.riding || now - st.keyAt < 400) return;
     st.keyAt = now;
-    if (st.downed) { A.hud.small("You can't play dead while you're down", 2); return; }
+    if (st.downed) return; // wounds: K held while down is the pistol to the head (wounds.js)
     if (A.game.cfg.gameMode !== 'classic') { A.hud.small('Playing dead works in classic matches only', 2); return; }
     // (a corpse can't hang in the air, on a ladder or in the water; off the zip line the server lets you fall)
     if (!me.onGround && !me.zip && !st.pd) { A.hud.small('Stand on the ground to play dead', 2); return; }
