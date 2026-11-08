@@ -1141,7 +1141,7 @@ function onCar(p, m, t) {
   if (Math.abs(c.speed) < 4) return;
   const boxes = carBoxes(c);
   for (const q of players.values()) {
-    if (q === p || !q.alive || q.driving != null || q.riding != null) continue;
+    if (q === p || !q.alive || q.driving != null || q.riding != null || q.trunk != null) continue; // stealth: + not whoever hides in a trunk (he's inside the car's boxes)
     if (!CFG.friendlyFire && mates(q, p)) continue;
     const hit = boxes.some(b => q.p[0] + 0.35 > b.min[0] && q.p[0] - 0.35 < b.max[0] && q.p[2] + 0.35 > b.min[2] &&
       q.p[2] - 0.35 < b.max[2] && q.p[1] < b.max[1] && q.p[1] + 1.8 > b.min[1]);

@@ -36,6 +36,9 @@ const living = [-17.5, 0.813, 1.0], hearthFront = [-19.3, 0.85, 3.85];
 CT.at([-19.3, C.hearth, 4.8], 0, 0, 1); // crawled into the firebox
 await sleep(500);
 check(sootOf(cid) == null, 'crawling into the firebox: no soot');
+T.clear(); CT.clear();
+CT.use(true); await sleep(150); CT.use(false); await sleep(400);
+check(!T.got('lights').length && !CT.got('msg').length, 'E in the firebox: nothing (the south-west room\'s light switch, on the far side of the wall, is out of reach from in here)');
 CT.at([-19.3, 4.0, 4.8]); // up the flue
 await waitFor(() => sootOf(cid) != null, 1500);
 check(sootOf(cid) > 19, `up the flue: sooty (st.s says ${sootOf(cid)} s)`);

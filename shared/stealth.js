@@ -64,10 +64,14 @@ export function topSpot(C) {
   return [lx, ltop - 0.3, Math.min(lz - 0.36, (C.fz1 + C.fz2) / 2 + 0.05)];
 }
 // The flue's rungs as a map ladder ({ min, max, n }, as builder.ladder makes them); `off`: taken away (a fire burns).
+// Its wall side is set PULL m behind the rungs' wall: a climber is pulled to 0.5 m from that side (physics.js
+// ladderPull), and in a flue only 0.8 m deep that would press him into the front wall — near the top the climb's 1 m
+// step-up then stood him on the front rim. 0.1 m keeps him 5 cm clear of both walls.
+const PULL = 0.1;
 export function chimneyLadder(C, off = false) {
-  const [x, z, n, y0, y1, w] = C.ladder, d = 0.5, hw = w / 2;
-  const [x1, x2] = n[0] ? [Math.min(x, x + n[0] * d), Math.max(x, x + n[0] * d)] : [x - hw, x + hw];
-  const [z1, z2] = n[1] ? [Math.min(z, z + n[1] * d), Math.max(z, z + n[1] * d)] : [z - hw, z + hw];
+  const [x, z0, n, y0, y1, w] = C.ladder, d = 0.5, hw = w / 2, z = z0 - n[1] * PULL, xw = x - n[0] * PULL;
+  const [x1, x2] = n[0] ? [Math.min(xw, xw + n[0] * d), Math.max(xw, xw + n[0] * d)] : [x - hw, x + hw];
+  const [z1, z2] = n[1] ? [Math.min(z, z + n[1] * d), Math.max(z, z + n[1] * d)] : [z0 - hw, z0 + hw];
   return off ? { min: [x1, -1000, z1], max: [x2, -1000, z2], n, chimney: true } : { min: [x1, y0, z1], max: [x2, y1, z2], n, chimney: true };
 }
 

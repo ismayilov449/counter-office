@@ -187,11 +187,13 @@ class Prints {
     this.walkers.clear();
   }
 
-  // The floor right under feet p, as drawn: { y, n } or null (in the air, up a ladder, in water).
+  // The floor right under a print at (x, z), for feet at y, as drawn: { y, n } or null (in the air, up a ladder, in
+  // water). On a slope (the roof: a stair of 0.1 m boxes in the collision) the feet stand on the highest box under the
+  // body, up to a step (0.5 m) above the box under the print.
   floor(x, y, z) {
-    const coll = ctx.coll(), h = coll.raycast([x, y + 0.4, z], [0, -1, 0], 0.8, 'solid');
+    const coll = ctx.coll(), h = coll.raycast([x, y + 0.4, z], [0, -1, 0], 1.0, 'solid');
     let fy = h && h.n[1] > 0 ? y + 0.4 - h.t : null, n = [0, 1, 0];
-    if (fy == null || Math.abs(fy - y) > 0.25) return null;
+    if (fy == null || fy > y + 0.25 || fy < y - 0.5) return null;
     if (this.index) { const f = faceFloor(this.index, x, z, fy - 0.2, fy + 0.3); if (f) { fy = f.y; n = f.n; } }
     if (inWater(this.map.water, [x, fy + 0.05, z])) return null;
     return { y: fy, n };
@@ -453,6 +455,8 @@ export function hint(current = '') {
 }
 function chimneyHint(me) {
   if (!C) return null;
+  // (in the firebox: how to go up — and no hint of the light switch on the far side of the wall, which E doesn't reach from here)
+  if (inFlue(C, me.p) && me.onGround && me.p[1] < C.hearth + 0.3) return lit ? 'Get out of the fire!' : 'The chimney: look up and hold W to climb';
   if (atTop(C, me.p)) return lit ? 'Smoke and heat pour out of the chimney: the fire below is lit' : 'Press E to climb down the chimney';
   if (atHearth(C, me.p) && !lit) return `Hold E to light the fire (${STEALTH.light} s): nobody gets up or down the chimney until the round ends`;
   return null;
@@ -470,5 +474,10 @@ export function progressLabel(a) {
 
 export const fireLit = () => lit;
 
-// (for the node tests: dev/test-scripts/stealth/clientsmoke.mjs)
-export const _debug = () => ({ dark: () => prints.dark.array, prints, soot, ladder: () => ladder, creakLog });
+// (for the tests: dev/test-scripts/stealth/clientsmoke.mjs in Node, g1.mjs in the browser)
+export const _debug = () => ({
+  dark: () => prints.dark.array, prints, soot, ladder: () => ladder, creakLog, lit: () => lit,
+  me: () => { const m = ctx.me; return { p: m.p, trunk: m.trunk ?? null, alive: m.alive, crouch: m.crouch, onGround: m.onGround, yaw: m.yaw, pitch: m.pitch, id: m.id }; },
+  remotes: () => [...ctx.remotes.values()].map(r => ({ id: r.id, inTrunk: !!r.inTrunk, visible: !!r.model?.visible, p: r.p })),
+  printCount: () => prints.count,
+});

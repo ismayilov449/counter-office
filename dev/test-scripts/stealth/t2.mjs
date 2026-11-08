@@ -63,6 +63,7 @@ check(!T.got('shot').length, 'he can\'t shoot from inside');
 await press(T);
 check(T.got('drive').length === 1, 'the T gets in to drive (from beside the door)');
 const start = car(1).p;
+CT.clear();
 for (let i = 1; i <= 15; i++) {
   T.send({ t: 'car', id: 1, p: [start[0] + i * 0.8, start[1], start[2]], yaw: garage.yaw, speed: 6, steer: 0 });
   await sleep(80);
@@ -74,6 +75,7 @@ r = row(cid);
 const want2 = trunkPos(moved);
 check(Math.abs(moved.p[0] - start[0] - 12) < 0.05 && r && Math.hypot(r[1] - want2[0], r[3] - want2[2]) < 0.05, `driven 12 m out onto the lawn: the hider went along (${r && r.slice(1, 4).join(', ')})`);
 check(hidden().some(k => k[0] === cid), 'still hidden');
+check(!CT.got('dmg').length, `not run over by his own car at 6 m/s (he's inside its boxes): ${CT.got('dmg').length} hits (the browser test found him downed by it)`);
 
 // ---- 3. out
 CT.clear();

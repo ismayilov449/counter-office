@@ -5,10 +5,14 @@
 //   2. rays from inside the flue in every direction hit a drawn face before leaving it (no see-through seams), except
 //      up out of the top and out through the mouth;
 //   3. collision: the flue is open from the hearth to the top, a body fits up it, its walls are solid, the hearth and
-//      the firebox's mouth are where they should be.
+//      the firebox's mouth are where they should be;
+//   4. climbing, with main.js's ladder movement (copied below) and the game's physics: up from the firebox and out
+//      over the south rim onto the roof; E at the top leaves you hanging on the rungs (not standing on a rim); down to
+//      the hearth; with the rungs taken away (a fire), you fall to the hearth.
 // node dev/test-scripts/stealth/geom.mjs [map]   (exit code 1 on any failure)
 import { CHIMNEY as C } from '../../../shared/maps/mansion_stealth.js';
-import { overlapsAny, PLAYER } from '../../../shared/physics.js';
+import { overlapsAny, PLAYER, movePlayer, ladderAt, ladderPull, ladderExit } from '../../../shared/physics.js';
+import { chimneyLadder, topSpot } from '../../../shared/stealth.js';
 const id = process.argv[2] || 'mansion';
 const M = (await import(`../../../shared/maps/${id}.js`)).default;
 let fails = 0;
@@ -156,6 +160,64 @@ ok(inMouth && standUp && noStandMouth, 'crouched you fit through the mouth (not 
 const [, , , , ltop] = C.ladder;
 const rim = !overlapsAny(boxes, -19.3, C.top + 0.001, C.z2 + 0.2, PLAYER.radius, PLAYER.crouchHeight);
 ok(C.top - (ltop - 0.12) <= 1 && rim, `from the rungs' top (feet ${(ltop - 0.12).toFixed(2)}) the rim is ${(C.top - ltop + 0.12).toFixed(2)} m up, and there's room on it`);
+
+
+// ---- 4. climbing (main.js updateLocal's ladder part, the same numbers; 60 frames a second)
+console.log('-- climbing (main.js\'s ladder movement, the game\'s physics)');
+const lad = chimneyLadder(C);
+// (onGround: false for someone put in mid-air, as stTo does; until(me): stop there)
+function sim(p, yaw, pitch, keys, secs, { ladders = [lad], crouch = false, onGround = true, until = null } = {}) {
+  const me = { p: p.slice(), v: [0, 0, 0], onGround, crouch, climbing: false };
+  const dt = 1 / 60, sy = Math.sin(yaw), cy = Math.cos(yaw), trail = [];
+  const fw = keys.includes('W') ? 1 : 0, st = 0;
+  for (let i = 0; i < secs * 60; i++) {
+    const boxes = M.boxes;
+    if (me.crouch && !keys.includes('Ctrl') && !overlapsAny(boxes, me.p[0], me.p[1] + 0.01, me.p[2], PLAYER.radius, PLAYER.height)) me.crouch = false;
+    if (keys.includes('Ctrl')) me.crouch = true;
+    const wx = -sy * fw + cy * st, wz = -cy * fw - sy * st;
+    let ladder = ladderAt(ladders, me.p, me.crouch ? PLAYER.crouchHeight : PLAYER.height);
+    if (ladder && me.onGround && (-sy * -ladder.n[0] + -cy * -ladder.n[1]) < 0.3) ladder = null;
+    if (ladder) {
+      const climb = fw * (pitch > -0.45 ? 1 : -1);
+      let hx = cy * st * 1.5, hz = -sy * st * 1.5;
+      const [px, pz] = ladderPull(ladder, me.p);
+      hx += px; hz += pz;
+      if ((climb > 0 && me.p[1] > ladder.max[1] - 0.6) || (me.onGround && climb <= 0)) { hx = wx * 2.5; hz = wz * 2.5; }
+      const off = climb > 0 && !st && me.p[1] > ladder.max[1] - 0.6 ? ladderExit(ladder, me.p, boxes) : null;
+      if (off) { hx = off[0]; hz = off[1]; }
+      if (climb > 0 && me.p[1] > ladder.max[1] - 0.6) me.crouch = true;
+      me.v[0] = hx; me.v[2] = hz;
+      me.v[1] = climb > 0 && me.p[1] > ladder.max[1] - 0.12 ? 0 : climb * 3.4;
+    } else if (me.onGround) {
+      const speed = 5 * (me.crouch ? 0.34 : 1), k = Math.min(1, dt * 10);
+      me.v[0] += (wx * speed - me.v[0]) * k; me.v[2] += (wz * speed - me.v[2]) * k;
+    }
+    me.climbing = !!ladder;
+    movePlayer(me, dt, boxes, ladder ? 0 : PLAYER.gravity);
+    if (i % 30 === 0) trail.push(+me.p[1].toFixed(2));
+    if (until && until(me)) break;
+  }
+  return { me, trail };
+}
+const inFlueBox = p => p[0] > C.fx1 && p[0] < C.fx2 && p[2] > C.fz1 && p[2] < C.fz2;
+const fmt = p => p.map(v => v.toFixed(2)).join(', ');
+{
+  const r = sim([-19.3, C.hearth, 4.8], Math.PI, 0.7, ['W'], 8, { until: m => m.p[2] > C.z2 + 0.3 && m.onGround });
+  const p = r.me.p;
+  ok(p[2] > C.z2 + 0.3 && p[1] > 9 && p[1] < C.top - 0.1 && r.me.onGround, `up from the firebox, looking up, W: out over the south rim onto the roof (${fmt(p)}; y every 0.5 s ${r.trail.join(' ')})`);
+}
+{
+  const r = sim(topSpot(C), 0, 0, [], 3, { crouch: true, onGround: false });
+  ok(inFlueBox(r.me.p) && r.me.p[1] > 9.5 && r.me.p[1] < C.top - 0.3, `put on the rungs at the top (E on the roof), no keys: hanging in the flue, not on a rim (${fmt(r.me.p)})`);
+  const r2 = sim(topSpot(C), Math.PI, -1.0, ['W'], 6, { crouch: true, onGround: false });
+  ok(Math.abs(r2.me.p[1] - C.hearth) < 0.05 && inFlueBox(r2.me.p), `from there, looking down, W: down to the hearth (${fmt(r2.me.p)})`);
+}
+{
+  const r = sim([-19.3, 6.0, 4.8], Math.PI, 0.7, [], 3, { ladders: [chimneyLadder(C, true)], onGround: false });
+  ok(Math.abs(r.me.p[1] - C.hearth) < 0.05, `with the rungs taken away (a fire), a climber falls to the hearth (${fmt(r.me.p)})`);
+  const r2 = sim([-19.3, 6.0, 4.8], Math.PI, 0.7, [], 3, { onGround: false });
+  ok(Math.abs(r2.me.p[1] - 6.0) < 0.05 && inFlueBox(r2.me.p), `with them, he hangs there (${fmt(r2.me.p)})`);
+}
 
 console.log(fails ? `${fails} FAILED` : 'all ok');
 process.exit(fails ? 1 : 0);

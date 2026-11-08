@@ -56,7 +56,7 @@ const mesh = scene.children.find(o => o.isInstancedMesh);
 setMap('cs_mansion');
 const lad = map.ladders.filter(l => l.chimney);
 ok('cs_mansion: the chimney\'s rungs are a ladder (once)', lad.length === 1 && Math.abs(lad[0].min[1] - C.hearth) < 1e-6 && Math.abs(lad[0].max[1] - 10.4) < 1e-6
-  && lad[0].min[2] > C.fz1 && lad[0].max[2] <= C.fz2 + 1e-6 && lad[0].min[0] >= C.fx1 && lad[0].max[0] <= C.fx2 && lad[0].n[1] === -1);
+  && lad[0].min[2] > C.fz1 && Math.abs(lad[0].max[2] - (C.fz2 + 0.1)) < 1e-6 && lad[0].min[0] >= C.fx1 && lad[0].max[0] <= C.fx2 && lad[0].n[1] === -1);
 setMap('cs_mansion_night');
 ok('cs_mansion_night: the same ladder, still once', map.ladders.filter(l => l.chimney).length === 1 && map.ladders.includes(lad[0]));
 setMap('de_dust2');
@@ -73,6 +73,8 @@ me.p = [-19.3, 9.75, 5.7];
 ok('on the roof by the stack: E climbs down', stealth.hint() === 'Press E to climb down the chimney');
 me.p = [-19.3, 5.0, 4.8];
 ok('inside the flue: nothing of ours (the ladder\'s own hint)', stealth.hint() === null);
+me.p = [-19.3, C.hearth, 4.8]; me.onGround = true;
+ok('standing in the firebox: how to climb (not the light switch behind the wall)', stealth.hint('Press E to switch the lights off') === 'The chimney: look up and hold W to climb');
 ok('the progress label for lighting', stealth.progressLabel('fireplace') === 'Lighting the fire...' && stealth.progressLabel('flood') === null);
 
 // ---- the fire
@@ -128,10 +130,20 @@ for (let i = 0; i <= 50; i++) { const x = -20.6 + i * 0.04; r.p = [x, roofY(x), 
 pr = prints().slice(n0);
 ok(`prints on the roof too: ${pr.length}`, pr.length >= 3);
 ok('lying on the roof\'s slope (tilted, not on the collision\'s steps)', pr.length && pr.every(p => p.up[1] < 0.95 && p.up[0] < -0.2) && pr.every(p => Math.abs(p.y - (9.32 + (p.x + 20.15) * 1.044 / 1.7) - 0.01 * p.up[1]) < 0.03));
+// along the slope (south, level that way), with the feet where a body really stands on the stepped roof: on the
+// highest box under it, up to 0.3 m above the box under each print (the browser test found none like that at first)
+{
+  const n = mesh.count, feetY = (x, z) => Math.max(...[-0.35, -0.17, 0, 0.17, 0.35].map(dx => { const h = coll.raycast([x + dx, 13, z], [0, -1, 0], 6, 'solid'); return 13 - h.t; }));
+  r.p = [-19.3, feetY(-19.3, 6.0), 6.0]; step();
+  for (let i = 0; i <= 75; i++) { const z = 6.0 + i * 0.04; r.p = [-19.3, feetY(-19.3, z), z]; step(); }
+  const along = prints().slice(n);
+  ok(`walking along the roof's slope (feet on the highest step under the body, ${(feetY(-19.3, 7) - 9.75).toFixed(2)} m over the print's): ${along.length} prints, tilted`, along.length >= 5 && along.every(p => p.up[1] < 0.95 && p.y > 9.5));
+}
 // the soot wears off: fainter prints
 stealth.onSnapshot({ s: [[2, 3]] });
+const nWorn = mesh.count;
 for (let i = 0; i < 40; i++) { r.p = [-21.5 + i * 0.04, 0.8128, 3.0]; step(); }
-ok('worn soot: faint prints', [...stealth._debug().dark().slice(n0 + pr.length, mesh.count)].every(d => d < 0.45 && d > 0.25));
+ok('worn soot: faint prints', mesh.count > nWorn && [...stealth._debug().dark().slice(nWorn, mesh.count)].every(d => d < 0.45 && d > 0.25));
 stealth.onSnapshot({});
 const n1 = mesh.count;
 for (let i = 0; i < 40; i++) { r.p = [-21.5 + i * 0.04, 0.8128, 3.5]; step(); }
