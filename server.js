@@ -39,6 +39,7 @@ import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas i
 import { createFlood } from './lib/flood.js'; // Floodgate
 import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out of deep water
 import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
+import { createUnderground } from './lib/underground.js'; // underground: no radar underground, the echo, the air vents
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -339,6 +340,7 @@ function sparkAt(pos, kind, by = null) { return gas.sparkAt(pos, kind, by); }
 // Floodgate (Mansion): the storm drain's valve floods the underground (see lib/flood.js)
 const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
   sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
+const ug = createUnderground({ map: () => MAP, world: () => world, game, now, broadcast, send }); // underground (Mansion): see lib/underground.js
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -2529,6 +2531,7 @@ function onMortar(p, m) {
 function onSpot(p, m) {
   const t = now(), pos = vec3(m.p);
   if (p.team === 'CT' && jammedAt(p.p)) return send(p, { t: 'msg', text: JAM_MSG });
+  if (ug.refuse(p)) return; // underground: no signal down there
   if (!p.alive || !pos || !inTeam(p) || t - (p.spotAt || 0) < 2000) return;
   const eye = eyeOf(p);
   if (dist3(eye, pos) > 250 || !lineOfSight(eye, [pos[0], pos[1] + 0.3, pos[2]])) return;
@@ -3006,6 +3009,7 @@ function spots(eye, yaw, e, t, fov = SPOT.fov) {
   if (d > SPOT.range) return false;
   if (e.hidden && d > CAMO.botSees) return false;
   if (jammedAt(e.p)) return false;
+  if (ug.under(e.p) || ug.under(eye)) return false; // underground: nobody down there is spotted, nor spots anyone (no signal)
   if (d > 2) {
     const off = Math.atan2(-(e.p[0] - eye[0]), -(e.p[2] - eye[2])) - yaw;
     if (Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) > fov) return false;
@@ -3057,6 +3061,7 @@ function updateSpotting(t) {
 function onPing(p, m) {
   const t = now(), pos = vec3(m.p);
   if (p.team === 'CT' && jammedAt(p.p)) return send(p, { t: 'msg', text: JAM_MSG });
+  if (ug.refuse(p)) return; // underground: no signal down there
   if (!p.alive || !pos || t - (p.pingAt || 0) < PING.cooldown * 1000 || dist3(eyeOf(p), pos) > PING.range + 5) return;
   p.pingAt = t;
   const to = isDM() || !inTeam(p) ? [p] : [...players.values()].filter(q => q === p || mates(q, p));
@@ -4005,7 +4010,7 @@ function tick() {
     if (p.ws.readyState !== 1) continue;
     const me = p.act ? JSON.stringify({ a: p.act.type, pr: Math.min(1, (t - p.act.start) / p.act.dur) }) : 'null';
     // (the enemies the player's team has spotted: only to that team)
-    const sp = inTeam(p) && spotOn() ? ',"sp":' + (p.team === 'CT' && p.alive && jammedAt(p.p) ? '[]' : spotJson[p.team]) : '';
+    const sp = inTeam(p) && spotOn() ? ',"sp":' + ((p.team === 'CT' && p.alive && jammedAt(p.p)) || ug.noRadar(p) ? '[]' : spotJson[p.team]) : ''; // underground: (|| ug.noRadar(p))
     // Disguise: the fooled team's copy shows a disguised player as the dead one; "dg" is the wearer's own team's
     p.ws.send(disguise.headFor(p, head, pl) + (p.gotSnap ? changed : all) + sp + disguise.snapKey(p) + body.snap(p) + ',"me":' + me + '}'); // body: + "bd"
     p.gotSnap = true;

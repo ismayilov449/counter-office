@@ -1,7 +1,9 @@
 # Feature: Underground & vents (group 5, branch `feature/underground`)
 
 ## STATUS
-- **In progress.** The underground areas and the vent grilles are chosen (below); 5.1 (no radar underground) is next.
+- **5.1 No radar underground: done** (server and browser). Tests: `underground/t-radar.mjs` 12/12 on cs_mansion and
+  cs_mansion_night, `underground/clientsmoke.mjs` 39/39, the old `jamtest.mjs` (de_dust2) still passes.
+- **Next:** 5.2 echo, then 5.3 vents.
 
 ## The vent grilles (chosen first, so the other wave-1 groups can avoid them)
 Three short ducts, a grille at each end (`shared/underground.js`, `GRILLES`/`DUCTS`). Every grille sits where nothing

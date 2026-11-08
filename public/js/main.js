@@ -37,6 +37,7 @@ import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play 
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 import { createElevator } from './elevator.js'; // elevator
+import * as ug from './underground.js'; // underground: no radar underground, the echo, the air vents (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -141,6 +142,7 @@ function loadMap(id) {
   renderMapVotes();
   world.setShadowSize(qlevel.shadowSize);
   flood.setMap(map); // Floodgate
+  ug.setMap(map); // underground
   prewarm();
 }
 
@@ -1010,6 +1012,7 @@ function radarEnemies(now) {
 // Pings: the middle mouse button puts a "!" on the team's radar where we're looking.
 const pings = [];
 function sendPing() {
+  if (ug.blocked()) return; // underground: no signal down there
   const o = eyePos(), d = aimDir(me.yaw, me.pitch);
   const t = coll.raycast(o, d, PING.range, 'bullet')?.t ?? 60;
   net.send({ t: 'mark', p: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] });
@@ -1166,6 +1169,7 @@ function aimMortar(dBearing, dElev) {
 
 // Calling in a target (V): the spot you're looking at, for the team's mortar.
 function spotTarget() {
+  if (ug.blocked()) return; // underground: no signal down there
   const o = eyePos(), d = aimDir(me.yaw, me.pitch);
   const hit = coll.raycast(o, d, 250, 'bullet');
   if (!hit) { hud.small('Look at a spot on the ground to call in a target', 2); return; }
@@ -3688,7 +3692,7 @@ function updateHud(now) {
     bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
   }
   const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
-  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere());
+  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
   drawMortarMap(performance.now(), mates);
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
@@ -4005,6 +4009,7 @@ function frame() {
   updateCamera(dt, now);
   body.camera(camera); // body: the view from the floor
   flood.update(dt, now, camera); // Floodgate
+  ug.update(dt, now, camera); // underground
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -4036,6 +4041,7 @@ function frame() {
   if (shotRequested) saveScreenshot();
 }
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
+ug.init({ scene, net, me, hud, fx, coll: () => coll, indoors: p => indoors(p) }); // underground
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();
