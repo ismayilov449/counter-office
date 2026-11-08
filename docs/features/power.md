@@ -1,26 +1,44 @@
 # Power & machinery (ROADMAP group 3, branch `feature/power`)
 
-## STATUS (2026-11-08: built and server-tested; the browser test and the draw-cost numbers are next)
+## STATUS (2026-11-08: built, server-tested and browser-tested on both Mansion maps; only the sounds by ear and a real laptop left)
 
-- **Done (server, browser code, geometry; server and node tests):**
+- **Done:** 3.1, 3.2 and 3.3, server, browser and geometry, on `cs_mansion` and `cs_mansion_night`.
   - **3.1 A breaker per circuit + the garage's generator.** `t1.mjs` 31/31 (day and night), `t4.mjs` 9/9 (the links),
-    `unit.mjs` 57/57, `client-node.mjs` 37/37, `lib.mjs` 29/29.
+    `unit.mjs` 65/65, `client-node.mjs` 43/43, `lib.mjs` 29/29.
   - **3.2 Power surge.** `t2.mjs` 19/19 (`POWER_SURGE=1`), and its random mode on a default server (1 to 4 of 5 bulbs).
-  - **3.3 Cut the lift's cable.** `t3.mjs` 15/15 (the brake never catching) and 10/10 (always catching), `lib.mjs`
-    (hostages riding and under it).
-- **Regressions run on this branch:** `t17cctv` 17/17, `t-elev` 35/35, flood `t1` 18/18, `integration/links.mjs`
-  a–g 36/36 and h 4/4 (`GAS_LEAK_X=6`), `mansion/walls.mjs` 0 missing / 0 drawn twice, nav 0 links through floors
-  (30,412 nodes; main 30,398: +14 on the machine room's floor), all 7 maps load and take a player (`maps.mjs`), 60 s
-  with `BOTS=4` on both Mansion maps: no server errors, tick 0.7–0.9 ms average (max 3.1 ms).
-- **Not done yet (needs the browser, when allowed):** the browser test (the panel, the generator, the winch and the
-  machine room seen in the game, day and night; the rooms dark per circuit; the hints; the bulbs bursting; the cabin
-  falling with you in it; the sounds by ear; no page errors) and **the draw cost** measured with `views.mjs` against
-  `main`. Expected: +1 draw call per model in the view's frustum (the panel, the generator, the winch: one mesh each,
-  no shadows), +0 for the machine room, the ladder's brackets and the pit's buffers (their faces go into the level's
-  per-material meshes: concrete, block, gravel, trim, metal, all already there), +0…1 for the generator's exhaust
-  (the effects' smoke billboards), no new light. Looking at the house from outside, all three models are in the
-  frustum: up to +3.
-- **Next:** the browser test, then the draw-cost numbers here.
+  - **3.3 Cut the lift's cable.** `t3.mjs` 15/15 (the brake never catching) and 11/11 (always catching, with the
+    climb-out), `lib.mjs` (hostages riding and under it), `fall-node.mjs` 8/8.
+- **Regressions run on this branch:** `t17cctv` 17/17, `t-elev` 35/35 (also after the climb-out), flood `t1` 18/18,
+  `integration/links.mjs` a–g 36/36 and h 4/4 (`GAS_LEAK_X=6`), elevator `unit.mjs` 694/694 and `client-node.mjs`
+  15/15, `mansion/walls.mjs` 0 missing / 0 drawn twice, nav 0 links through floors (30,412 nodes; main 30,398: +14 on
+  the machine room's floor), all 7 maps load and take a player (`maps.mjs`), 60 s with `BOTS=4` on both Mansion maps:
+  no server errors, tick 0.7–0.9 ms average (max 3.1 ms).
+- **Browser-tested (2026-11-08, headless Edge + swiftshader at 960x540, every screenshot looked at):** `gpower-a.mjs`
+  44/44 on both maps and `gpower-b.mjs` 35/35 on both maps, no page errors. Seen: the panel (labels, levers), the
+  generator, the terrace's ladder climbed onto the roof and over it to the machine room, the machine room from the
+  ridge (day and night) and inside (the winch; hint; the progress bar; let go: nothing cut); each floor's breaker alone
+  darkening only its floor (brightness against lit, day: upper 65/129 — its corridor still lit by the stair hall's
+  lamp, which is on the ground floor's circuit —, ground 15/134, cellar 10/42; night: 66/137, 11/136, 10/63) with the
+  other two as lit as before; the CCTV's breaker: the monitors black (4.5 against 50), NO POWER at the desk; the lift's
+  breaker while riding: stuck in the dark (hint), the house lit, back on it goes on; the fuse box, the generator lighting
+  both floors (129/12) but not the cellar, its hint for a T with the fuel left, running out (dark again), the mains
+  back; bulbs bursting on a restore (lit, then dark, the burst's dust puff and spark dots in the next frame; their
+  switch's hint says so); the cabin dropping away from the upper landing with a rider in it (the kill feed "[lift]"),
+  the shaft after, the call button out of order; riding the fall inside (the page's height on the cabin's floor every
+  frame, within 4 cm, ending at −3.05; 43 damage; dark; pry; climb out); the brake catching (0.84 m, no damage, out of
+  order, pry, climb out).
+- **Fixed in the browser pass** (see "Every lift change" and the hooks): climbing out of a cabin stopped under a floor
+  (5b84095); the lamps of another storey shining through the slab onto a floor without power (5b84095); a dead light
+  switch's hint (5b84095); a rider left on the falling cabin's roof at 10 fps or less (2aab4d1).
+- **Draw cost** (`pviews.mjs`, viewer.js at 960x540, swiftshader, day map; draw calls, the views ±2 from flickering
+  lamps): the level alone against `main` +0 (−1…+4 view to view, within the noise), +3.6k triangles (the machine
+  room, the roof split round it, its rubble cores); with the three models: the panel's view 115 → 117, the cellar
+  126 → 128, the generator's 228 → 232, the garage 262 → 263, inside the machine room 69 → 70, the roof 83 → 84, the
+  terrace 182 → 186, the street (all three in the frustum, none visible) 304 → 307; vcost.json's views +0…+5. No
+  shadows, no new light; the generator's exhaust uses the effects' smoke billboards.
+- **Left:** the sounds by ear (the generator's roar and how far it carries, the grinder, the snap, the crash, the
+  brake, the pop, the breakers); the frame rate on a real laptop; how the burst looks at full speed (headless draws
+  1–3 frames a second).
 
 ## Footprints (for the other wave-1 groups: please keep clear)
 
@@ -204,9 +222,12 @@ car (look at the car).
   broken; `guard()` does nothing while falling (no braking for someone in the shaft: it's in free fall); `settle()`
   calls `ctx.landed({ y, t })` when a fall ends; a new method `fall(t, tc, land)` (from where it is: power off, no
   calls, doors frozen, the fall motion). Its `power()` is now `circuits.liftWorks()` (the lift's circuit and the cable).
-- `public/js/elevator.js`: `motion()` passes `fall`/`tc`; a frame's ride may be up to 3 m while falling (0.5 otherwise);
-  others drawn in the past are put in a falling cabin up to 8 m away (1 otherwise); the hints say "Out of order" on the
-  buttons and "The lift is wrecked" stuck between floors.
+- `public/js/elevator.js`: `motion()` passes `fall`/`tc`; a frame's ride may be up to 3 m while falling or within 1.5 s of
+  a fall's state arriving (`falling()`, `fellAt`; 0.5 otherwise: at 10 fps or less the "landed" state could come with
+  the fall's last frame, or before any frame for a short caught fall, and the player, not moved, was lifted onto the
+  cabin's roof — found in the night map's browser test, replayed by `fall-node.mjs`); others drawn in the past are put
+  in a falling cabin up to 8 m away (1 otherwise); the hints say "Out of order" on the buttons and "The lift is wrecked"
+  stuck between floors.
 - **Climbing out of a sunken cabin (a fix found in the browser test, both files):** with the cabin's doors and a
   landing's doors open and that floor more than 0.3 m (`CLIMB`) above the cabin's, E on the doors (`f`) puts you on the
   landing (`place(p, landingSpot(s))`, an `elevTo`), and the hint says "Press E to climb out". Before, a cabin stopped
@@ -263,3 +284,19 @@ car (look at the car).
   the cellar's breaker off (no shock), switching it on in the water (shock, the fuse blows); the generator doesn't
   feed the cellar.
 - `maps.mjs` (server): every map loads; the power state only on the Mansion maps.
+- `fall-node.mjs` (node): the browser's lift riding the fall at 60, 10, 3 and 1.5 fps with the "landed" state arriving
+  before the next frame: on the crashed (or caught) cabin's floor every way.
+- **Browser** (`edge.ps1`: the headless Edge on CDP 9630, fresh profile, no extensions or sync, 960x540; servers from
+  srv.sh with `ROUND_TIME=600 AUTO_BALANCE=0`; `png.mjs` measures a screenshot's brightness):
+  - `gpower-a.mjs` (`POWER_SURGE=0 GEN_TANK=25`; the browser a T, scripted CT and T): the panel, the generator, the
+    terrace's ladder climbed onto the roof, the machine room, the winch (hint, progress bar), the street; each floor's
+    breaker alone (three views' brightness against lit), the CCTV's (the monitors black, NO POWER at the desk), the
+    lift's while riding (stuck in the dark, the house lit, back on: it goes on), the fuse box, the generator lighting
+    both floors and not the cellar, running out, the mains back; no page errors.
+  - `gpower-b.mjs` (`POWER_SURGE=1 POWER_CATCH=0,0,1`; the browser a CT): bulbs bursting on a restore (screenshots as each
+    `pwPop` arrives), the cabin falling seen from the upper landing (a scripted rider holding the doors), the shaft
+    after, out of order; riding the fall inside (the page's height each frame, the 43 damage, prying, E to climb out);
+    the brake catching (no damage, out of order, climbing out); no page errors.
+  - `gsparks.mjs`: a control — do the effects' sparks show in a headless screenshot (impact sparks, a bulb burst).
+  - `pviews.mjs <prefix> [map]` (`MODELS=1` for the models): the draw cost with viewer.js at 960x540, the power views
+    and vcost.json's; run against this branch's server and main's.

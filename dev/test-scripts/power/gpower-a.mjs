@@ -45,7 +45,7 @@ async function lookAt(p, q, settle = 700) {
 }
 // all messages kept so far (the page's list is emptied; we keep our own)
 const seen = [];
-const pull = async () => { seen.push(...(await msgs())); return seen; };
+const pull = async () => { seen.push(...JSON.parse(await ev('JSON.stringify(__in.splice(0))'))); return seen; }; // (one call: read and empty the page's list at once, or a message arriving in between is lost)
 const last = async t => (await pull()).filter(m => m.t === t).pop();
 async function waitMsg(fn, ms = 8000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { if ((await pull()).some(fn)) return true; await sleep(200); } return false; }
 const shotL = async (name, rect) => { const f = await shot(`${P}_${name}.png`); const l = meanLum(f, rect); console.log(`  [shot] ${P}_${name}.png  brightness ${l.toFixed(1)}`); return l; };
