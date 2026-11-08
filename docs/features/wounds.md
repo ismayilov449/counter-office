@@ -6,27 +6,22 @@ Four features on top of "Downed, not dead" (`body.md`), blood trails and the ban
 1.4 the adrenaline syringe.
 
 ## STATUS
-- **Done (built and server-tested), all four items, in order, each committed and pushed** (5f3b463 1.1, 68d792a 1.2,
-  211696d 1.3, 0a13e0f 1.4; then this doc, the disguise words and a 'gone' check). Server tests on cs_mansion and cs_mansion_night, node tests of the shared rules, of the
-  server module without a server and of the browser module with fakes (numbers under "Verified").
-- **Browser test: HALF-DONE — stopped 2026-11-08 at the user's usage limit (WIP commit).** Where it stopped:
-  - `wounds/g1.mjs` (cs_mansion): **39/39 passed**, screenshots looked at: the syringe in the buy menu (Equipment,
-    key 9, gold picture, words, ✔, SYRINGE badge); a 2.01 s syringe revive with "(adrenaline)" on the bar; the drag
-    (AK swapped for the Glock, 0.97 m/s in game time, the body 0.94 m behind head first with still legs, the blood
-    trail, the hint; standing still the revive goes on to the end); seen from outside (from the side: the body on
-    the ground, head towards Toby); dragged (the view goes with the body); interrogation (hint, "Interrogating
-    Charlie...", the message, a yellow "?" ring round Cathy's red dot on the radar, gone after 5.2 s); no page errors.
-    g1 **not yet run on cs_mansion_night**, nor rerun after the fixes below.
-  - `wounds/g2.mjs` (cs_mansion): the first run gave 20/24 and showed the bugs fixed below; **the rerun with the
-    fixes was stopped part way, no result**. Passed in that first run: the suicide from the player's own view (the
-    shot, the feed "Tester (shot himself)", the head tilt and dark edges), Cathy's suicide as others see it (her
-    shot heard, the feed), a 2.05 s syringe revive of the browser with the ADRENALINE badge and 0.04 rad of drift;
-    no page errors. Its 4 failures were the test's teleport (a fake 'spawn') wiping the client's wounds, and the
-    blur bug below.
-  - **Not run at all yet:** g1/g2 on cs_mansion_night, `mansion/buyhover.mjs`, `integration/gviews.mjs` against
-    `main` (the draw cost), the CSS blur's frame cost (g2 part a: the first numbers measured nothing, because of the
-    blur bug).
-  - **Fixed in the browser code (this WIP commit; node smoke test 52/52, not yet re-checked in the browser):**
+- **Done: built, server-tested and browser-tested, all four items**, in order, each committed and pushed (5f3b463 1.1,
+  68d792a 1.2, 211696d 1.3, 0a13e0f 1.4; 1a3fd2e this doc, the disguise words and a 'gone' check; 455b255 the WIP
+  of the browser fixes, made final by the commit after it). Server tests on cs_mansion and cs_mansion_night, node
+  tests of the shared rules, of the server module without a server and of the browser module with fakes, browser
+  tests on both maps (numbers under "Verified").
+- **Browser-tested (2026-11-08, headless Edge 960x540, CDP 9610, server 4210 BOTS=0; both Mansion maps; every
+  screenshot looked at; no page errors in any run).** Details under "Verified (browser)".
+  - `wounds/g1.mjs` 39/39 on cs_mansion and on cs_mansion_night (the buy menu and the syringe, a 2 s syringe revive,
+    the drag, the drag seen from outside, being dragged, the interrogation and its radar ring).
+  - `wounds/g2.mjs` 24/24 on cs_mansion and on cs_mansion_night (wounds, limp, sway, blur waves, bandage, the
+    suicide from both views, the syringe's after-effects).
+  - `mansion/buyhover.mjs`: 42 items (the syringe one of them) all stay put under the mouse at 10 of the 11 window
+    sizes; at 900x560 the 5 known failures (the Mines & camo column scrolls off: pmn, mon50, satchel, camo, jammer),
+    as on `main`; no page errors.
+  - Draw cost against `main` (`integration/gviews.mjs`): the same (see "Draw cost").
+  - **Fixed from the browser test** (WIP 455b255, re-checked in the browser on both maps and committed for good):
     1. the blur never showed: main.js's `updateHud` resets the game canvas's `style.filter` every frame
        (nightvision, CCTV), so the blur now goes on its container `#game`;
     2. down, my hints sat on body.js's "YOU'RE DOWN" panel: they're now on a line of their own under it
@@ -37,17 +32,18 @@ Four features on top of "Downed, not dead" (`body.md`), blood trails and the ban
     5. the player's own view of ending it: the head now tilts towards the pistol and drops over the 5 s;
     6. a 'spawn' with the same spawn number (a move, as the tests' teleport) no longer clears the wounds (a new life
        has a new number; the server also sends cleared wounds then).
-  - **To resume:** restart the 4210 server (`BOTS=0 START_MONEY=16000 MAP_ROTATION=0 ROUND_TIME=600`), a headless
-    Edge on CDP 9610 (`--disable-extensions --disable-sync`, fresh profile, 960x540), then
-    `GAME_PORT=4210 CDP_PORT=9610 MAP=<map> OUT=<dir> node dev/test-scripts/wounds/g2.mjs` and `g1.mjs` on both
-    Mansion maps (a fresh server before each); look at the screenshots (`g2_ending.png`: the line and bar under the
-    panel, no overlap; `g2_badges.png` / `g2_adrenaline.png`: the badge row clear of the footer; `g2_blur.png`;
-    `g2_remote_ending.png`: the pistol at Cathy's temple, filmed from in front of her). Then `buyhover.mjs`,
-    `gviews.mjs` on this branch and on `main`, rerun the server tests (`wounds/t1`–`t4`), commit, push.
+  - **Intermittent, not explained:** g1's "Mate revives the browser after the drag" (the browser dragged, then Mate
+    stands still with E held) missed twice, in the two fastest runs (81 s and 90 s, day and night), and passed in the
+    other four runs; the server tests of the same flow pass (`t1.mjs` a, `t4.mjs` d). The check now waits 10 s and
+    prints the server's act and the revive's progress if it misses again. If a player ever sees it, pressing E again
+    revives him.
   - `dev/test-scripts/wounds/gdiag.mjs` is a diagnostic (the drag seen from the side: `gd_*.png`), not a test.
 - **No geometry** added: nothing for the other wave-1 groups to avoid.
-- Left (not checked): the sounds by ear (the suicide's pistol cock is the 'draw' sound, the shot is the pistol's own),
-  how the drag, the limp's dip, the sway and the blur feel at a real frame rate on a laptop.
+- Left (not checked): the sounds by ear (the suicide's pistol cock is the 'draw' sound, the shot is the pistol's own);
+  how the drag, the limp's dip, the sway and the blur feel at a real frame rate, and the blur's cost on a real Intel
+  laptop (headless it costs nothing measurable: see "Draw cost"); by hand, whether the remote "pistol at the head"
+  pose reads well (it reads as the pistol up beside the head, not sharply at the temple). Seen in passing, not this
+  feature's: blood.js's BLEEDING badge in the bottom row overlaps the bet's "F3" footer in buy time (as on `main`).
 
 ## (a) README (for the players)
 
@@ -74,7 +70,7 @@ teammate; hold on a downed enemy: interrogate"; **K** also "down: hold to shoot 
   - a **graze to the head** (a head hit you survive, e.g. through a helmet): your sight blurs in waves.
 
   They last until you die or the round ends. A **bandage (P) halves** them (P works on a fresh wound even when you've
-  stopped bleeding); a new hit on a bandaged spot makes it fresh again. LEG / ARM / HEAD badges by your health show
+  stopped bleeding); a new hit on a bandaged spot makes it fresh again. LEG / ARM / HEAD badges above your health show
   them (½ when bandaged). Bots limp and shoot worse too.
 - **Adrenaline syringe** (buy menu, Equipment, **$400**; classic rounds on bomb and hostage maps). With one, your
   revive takes **2 seconds** instead of 5 and uses it up; but the one you revive gets up with shaking aim and blurred
@@ -141,9 +137,21 @@ drone → off the zip line / CCTV desk / car → **revive** (body.js; **walking 
 1.1) → **interrogate a downed enemy** (wounds) → letting go of a held hostage → a lift target aimed at → grabbing a
 hostage → a uniform → the valves → the old uses. The interrogation is refused where E plants or defuses the bomb, while
 holding a hostage, on a gadget, in a car, with the drone. Hints: body.js's revive hint gets " · walk to drag him";
-while dragging "Dragging X — stand still to revive him, let go of E to drop him"; a downed enemy in front "Hold E to
-interrogate X (3 s)"; down: "Hold K to end it yourself (5 s)" ("X is interrogating you — hold K to end it first",
-"X is dragging you").
+while dragging "Dragging X — stand still to revive, let go of E to drop him"; a downed enemy in front "Hold E to
+interrogate X (3 s)". **Down, no hint line** (it would sit on body.js's "YOU'RE DOWN" panel): a line of its own
+under that panel (`#wd-down`, bottom 13 %): "Hold K to end it yourself (5 s)", "X is interrogating you — hold K to
+end it first (5 s)", "X is dragging you · hold K to end it yourself (5 s)", and while ending it "Ending it — let go
+of K to stop" with its own bar (not the hud's progress bar, which also sits on that panel).
+
+### Where it shows on screen
+- The wound badges (LEG, ARM, HEAD, ½ bandaged; ADRENALINE n; SYRINGE): a row of their own above the health
+  (`#wd-badges`, left 18 px, bottom 58 px: under the chat). (In the bottom row they ran into the bet's "F3" footer in
+  buy time; blood.js's own BLEEDING badge in that row still can, as on `main`.)
+- The blur: a CSS `filter: blur()` on the canvas's container `#game`, only while a wave is on. Not on the canvas
+  itself: main.js's `updateHud` sets the canvas's own filter every frame (nightvision, the CCTV picture), so a blur
+  there was wiped before it was drawn (found in the browser test); the container's filter adds to it.
+- Ending it, in your own view: dark edges growing (`#wd-end`), the view tilting towards the pistol and dropping a
+  little over the 5 s.
 
 ### Protocol
 - Client → server: `wdDrag {on: 1|0}` (walking with E held over a downed teammate / standing still again);
@@ -180,7 +188,7 @@ interrogate X (3 s)"; down: "Hold K to end it yourself (5 s)" ("X is interrogati
   out from the body's middle line (relative to his facing) → arm. Effects: leg 0.7× speed; arm +0.012 spread and
   0.011 rad sway; head blur up to 3 px in waves (every 6 s); bandaged: half. The browser applies them to its player
   (speed in updateLocal, spread in computeSpread, the sway moves `me.yaw/pitch` so the shots go where the view
-  drifts, the blur is a CSS filter on the game canvas, only while a wave is on); the server gives bots `wdSpeed` and
+  drifts, the blur is a CSS filter on `#game`, only while a wave is on); the server gives bots `wdSpeed` and
   `wdSpread`. A bandage done (blood.js clears `bandageUntil`) halves every fresh wound.
 - **Syringe:** $400, one at a time, classic on bomb/hostage maps (not aim_map, warmup buys allowed like everything).
   The revive with it takes 2 s; it's used up when the revive completes (a cancelled revive keeps it). The revived
@@ -190,9 +198,17 @@ interrogate X (3 s)"; down: "Hold K to end it yourself (5 s)" ("X is interrogati
 ### Draw cost
 Nothing is added to the scene: no meshes, materials, lights or shadows. The drag and the suicide only pose the
 existing player models; the wounds are a CSS filter (blur, only during a wave), a DOM overlay (the suicide's dark
-edges) and DOM badges. Expected 0 draw calls against `main` in every view; to be confirmed with `views.mjs` /
-`integration/gviews.mjs` in the browser phase. The CSS blur makes the browser composite the canvas through a filter
-while a wave is on (a head graze or adrenaline only): worth a look at the frame time on an Intel laptop.
+edges) and DOM badges.
+
+**Measured (2026-11-08, `integration/gviews.mjs`, median draw calls a frame over 40 frames, this branch / `main`
+539ce42 run from a copy of origin/main):** day — living room 243 / 243, kitchen 116 / 116, cellar 136 / 136,
+street 409 / 408; night — 262 / 262, 123 / 123, 149 / 151, 431 / 432. **No change** (the ±1–2 go both ways: frame
+to frame noise). No page errors on either.
+
+The blur: headless (SwiftShader), the average frame time with `#game` blurred 3 px was the same as without
+(cs_mansion, three pairs of 4 s: 24.6 / 24.1 ms a frame, i.e. nothing measurable; the compositor's filter work may
+not show in requestAnimationFrame's timing there). It's only on while a wave is on (a head graze, or adrenaline): the
+frame time on a real Intel laptop is still worth a look.
 
 ### Verified (server and node, 2026-11-08; test server 4210)
 - `unit.mjs` 26/26: the body trails 0.95 m behind, never faster than 1.3 × 1.6 m/s, faces the dragger; slack when the
@@ -222,12 +238,16 @@ while a wave is on (a head graze or adrenaline only): worth a look at the frame 
 - `t4.mjs` 23/23 on both maps (syringe): $16000 → $15600, `inv.adren` 1; not twice; sold back; with it the revive
   takes 2.04 s and uses it up, the revived man gets `ad` 20000 ms, the reviver is told, 30 HP; without it 5.05 s; the
   after-effect runs out after 20 s; with it, 1 s (0.49) + a drag + standing still: up in 1.03 s, used up.
-- `clientsmoke.mjs` 48/48 (browser module with fakes): wdDrag on/off from the keys, the speed cap, pistol only, the
-  hints (dragging, revive + drag, dragged, down, interrogated, interrogate, already/behind: none), the dragged
-  position, wdEnd on/off and its progress bar and no crawling, the interrogation's progress label, the click and the
+- `clientsmoke.mjs` 52/52 (browser module with fakes): wdDrag on/off from the keys, the speed cap, pistol only, the
+  hints (dragging, revive + drag, interrogate, already/behind: none; down: no hint line, the line under the panel:
+  dragged, down, interrogated), the dragged position, wdEnd on/off and its bar under the panel (not the hud's) and no
+  crawling, the interrogation's progress label, the click and the
   pose at the temple and the shot for a remote, the pose put back, the reveal's message and radar ring (not on a
-  jammed radar), the limp's speed and dip, the spread, the sway (≤ 0.01 rad), the blur, bandaged halves and badges,
-  a new life clears, the adrenaline's message, spread, badges, the "(adrenaline)" revive label, the syringe picture.
+  jammed radar), the limp's speed and dip, the spread, the sway (≤ 0.01 rad), the blur (on `#game`, not the canvas),
+  bandaged halves and badges, a new life clears, the same spawn number (a move) doesn't, the adrenaline's message,
+  spread, badges, the "(adrenaline)" revive label, the syringe picture.
+- Rerun after the browser fixes (fresh server each): `t1`–`t4` 30/28/17/23 on both maps; `unit` 26/26, `unit2`
+  14/14.
 - Regressions on this branch (a fresh server on 4210 for each, no errors in any server log): body `t1.mjs` 57/57
   (cs_mansion), body `gadgets.mjs` 38/38 (both maps), blood `tblood.mjs` 33/33, integration `links.mjs` a–g 36/36 and
   h 4/4 (`GAS_LEAK_X=6`), shield `t-shield.mjs` 28/28, `t17cctv.mjs` 17/17, `t16zip.mjs` 14/14, disguise `t1.mjs`
@@ -237,19 +257,46 @@ while a wave is on (a head graze or adrenaline only): worth a look at the frame 
   ms, max 1.4 ms) and cs_mansion_night (the same counts; avg 1.05 ms, max 6.4 ms): no server errors.
 - All 7 maps start with bots (2 a side, one scripted player for 12 s each): no server errors.
 
-### Browser checks (to do; both Mansion maps, 960x540 headless Edge)
-- Drag: hold E on a downed teammate, walk: the pistol in hand, slow walk, the body follows behind (head towards you,
-  legs still, no crawl), the blood trail behind it; to the others: one arm reaching to the body; stand still: the
-  progress bar continues from where it was; to the dragged player: the view moves with the body, "X is dragging you".
-- Interrogation: the hint, the progress "Interrogating X...", then the message and the yellow ring with "?" round the
-  red dot for 5 s.
-- Suicide: down, hold K: the progress "Ending it — let go of K to stop", dark edges growing; to others: the pistol at
-  his temple (arms.rotation (π/2, −0.35), hand turned π/2: check it reads as a pistol to the head), the cock click
-  and the shot; the feed "(shot himself)".
-- Wounds: the LEG/ARM/HEAD badges (½ bandaged), the limp's dip, the sway, the blur waves (and frame time with them).
-- Syringe: in the Equipment column (9th, key 9) with its gold picture, the ABOUT text, ✔ when owned, the SYRINGE badge;
-  `mansion/buyhover.mjs` must still pass.
-- Draw calls: `integration/gviews.mjs` (living room, kitchen, cellar, street; day and night) against `main`.
+### Verified (browser, 2026-11-08; headless Edge 960x540 on CDP 9610, server 4210 BOTS=0 ROUND_TIME=600)
+How to run: a fresh server before each (`MAP=cs_mansion` or `cs_mansion_night`, `BOTS=0 START_MONEY=16000
+MAP_ROTATION=0 ROUND_TIME=600`), then `GAME_PORT=4210 CDP_PORT=9610 MAP=<same> OUT=<dir> node
+dev/test-scripts/wounds/g1.mjs` (~1.5–2 min) or `g2.mjs` (~2.5–5 min). Shared helpers: `gshared.mjs` (the page,
+the join retried on a cold page, the game's own clock, the radar's pixels). Screenshots `g1_*.png`, `g2_*.png`.
+- `g1.mjs` 39/39 on both maps:
+  - the buy menu: "Adrenaline", $400, key 9 in "6 Equipment", its gold syringe picture, the words on pointing at it,
+    ✔ once bought (and "Right-click to sell it"), the SYRINGE badge; a revive with it: "Reviving Mate (adrenaline)...",
+    up in 2.01 s, used up, Mate gets up shaky;
+  - the drag: the AK in hand, E on downed Mate (the bar), S held: "Dragging Mate — stand still to revive, let go of E
+    to drop him", the Glock in hand, 0.96–0.97 m/s in game time, Mate 2.55 m along and 0.93–0.94 m away, blood drops
+    added behind him; standing still: "Reviving Mate..." again, and he gets up. In the picture: his legs trailing away
+    and the blood trail behind them; from the side (`gdiag.mjs`): the body on the ground, head first towards the
+    dragger, legs still;
+  - Toby drags Mate past the browser: 0.90 m behind him, yaw towards him;
+  - the browser down and dragged by Mate: the view goes with the body (1.67 m), "Mate is dragging you · hold K to end
+    it yourself (5 s)" under the "YOU'RE DOWN" panel and no hint line; after the drag Mate's revive gets him up (see
+    the intermittent miss in STATUS), and he stays where he was dragged to;
+  - the interrogation: "Hold E to interrogate Charlie (3 s)", "Interrogating Charlie...", then "Charlie talked: Cathy is
+    on your radar for 5 s" and a yellow ring with "?" round Cathy's red dot (its pixels counted on the radar canvas),
+    still there at 3.8 s, gone at 5.2 s.
+- `g2.mjs` 24/24 on both maps:
+  - leg, arm and head hits (a Glock from 17 m, helmet): LEG ARM HEAD in their row above the health; walking 6.31 m/s
+    before, 4.41 m/s limping (0.70); the aim drifting 0.02 rad in 3.6 s with no mouse (0 before); the blur in waves
+    up to 3 px (19 of 40 samples blurred; `g2_blur.png` clearly blurred); P: LEG ½ ARM ½ HEAD ½ and "Wounds bandaged
+    — half as bad now";
+  - down: "Hold K to end it yourself (5 s)" under the panel; K held: "Ending it — let go of K to stop" with its own bar
+    (51 % at 2.6 s) under the panel, the hud's bar unused, the edges darkening (0.5), the view tilted; the shot; the
+    feed "Tango [Glock-18] Tester (shot himself)";
+  - (a new round) Cathy down 2 m away, filmed from in front: holding K, her pistol up beside her head; her shot heard,
+    "Cathy (shot himself)";
+  - the browser down, Chris's syringe: up in 2.05–2.07 s, "ADRENALINE 20" next to the badges, 0.04 rad of drift, blur
+    up to 3 px.
+- Draw cost: see "Draw cost". `mansion/buyhover.mjs` (~18 min headless): 1920x969, 1920x1080, 1536x730, 1536x864,
+  1366x657, 1366x768, 1280x720, 1280x701, 1280x600, 1024x640: "42 items, all stay put"; 900x560: the 5 known
+  failures (the Mines & camo column off the bottom), as before the syringe; no page errors.
+- Test notes: headless the page draws a few frames a second and main.js caps a step at 0.05 s, so walking is measured
+  in the game's time; the server's times (revives, the 5 s reveal) in real time. The tests' `tp` is a fake 'spawn'
+  with the same spawn number. The kill cam runs on the game's clock, so headless it can outlast an admin restart
+  (g2 presses Space after it).
 
 ### Known gaps / notes
 - While dragging with E held, E's "local use" freeze in main.js (planting spot with the bomb, a mine, a satchel, the

@@ -92,7 +92,7 @@ const sp = flat(p0, p1) / (g1 - g0);
 ok(`the pistol in hand while dragging (${row(me)?.[7]})`, row(me)?.[7] === 'glock');
 ok(`walking slowly: ${flat(p0, p1).toFixed(2)} m in ${(g1 - g0).toFixed(2)} s of game time = ${sp.toFixed(2)} m/s (≤ 1.3)`, flat(p0, p1) > 0.8 && sp < 1.45);
 ok(`Mate dragged along ${flat(m0, m1).toFixed(2)} m, ${flat(m1, p1).toFixed(2)} m from the browser (~0.95)`, flat(m0, m1) > 0.6 && Math.abs(flat(m1, p1) - 0.95) < 0.2);
-ok(`the hint while dragging: "${hint}"`, /^Dragging Mate — stand still to revive him/.test(hint));
+ok(`the hint while dragging: "${hint}"`, /^Dragging Mate — stand still to revive, let go of E to drop him/.test(hint));
 const inst1 = await ev('JSON.stringify(__inst())');
 ok(`blood drops behind him (instanced counts ${inst0} -> ${inst1})`, inst0 !== inst1);
 // stand still, E held: the revive goes on
@@ -134,7 +134,13 @@ ok(`dragged: the browser's body goes with Mate (${flat(b0, b1).toFixed(2)} m)`, 
 ok(`under the down panel: "${await text('wd-down')}"; no hint line ("${await text('hint')}")`, /^Mate is dragging you/.test(await text('wd-down')) && !(await text('hint')));
 await shot('g1_dragged.png');
 M.send({ t: 'wdDrag', on: 0 }); // (the revive goes on: the browser gets up)
-ok('Mate revives the browser after the drag', await until(() => g.has(m => m.t === 'bodyUp' && m.v === me), 7000));
+const trace = [];
+const upd = await until(async () => {
+  trace.push(`${JSON.stringify(M.snap?.me)} bd ${JSON.stringify(M.snap?.bd?.d?.find(e => e[0] === me))} at ${posOf(me)?.map(v => v.toFixed(2))}`);
+  return g.has(m => m.t === 'bodyUp' && m.v === me);
+}, 10000); // (the rest of the 5 s revive; it missed twice in fast runs, 2026-11-08: the trace below says where)
+ok('Mate revives the browser after the drag', upd);
+if (!upd) console.log('     ' + trace.filter((x, i) => i % 3 === 0).slice(0, 12).join('\n     '));
 M.use(false);
 await sleep(500);
 ok(`the browser stays where it was dragged to (${flat(posOf(me), b1).toFixed(2)} m off)`, flat(posOf(me), b1) < 0.3);

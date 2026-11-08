@@ -124,6 +124,7 @@ await shot('g2_shot.png');
 for (const c of bots) c.clear();
 await admin({ action: 'restart' });
 ok('a fresh round', await until(() => T2.got('round').length > 0, 15000));
+await sleep(600); await key('Space'); // (the kill cam of our death runs on the game's clock: headless, it outlasts the restart)
 C3.send({ t: 'buy', item: 'adren' });
 await sleep(4500);
 const B = [-34, 0, 0];
