@@ -6,7 +6,7 @@ const ok = (what, cond) => { n++; console.log((cond ? 'OK   ' : 'FAIL ') + what)
 
 // ---- a fake DOM: enough for the badges and overlays
 const el = tag => ({ tag, id: '', style: {}, children: [], innerHTML: '', textContent: '', classList: { add() {}, remove() {}, toggle() {} },
-  appendChild(c) { this.children.push(c); return c; }, append(...c) { this.children.push(...c); }, querySelector: () => el('div') });
+  appendChild(c) { this.children.push(c); return c; }, append(...c) { this.children.push(...c); }, querySelector(s) { return ((this._q ||= {})[s] ||= el('div')); } });
 const byId = new Map();
 globalThis.document = {
   createElement: el, head: el('head'), body: el('body'),
@@ -39,7 +39,7 @@ const hud = {
 };
 const keys = new Set();
 const slots = [];
-const canvas = { style: {} };
+const gameDiv = { style: {} }, canvas = { style: {}, parentElement: gameDiv }; // (the blur goes on #game: main.js owns the canvas's filter)
 const audio = { play: (...a) => played.push(a) };
 const game = { cfg: { gameMode: 'classic' }, phase: 'live' };
 initWounds({ net, me, remotes, hud, keys, audio, switchSlot: (s) => { slots.push(s); me.slot = s; }, weaponOf: s => me.inv[s], nameOf: id => names[id], canvas, busy: () => false, blockE: () => false });
@@ -48,6 +48,9 @@ const snap = (extra = {}) => net.handlers.s({ pl: [], ...extra });
 const cam = () => ({ position: { x: 0, y: 1.6, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, updateMatrixWorld() {} });
 let now = performance.now();
 const frame = (ms = 33) => { now += ms; wounds.frame(ms / 1000, now, cam()); };
+const downEl = () => document.body.children.find(c => c.id === 'wd-down');
+const downLine = () => { frame(); return downEl()?.querySelector('.t').textContent ?? '(none)'; };
+const badgesHtml = () => byId.get('hud').children.find(c => c.id === 'wd-badges')?.innerHTML || '';
 
 // ---------------------------------------------------------------- 1.1 the drag
 snap({ bd: { d: [[2, 0.9, 0.2, 1]], u: [], p: [] } }); // Mate (2) down, me reviving him
@@ -86,27 +89,29 @@ ok('down: body.js knows', body.downed());
 ok('dragged: I don\'t move myself (speed 0)', wounds.speed(1) === 0);
 for (let i = 0; i < 30; i++) frame();
 ok(`dragged: my position goes where the server puts me (${me.p.map(v => Math.round(v * 100) / 100)})`, Math.hypot(me.p[0] - 1.5, me.p[2] - 0.5) < 0.02);
-hud.hint('');
-ok(`dragged hint: "${hints.at(-1)}"`, hints.at(-1) === 'Mate is dragging you');
+hud.hint('Some hint');
+ok('down: no hint line (it would sit on the "YOU\'RE DOWN" panel)', hints.at(-1) === '');
+ok(`dragged, under the panel: "${downLine()}"`, /^Mate is dragging you · hold K to end it yourself/.test(downLine()));
 
 // ---------------------------------------------------------------- 1.2 the downed suicide, interrogation
 snap({ bd: { d: [[1, 0.8, 0, 0]], u: [], p: [] } });
-hud.hint('');
-ok(`down: "${hints.at(-1)}"`, /^Hold K to end it yourself/.test(hints.at(-1)));
+frame();
+ok(`down: "${downLine()}"`, /^Hold K to end it yourself/.test(downLine()));
 keys.add('KeyK');
 frame();
 ok('down, K held: wdEnd on', sent.at(-1)?.t === 'wdEnd' && sent.at(-1).on === 1);
 ok('ending it: no crawling', wounds.speed(1) === 0);
 snap({ bd: { d: [[1, 0.8, 0, 0]], u: [], p: [] }, wd: { d: [], k: [[1, 0.4]], i: [], a: [] } });
 hud.progress(null, 0);
-ok(`its progress bar (${JSON.stringify(progress.at(-1))})`, progress.at(-1)[0] === 'Ending it — let go of K to stop' && progress.at(-1)[1] === 0.4);
+ok('not on the hud\'s progress bar (it would sit on the "YOU\'RE DOWN" panel)', progress.at(-1)[0] == null);
+ok(`under the panel: "${downLine()}", its bar at ${downEl().querySelector('.bar i').style.width}`, downLine() === 'Ending it — let go of K to stop' && downEl().querySelector('.bar i').style.width === '40%' && downEl().querySelector('.bar').style.visibility === 'visible');
 keys.delete('KeyK');
 frame();
 ok('K let go: wdEnd off', sent.at(-1)?.t === 'wdEnd' && sent.at(-1).on === 0);
 // someone interrogating me
 snap({ bd: { d: [[1, 0.8, 0, 0]], u: [], p: [] }, wd: { d: [], k: [], i: [[3, 1, 0.3]], a: [] } });
-hud.hint('');
-ok(`interrogated: "${hints.at(-1)}"`, /^Bob is interrogating you — hold K to end it first/.test(hints.at(-1)));
+frame();
+ok(`interrogated: "${downLine()}"`, /^Bob is interrogating you — hold K to end it first/.test(downLine()));
 // up again; Bob (an enemy) down in front of me
 me.p = [0, 0, 0];
 snap({ bd: { d: [[3]], u: [], p: [] } });
@@ -159,7 +164,7 @@ let dipped = false;
 for (let i = 0; i < 60; i++) { now += 33; const c = cam(); wounds.frame(0.033, now, c); if (c.position.y < 1.6 - 0.01) dipped = true; }
 ok('leg: the view dips on the bad step', dipped);
 me.v = [0, 0, 0];
-ok(`badge: ${byId.get('bottom-left').children[0]?.innerHTML}`, /LEG/.test(byId.get('bottom-left').children[0]?.innerHTML));
+ok(`badge: ${badgesHtml()}`, /LEG/.test(badgesHtml()));
 net.handlers.wdWounds({ l: 1, a: 1, h: 0, ad: 0, adT: 0, n: 'a' });
 ok(`arm: the spread (+${WOUNDS.armSpread})`, Math.abs(wounds.spread(0.01) - (0.01 + WOUNDS.armSpread)) < 1e-9);
 const y0 = me.yaw;
@@ -168,26 +173,31 @@ for (let i = 0; i < 30; i++) { frame(); moved = Math.max(moved, Math.abs(me.yaw 
 ok(`arm: the aim sways by itself (up to ${moved.toFixed(4)} rad)`, moved > 0.002 && moved < 0.03);
 net.handlers.wdWounds({ l: 1, a: 1, h: 1, ad: 0, adT: 0, n: 'h' });
 let blurred = '';
-for (let i = 0; i < 200; i++) { frame(); if (canvas.style.filter) blurred = canvas.style.filter; }
+for (let i = 0; i < 200; i++) { frame(); if (gameDiv.style.filter) blurred = gameDiv.style.filter; }
 ok(`head: the sight blurs in waves (${blurred})`, /^blur\(/.test(blurred));
 net.handlers.wdWounds({ l: 0.5, a: 0.5, h: 0.5, ad: 0, adT: 0, n: 'band' });
 ok(`bandaged: half as bad (speed × ${wounds.speed(1)}), told`, Math.abs(wounds.speed(1) - (1 + WOUNDS.leg) / 2) < 1e-9 && /bandaged/.test(smalls.at(-1)));
 frame();
-ok(`badges: bandaged (${byId.get('bottom-left').children[0]?.innerHTML.match(/wd-band/g)?.length})`, byId.get('bottom-left').children[0]?.innerHTML.match(/wd-band/g)?.length === 3);
+ok(`badges: bandaged (${badgesHtml().match(/wd-band/g)?.length})`, badgesHtml().match(/wd-band/g)?.length === 3);
 net.handlers.spawn?.({ p: [0, 0, 0], yaw: 0, sq: 2 });
 ok('a new life: no wounds', wounds.speed(1) === 1 && wounds.spread(0) === 0);
 for (let i = 0; i < 3; i++) frame();
-ok('and no blur', canvas.style.filter === '');
+ok('and no blur', gameDiv.style.filter === '' && !canvas.style.filter);
+net.handlers.wdWounds({ l: 1, a: 0, h: 0, ad: 0, adT: 0, n: 'l' });
+net.handlers.spawn?.({ p: [3, 0, 3], yaw: 0, sq: 2 });
+ok('the same spawn number again (a move, not a new life): the wounds stay', wounds.speed(1) === WOUNDS.leg);
+net.handlers.spawn?.({ p: [0, 0, 0], yaw: 0, sq: 3 });
+ok('the next life: gone', wounds.speed(1) === 1);
 
 // ---------------------------------------------------------------- 1.4 adrenaline
 net.handlers.wdWounds({ l: 0, a: 0, h: 0, ad: 20000, adT: 20000, n: 'ad' });
 ok(`adrenaline: told ("${smalls.at(-1)}")`, /^Adrenaline!/.test(smalls.at(-1)));
 ok(`adrenaline: shaky (spread +${wounds.spread(0).toFixed(4)})`, wounds.spread(0) > 0.012);
 frame();
-ok(`badge (${byId.get('bottom-left').children[0]?.innerHTML})`, /ADRENALINE/.test(byId.get('bottom-left').children[0]?.innerHTML));
+ok(`badge (${badgesHtml()})`, /ADRENALINE/.test(badgesHtml()));
 me.inv.adren = 1;
 frame();
-ok('the syringe has a badge', /SYRINGE/.test(byId.get('bottom-left').children[0]?.innerHTML));
+ok('the syringe has a badge', /SYRINGE/.test(badgesHtml()));
 me.act = { a: 'bodyRevive', pr: 0.3 };
 snap({ bd: { d: [[2, 0.9, 0.3, 1]], u: [], p: [] } });
 hud.progress('Defusing the bomb...', 0.3);

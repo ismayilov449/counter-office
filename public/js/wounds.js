@@ -24,7 +24,7 @@ const st = {
   w: { l: 0, a: 0, h: 0 }, adUntil: 0, adT: 1, // my wounds; the adrenaline's after-effect (performance.now)
   reveal: new Map(), // enemy id -> until (performance.now): interrogated away (a ring round his radar dot)
   spots: new Map(), // id -> [x, z]: the snapshot's radar spots (where to draw the ring)
-  sentAt: -1e9, stillAt: 0, ending: false,
+  sentAt: -1e9, stillAt: 0, ending: false, sq: null,
   sway: [0, 0], walk: 0, blur: '', camDy: 0,
   posed: new Set(), // remotes posed here (to put back)
 };
@@ -37,7 +37,8 @@ export function initWounds(api) {
   const H = api.net.handlers;
   const wrap = (k, fn) => { const orig = H[k] || (() => {}); H[k] = m => fn(m, orig); };
   wrap('s', (m, orig) => { onSnap(m); orig(m); });
-  wrap('spawn', (m, orig) => { clearMe(); orig(m); });
+  // a new life clears my wounds (the server says so too); the same spawn number again is a move, not a new life
+  wrap('spawn', (m, orig) => { if (m.sq !== st.sq) clearMe(); st.sq = m.sq; orig(m); });
   H.wdWounds = onWounds;
   H.wdReveal = onReveal;
   H.wdTalked = m => A.hud.small(`You gave away ${A.nameOf(m.id)}`, 3);
@@ -136,11 +137,9 @@ function wrapHud() {
   hud.hint = function (text) {
     const me = A.me;
     let h = text;
-    if (me.alive && body.downed()) {
-      const ask = st.asks.find(e => e[1] === me.id);
-      h = st.ends.has(me.id) ? '' : ask ? `${A.nameOf(ask[0])} is interrogating you — hold K to end it first (${WOUNDS.suicide} s)`
-        : st.draggedBy != null ? `${A.nameOf(st.draggedBy)} is dragging you` : `Hold K to end it yourself (${WOUNDS.suicide} s)`;
-    } else if (me.alive && st.dragging != null) h = `Dragging ${A.nameOf(st.dragging)} — stand still to revive him, let go of E to drop him`;
+    // (down, the hint line would sit on body.js's "YOU'RE DOWN" panel: our words go on a line under it, downLine)
+    if (me.alive && body.downed()) h = '';
+    else if (me.alive && st.dragging != null) h = `Dragging ${A.nameOf(st.dragging)} — stand still to revive, let go of E to drop him`;
     else if (typeof text === 'string' && text.startsWith('Hold E to revive')) h = `${text} · walk to drag him`;
     else if (eFree()) { const q = askTarget(); if (q) h = `Hold E to interrogate ${q.name} (${WOUNDS.ask} s)`; }
     return hint0.call(this, h);
@@ -151,7 +150,6 @@ function wrapHud() {
       const e = st.asks.find(x => x[0] === me.id);
       label = `Interrogating ${e ? A.nameOf(e[1]) : ''}...`;
     } else if (label != null && me.act?.a === 'bodyRevive' && me.inv?.adren) label = `${label.replace(/\.\.\.$/, '')} (adrenaline)...`;
-    else if (label == null && me.alive && st.ends.has(me.id)) { label = 'Ending it — let go of K to stop'; frac = st.ends.get(me.id); }
     return progress0.call(this, label, frac);
   };
   // a pulsing yellow ring with a "?" round an enemy someone interrogated away (his red dot comes from the spotting)
@@ -175,6 +173,16 @@ function wrapHud() {
   };
 }
 
+// Down: what's happening to me and what K does (shown under body.js's "YOU'RE DOWN" panel).
+function downLine() {
+  const me = A.me;
+  if (!me.alive || !body.downed() || st.ends.has(me.id)) return '';
+  const ask = st.asks.find(e => e[1] === me.id);
+  if (ask) return `${A.nameOf(ask[0])} is interrogating you — hold K to end it first (${WOUNDS.suicide} s)`;
+  if (st.draggedBy != null) return `${A.nameOf(st.draggedBy)} is dragging you · hold K to end it yourself (${WOUNDS.suicide} s)`;
+  return `Hold K to end it yourself (${WOUNDS.suicide} s)`;
+}
+
 // ---------------------------------------------------------------- the wounds' effects on me
 
 const adLeft = (now = performance.now()) => (st.adUntil > now ? (st.adUntil - now) / st.adT : 0);
@@ -193,9 +201,12 @@ function effects(dt, now, camera) {
   const hs = Math.hypot(me.v?.[0] || 0, me.v?.[2] || 0);
   if (me.alive && st.w.l && me.onGround && hs > 0.3) st.walk += hs * dt * 1.7;
   const step = st.w.l && me.alive ? Math.max(0, Math.sin(st.walk)) ** 3 * Math.min(1, hs / 2) : 0;
-  if (step > 0.001) {
+  // ending it: the head tilts towards the pistol (right) and drops a little over the 5 s
+  const end = me.alive && st.ends.has(me.id) ? st.ends.get(me.id) : 0, k = end * end * (3 - 2 * end);
+  if (step > 0.001 || k > 0) {
     camera.position.y -= 0.06 * st.w.l * step;
-    camera.rotation.z -= 0.03 * st.w.l * step;
+    camera.rotation.z -= 0.03 * st.w.l * step + 0.28 * k;
+    camera.rotation.x -= 0.12 * k;
     camera.updateMatrixWorld();
   }
   // the blur: in waves (a head graze every 6 s, adrenaline every 3 s)
@@ -205,7 +216,10 @@ function effects(dt, now, camera) {
     px = fx.blur * Math.max(0, Math.sin((t * 2 * Math.PI) / per)) ** 2;
   }
   const css = px >= 0.25 ? `blur(${(Math.round(px * 4) / 4).toFixed(2)}px)` : '';
-  if (css !== st.blur && A.canvas) { st.blur = css; A.canvas.style.filter = css; }
+  // (on the canvas's container: main.js owns the canvas's own filter — nightvision, the CCTV picture — and sets it
+  // every frame; a filter on the parent adds to it)
+  const el = A.canvas?.parentElement || A.canvas;
+  if (el && el.style.filter !== css) { st.blur = css; el.style.filter = css; }
 }
 
 // ---------------------------------------------------------------- remote players
@@ -260,20 +274,31 @@ let ui = null;
 function buildUi() {
   const css = document.createElement('style');
   css.textContent = `
-#wd-badges { display: flex; gap: 6px; align-items: flex-end; }
+#wd-badges { position: absolute; left: 18px; bottom: 58px; display: flex; gap: 6px; pointer-events: none; }
+#wd-badges .badge { margin: 0; padding: 2px 7px; font-size: 13px; }
 #wd-badges .badge.wd-band { background: rgba(190, 120, 20, 0.75); }
 #wd-badges .badge.wd-ad { background: rgba(150, 40, 170, 0.75); }
 #wd-badges .badge.wd-syr { background: rgba(30, 140, 130, 0.75); }
 #wd-end { position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: 0;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.92) 100%); }`;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.92) 100%); }
+#wd-down { position: fixed; left: 50%; bottom: 13%; transform: translateX(-50%); width: 460px; max-width: 90vw; z-index: 9;
+  pointer-events: none; text-align: center; color: #ffd6cf; font: bold 13px Verdana, sans-serif; text-shadow: 0 1px 2px #000; }
+#wd-down .bar { height: 7px; width: 260px; margin: 5px auto 0; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,90,70,0.6); visibility: hidden; }
+#wd-down .bar i { display: block; height: 100%; width: 0; background: #e8e0d0; }`;
   document.head.appendChild(css);
+  // (a row of their own above the health: the bottom row is full with the bleeding badge, and the bet's footer is there
+  // in buy time)
   const box = document.createElement('div');
   box.id = 'wd-badges';
-  document.getElementById('bottom-left')?.appendChild(box);
+  (document.getElementById('hud') || document.body).appendChild(box);
   const end = document.createElement('div');
   end.id = 'wd-end';
+  const down = document.createElement('div');
+  down.id = 'wd-down';
+  down.innerHTML = '<div class="t"></div><div class="bar"><i></i></div>';
   document.body.appendChild(end);
-  ui = { box, end, key: '', endK: -1 };
+  document.body.appendChild(down);
+  ui = { box, end, down, text: down.querySelector('.t'), bar: down.querySelector('.bar'), fill: down.querySelector('.bar i'), key: '', endK: -1, downT: null, barK: -1 };
 }
 
 function updateHud(now) {
@@ -287,6 +312,11 @@ function updateHud(now) {
   // ending it: the world goes dark at the edges
   const f = me.alive && st.ends.has(me.id) ? Math.round(st.ends.get(me.id) * 20) / 20 : 0;
   if (f !== ui.endK) { ui.endK = f; ui.end.style.opacity = f; }
+  // down: the line under body.js's panel (and ending it, its bar: not the hud's progress bar, which sits on the panel)
+  const line = me.alive && body.downed() && st.ends.has(me.id) ? 'Ending it — let go of K to stop' : downLine();
+  if (line !== ui.downT) { ui.downT = line; ui.text.textContent = line; }
+  const b = me.alive && st.ends.has(me.id) ? Math.round(st.ends.get(me.id) * 100) : -1;
+  if (b !== ui.barK) { ui.barK = b; ui.bar.style.visibility = b >= 0 ? 'visible' : 'hidden'; ui.fill.style.width = `${Math.max(0, b)}%`; }
 }
 
 function forcePistol() {

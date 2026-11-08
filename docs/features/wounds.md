@@ -9,9 +9,42 @@ Four features on top of "Downed, not dead" (`body.md`), blood trails and the ban
 - **Done (built and server-tested), all four items, in order, each committed and pushed** (5f3b463 1.1, 68d792a 1.2,
   211696d 1.3, 0a13e0f 1.4; then this doc, the disguise words and a 'gone' check). Server tests on cs_mansion and cs_mansion_night, node tests of the shared rules, of the
   server module without a server and of the browser module with fakes (numbers under "Verified").
-- **Next: the browser test** (not allowed yet when this was written: at most 2 agents with a headless Edge). What to
-  look at is listed under "Browser checks". Also by browser: the draw cost (expected 0: see "Draw cost") and
-  `mansion/buyhover.mjs` (the Equipment column has 9 items now; Rifles still has 10, so no column is taller).
+- **Browser test: HALF-DONE — stopped 2026-11-08 at the user's usage limit (WIP commit).** Where it stopped:
+  - `wounds/g1.mjs` (cs_mansion): **39/39 passed**, screenshots looked at: the syringe in the buy menu (Equipment,
+    key 9, gold picture, words, ✔, SYRINGE badge); a 2.01 s syringe revive with "(adrenaline)" on the bar; the drag
+    (AK swapped for the Glock, 0.97 m/s in game time, the body 0.94 m behind head first with still legs, the blood
+    trail, the hint; standing still the revive goes on to the end); seen from outside (from the side: the body on
+    the ground, head towards Toby); dragged (the view goes with the body); interrogation (hint, "Interrogating
+    Charlie...", the message, a yellow "?" ring round Cathy's red dot on the radar, gone after 5.2 s); no page errors.
+    g1 **not yet run on cs_mansion_night**, nor rerun after the fixes below.
+  - `wounds/g2.mjs` (cs_mansion): the first run gave 20/24 and showed the bugs fixed below; **the rerun with the
+    fixes was stopped part way, no result**. Passed in that first run: the suicide from the player's own view (the
+    shot, the feed "Tester (shot himself)", the head tilt and dark edges), Cathy's suicide as others see it (her
+    shot heard, the feed), a 2.05 s syringe revive of the browser with the ADRENALINE badge and 0.04 rad of drift;
+    no page errors. Its 4 failures were the test's teleport (a fake 'spawn') wiping the client's wounds, and the
+    blur bug below.
+  - **Not run at all yet:** g1/g2 on cs_mansion_night, `mansion/buyhover.mjs`, `integration/gviews.mjs` against
+    `main` (the draw cost), the CSS blur's frame cost (g2 part a: the first numbers measured nothing, because of the
+    blur bug).
+  - **Fixed in the browser code (this WIP commit; node smoke test 52/52, not yet re-checked in the browser):**
+    1. the blur never showed: main.js's `updateHud` resets the game canvas's `style.filter` every frame
+       (nightvision, CCTV), so the blur now goes on its container `#game`;
+    2. down, my hints sat on body.js's "YOU'RE DOWN" panel: they're now on a line of their own under it
+       (`#wd-down`: "Hold K to end it yourself (5 s)", "X is dragging you · …", "X is interrogating you — …");
+    3. ending it, the hud's progress bar sat on that panel too: the bar is now in `#wd-down`;
+    4. in buy time the badges ran into the "F3 Bet" footer: they're now a row of their own above the health
+       (`#wd-badges`, left 18 px, bottom 58 px, under the chat);
+    5. the player's own view of ending it: the head now tilts towards the pistol and drops over the 5 s;
+    6. a 'spawn' with the same spawn number (a move, as the tests' teleport) no longer clears the wounds (a new life
+       has a new number; the server also sends cleared wounds then).
+  - **To resume:** restart the 4210 server (`BOTS=0 START_MONEY=16000 MAP_ROTATION=0 ROUND_TIME=600`), a headless
+    Edge on CDP 9610 (`--disable-extensions --disable-sync`, fresh profile, 960x540), then
+    `GAME_PORT=4210 CDP_PORT=9610 MAP=<map> OUT=<dir> node dev/test-scripts/wounds/g2.mjs` and `g1.mjs` on both
+    Mansion maps (a fresh server before each); look at the screenshots (`g2_ending.png`: the line and bar under the
+    panel, no overlap; `g2_badges.png` / `g2_adrenaline.png`: the badge row clear of the footer; `g2_blur.png`;
+    `g2_remote_ending.png`: the pistol at Cathy's temple, filmed from in front of her). Then `buyhover.mjs`,
+    `gviews.mjs` on this branch and on `main`, rerun the server tests (`wounds/t1`–`t4`), commit, push.
+  - `dev/test-scripts/wounds/gdiag.mjs` is a diagnostic (the drag seen from the side: `gd_*.png`), not a test.
 - **No geometry** added: nothing for the other wave-1 groups to avoid.
 - Left (not checked): the sounds by ear (the suicide's pistol cock is the 'draw' sound, the shot is the pistol's own),
   how the drag, the limp's dip, the sway and the blur feel at a real frame rate on a laptop.
