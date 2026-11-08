@@ -546,6 +546,7 @@ function tryFire(now) {
     if (item.res > 0) startReload();
     return;
   }
+  if (walls.jammed(id, def, now)) return; // walls: a wet gun jams (R clears it)
   item.mag--;
   me.nextShot = now + def.rate * 1000;
   me.lastFire = now;
@@ -2338,7 +2339,7 @@ document.addEventListener('keydown', e => {
     case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
-    case 'KeyR': startReload(); break;
+    case 'KeyR': if (!walls.clearJam()) startReload(); break; // walls: R clears a jammed gun first
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
     case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
@@ -4043,7 +4044,7 @@ function frame() {
   if (shotRequested) saveScreenshot();
 }
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
-walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map }); // walls:
+walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map, weapon: () => current() }); // walls:
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();

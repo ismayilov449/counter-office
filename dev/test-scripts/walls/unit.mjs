@@ -34,7 +34,7 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   ok(boxMaterial(map, { min: [0, 0, 0], max: [1, 1, 1], car: 0 }) === 'metal' && boxMaterial(map, { min: [0, 0, 0], max: [1, 1, 1], elev: true }) === 'metal', 'cars and the lift are metal');
   const floor = boxAt(map, [-18, 4.15, -1]);
   ok(floor && isSlab(floor) && boxMaterials(map, floor).length >= 1, `the floor between the storeys is a slab (${boxMaterials(map, floor).join('+')})`);
-  ok(boxMaterial(map, boxAt(map, [-30, 1, 0])) === 'foliage' || true, '(hedges: foliage where there are any)');
+  ok(counts.foliage > 10 && !MATERIALS.foliage.pen && MATERIALS.foliage.burns, `the hedges are foliage (${counts.foliage} boxes): they stop bullets and burn`);
   ok(boxMaterial(MAPS.de_dust2, MAPS.de_dust2.boxes[0]) === null && !materialsOn(MAPS.de_dust2), 'other maps are not classified');
   const burns = map.breakables.filter(pc => MATERIALS[pieceMaterial(map, pc)].burns).length;
   ok(burns > 50, `for the fire: ${burns} breakable pieces burn`);

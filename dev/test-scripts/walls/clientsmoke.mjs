@@ -5,7 +5,9 @@
 import * as THREE from 'three';
 import { MAPS } from '../../../shared/maps/index.js';
 import { CollisionWorld } from '../../../shared/collision.js';
-import { WALLS } from '../../../shared/walls.js';
+import { WALLS, WET, jamChance } from '../../../shared/walls.js';
+import { WEAPONS } from '../../../shared/weapons.js';
+import { makeFloodBoxes, setFloodBoxes } from '../../../shared/flood.js';
 
 let fails = 0, passes = 0;
 const ok = (cond, what) => { if (cond) passes++; else fails++; console.log((cond ? 'PASS ' : 'FAIL ') + what); };
@@ -52,7 +54,8 @@ const remotes = new Map();
 const net = { handlers: {}, send() {} };
 const hud = { small() {}, center() {} };
 const game = { phase: 'live', lights: { power: true } };
-walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map });
+let held = 'ak47';
+walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map, weapon: () => held });
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 300);
 const look = (p, d) => { camera.position.set(...p); camera.lookAt(p[0] + d[0], p[1] + d[1], p[2] + d[2]); camera.updateMatrixWorld(); };
 
@@ -154,6 +157,76 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   walls.round();
   T += 50; walls.update(0.05, T, camera);
   ok(walls.debug().patches === 0 && !walls.debug().sprayMesh, 'a new round clears them at once');
+
+  // ---- 2.3: wet guns
+  const run = (secs, step = 0.05) => { for (let s = 0; s < secs; s += step) { T += step * 1000; walls.update(step, T, camera); } };
+  const g = () => walls.debug().gun;
+  me.alive = true; held = 'ak47';
+  me.p = [-10, 0.813, -1];
+  run(0.2);
+  ok(g().wet === 0 && g().shown === '' && !walls.jammed('ak47', WEAPONS.ak47, T), 'dry: no WET, never jams');
+  me.p = [-40, -1.5, -12]; // swimming in the pool
+  run(0.2);
+  ok(g().wet === WET.swim && g().shown === 'WET', `swimming soaks the gun (${g().wet} s, the HUD says ${g().shown})`);
+  me.p = [-10, 0.813, -1];
+  let fired = 0, jamAt = -1;
+  for (let i = 0; i < 400 && jamAt < 0; i++) { me.nextShot = 0; if (walls.jammed('ak47', WEAPONS.ak47, T)) jamAt = i; else fired++; }
+  ok(jamAt >= 0 && g().jams.includes('ak47') && g().shown === 'JAMMED - TAP R', `a soaked gun jams (after ${fired} shots; about 1 in ${Math.round(1 / jamChance(WET.swim))} expected)`);
+  ok(walls.jammed('ak47', WEAPONS.ak47, T) && walls.jammed('ak47', WEAPONS.ak47, T + 1000), 'a jammed gun stays jammed');
+  ok(!walls.jammed('knife', WEAPONS.knife, T) && !walls.jammed('rpg', WEAPONS.rpg, T), 'knives and rockets never jam');
+  held = 'glock';
+  ok(!walls.clearJam(), 'R with another gun in hand reloads as usual (nothing to clear)');
+  held = 'ak47';
+  ok(walls.clearJam() && g().clearing && g().shown === 'CLEARING...', 'R on the jammed gun starts clearing it');
+  run(0.3);
+  held = 'glock'; run(0.1); held = 'ak47';
+  ok(!g().clearing && g().jams.includes('ak47'), 'switching guns cancels the clearing');
+  walls.clearJam();
+  run(WET.clear + 0.1);
+  ok(!g().jams.length, `cleared after ${WET.clear} s`);
+  run(WET.swim + 1, 0.5);
+  ok(g().wet === 0 && g().shown === '', `it dries in ${WET.swim} s`);
+  me.p = [-40, -0.5, -12]; // wading at the pool's edge (water round the feet, not the chest)
+  run(0.1);
+  ok(g().wet === WET.wade, `wading: ${g().wet} s`);
+  me.p = [-10, 0.813, -1];
+  run(WET.wade + 1, 0.5);
+  me.p = [-8.3, 0.813, 5.85];
+  walls.onSnapshot([[[-7.8, 0.81, 6.15, 0.9, 2, 6.5, -1, 0]], [], []]);
+  run(0.1);
+  ok(g().wet === WET.puddle, `standing in a soaked floor: ${g().wet} s`);
+  walls.onSnapshot(undefined);
+  me.alive = false; run(0.1); me.alive = true;
+  ok(g().wet === 0 && !g().jams.length, 'dying dries and clears it');
+  walls.round();
+
+  // ---- 2.4: bodies float up
+  const fb = makeFloodBoxes();
+  setFloodBoxes(fb, -0.45); // the flooded cellar, full
+  map.water.push(...fb);
+  const body = (id, p) => { const model = new THREE.Group(); model.rotation.x = Math.PI / 2; model.position.set(...p); const tag = new THREE.Object3D(); tag.position.set(0, 2.15, 0); model.add(tag); return { id, alive: false, p, model, tag }; };
+  const drowned = body(7, [-18, -2.2, 0]), pooled = body(8, [-40, -2.05, -12]), dry = body(9, [-10, 0.813, -1]);
+  for (const r of [drowned, pooled, dry]) remotes.set(r.id, r);
+  const settle = secs => { for (let s = 0; s < secs; s += 0.05) { T += 50; for (const r of remotes.values()) r.model.position.y = r.p[1]; walls.update(0.05, T, camera); } };
+  settle(1);
+  ok(drowned.model.position.y > -2.0 && drowned.model.position.y < -1.3, `a body in the flooded cellar rises (${drowned.model.position.y.toFixed(2)} after 1 s)`);
+  settle(5);
+  const ys = [];
+  for (let i = 0; i < 40; i++) { settle(0.05); ys.push(drowned.model.position.y); }
+  const lo = Math.min(...ys), hi = Math.max(...ys);
+  ok(lo > -0.65 && hi < -0.5 && hi - lo > 0.02, `and bobs at the surface (${lo.toFixed(2)}…${hi.toFixed(2)}; the water at -0.45)`);
+  ok(drowned.tag.visible && Math.abs(drowned.tag.position.z + 0.55) < 1e-6, 'his name shows over him');
+  ok(pooled.model.position.y > -0.45 && pooled.model.position.y < -0.3, `a body in the pool floats too (${pooled.model.position.y.toFixed(2)}, the surface at -0.25)`);
+  ok(dry.model.position.y === dry.p[1] && !dry.waFloat, 'a body on a dry floor stays where it is');
+  setFloodBoxes(fb, -4.88); // drained
+  settle(0.2);
+  ok(!drowned.waFloat && drowned.tag.position.y === 2.15 && drowned.model.position.y === -2.2, 'the water gone: back on the floor, the name tag as it was');
+  drowned.alive = true; drowned.model.rotation.x = 0;
+  setFloodBoxes(fb, -0.45);
+  settle(0.2);
+  ok(!drowned.waFloat, 'the living don\'t float');
+  map.water.splice(map.water.indexOf(fb[0]), fb.length);
+  for (const r of [drowned, pooled, dry]) remotes.delete(r.id);
 }
 // other maps: nothing
 map = MAPS.de_dust2;
