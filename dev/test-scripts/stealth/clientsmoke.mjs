@@ -125,7 +125,9 @@ ok('fresh soot: dark prints', [...stealth._debug().dark().slice(0, pr.length)].e
 // the roof: up the west slope, south of the stack (the faces' slope, not the collision's steps)
 const n0 = mesh.count;
 r.p = [-20.6, 9.25, 5.8]; step(); // (a jump: no print)
-const roofY = x => { const h = coll.raycast([x, 13, 5.8], [0, -1, 0], 6, 'solid'); return 13 - h.t; };
+// (integration 2026-11-08: power's machine room carve leaves a 2 mm seam in the roof's collision at x -19.2, all along
+// the roof; a body can't fall through it, but a ray straight down at exactly -19.2 does: then 1 cm either side)
+const roofY = x => { const h = [x, x - 0.01, x + 0.01].map(v => coll.raycast([v, 13, 5.8], [0, -1, 0], 6, 'solid')).find(Boolean); return 13 - h.t; };
 for (let i = 0; i <= 50; i++) { const x = -20.6 + i * 0.04; r.p = [x, roofY(x), 5.8]; step(); }
 pr = prints().slice(n0);
 ok(`prints on the roof too: ${pr.length}`, pr.length >= 3);
