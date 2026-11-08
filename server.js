@@ -3416,6 +3416,7 @@ function onBuy(p, id) {
   } else if (id === 'camo') {
     if (p.camo) return fail('You already have camouflage.');
   }
+  if (id === 'adren' && wounds.cantBuy(p)) return fail(wounds.cantBuy(p)); // wounds: the adrenaline syringe (one, classic rounds)
   if (isDM()) price = 0;
   if (p.money < price) return fail('You have insufficient funds!');
 
@@ -3438,6 +3439,7 @@ function onBuy(p, id) {
   else if (id === 'kit') p.kit = true;
   else if (id === 'nvg') p.nvg = true;
   else if (id === 'camo') p.camo = true;
+  if (id === 'adren') p.inv.adren = 1; // wounds: the syringe (in the inventory: kept by a survivor, lost with a death)
   send(p, { t: 'sfx', s: 'buy' });
   sendMe(p);
 }
@@ -3478,6 +3480,7 @@ function onSell(p, id) {
   } else if (id === 'kit') p.kit = false;
   else if (id === 'nvg') p.nvg = false;
   else if (id === 'camo') { p.camo = false; p.camoOn = false; }
+  if (id === 'adren') { if (!p.inv.adren) return fail('You don\'t have it any more.'); p.inv.adren = 0; } // wounds: the syringe
   p.buys.splice(i, 1);
   if (wdef?.perTeam) countTeamBuy(p.team, id, -1);
   p.money += b.price;

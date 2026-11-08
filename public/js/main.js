@@ -1379,6 +1379,7 @@ function owns(id) {
   if (id === 'vesthelm') return me.armor >= 100 && me.helmet;
   if (id === 'kit') return me.kit;
   if (id === 'nvg') return me.nvg;
+  if (id === 'adren') return !!me.inv?.adren; // wounds: the adrenaline syringe
   return false;
 }
 
@@ -1397,6 +1398,7 @@ function cantBuy(id) {
   const i = itemInfo(id);
   if (!availableTo(id, me.team)) return `${i.team === 'CT' ? 'CT' : 'T'} only`;
   if (id === 'kit' && (game.mode !== 'bomb' || game.cfg.gameMode !== 'classic')) return 'Bomb maps only';
+  if (id === 'adren' && (game.mode === 'elim' || game.cfg.gameMode !== 'classic')) return 'Classic only'; // wounds: no downed state elsewhere
   if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar' || id === 'jammer' || id === 'satchel' || id === 'drone')) return 'Not in Zombie';
   return '';
 }

@@ -22,8 +22,7 @@ export const WOUNDS = {
   armShake: 0.011, // radians the aim sways with a fresh arm wound
   headBlur: 3, // px: the sight's blur at the worst of a wave with a fresh head graze
   armSide: 0.2, // m: a chest or stomach hit this far out from the body's middle line is an arm hit
-  adren: {
-    price: 400,
+  adren: { // (its price: ITEMS.adren in shared/weapons.js, $400)
     revive: 2, // s: a revive with the syringe (5 without)
     after: 20, // s of shaking aim and blurred sight after getting up (fading out)
     shake: 0.016, // radians of sway at the start
