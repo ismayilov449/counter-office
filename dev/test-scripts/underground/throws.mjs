@@ -26,10 +26,11 @@ export function throwFrom(feet, yaw, pitch, strong) {
 }
 
 // The quickest throw from `feet` that goes into grille g first (null if none found), with where in its path it goes in.
-export function findThrow(world, vents, g, feet, fuse = 1.6, impact = false) {
+// kinds: which throws to try ([false, true]: the lob (Mouse2) and the strong one (Mouse1)).
+export function findThrow(world, vents, g, feet, fuse = 1.6, impact = false, kinds = [false, true]) {
   const c = g.c, yaw0 = Math.atan2(-(c[0] - feet[0]), -(c[2] - feet[2]));
   let best = null;
-  for (const strong of [false, true]) {
+  for (const strong of kinds) {
     for (let dy = 0; dy <= 0.3; dy += 0.1) {
       for (const sy of dy ? [1, -1] : [1]) {
         for (let pitch = -1.45; pitch <= 1.45; pitch += 0.05) {

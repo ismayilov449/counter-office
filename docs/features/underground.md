@@ -10,12 +10,27 @@
 - **Regressions run on this branch:** gas `t_gas.mjs` (GAS_LEAK_X=3) all OK, gas `maps.mjs` (all 7 maps load),
   `integration/links.mjs` a–g 36/36 and h 4/4 (GAS_LEAK_X=6), `mansion/walls.mjs` 0 missing / 0 twice; `BOTS=4` for
   60 s on both Mansion maps: no server errors, tick 0.8–2.0 ms average (max 10.4 ms at the start).
-- **Not done yet (needs the browser, when allowed):** the browser test — the grilles seen in the game (day, night,
-  blackout), the radar's static underground, the echo and the duct rattle by ear, listening at a grille, a thrown
-  grenade disappearing into a grille and dropping out of the other one, no page errors; and **the draw cost** measured
-  with `views.mjs`/`gviews.mjs` against `main` (expected: +1 draw call in a view with any grille in the frustum, 12
-  triangles, no shadow pass, no new light).
-- **Next:** the browser test, then the draw-cost numbers here.
+- **Browser-tested (2026-11-08, headless Edge, swiftshader, 960x540; `g-underground.mjs` 22/22 on cs_mansion and
+  22/22 on cs_mansion_night, no page errors).** Every screenshot was looked at: the six grilles by day and at night (the
+  cellar's over the gap between the wine racks, the back lawn's at the foot of the wall by the crates, the two ceiling
+  grilles by their lamps, the two floor grilles), and in the blackout (as dark as the walls round them); the hint by
+  each grille; the radar's "NO SIGNAL" static in the cellar, the drain and the smugglers' tunnel as a T and in the
+  cellar as a CT, the message going down, a ping refused, normal radar again in the kitchen and the living room; a
+  real lob (Mouse2) at the kitchen's ceiling grille: the grenade seen right under the grille, then gone, a new one coming
+  up out of the bedroom's floor grille (tracked in the page: the first ends 0.46 m from the kitchen's grille, the
+  second starts 0.29 m from the bedroom's), the boom upstairs, one "Fire in the hole" (the throw) and none for the
+  grenade out of the vent; a scripted player's smoke thrown into the north-east room's ceiling grille popping out of
+  the security room's floor grille and filling that room.
+- **Draw cost** (WebGL draws per frame; the light frames' median, then the frames that also redraw the shadow maps;
+  `g-ugcost.mjs`). Against `main`, cs_mansion by day — branch / main: cellar grille 89 / 88 (224 / 222), back lawn
+  303 / 300 (435 / 433), kitchen ceiling 101 / 100 (238 / 236), bedroom floor 122 / 120 (259 / 256), north-east room
+  ceiling 173 / 173 (311 / 310), security room floor 216 / 215 (352 / 351), kitchen 116 / 116 (254 / 252), cellar
+  129 / 129 (266 / 266). The same views on the branch with the grilles' mesh hidden, right after (A/B, the exact
+  cost): +0…+2 draws (noise ±1: it is one mesh, one draw call where it's in view), by day and at night; nothing in the
+  shadow passes (it casts no shadow), no light added.
+- **Not checked:** the sounds by ear (the echo, the tunnel ring, the duct rattle, listening through a grille: the
+  headless browser has no sound card); frame times on a real laptop.
+- **Next:** nothing on this branch; the merge links below.
 
 ## The vent grilles
 Three short ducts, a grille at each end (`shared/underground.js`, `GRILLES`/`DUCTS`). Every grille sits where nothing
@@ -196,3 +211,14 @@ No new E use. The grilles' hint is the lowest priority (only when nothing else i
   signal in 11 places, messages, the echo with a fake sound kit, the grilles' mesh, listening (crouched/standing,
   sides, other rooms), hints, the duct rattle; nothing on the other 5 maps.
 - `throws.mjs`: the throw search the tests share.
+- `g-underground.mjs` (browser; server: `srv.sh ROUND_TIME=600 START_MONEY=16000 AUTO_BALANCE=0 BUY_TIME=300`, so the
+  browser player and a scripted helper are both Terrorists and it stays warmup; `MAP=cs_mansion_night` for the night):
+  the checks in STATUS, screenshots `gu_d_*` / `gu_n_*` in OUT. `edge.ps1` (re)starts the headless Edge on CDP 9650
+  (no extensions, no sync, fresh profile, 960x540) and stops it by its PID and port only.
+- `g-ugcost.mjs` (browser): the draw calls in the six grille views, the kitchen and the cellar (`AB=1`: each also with
+  the grilles' mesh hidden). Run against this branch's server and `main`'s (e.g. `git archive main` into a scratch
+  folder, its own `node_modules` copy, the server there on the same port).
+- Lessons: the server's team balance moves a second Terrorist to the CTs (a round starts, buy time runs out):
+  `AUTO_BALANCE=0`; close the page's socket (`__ws.close()`) before rejoining in the same tab, or the old player stays;
+  a grenade thrown straight up from under a ceiling grille goes in within 0.05 s (no frame shows it): throw from a
+  couple of metres to see it go in.
