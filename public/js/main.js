@@ -41,7 +41,7 @@ import { createElevator } from './elevator.js'; // elevator
 import { createPower } from './power.js'; // power: the breaker panel, the generator, the lift's winch, bulbs bursting (Mansion)
 import * as stealth from './stealth.js'; // stealth: the chimney, the creaking boards, hiding in a car's trunk
 import * as ug from './underground.js'; // underground: no radar underground, the echo, the air vents (Mansion)
-import * as walls from './walls.js'; // walls: see-through bullet holes, burst pipes, live wires, wet guns, floating bodies (Mansion)
+import * as walls from './walls.js'; // walls: see-through bullet holes, burst pipes, live wires, floating bodies (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -559,7 +559,6 @@ function tryFire(now) {
     if (item.res > 0) startReload();
     return;
   }
-  if (walls.jammed(id, def, now)) return; // walls: a wet gun jams (R clears it)
   item.mag--;
   me.nextShot = now + def.rate * 1000;
   me.lastFire = now;
@@ -2360,7 +2359,7 @@ document.addEventListener('keydown', e => {
     case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
-    case 'KeyR': if (!walls.clearJam()) startReload(); break; // walls: R clears a jammed gun first
+    case 'KeyR': startReload(); break;
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
     case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
@@ -4094,7 +4093,7 @@ function frame() {
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
 stealth.init({ scene, me, net, hud, fx, game, remotes, cars, coll: () => coll, map: () => map, replay: () => !!killcam }); // stealth: its browser side (public/js/stealth.js)
 ug.init({ scene, net, me, hud, fx, coll: () => coll, indoors: p => indoors(p) }); // underground
-walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map, weapon: () => current() }); // walls:
+walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map }); // walls:
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();

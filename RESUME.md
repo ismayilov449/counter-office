@@ -7,7 +7,11 @@
 
 **To continue:** the five wave 1 groups of ROADMAP.md are merged, linked and tested together on the branch
 **`integration/2026-11-08`**, and **`main` has it** (fast-forwarded to 9ff3bb7 with the user's go-ahead on
-2026-11-09). The next work is **ROADMAP.md wave 2**: groups 6 Hostages, 7 Explosives, 8 Close combat, 9 Sight, 10 Fire. All the groups they wait for are in, so all
+2026-11-09). The next work is **ROADMAP.md wave 2**: groups 6 Hostages, 7 Explosives, 8 Close combat, 9 Sight, 10 Fire.
+
+**Removed after the merge (2026-11-09, the user's request): wet guns jam (ROADMAP 2.3).** Guns never jam and R only
+reloads; `WET`, `jamChance`, `walls.jammed()` / `walls.clearJam()` and the WET / JAMMED line over the ammo are gone
+(the wet floors, the electrocution and the floating bodies stay). Walls' tests were updated to check it stays gone. All the groups they wait for are in, so all
 five can start (at most 5 agents building, at most 2 testing in a browser; ROADMAP.md "Rules for the agents").
 
 **What the integration branch has** (on top of `main` 539ce42), merged in this order, each one's server tests run
@@ -19,7 +23,7 @@ after its merge:
 | 2 | `feature/power` c557feb | 3 Power & machinery: breakers per circuit, garage generator, surge, cutting the lift's cable | `power.md` |
 | 3 | `feature/stealth` 7d7ad34 | 4 Stealth & hiding: the chimney, creaking floorboards, the car trunk | `stealth.md` |
 | 4 | `feature/underground` 17f54c0 | 5 Underground & vents: no radar underground, echo, air vents | `underground.md` |
-| 5 | `feature/walls` a02a5af | 2 Walls & water: bullets through walls + see-through holes, pipes/wires/wet floors, wet guns, floating bodies | `walls.md` |
+| 5 | `feature/walls` a02a5af | 2 Walls & water: bullets through walls + see-through holes, pipes/wires/wet floors, wet guns (removed 2026-11-09), floating bodies | `walls.md` |
 
 Then the links between them, E's order and the fixes (section 9 has the details):
 - **Links:** walls' live wires follow power's circuits; the chimney is brick for the bullets; a trunk hider is out of
@@ -796,7 +800,8 @@ for wave 2): read that file before changing a group. The short version, and what
 - Shared player fields: `wd…` (wounds: `wdUse` E held, `wd` the wounds, `wdAd` the syringe's after-effect, `wdHeldUntil`
   see the fixes), `p.trunk` / `p.sootUntil` (stealth), `p.inv.adren` (the syringe). Power's state is `game.lights` +
   `lights.dead`; walls writes `p.wetShockAt`.
-- Keys: **K** held while down = shoot yourself (5 s); **R** clears a jammed gun; everything else is **E** (the order below).
+- Keys: **K** held while down = shoot yourself (5 s); everything else is **E** (the order below). (R used to clear a
+  jammed gun; wet guns were removed on 2026-11-09.)
 
 ### The groups (one paragraph each; details in docs/features)
 - **Downed & wounds** (`wounds.md`, branch fd8fbd7): drag a downed teammate (E held + walking; `lib/drag.js` is the
@@ -824,7 +829,7 @@ for wave 2): read that file before changing a group. The short version, and what
 - **Walls & water** (`walls.md`, a02a5af): bullets through wood and plaster (`shared/materials.js` classifies every
   Mansion box; brick, stone, metal and floors stop them), see-through bullet holes (a shader patch, 0 draw calls),
   burst pipes and live wires in the walls (sprays, wet floors, electrocution, sparks set off gas), wet guns jam (R
-  clears), bodies float up in the flood. On the Mansion maps this replaces the old realism rule (half damage through a
+  clears; **removed on 2026-11-09 at the user's request**), bodies float up in the flood. On the Mansion maps this replaces the old realism rule (half damage through a
   thin wall or door, brick too). Tests: `walls/unit.mjs`, `clientsmoke.mjs`, `t1.mjs`, `t2.mjs`, `maps.mjs`, browser
   `g1.mjs`, `gcost.mjs`.
 

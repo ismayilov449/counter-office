@@ -2,7 +2,7 @@
 // losing damage in every wall, at most one wall (two with a powerful gun). The holes they leave are see-through in
 // the browser. Hidden water pipes and electric cables run in some walls (shared/maps/mansion_walls.js): a bullet
 // through one bursts the pipe (it sprays and soaks the floor) or cuts the cable (it sparks; a spark in a wet patch
-// electrocutes whoever stands in it while the power is on). Wet guns jam. Used by the server (lib/walls.js), the
+// electrocutes whoever stands in it while the power is on). Used by the server (lib/walls.js), the
 // browser (public/js/walls.js) and the tests; the materials come from shared/materials.js.
 import { MATERIALS, boxMaterial, materialsOn, isSlab } from './materials.js';
 import { WEAPONS } from './weapons.js';
@@ -126,15 +126,3 @@ export function runHit(runs, pass) {
   });
   return best;
 }
-
-// ---- wet guns (the browser's: see public/js/walls.js): seconds of wetness you get, how much a gun can hold, and the
-// chance a shot jams (from `jam` damp to `jamMax` soaked); clearing a jam with R takes `clear` seconds.
-export const WET = {
-  swim: 30, // swimming (your head under, or deep water): soaked
-  wade: 14, // wading (water round your feet: the pool's edge, the flood, a fountain)
-  puddle: 6, // standing in a soaked floor (lib/wetfloor.js)
-  max: 30, // a gun holds this much (dries a second a second)
-  jam: 0.04, jamMax: 0.14,
-  clear: 0.7,
-};
-export const jamChance = wet => (wet <= 0 ? 0 : WET.jam + (WET.jamMax - WET.jam) * Math.min(1, wet / WET.max));

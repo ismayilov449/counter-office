@@ -7,8 +7,8 @@
 //   shot bursts the pipe in the hall's south wall: two sprays, the wet patch grows; e. the cable in the same wall cut:
 //   its ends spark; the T in the puddle is electrocuted (seen from beside), then the page steps in (the victim's view)
 //   and dies, which ends the round;
-//   round 2: f. the holes, sprays and puddles are gone; g. a swim in the pool: WET; firing until it jams (JAMMED - TAP
-//   R), R clears it (CLEARING..., no reload); h. the T shot dead in the pool floats up; i. the floodgate opened, a T on
+//   round 2: f. the holes, sprays and puddles are gone; g. a swim in the pool: the gun still fires (wet guns were
+//   removed); h. the T shot dead in the pool floats up; i. the floodgate opened, a T on
 //   the cellar floor electrocuted by the flood: his body floats up and bobs at the top, seen from the stairs.
 import fs from 'node:fs';
 import { open, sleep, OUT } from '../mansion/game.mjs';
@@ -32,7 +32,6 @@ const checks = [];
 const check = (ok, what) => { checks.push(ok); console.log(ok ? 'PASS' : 'FAIL', what); };
 const W = async () => JSON.parse(await ev("import('/js/walls.js').then(m => { const d = m.debug(); delete d.list; delete d.hintSpots; return JSON.stringify(d); })"));
 const F = async () => JSON.parse(await ev("import('/js/flood.js').then(m => JSON.stringify(m.debug()))"));
-const gunText = () => ev("(document.getElementById('ammo')?.previousElementSibling?.textContent) || ''");
 const ammo = () => ev("document.getElementById('ammo').textContent");
 const waitFor = async (fn, ms, step = 250) => { for (let i = 0; i < ms / step; i++) { if (await fn()) return true; await sleep(step); } return false; };
 const EYE = PLAYER.eye;
@@ -233,30 +232,16 @@ await aim([-12.3, 0.813, -2.5], [WALL_X, 1.72, -2.5]);
 await sleep(1500);
 await shot(`${P}_f_wall_whole.png`);
 
-// ---- g. wet guns
-check((await gunText()) === '', 'g. dry: nothing over the ammo');
+// ---- g. wet guns were removed (2026-11-09): after a swim the gun fires as usual, and nothing says WET or JAMMED
 await tp([-40, -2.0, -12], 0);
 await sleep(2000);
 await tp([-34.8, 0, -12], -Math.PI / 2);
 await sleep(800);
-check((await gunText()) === 'WET' && (await W()).gun.wet > 20, `g. after a swim in the pool: "${await gunText()}" (${(await W()).gun.wet.toFixed(0)} s)`);
-await shot(`${P}_g1_wet.png`);
 await look(0, -0.6);
-let jammed = false;
-for (let i = 0; i < 14 && !jammed; i++) {
-  await fire(900);
-  jammed = (await gunText()) === 'JAMMED - TAP R';
-  if (!jammed && /^0/.test(await ammo())) { await g.key('KeyR'); await sleep(4000); }
-}
-const magJam = await ammo();
-await shot(`${P}_g2_jammed.png`);
-check(jammed, `g. firing the wet gun: it jams ("${await gunText()}", ammo ${magJam})`);
-await g.key('KeyR');
-const clr = await gunText();
-await shot(`${P}_g3_clearing.png`);
-await sleep(1600);
-const after = await gunText(), magAfter = await ammo();
-check(clr === 'CLEARING...' && (after === 'WET' || after === '') && magAfter === magJam, `g. R clears it ("${clr}" → "${after}"), without a reload (ammo ${magJam} → ${magAfter})`);
+const magBefore = await ammo();
+for (let i = 0; i < 3; i++) await fire(900);
+const magWet = await ammo(), hudText = await ev("document.getElementById('bottom-right')?.textContent || ''");
+check(magWet !== magBefore && !/WET|JAMMED/.test(hudText), `g. after a swim the gun fires as usual (ammo ${magBefore} → ${magWet}), no WET or JAMMED on the HUD`);
 
 // ---- h. a body floating in the pool
 t1.at([-40, -2.0, -12]);
@@ -264,7 +249,6 @@ await aim([-34.8, 0, -12], [-40, -1.0, -12]);
 await msgs(true);
 for (let i = 0; i < 8; i++) {
   if ((await msgs(false)).some(m => m.t === 'kill' && m.v === ids.t1)) break;
-  if ((await gunText()) === 'JAMMED - TAP R') { await g.key('KeyR'); await sleep(1500); }
   await fire(900);
   if (/^0/.test(await ammo())) { await g.key('KeyR'); await sleep(4000); }
 }

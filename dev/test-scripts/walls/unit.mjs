@@ -4,7 +4,7 @@
 import { MAPS } from '../../../shared/maps/index.js';
 import { CollisionWorld } from '../../../shared/collision.js';
 import { MATERIALS, boxMaterial, boxMaterials, pieceMaterial, materialsOn, isSlab } from '../../../shared/materials.js';
-import { penetrate, keepThrough, segSeg, runHit, jamChance, WET } from '../../../shared/walls.js';
+import { penetrate, keepThrough, segSeg, runHit } from '../../../shared/walls.js';
 import { WEAPONS } from '../../../shared/weapons.js';
 
 let fails = 0, passes = 0;
@@ -124,7 +124,6 @@ ok(Math.abs(h.d - 1) < 1e-9 && Math.abs(h.s - 0.5) < 1e-9, 'segSeg: the closest 
 const runs = [{ kind: 'pipe', a: [0, 1, -5], b: [0, 1, 5], r: 0.07 }, { kind: 'cable', a: [0, 0.3, -5], b: [0, 0.3, 5], r: 0.07 }];
 ok(runHit(runs, { a: [-0.2, 1.03, 0], b: [0.2, 1.05, 0.1] })?.run.kind === 'pipe', 'runHit: a bullet through the wall at the pipe\'s height cuts it');
 ok(runHit(runs, { a: [-0.2, 0.5, 0], b: [0.2, 0.5, 0] }) === null, 'runHit: between the pipe and the cable nothing');
-ok(jamChance(0) === 0 && jamChance(WET.max) === WET.jamMax && jamChance(WET.max / 2) > WET.jam, 'jam chance: none dry, more the wetter');
 
 console.log(`\n${passes} passed, ${fails} failed`);
 process.exitCode = fails ? 1 : 0;

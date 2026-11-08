@@ -11,15 +11,13 @@
 //   spray), the wet patches on the floor (public/js/wetfloor.js, one mesh), sparks out of a cut cable's holes while
 //   the power is on, the electrocution's flash and crackle ('waZap'), and the hints on the walls where pipes and
 //   cables run: radiators and sockets (one mesh).
-// - Wet guns: after swimming, wading or standing in a soaked floor your gun may jam when you fire; R clears it.
 // - Bodies float up: the dead in deep water (the flooded cellar, the pool) rise and bob at the surface.
 // Only on the Mansion maps. main.js calls init() once, setMap() on every map load, update() every frame,
-// onSnapshot() with the snapshot's `wa`, localShot() for each of your bullets, remoteShot() with each 'shot' message,
-// round() at a new round, jammed() before firing a bullet and clearJam() on R.
+// onSnapshot() with the snapshot's `wa`, localShot() for each of your bullets, remoteShot() with each 'shot' message
+// and round() at a new round.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { penetrate, WALLS, WET, jamChance } from '/shared/walls.js';
-import { inWater } from '/shared/physics.js';
+import { penetrate, WALLS } from '/shared/walls.js';
 import { MATERIALS, PAINT_MATERIAL, pieceMaterial, boxMaterial, materialsOn } from '/shared/materials.js';
 import { wallRuns } from '/shared/maps/mansion_walls.js';
 import { WEAPONS } from '/shared/weapons.js';
@@ -496,95 +494,6 @@ function updateWires(now, camera) {
   }
 }
 
-// ---------------------------------------------------------------- wet guns (yours only: the browser's own rule)
-// Swimming (deep water: the flood, the pool), wading (water round your feet) or standing in a soaked floor wets your gun
-// (WET: seconds of wetness, a second dries a second). Firing a wet gun may jam it (jamChance): it won't fire until you
-// tap R, which clears it in WET.clear s instead of reloading. A jam stays with that gun until cleared (or you die, or
-// a new round). Bots don't jam. Shown over the ammo: WET while it's wet, JAMMED (tap R) while it's jammed.
-const gun = { wet: 0, jams: new Set(), clearing: null, clickAt: 0, alive: false, el: null, shown: '' };
-
-function gunHud() {
-  const right = document.getElementById('bottom-right'), ammo = document.getElementById('ammo');
-  if (!right) return;
-  gun.el = document.createElement('div');
-  gun.el.style.cssText = 'font:bold 13px Consolas,monospace;letter-spacing:1px;text-align:right;min-height:16px;text-shadow:0 0 3px #000';
-  if (ammo && right.insertBefore) right.insertBefore(gun.el, ammo);
-  else right.appendChild(gun.el);
-}
-
-// How wet you're getting now: swim, wade, puddle or nothing.
-function soaking() {
-  const { me } = D, p = me.p, water = map.water;
-  if (inWater(water, [p[0], p[1] + 1.0, p[2]])) return WET.swim;
-  if (inWater(water, [p[0], p[1] + 0.05, p[2]])) return WET.wade;
-  if (wet.at(p)) return WET.puddle;
-  return 0;
-}
-
-function updateGun(dt, now) {
-  const { me } = D;
-  if (!me.alive) { if (gun.alive) resetGun(); gun.alive = false; showGun(); return; }
-  gun.alive = true;
-  const s = on ? soaking() : 0;
-  gun.wet = s ? Math.min(WET.max, Math.max(gun.wet, s)) : Math.max(0, gun.wet - dt);
-  const c = gun.clearing;
-  if (c && (D.weapon() !== c.id || D.me.reload)) gun.clearing = null; // (switched away: cancelled)
-  else if (c && now >= c.until) {
-    gun.jams.delete(c.id);
-    gun.clearing = null;
-    audio.play('click');
-  }
-  showGun();
-}
-
-function showGun() {
-  if (!gun.el) return;
-  const id = D.weapon?.(), jammed = gun.alive && gun.jams.has(id);
-  const text = !gun.alive ? '' : gun.clearing ? 'CLEARING...' : jammed ? 'JAMMED - TAP R' : gun.wet > 0 ? 'WET' : '';
-  if (text === gun.shown) return;
-  gun.shown = text;
-  gun.el.textContent = text;
-  gun.el.style.color = jammed || gun.clearing ? '#ff6a5a' : '#7cc8ff';
-}
-
-function resetGun() {
-  gun.wet = 0;
-  gun.jams.clear();
-  gun.clearing = null;
-}
-
-// main.js tryFire, just before a bullet is fired: true when the gun doesn't fire (it's jammed, or it jams now).
-export function jammed(id, def, now) {
-  if (!on || !def || def.melee || def.rocket || def.mounted) return false;
-  if (gun.jams.has(id)) {
-    if (now >= gun.clickAt) { gun.clickAt = now + 350; audio.play('empty'); }
-    D.me.nextShot = Math.max(D.me.nextShot, now + 200);
-    return true;
-  }
-  if (gun.wet > 0 && Math.random() < jamChance(gun.wet)) {
-    gun.jams.add(id);
-    gun.clickAt = now + 350;
-    audio.play('empty');
-    D.me.nextShot = Math.max(D.me.nextShot, now + 200);
-    D.hud.small?.('Your wet gun jammed: tap R to clear it', 2.5);
-    showGun();
-    return true;
-  }
-  return false;
-}
-
-// R: clears a jam (instead of reloading). True when it did (or is doing it).
-export function clearJam() {
-  const id = D.weapon?.();
-  if (!on || !D.me.alive || !gun.jams.has(id)) return false;
-  if (!gun.clearing) {
-    gun.clearing = { id, until: performance.now() + WET.clear * 1000 };
-    audio.play('click');
-    showGun();
-  }
-  return true;
-}
-
 // ---------------------------------------------------------------- bodies float up
 // A dead player lying in deep water (the flood, the pool: at least `deep` m of it over him) rises to the surface and
 // bobs there, face up, his name over him: you see who drowned down there. Only how he's drawn; the server's body
@@ -626,7 +535,7 @@ function floatBodies(dt, now) {
 
 // ---------------------------------------------------------------- set-up
 
-// deps: { scene, net, fx, me, game, coll() (the collision world), remotes, hud, map(), weapon() (the gun in hand) }
+// deps: { scene, net, fx, me, game, coll() (the collision world), remotes, hud, map() }
 export function init(deps) {
   D = deps;
   buildRings();
@@ -634,7 +543,6 @@ export function init(deps) {
   wet = createWetFloorView(D.scene);
   patch(D.fx.decalMat);
   Object.assign(D.net.handlers, { waZap });
-  gunHud();
 }
 
 export function setMap(m) {
@@ -642,7 +550,6 @@ export function setMap(m) {
   on = materialsOn(m);
   clearHoles();
   clearWater();
-  resetGun();
   floorCache.clear();
   buildHints(m);
   if (!on) return;
@@ -660,7 +567,6 @@ function clearWater() {
 export function round() {
   clearHoles();
   clearWater();
-  resetGun();
 }
 
 // main.js prewarm(): one of each of this module's own materials at the warm-up spot, so their shaders are compiled
@@ -699,7 +605,6 @@ function unwarm() {
 // every frame (after the other players are posed: the floating bodies)
 export function update(dt, now, camera) {
   if (warmed) unwarm();
-  updateGun(dt, now);
   if (!on) { if (sprayMesh) sprayMesh.visible = false; if (wet) wet.mesh.visible = false; return; }
   pickHoles(camera);
   wet.update(dt, now);
@@ -713,5 +618,4 @@ export const debug = () => ({ on, holes: holes.length, cut: U.wallsN.value, ring
   list: holes.map(h => ({ a: h.a, b: h.b, r: h.r })),
   patches: wet?.list().length ?? 0, patchList: wet?.list().map(p => ({ p: p.p, r: p.r, live: p.live })) ?? [], wetMesh: !!wet?.mesh.visible, sprays: sprays.length, sprayMesh: !!sprayMesh?.visible, ends: ends.length,
   hints: hints ? hints.geometry.attributes.position.count : 0, hintSpots,
-  gun: { wet: gun.wet, jams: [...gun.jams], clearing: !!gun.clearing, shown: gun.shown },
   floating: [...D.remotes.values()].filter(r => r.waFloat).map(r => ({ id: r.id, y: r.model.position.y })) });

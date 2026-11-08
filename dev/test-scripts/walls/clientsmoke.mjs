@@ -1,12 +1,11 @@
 // public/js/walls.js in Node (no browser, no server): a fake page, real three.js, the real maps and collision. Runs the
-// entry points main.js calls (init, setMap, localShot, remoteShot, update, round, onSnapshot, and the wet gun and the
-// floating bodies once they exist) on cs_mansion and cs_mansion_night and checks what they do. Run:
+// entry points main.js calls (init, setMap, localShot, remoteShot, update, round, onSnapshot, and the
+// floating bodies) on cs_mansion and cs_mansion_night and checks what they do. Run:
 //   node --import ./dev/test-scripts/walls/register.mjs dev/test-scripts/walls/clientsmoke.mjs
 import * as THREE from 'three';
 import { MAPS } from '../../../shared/maps/index.js';
 import { CollisionWorld } from '../../../shared/collision.js';
-import { WALLS, WET, jamChance } from '../../../shared/walls.js';
-import { WEAPONS } from '../../../shared/weapons.js';
+import { WALLS } from '../../../shared/walls.js';
 import { makeFloodBoxes, setFloodBoxes } from '../../../shared/flood.js';
 
 let fails = 0, passes = 0;
@@ -54,8 +53,7 @@ const remotes = new Map();
 const net = { handlers: {}, send() {} };
 const hud = { small() {}, center() {} };
 const game = { phase: 'live', lights: { power: true } };
-let held = 'ak47';
-walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map, weapon: () => held });
+walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map });
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 300);
 const look = (p, d) => { camera.position.set(...p); camera.lookAt(p[0] + d[0], p[1] + d[1], p[2] + d[2]); camera.updateMatrixWorld(); };
 
@@ -171,47 +169,8 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
   T += 50; walls.update(0.05, T, camera);
   ok(walls.debug().patches === 0 && !walls.debug().sprayMesh, 'a new round clears them at once');
 
-  // ---- 2.3: wet guns
-  const run = (secs, step = 0.05) => { for (let s = 0; s < secs; s += step) { T += step * 1000; walls.update(step, T, camera); } };
-  const g = () => walls.debug().gun;
-  me.alive = true; held = 'ak47';
-  me.p = [-10, 0.813, -1];
-  run(0.2);
-  ok(g().wet === 0 && g().shown === '' && !walls.jammed('ak47', WEAPONS.ak47, T), 'dry: no WET, never jams');
-  me.p = [-40, -1.5, -12]; // swimming in the pool
-  run(0.2);
-  ok(g().wet === WET.swim && g().shown === 'WET', `swimming soaks the gun (${g().wet} s, the HUD says ${g().shown})`);
-  me.p = [-10, 0.813, -1];
-  let fired = 0, jamAt = -1;
-  for (let i = 0; i < 400 && jamAt < 0; i++) { me.nextShot = 0; if (walls.jammed('ak47', WEAPONS.ak47, T)) jamAt = i; else fired++; }
-  ok(jamAt >= 0 && g().jams.includes('ak47') && g().shown === 'JAMMED - TAP R', `a soaked gun jams (after ${fired} shots; about 1 in ${Math.round(1 / jamChance(WET.swim))} expected)`);
-  ok(walls.jammed('ak47', WEAPONS.ak47, T) && walls.jammed('ak47', WEAPONS.ak47, T + 1000), 'a jammed gun stays jammed');
-  ok(!walls.jammed('knife', WEAPONS.knife, T) && !walls.jammed('rpg', WEAPONS.rpg, T), 'knives and rockets never jam');
-  held = 'glock';
-  ok(!walls.clearJam(), 'R with another gun in hand reloads as usual (nothing to clear)');
-  held = 'ak47';
-  ok(walls.clearJam() && g().clearing && g().shown === 'CLEARING...', 'R on the jammed gun starts clearing it');
-  run(0.3);
-  held = 'glock'; run(0.1); held = 'ak47';
-  ok(!g().clearing && g().jams.includes('ak47'), 'switching guns cancels the clearing');
-  walls.clearJam();
-  run(WET.clear + 0.1);
-  ok(!g().jams.length, `cleared after ${WET.clear} s`);
-  run(WET.swim + 1, 0.5);
-  ok(g().wet === 0 && g().shown === '', `it dries in ${WET.swim} s`);
-  me.p = [-40, -0.5, -12]; // wading at the pool's edge (water round the feet, not the chest)
-  run(0.1);
-  ok(g().wet === WET.wade, `wading: ${g().wet} s`);
-  me.p = [-10, 0.813, -1];
-  run(WET.wade + 1, 0.5);
-  me.p = [-8.3, 0.813, 5.85];
-  walls.onSnapshot([[[-7.8, 0.81, 6.15, 0.9, 2, 6.5, -1, 0]], [], []]);
-  run(0.1);
-  ok(g().wet === WET.puddle, `standing in a soaked floor: ${g().wet} s`);
-  walls.onSnapshot(undefined);
-  me.alive = false; run(0.1); me.alive = true;
-  ok(g().wet === 0 && !g().jams.length, 'dying dries and clears it');
-  walls.round();
+  // ---- 2.3: wet guns were removed (2026-11-09): nothing jams, R always reloads
+  ok(!("jammed" in walls) && !("clearJam" in walls) && !("gun" in walls.debug()), "no wet guns: walls.js has no jam and R is a plain reload");
 
   // ---- 2.4: bodies float up
   const fb = makeFloodBoxes();

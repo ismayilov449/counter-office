@@ -338,10 +338,6 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
       again and again; armour doesn't help; it kills outright). Burst a pipe and cut the cable next to it, and that
       corner of the room becomes a death trap. The kill is credited to whoever cut the cable.
     - A spark in a room full of **gas** sets the gas off, like any spark.
-  - **Wet guns jam**: after swimming (the flood, the pool), wading, or standing in a wet patch, your gun is wet
-    (WET shows over your ammo) and sometimes **jams** when you fire — the wetter, the more often. A jammed gun won't
-    fire (JAMMED - TAP R): **tap R** to clear it (about a second) instead of reloading. It dries by itself: half a
-    minute after a swim, a few seconds after a puddle.
   - **Bodies float up**: in the flooded cellar (and the pool) the dead rise to the surface and bob there face up (a
     teammate with his name over him) — you can tell who drowned down there.
   - **The cat**: a ginger cat lives in the house. Every round it starts asleep in its basket by the living-room sofa,
@@ -823,7 +819,7 @@ The HUD shows the active party modes under the timer.
 |---|---|---|---|
 | W A S D | move | Space | jump (lets go of the zip line) |
 | Ctrl | duck | Shift | walk (silent) |
-| Mouse 1 / 2 | fire / zoom, knife stab | R | reload (or clear a jammed gun) |
+| Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
 | E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, car trunk, zip line on/off, CCTV desk, lift, valves, chimney (top); hold: revive a teammate (+ walk: drag him), interrogate a downed enemy, a uniform (crouched), light the fireplace, a breaker / the generator / the lift's winch (looking at it); hostage shield (T) | G | drop weapon |
 | 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |

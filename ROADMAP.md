@@ -17,7 +17,7 @@ group can start from `main`.
 | Order | Group | Features, in build order |
 |---|---|---|
 | 1 | Downed & wounds | 1.1 Drag a downed teammate · 1.2 Interrogate a downed enemy + the downed suicide · 1.3 Wounds with consequences · 1.4 Adrenaline syringe |
-| 2 | Walls & water | 2.1 See-through bullet holes · 2.2 Burst pipes and live wires · 2.3 Wet guns jam · 2.4 Bodies float up in the flood |
+| 2 | Walls & water | 2.1 See-through bullet holes · 2.2 Burst pipes and live wires · ~~2.3 Wet guns jam~~ (removed) · 2.4 Bodies float up in the flood |
 | 3 | Power & machinery | 3.1 Circuit breaker per floor + garage generator · 3.2 Power surge · 3.3 Cut the elevator cable |
 | 4 | Stealth & hiding | 4.1 The chimney · 4.2 Creaking floorboards · 4.3 Hide in the car trunk |
 | 5 | Underground & vents | 5.1 No radar underground · 5.2 Echo in the tunnels · 5.3 Air vents |
@@ -117,8 +117,9 @@ Builds on: the floodgate, gas (`sparkAt`). **Today bullets don't go through wall
    - A wet floor with a sparking wire electrocutes anyone standing in the water, and sparks set off gas.
 
    It links water, power and gas into one trap. *This adds the wet floor and the electrocution that the fire hose reuses.*
-3. **Wet guns jam.** After swimming or wading through the flood, your gun sometimes jams until it dries. Tap R to clear
-   it.
+3. ~~**Wet guns jam.**~~ **Removed on 2026-11-09 at the user's request** (it was built in wave 1, then taken out:
+   guns never jam, R only reloads). It was: after swimming or wading through the flood, your gun sometimes jams until
+   it dries; tap R to clear it.
 4. **Bodies float up in the flood.** In a flooded cellar the dead float to the surface. Grim, but it tells you who
    drowned down there.
 

@@ -3,7 +3,7 @@
 // It flashes blue when a spark electrocutes someone in it. Made for the burst pipes (public/js/walls.js) and meant to
 // be reused (the fire hose's patches come through the same list).
 //   const view = createWetFloorView(scene); view.set(packed list); view.update(dt, now); view.zap(now);
-//   view.at(feet): the patch someone's feet are in (wet guns); view.clear(); view.list()
+//   view.at(feet): the patch someone's feet are in; view.clear(); view.list()
 import * as THREE from 'three';
 import { unpackPatch, inPatch } from '/shared/wetfloor.js';
 

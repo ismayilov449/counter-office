@@ -1,5 +1,10 @@
 # Walls & water (ROADMAP group 2, branch `feature/walls`)
 
+> **2026-11-09: 2.3 Wet guns jam was removed at the user's request** (after the merge into `main`). `WET`,
+> `jamChance`, `walls.jammed()`, `walls.clearJam()`, the WET / JAMMED / CLEARING line over the ammo and main.js's two
+> hooks (in `tryFire()` and on R) are gone; guns never jam and R only reloads. `clientsmoke.mjs` and `g1.mjs` now check
+> that it stays gone. Where this file still mentions wet guns, it's history.
+
 ## STATUS (2026-11-08)
 - **Done (server, browser code, server and Node tests):**
   - **2.1 See-through bullet holes** — `t1.mjs` 13/13 (cs_mansion and cs_mansion_night), `unit.mjs` 78/78, `clientsmoke.mjs` 102/102 in all (holes part).
@@ -70,14 +75,10 @@ For the cs_mansion section (it works the same on cs_mansion_night):
       again and again; armour doesn't help; it kills outright). Burst a pipe and cut the cable next to it, and that
       corner of the room becomes a death trap. The kill is credited to whoever cut the cable.
     - A spark in a room full of **gas** sets the gas off, like any spark.
-  - **Wet guns jam**: after swimming (the flood, the pool), wading, or standing in a wet patch, your gun is wet
-    (WET shows over your ammo) and sometimes **jams** when you fire — the wetter, the more often. A jammed gun won't
-    fire (JAMMED - TAP R): **tap R** to clear it (about a second) instead of reloading. It dries by itself: half a
-    minute after a swim, a few seconds after a puddle.
   - **Bodies float up**: in the flooded cellar (and the pool) the dead rise to the surface and bob there face up (a
     teammate with his name over him) — you can tell who drowned down there.
 
-Keys table: **R** reloads, or clears a jammed gun when it's jammed — no new key.
+Keys table: no new key (R only reloads: wet guns were removed).
 
 ## (b) RESUME notes
 
