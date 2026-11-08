@@ -37,6 +37,7 @@ import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play 
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 import { createElevator } from './elevator.js'; // elevator
+import * as walls from './walls.js'; // walls: see-through bullet holes, burst pipes, live wires, wet guns, floating bodies (Mansion)
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -141,6 +142,7 @@ function loadMap(id) {
   renderMapVotes();
   world.setShadowSize(qlevel.shadowSize);
   flood.setMap(map); // Floodgate
+  walls.setMap(map); // walls:
   prewarm();
 }
 
@@ -443,6 +445,7 @@ function fireBullet(id, def, now) {
   const muzzle = viewMuzzleWorld();
   for (const d of dirs) {
     const tr = localTrace(o, d, 250);
+    walls.localShot(o, d, id); // walls: holes in the walls it goes through
     if (tr.hitR) fx.blood(tr.end);
     else if (tr.wall) { fx.decal(tr.end, tr.wall.n); if (!def.pellets || Math.random() < 0.4) fx.sparks(tr.end, tr.wall.n); }
     if (def.sniper || Math.random() < (def.pellets ? 0.25 : 0.5)) fx.tracer(muzzle, tr.end);
@@ -2932,6 +2935,7 @@ const net = new Net({
         if (hit) { fx.decal(end, hit.n); if (m.tr.length === 1 || Math.random() < 0.4) fx.sparks(end, hit.n); }
       }
     }
+    walls.remoteShot(m); // walls: holes in the walls the bullets went through
   },
   hit(m) {
     hud.hitmarker(m.hs);
@@ -3155,6 +3159,7 @@ const net = new Net({
     spotted.clear();
     lostSpots.clear();
     fx.clearDecals();
+    walls.round(); // walls: the holes, pipes, cables and floors are as new
     fx.clearCraters();
     fx.clearGibs();
     bleed.clear(); // blood trails
@@ -4005,6 +4010,7 @@ function frame() {
   updateCamera(dt, now);
   body.camera(camera); // body: the view from the floor
   flood.update(dt, now, camera); // Floodgate
+  walls.update(dt, now, camera); // walls:
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();
@@ -4036,6 +4042,7 @@ function frame() {
   if (shotRequested) saveScreenshot();
 }
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
+walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map }); // walls:
 loadMap(DEFAULT_MAP);
 refreshViewModel();
 frame();

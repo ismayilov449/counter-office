@@ -37,6 +37,7 @@ import { createDisguise } from './lib/disguise.js'; // Disguise
 import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
+import { createWalls } from './lib/walls.js'; // walls: bullets through wood and plaster, burst pipes, live wires, wet floors
 import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out of deep water
 import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
 
@@ -339,6 +340,7 @@ function sparkAt(pos, kind, by = null) { return gas.sparkAt(pos, kind, by); }
 // Floodgate (Mansion): the storm drain's valve floods the underground (see lib/flood.js)
 const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
   sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
+const walls = createWalls({ game, players, map: () => MAP, world: () => world, broadcast, send, notify, now, applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), sparkAt: (...a) => sparkAt(...a), shootDoor: (...a) => shootDoor(...a), hurtPiece: (...a) => hurtPiece(...a), breakPieces: (...a) => breakPieces(...a), mates, cfg: CFG, flood }); // walls: (lib/walls.js)
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -574,6 +576,7 @@ function resetWorld() {
   game.camDownAt = {};
   gas.reset(); // gas: the pipes are mended and the air is clean again
   flood.reset(); // Floodgate: drained every round
+  walls.reset(); // walls: pipes mended, cables dead, floors dry
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
   sendGadgets();
   elevator.reset(); // elevator: the cabin back on the ground floor, doors shut
@@ -2331,8 +2334,9 @@ function onShoot(p, m) {
   const ownCar = carOf(p)?.id ?? null;
   const shattered = [], chipped = [], jamHits = [], shotSatchels = [], shotDrones = [], shotCams = [];
   for (const d of dirs) {
-    const wall = world.raycast(o, d, range, 'bullet', ownCar);
-    const wallT = wall ? wall.t : range;
+    const pen = walls.trace(o, d, range, w, ownCar); // walls: through wood and plaster (Mansion; elsewhere a plain raycast)
+    const wall = pen.wall;
+    const wallT = pen.wallT;
     let best = null;
     for (const q of players.values()) {
       if (q === p || !q.alive || !inTeam(q)) continue;
@@ -2347,8 +2351,9 @@ function onShoot(p, m) {
       const hit = rayPlayer(o, d, h.p, false, best ? best.t : wallT);
       if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit };
     }
-    // Realism (cs_mansion): through a thin wall or a door, the bullet goes on with half its punch.
-    if (!best && wall && MAP.realism && !def.melee && (wall.box.door != null || (wall.box.brk != null && Math.min(wall.box.max[0] - wall.box.min[0], wall.box.max[2] - wall.box.min[2]) <= REAL.thin))) {
+    if (best) best.through = pen.keep(best.t); // walls: the damage the walls on the way left
+    // Realism (cs_mansion): through a thin wall or a door, the bullet goes on with half its punch. (walls: not where the walls feature does it)
+    if (!best && wall && MAP.realism && !walls.on() && !def.melee && (wall.box.door != null || (wall.box.brk != null && Math.min(wall.box.max[0] - wall.box.min[0], wall.box.max[2] - wall.box.min[2]) <= REAL.thin))) {
       const b = wall.box;
       const exit = Math.min(...[0, 1, 2].filter(k => Math.abs(d[k]) > 1e-6).map(k => ((d[k] > 0 ? b.max[k] : b.min[k]) - o[k]) / d[k]));
       if (exit > wall.t && exit - wall.t < 1) {
@@ -2388,6 +2393,7 @@ function onShoot(p, m) {
     }
   }
   gas.onShot(p, o, traces, def); // gas: a bullet holes a pipe; muzzle flashes and hits are sparks
+  walls.onShot(p, w, traces); // walls: the walls the bullets went through (doors, chips, pipes, cables)
   breakGlass(shattered);
   for (const j of jamHits) if (--j.hp <= 0) destroyJammer(j, p);
   breakPieces(chipped);
@@ -2401,7 +2407,7 @@ function onShoot(p, m) {
   const info = {};
   for (const h of hits) {
     if (h.hostage) {
-      const dmg = def.melee ? (alt ? def.altDamage : def.damage) : def.damage * Math.pow(def.rangeMod, h.t / 12.7);
+      const dmg = def.melee ? (alt ? def.altDamage : def.damage) : def.damage * Math.pow(def.rangeMod, h.t / 12.7) * (h.through ?? 1); // walls: (through)
       hurtHostage(h.hostage, p, dmg * ({ head: 4, stomach: 1.25, legs: 0.75 }[h.part] ?? 1), w);
       shield.hostageHit(h.hostage, p); // shield: a CT who hits a held hostage is told so
       info.any = true;

@@ -580,6 +580,8 @@ function material(kind) {
   return entry;
 }
 
+export const paintMaterial = key => (key.startsWith('img:') ? imageMaterial(key.slice(4)) : material(key)).mat; // walls: the see-through bullet holes patch these (public/js/walls.js)
+
 // Box with world-aligned UVs and baked "ambient occlusion" darkening toward the ground.
 function boxGeometry(b, scale, floorShade) {
   const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1], d = b.max[2] - b.min[2];
