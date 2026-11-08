@@ -1788,11 +1788,15 @@ function applyDoors(states) {
   world?.setDoors(game.doors);
 }
 
+// A light switch faces its room (rot: the plate's facing, [sin, 0, cos]); from behind it (the far side of its wall)
+// you can't reach it. Every switch on both Mansion maps faces open floor (checked at the integration, 2026-11-08).
+const switchBehind = (sw, p) => (p[0] - sw.p[0]) * Math.sin(sw.rot || 0) + (p[2] - sw.p[2]) * Math.cos(sw.rot || 0) < -0.05;
 function nearestSwitch() {
   if (elevator.walledIn(me.p)) return null; // elevator: not through the shaft's walls (the switch is on its outside)
   let best = null, bd = 1.8;
   for (const sw of map.switches || []) {
     const d = Math.hypot(me.p[0] - sw.p[0], me.p[2] - sw.p[2]);
+    if (switchBehind(sw, me.p)) continue; // (not from behind its wall, as on the server)
     if (d < bd && Math.abs(me.p[1] + 1.2 - sw.p[1]) < 1.6) { bd = d; best = sw; }
   }
   return best;
@@ -3680,9 +3684,13 @@ function updateHud(now) {
   } else if (!me.alive && me.team !== 'SPEC' && game.phase !== 'warmup') {
     hint = isGG() || isDM() ? 'Respawning...' : 'You will respawn next round';
   }
-  // The new features' E uses go over the old ones above, in the server's order (onUse): a revive (body.js, at hud.hint)
-  // > a lift target aimed at > the hostage shield > a uniform > the valves > the old uses. On a gadget, in a car, flying
-  // the drone or with the mortar, E does that first.
+  // The new features' E uses go over the old ones above, in the server's order (onUse): out of a car's trunk (stealth,
+  // below: over everything) > a revive (body.js, at hud.hint; walking with E held drags him: wounds) > interrogating a
+  // downed enemy (wounds.js, at hud.hint, under body.js's) > a lift target aimed at > the hostage shield > a uniform >
+  // the valves > power's aimed uses (breakers, generator, winch) > the fireplace / the chimney's top (stealth) > the old
+  // uses (... doors, switches, then a car's trunk (stealth) just before the cars) > an air vent's hint (underground: no
+  // E use, only when nothing else is said). On a gadget, in a car, flying the drone or with the mortar, E does that first.
+  // (Each line below goes over the ones before it.)
   if (me.alive && !me.act && me.driving == null && !me.riding && !me.drone && !me.mortar && !gadgets.busy()) {
     if ((gh = stealth.hint(hint))) hint = gh; // stealth: the fireplace and the chimney's top (under the valves, as on the server), a trunk (under the doors and switches, over the cars)
     hint = circuits.hint(hint); // power: aimed at a breaker, the generator or the lift's winch (after the valves, before the old uses); a dead switch says why

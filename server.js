@@ -347,7 +347,7 @@ const flood = createFlood({ game, players, map: () => MAP, broadcast, send, noti
   sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
 const stealth = createStealth({ game, players, map: () => MAP, world: () => world, broadcast, send, now, applyDamage: (...a) => applyDamage(...a), killPlayer: (...a) => killPlayer(...a), mates: (a, b) => mates(a, b), groundY: (...a) => groundY(...a), roundless: () => game.phase === 'warmup' || isDM() || isGG(), sparkAt: (pos, kind, by) => sparkAt(pos, kind, by) }); // stealth: the chimney, the trunk (lib/stealth.js)
 const ug = createUnderground({ map: () => MAP, world: () => world, game, now, broadcast, send }); // underground (Mansion): see lib/underground.js
-const walls = createWalls({ game, players, map: () => MAP, world: () => world, broadcast, send, notify, now, applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), sparkAt: (...a) => sparkAt(...a), shootDoor: (...a) => shootDoor(...a), hurtPiece: (...a) => hurtPiece(...a), breakPieces: (...a) => breakPieces(...a), mates, cfg: CFG }); // walls: (lib/walls.js)
+const walls = createWalls({ game, players, map: () => MAP, world: () => world, broadcast, send, notify, now, applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), sparkAt: (...a) => sparkAt(...a), shootDoor: (...a) => shootDoor(...a), hurtPiece: (...a) => hurtPiece(...a), breakPieces: (...a) => breakPieces(...a), mates, cfg: CFG, poweredAt: pos => circuits.poweredAt(pos) }); // walls: (lib/walls.js); walls x power: the cables follow the circuits
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -1136,11 +1136,15 @@ const circuits = createPower({
   applyDamage: (...a) => applyDamage(...a), hurtHostage: (...a) => hurtHostage(...a), mates: (a, b) => mates(a, b), elevator: () => elevator,
 });
 
+// A light switch faces its room (rot: the plate's facing, [sin, 0, cos]); from behind it (the far side of its wall)
+// you can't reach it. Every switch on both Mansion maps faces open floor (checked at the integration, 2026-11-08).
+const switchBehind = (sw, p) => (p[0] - sw.p[0]) * Math.sin(sw.rot || 0) + (p[2] - sw.p[2]) * Math.cos(sw.rot || 0) < -0.05;
 function nearestSwitch(p) {
   if (MAP.elevator && elevator.walledIn(p.p)) return null; // elevator: not through the shaft's walls (the switch is on its outside)
   let best = null, bd = 1.8;
   for (const sw of MAP.switches || []) {
     const d = dist2(p.p, sw.p);
+    if (switchBehind(sw, p.p)) continue; // (not from behind its wall: the living room reached the south-west room's switch through it)
     if (d < bd && Math.abs(p.p[1] + 1.2 - sw.p[1]) < 1.6) { bd = d; best = sw; }
   }
   return best;
@@ -1592,7 +1596,7 @@ body.onPlayDead(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff
 // body × shield: a corpse holds no hostage (let go as a real death would: 'died'); × disguise: a wearer who drops is
 // seen through ('went down'); × elevator: no lift target
 body.onPlayDead(p => { shield.letGo(p, 'died'); disguise.reveal(p, 'downed'); p.elevAim = null; });
-const wounds = createWounds({ players, game, cfg: CFG, map: () => MAP, now, send, broadcast, sendMe, killPlayer, inTeam, busy, disguise }); // wounds: (lib/wounds.js)
+const wounds = createWounds({ players, game, cfg: CFG, map: () => MAP, now, send, broadcast, sendMe, killPlayer, inTeam, busy, disguise, under: pos => ug.under(pos) }); // wounds: (lib/wounds.js); wounds x underground: the interrogation skips teammates underground
 
 // bet feature: F3 bet on yourself (lib/bet.js)
 const bet = createBets({ players, game, cfg: CFG, now, send, broadcast, sendMe, mates, inTeam });
@@ -2193,6 +2197,10 @@ function hostageInReach(p, h) {
 // letting go of a hostage held as a shield; a lift target the player aims at (button, hatch, doors: aiming beats the
 // shield's and the hostage's nearness); grabbing a hostage; a dead enemy's uniform (except where E plants or defuses the
 // bomb); the valves (floodgate, gas); then the old uses.
+// Integration 2026-11-08 (ROADMAP wave 1): out of a car's trunk with the gadgets (stealth); interrogating a downed enemy
+// right after the revive (wounds; walking with E held turns a revive into a drag); after the valves, power's aimed uses
+// (breakers, the generator, the winch), then the fireplace and the chimney's top (stealth); among the old uses, into a
+// car's trunk just before getting into a car (stealth). The air vents have no E use (a hint only).
 function onUse(p, m, t) {
   if (!m.on) { p.act = null; return; }
   if (p.piloting != null) { const d = game.drones.find(x => x.id === p.piloting); if (d) loseDrone(d, 'released'); else p.piloting = null; return; }

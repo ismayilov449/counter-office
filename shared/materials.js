@@ -6,6 +6,8 @@
 //   pen:  bullets go through it            loss: how much of a bullet's damage 0.4 m of it eats (before the gun's power)
 //   max:  the longest path through it (m)  burns: it catches fire (for the fire feature)
 //   hole: a bullet hole's radius in it (m) (the see-through hole in the browser)
+import { CHIMNEY } from './maps/mansion_stealth.js'; // (integration 2026-11-08, walls x stealth: the chimney is brick)
+
 export const MATERIALS = {
   plaster: { pen: true, loss: 0.5, max: 0.8, burns: false, hole: 0.022 },
   wood: { pen: true, loss: 0.4, max: 1.0, burns: true, hole: 0.02 },
@@ -102,6 +104,14 @@ function staticMaterials(map) {
           }
         }
       }
+    }
+    // walls x stealth (integration 2026-11-08): the chimney's four walls, floor to stack top, are brick (their faces
+    // also carry the stack's concrete cap, the mouth's stone and the flue's soot, which read as stone or metal); the
+    // hearth and the firebox's floor (low) keep what their faces say
+    const C = CHIMNEY;
+    if (b.min[0] >= C.x1 - 0.01 && b.max[0] <= C.x2 + 0.01 && b.min[2] >= C.z1 - 0.01 && b.max[2] <= C.z2 + 0.01 && b.min[1] >= C.floor - 0.01 && b.max[1] - b.min[1] > 2) {
+      t.statics.set(b, { m: 'brick', all: ['brick'] });
+      continue;
     }
     t.statics.set(b, { m: hardest(found) || 'stone', all: [...new Set(found)] });
   }

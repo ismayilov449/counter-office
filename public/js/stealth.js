@@ -23,20 +23,23 @@ let trunkSeq = null; // our spawn when we got into a trunk (a new life is out of
 let cover = null; // the dark view in a trunk (a page element over the game, under the HUD)
 
 // ---------------------------------------------------------------- sounds (made like the flood's: audio.js's parts)
+// (integration 2026-11-08, stealth x underground: like audio.play's sounds, these come through an air vent when one
+// is nearer than the way round: public/js/underground.js ventPos via audio.vent)
+const heard = pos => (pos && audio.vent?.(pos)) || pos;
 function sound(name, pos) {
   const k = floodKit();
   if (!k) return;
   const { ctx: ac, burst, tone } = k, t = ac.currentTime;
   if (name === 'light') {
     // a match struck, then the kindling catching with a whoosh
-    const out = audio.out(pos, [5, 1]);
+    const out = audio.out(heard(pos), [5, 1]);
     burst(out, t, { dur: 0.12, type: 'highpass', freq: 2500, gain: 0.35 });
     burst(out, t + 0.15, { dur: 1.2, type: 'bandpass', freq: 300, freqEnd: 1400, q: 0.6, gain: 0.5 });
     tone(out, t + 0.15, { freq: 60, freqEnd: 90, dur: 0.9, gain: 0.25 });
     for (let i = 0; i < 8; i++) burst(out, t + 0.5 + Math.random() * 1.2, { dur: 0.02, type: 'highpass', freq: 3000, gain: 0.18 });
   } else if (name === 'trunk') {
     // the lid: a hollow metal thump and the latch
-    const out = audio.out(pos, [5, 1]);
+    const out = audio.out(heard(pos), [5, 1]);
     burst(out, t, { dur: 0.12, freq: 380, gain: 0.8 });
     tone(out, t, { freq: 110, freqEnd: 70, dur: 0.18, gain: 0.45 });
     tone(out, t + 0.02, { freq: 900, dur: 0.15, type: 'triangle', gain: 0.05 });
@@ -52,7 +55,7 @@ function creak(kind, pos, g = 1) {
   if (creakLog.length > 50) creakLog.shift();
   const k = floodKit();
   if (!k) return;
-  const { ctx: ac, burst, tone } = k, t = ac.currentTime, out = audio.out(pos, [4, 1]);
+  const { ctx: ac, burst, tone } = k, t = ac.currentTime, out = audio.out(heard(pos), [4, 1]);
   const r = 0.9 + Math.random() * 0.2, step = kind === 'step';
   const f = (step ? 980 : 620) * r, len = (step ? 0.2 : 0.32) * (0.85 + Math.random() * 0.3);
   burst(out, t, { dur: 0.05, freq: step ? 420 : 300, gain: 0.22 * g });
