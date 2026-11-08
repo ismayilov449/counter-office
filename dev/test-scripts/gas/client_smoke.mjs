@@ -25,7 +25,7 @@ for (const id of ['cs_mansion', 'cs_mansion_night']) {
 
   gas.setMap(MAPS[id]);
   const groups = scene.children.filter(c => c.isGroup);
-  ok(`${id}: 2 pipes built (${groups.map(meshes).join(' + ')} meshes: one per material, and the valve lever)`, gas.debug().pipes.length === 2 && groups.length === 2 && groups.every(g => meshes(g) <= 8));
+  ok(`${id}: 2 pipes built (${groups.map(meshes).join(' + ')} meshes: the fixed parts in one, and the valve lever)`, gas.debug().pipes.length === 2 && groups.length === 2 && groups.every(g => meshes(g) <= 2)); // (integration 2026-11-08: one mesh per pipe, was one per material)
 }
 const kitchen = MAPS.cs_mansion.rooms.findIndex(r => r.group === 'lampa6');
 frames(5);

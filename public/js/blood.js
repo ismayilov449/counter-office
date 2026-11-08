@@ -329,7 +329,11 @@ export class BloodTrails {
     this.badge = document.createElement('div');
     this.badge.className = 'badge hidden';
     this.badge.id = 'bleed-badge';
-    document.getElementById('bottom-left')?.appendChild(this.badge);
+    // (in the row above the health, first: in the bottom row it ran into the bet's "F3" line in buy time; integration
+    // 2026-11-08. A page without that row: the bottom row, as before)
+    const row = document.getElementById('hud-badges');
+    if (row) row.insertBefore(this.badge, row.firstChild);
+    else document.getElementById('bottom-left')?.appendChild(this.badge);
     this.bar = document.createElement('div');
     this.bar.className = 'hidden';
     this.bar.style.cssText = 'position:absolute;top:72%;left:50%;transform:translateX(-50%);width:240px;text-align:center;font-family:Consolas,monospace;color:var(--hud)';

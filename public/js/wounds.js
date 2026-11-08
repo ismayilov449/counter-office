@@ -50,13 +50,17 @@ export function initWounds(api) {
 
 function onSnap(m) {
   const wd = m.wd, me = A.me, now = performance.now();
-  const was = st.dragging;
+  const was = st.dragging, lastAt = st.myAt;
   st.d = wd?.d || [];
   st.dragging = null; st.draggedBy = null; st.myAt = null;
   for (const [a, b, x, y, z] of st.d) {
     if (a === me.id) st.dragging = b;
     if (b === me.id) { st.draggedBy = a; st.myAt = [x, y, z]; }
   }
+  // the drag is over: I lie exactly where the server last put me, not where my smoothing towards it had got to (at a
+  // few frames a second that was up to ~0.7 m behind; sent as my position, the body "moved" and the revive the
+  // dragger starts by standing still was dropped at once: body.js's 0.6 m check. Integration 2026-11-08)
+  if (lastAt && !st.myAt && me.alive && me.p) { me.p[0] = lastAt[0]; me.p[1] = lastAt[1]; me.p[2] = lastAt[2]; }
   if (st.dragging != null && was == null) st.stillAt = now;
   const ends = new Map((wd?.k || []).map(([id, f]) => [id, f]));
   // somebody down pulls his pistol to his head: the click of it, where he lies
@@ -290,7 +294,8 @@ function buildUi() {
   // in buy time)
   const box = document.createElement('div');
   box.id = 'wd-badges';
-  (document.getElementById('hud') || document.body).appendChild(box);
+  // (in the page's badge row after BLEEDING, integration 2026-11-08; without that row, at this spot on its own)
+  (document.getElementById('hud-badges') || document.getElementById('hud') || document.body).appendChild(box);
   const end = document.createElement('div');
   end.id = 'wd-end';
   const down = document.createElement('div');

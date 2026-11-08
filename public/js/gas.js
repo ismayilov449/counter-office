@@ -25,11 +25,14 @@ function softTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-// The meter's face: a white dial, a counter, GAS in red.
+// The meter's face: a white dial, a counter, GAS in red (the left half); the right half plain white, for the parts that
+// are only their vertex colour (one mesh and one material for a whole pipe: integration 2026-11-08; it was one mesh per
+// colour, 10 draw calls for the two pipes, drawn through the walls whenever they're in the view).
 function dialTexture() {
   const c = document.createElement('canvas');
-  c.width = c.height = 64;
+  c.width = 128; c.height = 64;
   const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(64, 0, 64, 64);
   g.fillStyle = '#2a2a2a'; g.fillRect(0, 0, 64, 64);
   g.fillStyle = '#e8e4d8'; g.fillRect(4, 4, 56, 56);
   g.fillStyle = '#111'; g.fillRect(10, 26, 44, 12);
@@ -42,14 +45,22 @@ function dialTexture() {
 // ctx: { scene, camera, fx, audio, me, brk() (broken pieces), indoors(p), shellShock(s), realBlast(m) }
 export function createGasClient(ctx) {
   const { scene, fx, audio, me } = ctx;
+  // the parts' colours (vertex colours of the one mesh: the dial is the texture's left half, the rest its white half)
+  const COLORS = { gas: 0xd8b21c, meter: 0x7c8286, dial: 0xffffff, valve: 0xb4241c, tank: 0xd6d2c6, flue: 0x3a3836 };
   const mats = {
-    gas: new THREE.MeshLambertMaterial({ color: 0xd8b21c }),
-    meter: new THREE.MeshLambertMaterial({ color: 0x7c8286 }),
-    dial: new THREE.MeshLambertMaterial({ map: dialTexture() }),
-    valve: new THREE.MeshLambertMaterial({ color: 0xb4241c }),
-    tank: new THREE.MeshLambertMaterial({ color: 0xd6d2c6 }),
-    flue: new THREE.MeshLambertMaterial({ color: 0x3a3836 }),
+    pipe: new THREE.MeshLambertMaterial({ map: dialTexture(), vertexColors: true }), // (every fixed part of a pipe)
+    valve: new THREE.MeshLambertMaterial({ color: COLORS.valve }),
   };
+  // a part's geometry coloured (and, but for the dial, its UVs on the texture's white half)
+  const _c = new THREE.Color();
+  function paint(geo, part) {
+    _c.set(COLORS[part] ?? COLORS.gas);
+    const n = geo.attributes.position.count, col = new Float32Array(n * 3), uv = geo.attributes.uv;
+    for (let i = 0; i < n; i++) { col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, part === 'dial' ? uv.getX(i) * 0.5 : 0.75, part === 'dial' ? uv.getY(i) : 0.5);
+    return geo;
+  }
   const soft = softTexture();
   const board = new Billboards(scene, soft, { max: HAZE_MAX, sort: true });
   board.mesh.visible = false;
@@ -59,11 +70,11 @@ export function createGasClient(ctx) {
   let msgEl = null, msgText = '';
   let lastPuff = 0;
 
-  // ---- the pipes' models (one mesh per material and pipe, so a wrecked pipe can go)
+  // ---- the pipes' models (one mesh for a pipe's fixed parts, and its valve lever: so a wrecked pipe can go)
   function buildPipe(d) {
     const group = new THREE.Group();
-    const geos = {};
-    const add = (mat, geo) => (geos[mat] ||= []).push(geo);
+    const geos = [];
+    const add = (part, geo) => geos.push(paint(geo, part));
     let lever = null;
     for (const p of d.parts) {
       if (p.k === 'pipe') {
@@ -98,7 +109,7 @@ export function createGasClient(ctx) {
         group.add(lever);
       }
     }
-    for (const [m, list] of Object.entries(geos)) group.add(new THREE.Mesh(mergeGeometries(list), mats[m]));
+    if (geos.length) group.add(new THREE.Mesh(mergeGeometries(geos), mats.pipe));
     scene.add(group);
     return { def: d, group, lever, s: PIPE.ok, at: d.leak, room: gasRoomAt(rooms, d.leak, 0.1), hiss: null, anchors: null };
   }

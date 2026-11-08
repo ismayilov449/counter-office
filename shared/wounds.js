@@ -12,6 +12,7 @@ export const WOUNDS = {
     reach: 1.8, // m (flat) from the dragger to the downed teammate to take hold of him
     lose: 2.6, // m (flat): the body further than this from the dragger (he ran off, was moved): he lets go
     still: 0.35, // s without a movement key, E still held: the drag stops and the revive goes on
+    hold: 800, // ms after a drag the server keeps the body where the drag left it, until his browser agrees (lib/wounds.js)
   },
   ask: 3, // s holding E on a downed enemy to interrogate him
   reveal: 5, // s the teammate he gives away shows on the interrogator's team's radar

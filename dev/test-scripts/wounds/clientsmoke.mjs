@@ -50,7 +50,7 @@ let now = performance.now();
 const frame = (ms = 33) => { now += ms; wounds.frame(ms / 1000, now, cam()); };
 const downEl = () => document.body.children.find(c => c.id === 'wd-down');
 const downLine = () => { frame(); return downEl()?.querySelector('.t').textContent ?? '(none)'; };
-const badgesHtml = () => byId.get('hud').children.find(c => c.id === 'wd-badges')?.innerHTML || '';
+const badgesHtml = () => (byId.get('hud-badges') || byId.get('hud')).children.find(c => c.id === 'wd-badges')?.innerHTML || ''; // (integration: in the page's badge row)
 
 // ---------------------------------------------------------------- 1.1 the drag
 snap({ bd: { d: [[2, 0.9, 0.2, 1]], u: [], p: [] } }); // Mate (2) down, me reviving him
