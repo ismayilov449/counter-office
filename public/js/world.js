@@ -1814,6 +1814,12 @@ export function buildWorld(scene, map, qualityName) {
   const lamps = [], pool = [];
   group.updateMatrixWorld(true);
   group.traverse(o => { if (o.isPointLight) lamps.push(o); });
+  // (integration 2026-11-08: a lamp lights only its own room, roomlight.js lampBoxes: its room's boxes, from map.rooms
+  // by its light group, at most two; none: it lights everything round it, as before)
+  for (const l of lamps) {
+    const g = l.userData.group, rs = g ? (map.rooms || []).filter(r => r.group === g) : [];
+    if (rs.length && rs.length <= 2) l.userData.box = rs;
+  }
   if (lamps.length > q.lamps) {
     for (const l of lamps) {
       l.userData.at = l.getWorldPosition(new THREE.Vector3());
@@ -1835,7 +1841,8 @@ export function buildWorld(scene, map, qualityName) {
       .sort((x, y) => x.userData.at.distanceToSquared(camPos) - y.userData.at.distanceToSquared(camPos));
     pool.forEach((p, i) => {
       const l = cands[i];
-      if (!l) { p.intensity = 0; return; }
+      if (!l) { p.intensity = 0; p.userData.box = null; return; }
+      p.userData.box = l.userData.box || null; // (its room: roomlight.js)
       p.position.copy(l.userData.at);
       p.color.copy(l.color);
       p.intensity = l.intensity;

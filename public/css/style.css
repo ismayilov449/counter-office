@@ -289,8 +289,8 @@ button.ghost { background: transparent; border-style: dashed; }
 .badge.kit { background: rgba(40, 90, 200, 0.7); }
 .badge.nvgb { background: rgba(40, 150, 60, 0.7); }
 /* A row above the health for the longer badges (BLEEDING · P bandage, the wounds): in the bottom row they ran into the
-   bet's "F3" line at the bottom middle in buy time. Under the chat (bottom 90 px). */
-#hud-badges { position: absolute; left: 18px; bottom: 58px; display: flex; gap: 6px; align-items: flex-end; pointer-events: none; }
+   bet's "F3" line at the bottom middle in buy time. Over the health row (its top 62 px up), under the chat (90 px). */
+#hud-badges { position: absolute; left: 18px; bottom: 64px; display: flex; gap: 6px; align-items: flex-end; pointer-events: none; }
 #hud-badges .badge { margin: 0; padding: 2px 7px; font-size: 13px; }
 #hud-badges #wd-badges { position: static; }
 .stat small { font-size: 14px; }

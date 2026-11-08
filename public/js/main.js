@@ -9,7 +9,7 @@ import { CAR, seatPos, stepCar } from '/shared/vehicles.js';
 import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
-import { setRooms, setGlow, ambientAt, glowAt } from './roomlight.js';
+import { setRooms, setGlow, ambientAt, glowAt, maskLamps } from './roomlight.js';
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
@@ -89,6 +89,7 @@ function trackSnapshot(time) {
 }
 
 const scene = new THREE.Scene();
+maskLamps(scene); // (integration 2026-11-08: a lamp lights only its own room, not the rooms round it through the walls)
 const camera = new THREE.PerspectiveCamera(BASE_FOV, innerWidth / innerHeight, 0.05, 900);
 camera.rotation.order = 'YXZ';
 

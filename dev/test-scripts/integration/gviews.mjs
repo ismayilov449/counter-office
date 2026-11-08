@@ -54,6 +54,9 @@ const VIEWS = [
   ['kitchen', [-17.5, 0.81, -11.5], 0, 0],        // the kitchen, looking north at the gas pipe
   ['cellar', [-15.5, -2.2, 0.5], Math.PI / 2, 0], // the cellar, looking west along it to the lift and the fuse box
   ['street', [26.5, 0, 0.5], Math.PI / 2, 0],     // the street at the gate, looking west at the house
+  // (integration 2026-11-08: the roof and the garage)
+  ['garage', [-16.6, 0.0, -16.6], Math.PI / 2, -0.1], // the garage, looking west at the car and the generator
+  ['roof', [-18.0, 10.57, 6.6], 0.35, -0.15], // the roof's west slope south of the chimney, looking north (the stack, the machine room)
 ];
 const res = {};
 for (const [name, p, yaw, pitch] of VIEWS) {
