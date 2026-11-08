@@ -41,6 +41,7 @@ import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas i
 import { createFlood } from './lib/flood.js'; // Floodgate
 import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out of deep water
 import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
+import { createStealth } from './lib/stealth.js'; // stealth: the chimney, hiding in a car's trunk
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -342,6 +343,7 @@ function sparkAt(pos, kind, by = null) { return gas.sparkAt(pos, kind, by); }
 const flood = createFlood({ game, players, map: () => MAP, broadcast, send, notify, applyDamage, hurtHostage, eyeOf, lineOfSight, mates, cfg: CFG, now,
   live: () => circuits.powered('cellar'), // power: the water at the fuse box is live only with the cellar's circuit
   sparkAt: (pos, kind) => (typeof sparkAt === 'function' ? sparkAt(pos, kind) : undefined) }); // flood → gas: the shorting fuse box sparks
+const stealth = createStealth({ game, players, map: () => MAP, world: () => world, broadcast, send, now, applyDamage: (...a) => applyDamage(...a), killPlayer: (...a) => killPlayer(...a), mates: (a, b) => mates(a, b), groundY: (...a) => groundY(...a), roundless: () => game.phase === 'warmup' || isDM() || isGG(), sparkAt: (pos, kind, by) => sparkAt(pos, kind, by) }); // stealth: the chimney, the trunk (lib/stealth.js)
 
 const makeItem = id => ({ id, mag: WEAPONS[id].mag, res: WEAPONS[id].reserve });
 const freshInv = team => ({ primary: null, secondary: inTeam({ team }) ? makeItem(defaultPistol(team)) : null, he: 0, flash: 0, smoke: 0, molotov: 0, pmn: 0, mon50: 0, jammer: 0, satchel: 0, drone: 0, c4: false });
@@ -578,6 +580,7 @@ function resetWorld() {
   game.camDownAt = {};
   gas.reset(); // gas: the pipes are mended and the air is clean again
   flood.reset(); // Floodgate: drained every round
+  stealth.reset(); // stealth: the fire out, the trunks empty, nobody sooty
   broadcast({ t: 'world', glass: [], brk: [], lights: game.lights, doors: world.doorStates });
   sendGadgets();
   elevator.reset(); // elevator: the cabin back on the ground floor, doors shut
@@ -800,6 +803,7 @@ function explodeCar(c, attacker) {
     send(q, { t: 'exited', p: q.p, yaw: q.yaw });
     killPlayer(q, attacker && attacker !== q && !mates(attacker, q) ? attacker : null, 'car', false);
   }
+  stealth.carBlown(c, attacker); // stealth: whoever hid in its trunk dies with it
   c.driver = null;
   c.riders = [null, null];
   breakGlass(world.intactGlass.filter(g => dist3(center, [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2, (g.min[2] + g.max[2]) / 2]) < 6).map(g => g.id));
@@ -976,7 +980,7 @@ function gadgetState() {
 }
 const sendGadgets = (to = null) => { if (!MAP.mansion2) return; if (to) send(to, gadgetState()); else broadcast(gadgetState()); };
 // Someone on a gadget can't shoot, throw or use their items.
-const busy = p => !!p.zip || !!p.cctv;
+const busy = p => !!p.zip || !!p.cctv || p.trunk != null; // stealth: + hiding in a car's trunk
 
 // ---- Zip line: E at either end hooks you on; the server moves you along the cable (your browser works out the same
 // from the start time, see zipRide) and the snapshot shows you hanging there. E or Space lets go (CS 1.6's fall damage
@@ -1150,7 +1154,7 @@ function onCar(p, m, t) {
   if (Math.abs(c.speed) < 4) return;
   const boxes = carBoxes(c);
   for (const q of players.values()) {
-    if (q === p || !q.alive || q.driving != null || q.riding != null) continue;
+    if (q === p || !q.alive || q.driving != null || q.riding != null || q.trunk != null) continue; // stealth: + not whoever hides in a trunk (he's inside the car's boxes)
     if (!CFG.friendlyFire && mates(q, p)) continue;
     const hit = boxes.some(b => q.p[0] + 0.35 > b.min[0] && q.p[0] - 0.35 < b.max[0] && q.p[2] + 0.35 > b.min[2] &&
       q.p[2] - 0.35 < b.max[2] && q.p[1] < b.max[1] && q.p[1] + 1.8 > b.min[1]);
@@ -2108,6 +2112,7 @@ function updateActions(t) {
     const a = p.act;
     if (!a) continue;
     if (a.type === 'flood') { flood.updateAct(p, a, t); continue; } // Floodgate: turning the valve
+    if (a.type === 'fireplace') { stealth.updateAct(p, a, t); continue; } // stealth: lighting the fireplace
     if (a.type === 'gasValve') { gas.valve(p, a, t); continue; } // gas: shutting a valve
     if (a.type === 'elevforce') { elevator.act(p, a, t); continue; } // elevator: prying the lift's doors (any phase)
     if (a.type.startsWith('pw')) { circuits.act(p, a, t); continue; } // power: a breaker, the generator, cutting the lift's cable
@@ -2189,6 +2194,7 @@ function onUse(p, m, t) {
     if (p.zip) { zipOff(p, t, 'letgo'); return; }
     if (p.cctv) { cctvOff(p, 'left'); return; }
     if (p.driving != null || p.riding != null) { exitCar(p); return; }
+    if (stealth.leave(p)) return; // stealth: out of a car's trunk
   }
   if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
   if (wounds.use(p, t)) return; // wounds: interrogate a downed enemy (hold E 3 s)
@@ -2201,6 +2207,7 @@ function onUse(p, m, t) {
   if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
   if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
   if (circuits.use(p, t)) return; // power: aimed at a breaker, the generator or the lift's winch (before the old uses)
+  if (stealth.use(p, t)) return; // stealth: hold E at the hearth to light the fire; E on the roof by the stack climbs into the chimney
   if (plantHere) {
     p.act = { type: 'plant', start: t, pos: p.p.slice(), dur: CFG.plantTime * 1000 };
     return;
@@ -2274,6 +2281,7 @@ function onUse(p, m, t) {
     gas.sparkAt(sw.p, 'switch', p); // gas: a light switch sparks
     return;
   }
+  if (stealth.trunk(p, t)) return; // stealth: E behind a car (not the pickup): into its trunk
   const car = world.cars
     .filter(c => !c.wrecked && (c.driver == null || c.riders.includes(null)) && dist2(p.p, c.p) < CAR.enterRange && Math.abs(p.p[1] - c.p[1]) < 1.5)
     .sort((a, b) => dist2(p.p, a.p) - dist2(p.p, b.p))[0];
@@ -3041,6 +3049,7 @@ function updateSpotting(t) {
     const list = [];
     for (const q of players.values()) if (q.alive && inTeam(q)) list.push(q);
     body.unspot(list); // body: a "corpse" is never spotted
+    stealth.unspot(list); // stealth: nobody sees into a car's trunk
     for (const v of list) {
       for (const e of list) {
         if (v.team === e.team || (v.id * 7 + e.id + spotTick) % SPOT.every) continue;
@@ -3696,6 +3705,7 @@ function handle(p, m) {
       if (p.zip) { p.p = zipFeet(MAP.zip, zipNow(p, t).s); p.yaw = m.yaw; p.pitch = m.pitch; p.c = 0; p.history.push({ t, p: p.p, c: 0 }); while (p.history[0].t < t - 1000) p.history.shift(); break; }
       // At the CCTV desk you sit on the chair facing the monitors.
       if (p.cctv) { p.p = MAP.cctv.seat.slice(); p.yaw = MAP.cctv.yaw; p.pitch = -0.3; p.c = 1; p.history.push({ t, p: p.p, c: 1 }); while (p.history[0].t < t - 1000) p.history.shift(); break; }
+      if (stealth.pinned(p, m, t)) break; // stealth: in a car's trunk the server says where you are
       if (p.zipFall) zipLanding(p, pos, t);
       if (!p.alive) break;
       if (MAP.elevator) elevator.fixRider(pos); // elevator: in the cabin means on its floor now
@@ -3974,6 +3984,7 @@ function tick() {
   const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
   tick.prev = t;
   flood.tick(t, dt); // Floodgate: the water level, drowning, electrocution
+  stealth.tick(t); // stealth: soot, the fireplace's fire, the hiders kept in their cars
   bots.update(dt);
   if (game.hostages.length) {
     for (const ev of updateHostages(game.hostages, players, dt, p => world.move(null, p, 2), t)) {
@@ -4014,6 +4025,7 @@ function tick() {
     ...gas.snap(), // gas: { gs: { p: pipe states, r: [room, concentration 0..250, ...] } } while there is any
     ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
     ...wounds.snap(), // wounds: wd: { d: [[dragger, dragged, x, y, z]], k: [[id, 0..1]] ending it, i: [[asker, victim, 0..1]], a: [interrogated] }
+    ...stealth.snap(), // stealth: st: { f: the fireplace burns, s: sooty players, k: who hides in which trunk }, only while there's any
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the
   // client keeps the last ones it got. The text is made once for everybody, not once per player.

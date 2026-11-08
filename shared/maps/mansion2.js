@@ -18,6 +18,7 @@ import { addGasPipes } from './mansion_gas.js'; // gas: the kitchen's gas pipe a
 import { floodWorks } from './mansion_flood.js'; // Floodgate: the valve in the storm drain
 import { addElevator } from './mansion_elevator.js'; // elevator
 import { addPower } from './mansion_power.js'; // power: the breaker panel, the generator, the lift's machine room on the roof
+import { addStealth } from './mansion_stealth.js'; // stealth: the fireplace and chimney, the creaking boards
 
 const IN = 0.0254; // a texel, in metres
 
@@ -597,6 +598,7 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
 
   const elevator = addElevator({ carve, unface, face, decor, rooms, keep, solid: (...b) => solids.push(...b) }); // elevator: the lift's shaft (mansion_elevator.js)
   addPower({ carve, brush, ladders, keep, solid: (...b) => solids.push(...b) }); // power: the machine room on the roof, the roof ladder, the generator's solid (mansion_power.js)
+  addStealth({ carve, unface, face, brush, decor, keep }); // stealth: the fireplace and chimney (shared/maps/mansion_stealth.js)
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
   return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv, elevator }; // (elevator: + elevator)
 }
