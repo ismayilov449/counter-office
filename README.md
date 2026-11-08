@@ -153,6 +153,40 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
       until it goes off.
     - Its motor **sparks** each time it starts: with enough gas in the room (see Gas below), that sets it off.
     - Every round it starts on the ground floor, doors and hatch shut. Bots don't use it.
+  - **Power & machinery**:
+    - **Circuits and breakers.** The house's power comes through the fuse box in the cellar (its lever is still the
+      master switch: Terrorists cut everything, CTs bring it back) and then through a **breaker panel** on the cellar's
+      north wall, just right of the fuse box. It has five breakers, labelled: **UPPER** (the upper floor's lights),
+      **GROUND** (the ground floor's lights, the garage and, at night, the estate's lamps), **CELLAR** (the cellar's
+      light), **CCTV** (the cameras and the security monitors) and **LIFT** (the lift and its light).
+      - Look at a breaker and **hold E (1 s)**. Terrorists switch breakers off, CTs switch them back on. Cutting one
+        darkens or stops only that floor or system: cut UPPER and the upper floor goes pitch dark while the rest stays
+        lit; cut LIFT and the lift stops dead (like in a blackout); cut CCTV and the cameras show NO POWER.
+      - A light switch on a floor with no power does nothing (its hint says "No power here — the breaker for the
+        upper floor is off"). When the power comes back, every lamp comes back as its switch was.
+    - **The generator** in the garage (against the wall by the kitchen steps): if the Terrorists cut the power, a
+      **CT** can look at it and **hold E (3 s)** to start it. It's loud: you hear it roar from far across the estate.
+      While it runs it lights **both floors of the house** (not the cellar, the cameras or the lift), as far as their
+      breakers allow. A Terrorist can switch it off (hold E, 2 s). Its tank lasts **90 seconds** of running; then it
+      sputters out. It's full again every round.
+    - **Power surge.** When the power comes back to a circuit (a breaker, the fuse box or the generator), a second
+      later a few of its **lit** bulbs burst with a pop and a shower of sparks, and stay dark until the round ends.
+      Each burst is a spark: in a room full of gas, it blows up. Switch the lights off before you bring the power back
+      to be safe.
+    - **Cut the lift's cable.** The lift's machine room stands on the roof, right over the shaft. Get onto the roof
+      from the roof terrace: a steel ladder runs up the front wall by the terrace's door to the eave; walk up over the
+      ridge, and the machine room's door faces you on the other slope. A **Terrorist** looks at the winch and **holds
+      E (4 s)** to cut the cable with a grinder (loud, sparks).
+      - The cabin falls with everyone in it (or on its roof). The emergency brake catches it only sometimes (**1 in
+        3**): then it drops less than a metre and stops, nobody hurt.
+      - Otherwise it crashes into the pit: everyone riding takes fall damage by the height — from the upper floor it's
+        deadly, from the ground floor about 40, from the cellar nothing. Hostages too. Anyone in the pit under it is
+        crushed (killed outright). The crash sparks (gas).
+      - The lift is out of order until the round ends (the buttons say so; its breaker doesn't help). Get out by
+        prying the doors open (hold E, 3 s; the cabin ends up just under a floor) and then **E** again to climb out,
+        or through the roof hatch.
+      - Killing an enemy this way counts as your kill; teammates riding it get hurt too, but it's not a team kill.
+    - Bots don't use any of it.
   - **Smugglers' tunnel** from the cellar to the **shed**: a low opening in the cellar's south-east corner leads
     into a narrow timber-shored passage (about 40 m) east under the lawn and south to below the shed, where a ladder
     goes up to a **trapdoor** in the shed's floor. **E** opens it (from the ladder or from above); it creaks open
@@ -182,6 +216,26 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
       that lands in the water fizzles out; an HE grenade going off under water hurts only those in the water near
       it (walls don't break).
     - Every round starts dry.
+  - **Underground** (the cellar, the smugglers' tunnel, the storm drain and the old water tunnel under the north lawn):
+    - **No radar down there.** Your radar shows only static ("NO SIGNAL"), for both teams, and you can't ping (middle
+      mouse) or call in a mortar target (V). Nobody underground shows up as a red dot on anyone's radar, and what you
+      see down there doesn't reach your team's radar either. You rely on your ears.
+    - **Shots echo through the house.** A gunshot or an explosion underground is heard everywhere above ground as a
+      muffled, rolling boom from below, however far away you are — so everyone knows a fight is going on down there.
+      Down in the tunnels the shots ring and echo along the walls. Suppressed guns (USP, TMP, M4A1) make only a faint
+      thud.
+  - **Air vents**: three short ducts with a metal grille at each end — the cellar (high in its west wall, between the
+    wine racks) and the back lawn (at the foot of the house's west wall); the kitchen's ceiling and the floor of the
+    bedroom above it; the ceiling of the ground floor's north-east room and the floor of the security room above it.
+    - **Listen**: stand by a grille (crouch by a low one, or over a floor grille) and you hear what goes on at the
+      other end — footsteps, creaking boards, reloads, shots — much louder and clearer than through the walls, coming
+      out of the grille. The closer your ear is to the grille, the better.
+    - **Grenades**: throw a grenade into a grille (or drop one into a floor grille) and it rattles through the duct
+      and drops out of the other end a moment later — an HE or a flashbang into the room behind, a smoke grenade fills
+      it, a Molotov breaks on its floor. The grenade keeps its fuse, so throw it in early. You hear it clatter through.
+    - **Gas** spreads through the vents too, slowly: a leak in the kitchen reaches the bedroom above it after a minute
+      or two, and the cellar's vent lets a little of the boiler's gas out onto the back lawn.
+    - The ducts are too small to crawl through. Bots don't use them.
   - **Garage** against the house's north wall, between the manhole and the ladder: a steel **roller door** opens onto
     the north lawn. **E** rolls it up (2 seconds, a loud rattle; it comes down at once, but not on someone or a car in
     the way), and a blast nearby tears it out. Inside stands a **car** you can drive out (see Cars below), with tool
@@ -262,6 +316,34 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     - Rough times: a holed kitchen pipe makes the kitchen (doorways open, doors and windows shut) explosive in about
       25 seconds, and choking after a little over a minute; with the back door open it takes about 40 seconds; with
       the back door and both windows open it never gets there.
+  - **Bullets through walls**: bullets go through wood and plaster — the house's inner walls, its doors and wooden
+    furniture — but not brick, stone, metal or a floor. Every wall takes a share of the damage (more from a pistol,
+    less from a rifle or the AWP). Pistols, shotguns and SMGs go through one wall; rifles, snipers, the M249, the
+    P90, the Five-SeveN and the Desert Eagle through two. A wall too thick for the angle you shoot at (a steep angle
+    through a thick wall) stops the bullet. The house's outer walls and the chimney are brick: nothing gets through
+    them, nor through a car's body.
+    - **The holes are real**: every bullet leaves a hole on both sides of the wall. You can see through the holes —
+      shoot a wall full of holes and you can peek through it (holes close together come out bigger), and a lit room
+      behind a wall shines out through its holes into a dark one. Plaster dust puffs out of the far side. Every round
+      the walls are whole again.
+  - **Pipes and cables in the walls**: water pipes run inside some of the house's inner walls (a radiator on the wall
+    shows where: the pipe runs just above it), and electric cables run along them at socket height (the sockets show
+    where) and up from every light switch.
+    - Shoot through a wall where a **pipe** runs and it bursts: water sprays out of both holes for about 40 seconds
+      and a wet patch spreads over the floor on both sides.
+    - Shoot through a **cable** and it sparks at both holes, every second or so, for the rest of the round — as long
+      as its floor has power (the breaker for its floor, the fuse box, or the generator: cut it and it goes dead;
+      bring it back and it sparks again).
+    - A sparking cable at the edge of a wet patch **electrocutes anyone standing in the water** (35 damage a shock,
+      again and again; armour doesn't help; it kills outright). Burst a pipe and cut the cable next to it, and that
+      corner of the room becomes a death trap. The kill is credited to whoever cut the cable.
+    - A spark in a room full of **gas** sets the gas off, like any spark.
+  - **Wet guns jam**: after swimming (the flood, the pool), wading, or standing in a wet patch, your gun is wet
+    (WET shows over your ammo) and sometimes **jams** when you fire — the wetter, the more often. A jammed gun won't
+    fire (JAMMED - TAP R): **tap R** to clear it (about a second) instead of reloading. It dries by itself: half a
+    minute after a swim, a few seconds after a puddle.
+  - **Bodies float up**: in the flooded cellar (and the pool) the dead rise to the surface and bob there face up (a
+    teammate with his name over him) — you can tell who drowned down there.
   - **The cat**: a ginger cat lives in the house. Every round it starts asleep in its basket by the living-room sofa,
     and the server moves it, so everyone sees it in the same place.
     - **It wanders** between its favourite spots: the sofa, its basket, the food bowl in the kitchen, the stairs, the
@@ -277,6 +359,33 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
       something if it can). A PMN it steps on or a MON-50 tripwire it walks into goes off, whoever laid it.
     - **It can't die.** A bullet or a blast throws it through the air with a screech, and then it runs off to hide.
     - At night its eyes glow in the dark. Bots pay it no attention.
+  - **The fireplace and its chimney**: a brick fireplace on the living room's south wall (between the doorway to the
+    south-west room and the bookcases), its chimney straight up through the Terrorists' room to the roof.
+    - **A secret way up and down**: crouch into the fireplace, stand up at its back and look up: iron rungs go up the
+      flue (W climbs, like any ladder). At the top, step out over the rim onto the roof. On the roof, press **E** by the
+      chimney to climb in, then look down and hold W. (You get onto the roof from the roof terrace's ladder too: see
+      Power & machinery.)
+    - **Soot**: whoever climbs the flue comes out black with soot and leaves **black footprints** for 20 seconds, for
+      everyone to see (they fade away after a minute; they're gone next round).
+    - **Lighting it**: **hold E for 2 seconds** in front of the hearth and a fire roars up. Nobody gets up or down the
+      chimney until the round ends — the rungs are too hot, and whoever is in the flue falls — and the fire hurts anyone
+      in it (about 20 a second in the flames, 10 a second up the flue; lit by an enemy, the kill is his). Smoke pours
+      out of the chimney's top, so it's seen from outside. It goes out at the end of the round (with no rounds:
+      warmup, Deathmatch, Gun Game, after 90 seconds). Gas in the living room goes up when it's lit.
+  - **Creaking floorboards**: some boards and stairs creak when you step on them — even walking (Shift), and crouching
+    too (a little quieter). Everyone nearby hears it, like a footstep (and through an air vent). On the hall stairs and
+    the cellar stairs only the middle of some treads creaks: keep to the wall or to the banister side and you're
+    silent. The creaky spots: the hall stairs (north flight: 3rd and 6th steps; south flight: 2nd, 5th and 7th), the
+    cellar stairs (4th, 8th and 12th steps), the living room (by the doorway to the kitchen, in front of the sofa, in
+    front of the fireplace), the kitchen by the back door, the middle of the south-west room, upstairs the middle of
+    the Terrorists' room and the way into its east part, the middle of the north room and of the bedroom.
+  - **Hide in a car's trunk** (the car in the garage; not the pickup): stand behind the car, or beside its back end,
+    and press **E** to climb into the trunk. Inside you see only the strip of light under the lid. Nobody sees you —
+    you aren't drawn and you're never a red dot on the enemy radar (bots don't see you either) — and you can't shoot;
+    bullets don't get through the car's body to you. Whoever drives the car takes you along. **E** jumps out (behind
+    the car, or beside it). If a teammate opens the trunk he's told you're in it; if an enemy opens it, he finds you
+    and you tumble out. If the car is blown up, you die with it (the kill goes to whoever blew it up). Everyone hears
+    the lid. Getting into a trunk lets go of a teammate you were dragging.
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and
@@ -470,7 +579,8 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     chest height go over you.
   - **No downed state** when you're killed by a **headshot**, by anything that blows the body apart (RPG-7, RPG-26,
     mortar, HE grenade, C4, a car blowing up, a mine, the satchel, a drone dive; an AWP or M249 hit; a Scout or Desert
-    Eagle headshot), by the flooded cellar's electric shock, or when nobody else on your team is still on their feet.
+    Eagle headshot), by an electric shock (the flooded cellar's or a live wire's), crushed under the falling lift, or when
+    nobody else on your team is still on their feet.
     Fire: going down puts the flames out, but lying in the fire burns you to death.
   - When nobody on your team is left standing, the downed bleed out at once, so the round ends as usual.
   - The kill feed shows "Name (down)", then "Name (finished)" or "Name (bled out)", and "[revived]". The kill goes to
@@ -492,6 +602,32 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   - Not as the last one standing on your team (the round wouldn't end, so it would fool nobody); if your teammates all
     fall while you're playing dead, you get up. Only team chat while playing dead. Only with your feet on the ground
     (not in mid-air, on a ladder or swimming). The cat may come and meow at you.
+- **Drag a downed teammate.** Hold **E** on him (the revive starts) and **walk**: you drag him behind you, slowly
+  (1.3 m/s) and with only your pistol in your other hand. Stand still with E held and the revive goes on from where it
+  was; let go of E and you let go of him. He follows your path about a metre behind you (round corners, through
+  doors, up the stairs), keeps bleeding (and leaves a trail), and can still shoot his pistol. It ends when either of
+  you gets up or dies, when you get on a ladder, the zip line, the security desk, into a car or a car's trunk, fly the
+  drone or grab a hostage, or if you get more than 2.6 m away from him.
+- **Interrogate a downed enemy.** Hold **E** on a downed enemy in front of you for **3 seconds**: he gives away the
+  nearest of his teammates still on their feet, who shows on your whole team's radar for **5 seconds** (a ring with a
+  "?" round his red dot). Not one who is underground (no radar down there): if they all are, he talks but you learn
+  nothing. Once per downing. Then finish him if you like.
+- **End it yourself.** Down and waiting for a revive, you may see an enemy coming first: **hold K for 5 seconds** and
+  you shoot yourself with your pistol (let go of K to stop). Everyone sees the pistol at your head and hears the shot;
+  an interrogation not yet finished gets nothing. The kill goes to whoever downed you (bets too); the feed says
+  "(shot himself)".
+- **Wounds.** A bullet that hurts you without dropping you leaves a wound (classic matches):
+  - in the **leg**: you limp (70 % of your speed, the view dips on the bad step);
+  - in the **arm** (a hit out at the side of the chest or stomach; from the side that's always the arm): your aim
+    sways by itself and your shots spread more;
+  - a **graze to the head** (a head hit you survive, e.g. through a helmet): your sight blurs in waves.
+
+  They last until you die or the round ends. A **bandage (P) halves** them (P works on a fresh wound even when you've
+  stopped bleeding); a new hit on a bandaged spot makes it fresh again. LEG / ARM / HEAD badges above your health show
+  them (½ when bandaged). Bots limp and shoot worse too.
+- **Adrenaline syringe** (buy menu, Equipment, **$400**; classic rounds on bomb and hostage maps). With one, your
+  revive takes **2 seconds** instead of 5 and uses it up; but the one you revive gets up with shaking aim and blurred
+  sight that fade over **20 seconds**. One at a time; a survivor keeps it into the next round; lost when you die.
 - **Blood trails** — a player hit by a **bullet, a knife or shrapnel** (any explosion except fire) starts to
   **bleed**: drops of blood fall on the floor behind him as he moves, about one every 0.7 m, and now and then while
   he stands still. It's for tracking a wounded enemy, not for killing him: bleeding costs little or no health.
@@ -502,7 +638,7 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     lost) until revived.
   - **P bandages** you: it takes **2 seconds**, you walk slowly and can't shoot or throw meanwhile, and the bleeding
     stops. **Two bandages a life.** Not while driving, flying the drone, on the zip line or downed. A BLEEDING badge
-    next to your HP shows how many you have left.
+    above your HP shows how many you have left.
   - The drops are seen by everyone. They lie on floors, stairs, slopes and roofs (not in water), darken as they dry,
     fade out after about 40 seconds and are cleared every round. At most 600 are on the map at once (the oldest go
     first). No drops from someone in a car.
@@ -541,11 +677,14 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     be rescued.
   - Everyone sees it, hears a muffled scream when a hostage is grabbed, and the CTs get the message "A hostage is
     being used as a shield!". Bots don't grab hostages; bots hold their fire while a held hostage is in the way.
-- **What E does first**, where several things are in reach: getting off the zip line, up from the CCTV desk or out of
-  a car; reviving a downed teammate; letting go of a hostage you hold; a lift button, hatch or door you're looking at;
-  grabbing a hostage (Terrorists); a dead enemy's uniform (crouched); the floodgate's and gas valves; then the rest (planting,
-  hostages, defusing, mines, the fuse box, the zip line, the CCTV desk, doors, switches, cars, guns on the floor). The
-  hint on screen always says what E will do.
+- **What E does first**, where several things are in reach: getting off the zip line, up from the CCTV desk, out of
+  a car or out of a car's trunk; reviving a downed teammate (walking with E held drags him instead); interrogating a
+  downed enemy; letting go of a hostage you hold; a lift button, hatch or door you're looking at; grabbing a hostage
+  (Terrorists); a dead enemy's uniform (crouched); the floodgate's and gas valves; a breaker, the generator or the
+  lift's winch you're looking at; the fireplace (hold) and the chimney's top; then the rest (planting, hostages,
+  defusing, mines, the fuse box, the zip line, the CCTV desk, doors, switches, a car's trunk from behind it, cars, guns
+  on the floor). An air vent has no E use (its hint only says where it goes). The hint on screen always says what E
+  will do. A light switch is used from its own side of the wall only.
 - **Molotov** (buy menu → 6 Equipment, $400, both teams): the bottle breaks on the first floor it lands on and sets a
   circle of 3.5 m on fire for 7 seconds. Everyone inside takes a burst of up to 80 damage (a bit less than an HE, less
   towards the edge), then burns for 15 HP a second while standing in it, and for a moment after stepping out. Armor
@@ -684,9 +823,9 @@ The HUD shows the active party modes under the timer.
 |---|---|---|---|
 | W A S D | move | Space | jump (lets go of the zip line) |
 | Ctrl | duck | Shift | walk (silent) |
-| Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
+| Mouse 1 / 2 | fire / zoom, knife stab | R | reload (or clear a jammed gun) |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
-| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, zip line on/off, CCTV desk, lift, valves; hold: revive a teammate, a uniform (crouched); hostage shield (T) | G | drop weapon |
+| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, car trunk, zip line on/off, CCTV desk, lift, valves, chimney (top); hold: revive a teammate (+ walk: drag him), interrogate a downed enemy, a uniform (crouched), light the fireplace, a breaker / the generator / the lift's winch (looking at it); hostage shield (T) | G | drop weapon |
 | 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |
 | Q | last weapon | Wheel | switch weapon |
 | B | buy menu | O | buy equipment |
@@ -697,7 +836,7 @@ The HUD shows the active party modes under the timer.
 | Y / U | chat / team chat | Tab | scores |
 | M | choose team | F5 | screenshot |
 | H | ghillie camo on / off | Middle click | ping "!" on the team radar |
-| K | play dead / get up | P | bandage (when bleeding) |
+| K | play dead / get up; down: hold to shoot yourself (5 s) | P | bandage (when bleeding, or a fresh wound) |
 | Esc | menu (settings, map vote) | 0–9 | pick in menus (1–4 at the CCTV desk: cameras) |
 
 Ducking makes you 0.9 m tall, as in CS, so you fit through vents and crawl spaces. Duck in mid-air (jump, then
@@ -806,6 +945,19 @@ shared/flood.js, lib/flood.js, public/js/flood.js         The floodgate; shared/
 shared/elevator.js, lib/elevator.js, public/js/elevator.js The lift; shared/maps/mansion_elevator.js its shaft
 shared/bet.js, lib/bet.js, public/js/bet.js, public/css/bet.css  Bet on yourself (F3)
 lib/hostages.js      Hostages following a CT (breadcrumbs, side steps round corners)
+
+The ROADMAP wave 1 groups added on 2026-11-08, the same way:
+shared/wounds.js, lib/wounds.js, lib/drag.js, public/js/wounds.js  Drag a downed teammate, interrogate, end it yourself,
+                     wounds, the adrenaline syringe (lib/drag.js: the drag engine others reuse)
+shared/power.js, lib/power.js, public/js/power.js  Power & machinery: the circuits and breakers, the generator, the surge,
+                     cutting the lift's cable; shared/maps/mansion_power.js the panel, the generator, the roof's machine room
+shared/stealth.js, lib/stealth.js, public/js/stealth.js  Stealth & hiding: the chimney, creaking boards, the car trunk;
+                     shared/maps/mansion_stealth.js the fireplace and chimney, the creaky spots
+shared/underground.js, lib/underground.js, public/js/underground.js  Underground & vents: no radar underground, the echo,
+                     the air vents (grilles, ducts, the vent graph the gas uses)
+shared/materials.js, shared/walls.js, lib/walls.js, public/js/walls.js  Walls & water: what the Mansion is made of,
+                     bullets through walls and see-through holes, pipes and cables; shared/wetfloor.js, lib/wetfloor.js,
+                     public/js/wetfloor.js the wet floors; shared/maps/mansion_walls.js the pipes' and cables' runs
 docs/features/       One file per feature: its notes, tests and what is left
 ```
 

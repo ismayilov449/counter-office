@@ -3,9 +3,14 @@
 The user approved these 33 features on 2026-11-01. They are grouped so that **one agent builds one group**: features
 that share a game system or the same code are in the same group, so two agents never work on the same thing.
 
-**Nothing here is started yet.** Every group builds on the 9 features still on their branches (bet, blood, cat, shield,
-disguise, downed/play dead, gas, floodgate, elevator) and the hostage fix. **Start only after those are browser-tested
-and merged into `main`** (see RESUME.md section 0).
+**State (2026-11-08): wave 1 is done.** Groups 1–5 (wounds, walls, power, stealth, underground) were built and
+browser-tested on their branches, then merged, linked and tested together on **`integration/2026-11-08`** (RESUME.md
+sections 0 and 9; each group's notes stay in `docs/features/<group>.md`). **Next: wave 2, groups 6–10** (hostages,
+explosives, close combat, sight, fire). All of wave 1 is in, so every wave 2 group can start: from `main` once the
+user has had it fast-forwarded to the integration branch (until then, from the integration branch).
+
+(Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
+2026-11-02.)
 
 ## All 33 features at a glance
 
@@ -31,11 +36,11 @@ wave 1 group(s) it builds on.
 
 | Order | Group | Branch | Wave | Waits for | Groups that need it |
 |---|---|---|---|---|---|
-| 1 | Downed & wounds | `feature/wounds` | 1 | — | 6 Hostages, 7 Explosives (dragging a body) |
-| 2 | Walls & water | `feature/walls` | 1 | — | 8 Close combat (shooting code), 10 Fire (materials, wet floors) |
-| 3 | Power & machinery | `feature/power` | 1 | — | 9 Sight (rooms dark per floor), 10 Fire (generator fuel) |
-| 4 | Stealth & hiding | `feature/stealth` | 1 | — | 10 Fire (lighting the fireplace closes the chimney) |
-| 5 | Underground & vents | `feature/underground` | 1 | — | none (vents later carry fire smoke too) |
+| 1 | Downed & wounds | `feature/wounds` (done 2026-11-08) | 1 | — | 6 Hostages, 7 Explosives (dragging a body) |
+| 2 | Walls & water | `feature/walls` (done 2026-11-08) | 1 | — | 8 Close combat (shooting code), 10 Fire (materials, wet floors) |
+| 3 | Power & machinery | `feature/power` (done 2026-11-08) | 1 | — | 9 Sight (rooms dark per floor), 10 Fire (generator fuel) |
+| 4 | Stealth & hiding | `feature/stealth` (done 2026-11-08) | 1 | — | 10 Fire (lighting the fireplace closes the chimney) |
+| 5 | Underground & vents | `feature/underground` (done 2026-11-08) | 1 | — | none (vents later carry fire smoke too) |
 | 6 | Hostages | `feature/hostage-escape` | 2 | 1 | — |
 | 7 | Explosives | `feature/explosives` | 2 | 1 | — |
 | 8 | Close combat | `feature/closecombat` | 2 | 2 | — |
@@ -73,7 +78,7 @@ The same rules as the 9-feature build (RESUME.md section 0):
 
 ---
 
-## 1. Downed & wounds (`feature/wounds`, wave 1)
+## 1. Downed & wounds (`feature/wounds`, wave 1) — **done 2026-11-08**
 
 Builds on: downed / play dead, blood trails and the bandage.
 
@@ -96,7 +101,7 @@ Builds on: downed / play dead, blood trails and the bandage.
 Links: a teammate being dragged still bleeds (trail); a headshot still means no revive; the cat, disguise and bet rules
 for downed players stay as they are.
 
-## 2. Walls & water (`feature/walls`, wave 1)
+## 2. Walls & water (`feature/walls`, wave 1) — **done 2026-11-08**
 
 Builds on: the floodgate, gas (`sparkAt`). **Today bullets don't go through walls at all**: this group adds it first.
 
@@ -119,7 +124,7 @@ Builds on: the floodgate, gas (`sparkAt`). **Today bullets don't go through wall
 
 Links: a cable's sparks stop when its circuit is off (group 3); the fire hose soaks floors (group 10).
 
-## 3. Power & machinery (`feature/power`, wave 1)
+## 3. Power & machinery (`feature/power`, wave 1) — **done 2026-11-08**
 
 Builds on: the fuse box and blackout, CCTV, the elevator, gas (`sparkAt`).
 
@@ -137,7 +142,7 @@ Builds on: the fuse box and blackout, CCTV, the elevator, gas (`sparkAt`).
 Links: the generator runs on the fuel from the fuel cans (group 10); the estate fence isn't on the map, so it has no
 circuit.
 
-## 4. Stealth & hiding (`feature/stealth`, wave 1)
+## 4. Stealth & hiding (`feature/stealth`, wave 1) — **done 2026-11-08**
 
 Builds on: the cars, footsteps.
 
@@ -155,7 +160,7 @@ Builds on: the cars, footsteps.
 
 Links: the lit fireplace becomes a real fire with group 10.
 
-## 5. Underground & vents (`feature/underground`, wave 1)
+## 5. Underground & vents (`feature/underground`, wave 1) — **done 2026-11-08**
 
 Builds on: the cellar, tunnels and storm drain, the radar, gas.
 
