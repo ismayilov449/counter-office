@@ -797,7 +797,7 @@ function launchDrone(now) {
   const eye = eyePos(), f = [-Math.sin(me.yaw), 0, -Math.cos(me.yaw)];
   let start = [eye[0] + f[0] * 0.6, eye[1] + 0.1, eye[2] + f[2] * 0.6];
   if (coll.raycast(eye, f, 0.9, 'move')) start = [eye[0], eye[1] + 0.35, eye[2]];
-  me.drone = { id: null, p: start, v: [0, 2.5, 0], yaw: me.yaw, pitch: -0.15, roll: 0, state: 'fly', bomb: true, hp: DRONE.hits, hitAt: 0, until: now + DRONE.battery * 1000, t: 0, sentAt: 0, sig: 1, sigAt: 0, jam: false };
+  me.drone = { id: null, p: start, v: [0, 2.5, 0], yaw: me.yaw, pitch: -0.15, roll: 0, state: 'fly', bomb: DRONE.bombs, hp: DRONE.hits, hitAt: 0, until: now + DRONE.battery * 1000, t: 0, sentAt: 0, sig: 1, sigAt: 0, jam: false };
   me.inv.drone = 0;
   stopEmote();
   net.send({ t: 'drone', launch: 1, p: start.map(v => Math.round(v * 1000) / 1000), yaw: me.yaw });
@@ -813,8 +813,8 @@ function endDrone(why) {
 function droneBomb() {
   const d = me.drone;
   if (!d || d.state !== 'fly') return;
-  if (!d.bomb) { hud.small('No bomb left: dive into them (right mouse), or fly back and land by yourself', 2.5); return; }
-  d.bomb = false;
+  if (!d.bomb) { hud.small('No bombs left: dive into them (right mouse), or fly back and land by yourself', 2.5); return; }
+  d.bomb--;
   net.send({ t: 'drone', drop: 1, p: d.p });
 }
 function droneDive() {
@@ -934,7 +934,7 @@ function updateDroneHud(now) {
   const ground = coll.raycast(d.p, [0, -1, 0], 60, 'move');
   o.tl.innerHTML = `<span style="color:#ff4a3a">●</span> REC<br>SIG ${'▮'.repeat(bars)}${'▯'.repeat(5 - bars)}<br>BAT ${Math.round((left / DRONE.battery) * 100)}% (${Math.ceil(left)} s)` +
     `<br><span style="color:${hp < DRONE.hits ? '#ff7a4a' : 'inherit'}">HULL ${'▮'.repeat(hp)}${'▯'.repeat(DRONE.hits - hp)}</span>`;
-  o.tr.innerHTML = `${d.bomb ? 'BOMB READY' : 'BOMB DROPPED'}<br>ALT ${ground ? ground.t.toFixed(1) : '--'} m${d.state === 'dive' ? '<br><span style="color:#ff4a3a">DIVE</span>' : ''}`;
+  o.tr.innerHTML = `${d.bomb ? `BOMBS ${d.bomb}` : 'NO BOMBS'}<br>ALT ${ground ? ground.t.toFixed(1) : '--'} m${d.state === 'dive' ? '<br><span style="color:#ff4a3a">DIVE</span>' : ''}`;
   o.mid.style.display = d.jam || d.sig < 0.25 || left < 6 ? '' : 'none';
   o.mid.textContent = d.jam ? 'SIGNAL JAMMED' : d.sig < 0.25 ? 'WEAK SIGNAL — TURN BACK' : 'BATTERY LOW';
 }
@@ -3033,7 +3033,7 @@ const net = new Net({
     if (!me.drone) return;
     me.drone.id = m.id;
     me.drone.until = performance.now() + m.left;
-    me.drone.bomb = !!m.bomb;
+    me.drone.bomb = +m.bomb || 0;
   },
   droneEnd(m) {
     endDrone(m.why);

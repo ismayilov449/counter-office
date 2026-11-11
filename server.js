@@ -2908,7 +2908,7 @@ function onDrone(p, m, t) {
     if (!pos || !p.alive || !(p.inv.drone > 0) || d || game.phase === 'freeze' || game.phase === 'end' || busy(p) || dist3(pos, eyeOf(p)) > 1.5) return send(p, { t: 'droneEnd', why: 'nolaunch' });
     p.inv.drone--;
     const left = p.droneLeft ?? DRONE.battery * 1000;
-    const nd = { id: game.nextMineId++, owner: p.id, team: p.team, p: pos, yaw: isNum(m.yaw) ? m.yaw : p.yaw, pitch: 0, state: 'fly', bomb: p.droneBomb ?? true, hp: p.droneHp ?? DRONE.hits, until: t + left, at: t, vy: 0 };
+    const nd = { id: game.nextMineId++, owner: p.id, team: p.team, p: pos, yaw: isNum(m.yaw) ? m.yaw : p.yaw, pitch: 0, state: 'fly', bomb: p.droneBomb ?? DRONE.bombs, hp: p.droneHp ?? DRONE.hits, until: t + left, at: t, vy: 0 };
     p.droneLeft = null; p.droneBomb = null; p.droneHp = null;
     game.drones.push(nd);
     p.piloting = nd.id;
@@ -2929,7 +2929,7 @@ function onDrone(p, m, t) {
     if (isNum(m.yaw)) d.yaw = m.yaw;
     if (isNum(m.pitch)) d.pitch = Math.max(-1.5, Math.min(1.5, m.pitch));
   }
-  if (m.drop && d.bomb && d.state === 'fly') dropDroneBomb(d, p);
+  if (m.drop && d.bomb > 0 && d.state === 'fly') dropDroneBomb(d, p);
   if (m.dive && d.state === 'fly') { d.state = 'dive'; broadcast({ t: 'sfx', s: 'dronedive', p: d.p }); }
   if (m.boom && d.state === 'dive') {
     const at = vec3(m.boom);
@@ -2987,9 +2987,9 @@ function blastDrones(at, r) {
   for (const d of [...game.drones]) if (dist3(d.p, at) < r && lineOfSight(at, d.p)) downDrone(d, null, 'blast');
 }
 
-// The bomb: dropped straight down (with the drone's way), it goes off where it lands — an HE grenade's blast.
+// One of its bombs: dropped straight down (with the drone's way), it goes off where it lands — an HE grenade's blast.
 function dropDroneBomb(d, p) {
-  d.bomb = false;
+  d.bomb--;
   const o = [d.p[0], d.p[1] - 0.2, d.p[2]], v = [0, -1, 0];
   const path = [], end = simulateNade(world.nade(), o, v, WEAPONS.dronebomb.fuse, path, true);
   const id = game.nextNadeId++;
@@ -4083,7 +4083,7 @@ function tick() {
     el: Math.max(0, (t - game.roundStartAt) / 1000),
     pl,
     // drones: [id, owner, x, y, z, yaw, state (0 flying, 1 diving, 2 falling), bomb, hits it can still take]
-    ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb ? 1 : 0, d.hp]) } : {}),
+    ...(game.drones.length ? { dn: game.drones.map(d => [d.id, d.owner, r2(d.p[0]), r2(d.p[1]), r2(d.p[2]), r2(d.yaw), d.state === 'dive' ? 1 : d.state === 'fall' ? 2 : 0, d.bomb, d.hp]) } : {}),
     ...bleed.snap(), // blood trails: who is bleeding, bl: [id, level, flags]
     ...cat.snap(), // cat: [x, y, z, yaw, state, purring] on the Mansion maps (see shared/cat.js)
     ...shield.snap(), // shield: sh: [[hostage id, holder id], ...] while someone holds a hostage

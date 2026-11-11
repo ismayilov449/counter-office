@@ -564,11 +564,10 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   launch it. You crouch where you are with the remote — you can't move or shoot, and everyone can see you — and fly it
   through its camera: a grainy video with a signal bar, the battery left and the height.
   - **W A S D** fly, the **mouse** steers (and looks up and down), **Space** climbs, **Ctrl** descends.
-  - **Mouse1** drops its bomb: it falls straight down and goes off where it lands, an HE grenade's blast. **Right mouse**
+  - **Mouse1** drops a bomb (it carries **3**, one per click): it falls straight down and goes off where it lands, an HE grenade's blast. **Right mouse**
     dives (kamikaze): it races along where you look and blows up on whatever it hits, stronger than an HE (up to 140
     damage within 7 m, walls protect; it breaks the mansion's walls and wrecks cars). **E** lets go: it falls and breaks.
-  - Land it within 4 m of yourself to put it back in your bag (with the battery it has left, and its bomb if it still has
-    it); landed anywhere else, it's lost.
+  - Land it within 4 m of yourself to put it back in your bag (with the battery it has left, and the bombs it still has); landed anywhere else, it's lost.
   - The battery lasts 40 seconds. The signal weakens beyond 60 m and is lost at 80 m, and a wall between you and the drone
     counts the distance half as much again. A signal jammer brings it down — any jammer, the Terrorists' own too. Out of
     signal or battery, it falls.
