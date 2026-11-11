@@ -46,6 +46,7 @@ import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out
 import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
 import { createStealth } from './lib/stealth.js'; // stealth: the chimney, hiding in a car's trunk
 import { createUnderground } from './lib/underground.js'; // underground: no radar underground, the echo, the air vents
+import { createExplosives } from './lib/explosives.js'; // explosives: throw a grenade back, booby-trapped bodies, the dead man's switch, cut the wire
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -1576,6 +1577,8 @@ const escape = createEscape({ game, players, map: () => MAP, world: () => world,
 // Carrying wounded hostages (lib/hostage-carry.js)
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
+// explosives: ROADMAP group 7 (lib/explosives.js)
+const explosives = createExplosives({ game, players, send, broadcast, now, world: () => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n) });
 const bots = new BotManager({
   players: () => players, game: () => game, map: () => MAP, world: () => world, cfg: () => CFG, now,
   inTeam, enemies: (a, b) => !mates(a, b) && !b.playingDead /* body: bots take a "corpse" for dead */, mode: () => CFG.gameMode, mapMode: () => mapMode(MAP), phase: () => game.phase,
@@ -2238,6 +2241,7 @@ function onUse(p, m, t) {
     if (p.driving != null || p.riding != null) { exitCar(p); return; }
     if (stealth.leave(p)) return; // stealth: out of a car's trunk
   }
+  if (explosives.grab(p, t)) return; // explosives: grab an HE grenade at your feet (before a revive: it's about to go off)
   if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
   if (wounds.use(p, t)) return; // wounds: interrogate a downed enemy (hold E 3 s)
   if (!p.alive || p.act) return;
@@ -3175,6 +3179,7 @@ function onNade(p, m) {
   }
   for (const [gid, i] of panes) setTimeout(() => breakGlass([gid]), (i + 1) * NADE.dt * 1000);
   game.nades.push({ id, k, owner: p.id, at: now() + flight * 1000, end, ...duct?.n }); // underground: (+ duct)
+  explosives.thrown(game.nades[game.nades.length - 1], duct ? null : path); // explosives: its path, for grabbing it
   broadcast({ t: 'nade', id, k, o, v, owner: p.id, ...duct?.m }); // underground: (+ duct)
   sendMe(p);
 }
@@ -3720,6 +3725,7 @@ function handle(p, m) {
   if (wounds.handle(p, m)) return; // wounds: E held (drag), wdDrag, wdEnd (K while down); a dragged body doesn't move itself
   if (m.t.startsWith('elev')) { elevator.message(p, m); return; } // elevator
   if (m.t.startsWith('pw')) { circuits.message(p, m); return; } // power: pwAim
+  if (m.t.startsWith('xp')) { explosives.message(p, m); return; } // explosives: xpThrow, xpDms, xpWire
   switch (m.t) {
     case 'join': {
       if (p.joined) break;
@@ -4051,6 +4057,7 @@ function tick() {
   wounds.tick(t, dt); // wounds: drags, interrogations, the downed suicide, wounds, the syringe
 
   ug.tick(t); // underground: grenades dropping out of the air vents
+  explosives.tick(t); // explosives: a grenade held too long goes off in the hand
   for (let i = game.nades.length - 1; i >= 0; i--) {
     if (t >= game.nades[i].at) explodeNade(game.nades.splice(i, 1)[0]);
   }

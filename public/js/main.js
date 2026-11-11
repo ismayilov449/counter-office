@@ -44,6 +44,7 @@ import { createPower } from './power.js'; // power: the breaker panel, the gener
 import * as stealth from './stealth.js'; // stealth: the chimney, the creaking boards, hiding in a car's trunk
 import * as ug from './underground.js'; // underground: no radar underground, the echo, the air vents (Mansion)
 import * as walls from './walls.js'; // walls: see-through bullet holes, burst pipes, live wires, floating bodies (Mansion)
+import * as xp from './explosives.js'; // explosives: throw a grenade back, booby-trapped bodies, the dead man's switch, cut the wire
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -2276,6 +2277,7 @@ document.addEventListener('mousedown', e => {
     else if (e.button === 2) droneDive();
     return;
   }
+  if (e.button === 0 && xp.throwBack()) return; // explosives: the grenade in our hand goes back
   if (e.button === 0) {
     mouse1 = true;
     me.triggerFresh = true;
@@ -3099,6 +3101,7 @@ const net = new Net({
   },
   nade(m) {
     fx.nade(m.k, m.o, m.v, m.fu ?? nadeFuse(m.k), p => audio.play('bounce', p)); // underground: (m.fu: up to an air vent's grille, or what's left coming out of one)
+    xp.tagNade(m); // explosives: its id and kind (grabbing it)
     // 'Fire in the hole!' goes out on the thrower's team radio.
     if (m.vent == null && settings.radioVoice && m.k !== 'dronebomb' && (m.owner === me.id || teamOf(m.owner) === me.team)) audio.voice('ct_fireinhole'); // underground: (not again out of a vent)
   },
@@ -3283,12 +3286,14 @@ const net = new Net({
     fx.removeSpray(m.id);
   },
   ...disguise.handlers, // Disguise: disguiseOn / disguiseOff / disguiseFx
+  ...xp.handlers, // explosives: xpGrab, xpHot, xpTraps, xpDms
 });
 const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map, downed: () => body.downed() }); // blood trails (public/js/blood.js)
 initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
 initCarry({ me, remotes, hostages }); // carry
 initWounds({ net, me, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // body (integration: + in a trunk: E gets out first, as on the server)
+xp.initExplosives({ me, net, hud, fx, audio, scene, remotes, current: () => current(), coll: () => coll, eyePos, aimDir, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // explosives: (after initBody: grabbing a grenade's hint goes over a revive's)
 
 // The Mansion's gadgets: the zip line (see gadgets.js).
 const gadgets = createGadgets({
