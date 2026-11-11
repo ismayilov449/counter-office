@@ -3,7 +3,7 @@
 // back into the light): from a lit room into a blackout, normal after ~2.5 s. Once used to real darkness (below `deep`)
 // you see more than the plain picture: up to `boost` more exposure and a faint flat light (`see`, the nightvision's
 // light in roomlight.js, which gives 0.5) so walls, people and hostages show as dim shapes. Nothing extra is drawn.
-export const EYES = { dark: 1.5, light: 0.15, floor: 0.1, deep: 0.3, boost: 0.4, see: 0.14 };
+export const EYES = { dark: 1.5, light: 0.15, floor: 0.1, deep: 0.3, boost: 0.35, see: 0.14 };
 let e = 1; // what the eyes are used to: 0 black .. 1 daylight
 
 // light: how bright it is where you are (0..1); dt: seconds. Returns the factor for the exposure.
