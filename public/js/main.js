@@ -11,6 +11,7 @@ import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, setGlow, ambientAt, glowAt, maskLamps, setNvg } from './roomlight.js';
 import { ESCAPE } from '/shared/hostage-escape.js'; // escape: hostages try to escape, zip ties
+import { adaptEyes, resetEyes } from './eyes.js'; // eyes adjust to darkness (ROADMAP 9.1)
 import { initCarry, carrying, carrySlotOk, carryLimitKeys, carrySpeed, carryPose, carryRay } from './hostage-carry.js'; // carry: wounded hostages
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
@@ -3559,6 +3560,17 @@ function updateCamera(dt, now) {
   }
 }
 
+// Eyes adjust to darkness (eyes.js): how bright it is here (the sky light that gets into the room, against Mansion by
+// day's; a lit room's glow; the flashlight and nightvision count as bright), through the exposure. Dead or at the
+// CCTV: plain.
+const skyLight = th => { const c = parseInt(th.hemi.sky.slice(1), 16); return Math.min(1, th.hemi.intensity * (0.3 * (c >> 16) + 0.59 * ((c >> 8) & 255) + 0.11 * (c & 255)) / 255 / 1.76); };
+function updateEyes(dt) {
+  const base = map.theme.exposure || 1;
+  if (!me.alive || gadgets.watching()) { resetEyes(); renderer.toneMappingExposure = base; return; }
+  const light = me.nvgOn ? 1 : Math.max(ambientAt(camera.position) * skyLight(map.theme), Math.min(1, glowAt(camera.position) * 0.7), me.flashlight ? 0.8 : 0);
+  renderer.toneMappingExposure = base * adaptEyes(light, dt);
+}
+
 function updateViewModel(dt, now) {
   if (!vm) return;
   vm.visible = me.alive && me.driving == null && !me.drone && !gadgets.hidesWeapon() && !(me.scope && WEAPONS[current()].sniper);
@@ -4103,6 +4115,7 @@ function frame() {
   gas.update(dt, now); // gas: the shimmer, the hiss, "You smell gas"
   world?.update(dt, camera.position);
   updateViewModel(dt, now);
+  updateEyes(dt);
   if (vm && body.frozen()) vm.visible = false; // body: nothing in your hands while playing dead
   if (vm && stealth.inTrunk()) vm.visible = false; // stealth: nothing in your hands in a trunk
   updateHud(now);
