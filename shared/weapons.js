@@ -48,7 +48,7 @@ export const WEAPONS = {
   // One per team; heavy to carry.
   mortar: primary('mortar', { name: '82-BM-37', auto: false, price: 6000, damage: 300, mortar: true, blast: 14, rate: 2.5, mag: 6, reserve: 0, reload: 0, spread: 0, moveSpread: 0, spreadInc: 0, recoil: 0, rangeMod: 1, pen: 1, speed: 4.2, killReward: 300, maxRange: 80, elev: [750, 1415], setup: 2 }),
   // Mounted on the pickup truck: only the gunner uses it, and it never runs out.
-  pkt: { name: 'PKT', slot: 0, cls: 'mg', mounted: true, auto: true, damage: 38, rate: 0.085, spread: 0.006, moveSpread: 0, spreadInc: 0.0012, recoil: 0.007, rangeMod: 0.97, pen: 0.8, speed: 0 },
+  pkt: { name: 'PKT', slot: 0, cls: 'mg', mounted: true, auto: true, damage: 42, rate: 0.085, spread: 0.006, moveSpread: 0, spreadInc: 0.0012, recoil: 0.007, rangeMod: 0.97, pen: 0.8, speed: 0 },
 
   m249: primary('mg', { name: 'M249', price: 5750, damage: 32, rate: 0.08, mag: 100, reserve: 200, reload: 4.7, spread: 0.008, moveSpread: 0.08, spreadInc: 0.002, recoil: 0.011, rangeMod: 0.97, pen: 0.8, speed: 5.5, ammoPrice: 60 }),
 
@@ -124,7 +124,7 @@ export const CAMO = { still: 1.5, botSees: 4 };
 // furniture 80-130 (see shared/maps/breakables.js).
 export const BREAK = {
   blast: { c4: [8, 900], mortar: [5, 700], rpg: [3, 520], rpg26: [2.4, 420], satchel: [3.6, 570], car: [4, 500], he: [2.6, 380], pmn: [1.6, 300], mon50: [2.4, 320], drone: [3, 480] },
-  chip: { m249: 0.5, awp: 0.5, pkt: 0.5 },
+  chip: { m249: 0.5, awp: 0.5, pkt: 0.8 },
 };
 // Maps with `realism` (cs_mansion): what explosions do besides breaking things.
 //   push: [radius m, speed m/s] players are thrown back (and their aim knocked); doors within door m are blown off;
