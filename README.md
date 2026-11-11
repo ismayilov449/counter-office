@@ -97,6 +97,11 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - CTs win by rescuing every living hostage or eliminating the Terrorists; Terrorists win by
     eliminating the CTs or running out the clock. Rescue: +$1000 for the rescuer, +$150 for the other
     CTs. Killing a hostage costs $1500.
+  - **Hostages try to escape** (every hostage map): a hostage no Terrorist has had in sight (12 m) for 20 s sneaks
+    off to the street on its own, opening doors on the way; both teams are told. A Terrorist who gets within 4 m of it
+    stops it; if it reaches the street it counts as rescued. A crouched Terrorist holds **E** on a hostage for 2 s to
+    **zip-tie** it: it can't escape or be led until a CT holds **E** for 2 s to cut the ties (then it follows him).
+    The ties work loose after 60 s.
   - Four **doors** lead into the house: the **front door** (porch), the **left door** (south side), the
     **kitchen back door** (west, behind the house, up three stone steps) and the kitchen's **side door** from the
     garage. Press **E** to open or close them — they
@@ -470,15 +475,15 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   "game commencing" after 3 s and 3 s freeze time per round.
 - **Weapons:** Glock, USP, P228, Desert Eagle, Five-SeveN, Dual Berettas, M3, XM1014, MAC-10, TMP,
   MP5, UMP45, P90, Galil, FAMAS, AK-47, M4A1, Scout, SG 552, AUG, AWP, the semi-automatic snipers
-  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 (CT only, $6000), RPG-26 (T only, $3500), 82-BM-37 mortar ($6000), FPV drone (T only, $5500); HE, flashbang and smoke
+  D3/AU-1 (G3SG1, T, $5000) and Krieg 550 Commando (SG550, CT, $4200), M249, RPG-7 ($6000, only when the admin allows it), RPG-26 ($3500), 82-BM-37 mortar ($6000), FPV drone ($5500); HE, flashbang and smoke
   grenades, Molotov; Kevlar, helmet, defuse kit, nightvision.
-- **RPG-7** (buy menu → Heavy, CTs only, $6000; a Terrorist can pick it up from a dead CT): the rocket flies to
+- **RPG-7** (buy menu → Heavy, both teams, $6000, **only while the admin's "RPG-7" setting is on** — off by default,
+  it made storming the house too easy; anyone can pick one up): the rocket flies to
   the first wall, car or person and explodes for up to 500 damage within 9 m — but only to people who can see the
   explosion. A wall between you and the blast protects you. Rockets also smash windows and blow up cars.
-- **RPG-26** (buy menu → Heavy, Terrorists only, $3500; one per team each round — in Deathmatch one in anyone's hands
-  at a time): a throwaway one-shot tube. Up to 400 damage within 6 m and less accurate than the RPG-7; otherwise the
+- **RPG-26** (buy menu → Heavy, both teams, $3500, no limit): a throwaway one-shot tube. Up to 400 damage within 6 m and less accurate than the RPG-7; otherwise the
   same (walls protect, windows smash, cars blow up, fire, craters and gore, holes in the mansion — a bit smaller).
-  Once fired, the empty tube is thrown away and you're back on your pistol. A CT can pick up an unused one.
+  Once fired, the empty tube is thrown away and you're back on your pistol. Anyone can pick up an unused one.
   Bots don't buy it (one that picks it up fires it like the RPG-7).
 - **82-BM-37 mortar** (buy menu → Heavy, both teams, $6000, 6 shells; one per team — in Deathmatch one on the map;
   not in Zombie mode, and bots don't use it). It's heavy: you walk slowly with it. It's aimed like a real one, in
@@ -536,8 +541,7 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   goes off) or hold **E** next to it to defuse it (3 s, 1.5 s with a kit, +$200); an explosion nearby sets it off too.
   If its owner dies it stays (and can still be defused), but nobody can set it off. Up to 2 out at once; cleared every
   round. Bots don't use it.
-- **FPV drone** (buy menu → 5 Heavy, Terrorists only, $5500; one per team each round — in warmup and Deathmatch one in
-  anyone's hands at a time; not in Zombie mode). Press **6** to take out its remote (with the mines) and **Mouse1** to
+- **FPV drone** (buy menu → 5 Heavy, both teams, $5500, no limit; not in Zombie mode). Press **6** to take out its remote (with the mines) and **Mouse1** to
   launch it. You crouch where you are with the remote — you can't move or shoot, and everyone can see you — and fly it
   through its camera: a grainy video with a signal bar, the battery left and the height.
   - **W A S D** fly, the **mouse** steers (and looks up and down), **Space** climbs, **Ctrl** descends.

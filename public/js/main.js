@@ -10,6 +10,7 @@ import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, setGlow, ambientAt, glowAt, maskLamps, setNvg } from './roomlight.js';
+import { ESCAPE } from '/shared/hostage-escape.js'; // escape: hostages try to escape, zip ties
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
@@ -1944,7 +1945,7 @@ function clearHostages() {
 
 function syncHostages(list, time) {
   const seen = new Set();
-  for (const [id, x, y, z, yaw, st, leader] of list || []) {
+  for (const [id, x, y, z, yaw, st, leader, tied] of list || []) {
     seen.add(id);
     let h = hostages.get(id);
     if (!h) {
@@ -1958,6 +1959,7 @@ function syncHostages(list, time) {
     if (h.buf.length > 300) h.buf.shift();
     h.state = st;
     h.leader = leader;
+    h.tied = !!tied; // escape: zip-tied (arms down behind its back)
   }
   for (const [id, h] of hostages) if (!seen.has(id)) { scene.remove(h.model); disposeOwn(h.model); hostages.delete(id); } // new ones each round
 }
@@ -1979,10 +1981,18 @@ function updateHostageModels(dt) {
     } else {
       h.model.rotation.x = 0;
       h.walk += moved * 3.2;
-      posePlayer(h.model, false, h.state === 1 ? 0 : 1.1, h.walk, Math.min(1, moved / dt / 4));
+      posePlayer(h.model, false, h.tied ? -0.4 : h.state === 1 ? 0 : 1.1, h.walk, Math.min(1, moved / dt / 4));
     }
     shieldPoseHostage(h); // shield: a held hostage leans against its holder
   }
+}
+
+// escape: a Terrorist by a hostage that isn't tied: crouched, E zip-ties it; standing, the shield's hint says so too.
+function tieHint(hint) {
+  if (me.team !== 'T' || shieldHolding() || !(game.phase === 'live' || game.phase === 'warmup')) return hint;
+  const h = [...hostages.values()].find(x => x.state <= 1 && !x.tied && Math.hypot(me.p[0] - x.p[0], me.p[1] - x.p[1], me.p[2] - x.p[2]) < ESCAPE.reach && hostageInSight(x));
+  if (!h) return hint;
+  return me.crouch ? `Hold E to zip-tie the hostage (${ESCAPE.tie} s)` : `${hint || 'A hostage'} · crouch + hold E to zip-tie it`;
 }
 
 function nearestHostage() {
@@ -3667,6 +3677,7 @@ function updateHud(now) {
     } else if (me.mortar) hint = '';
     else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : mortarCanSetUp(me.p) ? 'Click to set up the mortar (the first shell blasts through the roof)' : NO_SKY;
     else if (me.riding) hint = 'Press E to get out of the car';
+    else if (hostage?.tied) hint = `Hold E to cut the hostage's zip ties (${ESCAPE.untie} s)`; // escape
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if ((gh = gadgets.hint())) hint = gh;
@@ -3702,6 +3713,7 @@ function updateHud(now) {
     if ((gh = flood.hint()) || (gh = gas.hint())) hint = gh; // Floodgate, gas: their valves
     hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere()); // Disguise: crouched over a dead enemy (not where E plants or defuses)
     hint = shieldHint(hint); // shield: grab / let go / held
+    hint = tieHint(hint); // escape: a crouched Terrorist zip-ties (before the shield, as on the server)
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
   }
   if (!hint && (gh = ug.hint())) hint = gh; // underground: by an air vent (no E use: only when nothing else is said)
@@ -3714,6 +3726,7 @@ function updateHud(now) {
   else hud.progress(null);
   if (me.act?.a === 'disguise') hud.progress(disguise.progressLabel(), me.act.pr); // Disguise
   if (me.act?.a === 'gasValve') hud.progress('Closing the gas valve...', me.act.pr); // gas
+  if (me.act?.a === 'tie' || me.act?.a === 'untie') hud.progress(me.act.a === 'tie' ? 'Zip-tying the hostage...' : 'Cutting the zip ties...', me.act.pr); // escape
   if (me.act?.a === 'flood') hud.progress(flood.actLabel(), me.act.pr); // Floodgate
   if (me.act && circuits.progress(me.act.a)) hud.progress(circuits.progress(me.act.a), me.act.pr); // power
   if (me.act && stealth.progressLabel(me.act.a)) hud.progress(stealth.progressLabel(me.act.a), me.act.pr); // stealth: lighting the fireplace
