@@ -545,6 +545,18 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   goes off) or hold **E** next to it to defuse it (3 s, 1.5 s with a kit, +$200); an explosion nearby sets it off too.
   If its owner dies it stays (and can still be defused), but nobody can set it off. Up to 2 out at once; cleared every
   round. Bots don't use it.
+  - **Dead man's switch:** with the phone out, **right mouse** arms it (the hint says ARMED). Killed or knocked down
+    while it's armed, all your satchels go off. Right mouse again, or putting the phone away, lets go of it safely.
+    An armed switch blinks red in your hand, and a CT who sees you (within 20 m) is told: shooting you is a decision.
+- **Explosives tricks** (bots don't use them):
+  - **Throw a grenade back:** an HE grenade lands by your feet (within 1.5 m) with at least 0.8 s of its fuse left:
+    press **E** to grab it ("GRENADE IN YOUR HAND" counts down) and **Mouse1** to throw it back with the fuse it has
+    left (its kills are yours). Too slow and it goes off in your hand: you die.
+  - **Booby-trapped body** (classic live rounds, like the uniforms): a Terrorist with an HE grenade crouches over a dead teammate and holds **E** for 2 s to
+    hide the grenade under him. The first CT who presses **E** on that body (to look, or to take its uniform) sets it
+    off. Look closely: a tiny grenade pin lies by a trapped body (you only see it within 2.5 m).
+  - **Cut the wire:** while defusing the bomb or a satchel charge (holding **E**), press **1** to cut the red wire or
+    **2** for the blue one: the right wire defuses it at once, the wrong one sets it off. For desperate last seconds.
 - **FPV drone** (buy menu → 5 Heavy, both teams, $5500, no limit; not in Zombie mode). Press **6** to take out its remote (with the mines) and **Mouse1** to
   launch it. You crouch where you are with the remote — you can't move or shoot, and everyone can see you — and fly it
   through its camera: a grainy video with a signal bar, the battery left and the height.
