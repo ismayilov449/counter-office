@@ -393,6 +393,9 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     the lid. Getting into a trunk lets go of a teammate you were dragging.
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
+    **Your eyes adjust to the dark:** coming from a lit room, the flashlight or nightvision into darkness, you see
+    almost nothing at first; after a couple of seconds your eyes adjust, and after a few more you see a bit better
+    than at first. Back into the light it's bright again at once.
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and
     ladder at each end.
   - The lawn by the left door has a **pickup truck** with a **PKT machine gun** in the back. It has two seats: the
