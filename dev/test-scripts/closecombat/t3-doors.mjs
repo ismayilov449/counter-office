@@ -103,6 +103,18 @@ await sleep(400);
 await press(bob, 120);
 ok('e: a crouched tap just opens it (north)', await until(() => doorState === -1, 1000));
 
+// f. a teleport is not running: Alice jumps 5 m (a spawn, a car exit) to the closed door and presses E: it just opens
+await press(bob);
+await until(() => doorState === 0, 1000);
+away(bob, -13);
+alice.at([X - 5, Y, Z - 1.0], S);
+await sleep(400);
+for (const c of all) c.clear();
+alice.at([X, Y, Z - 1.0], S);
+await sleep(100);
+await press(alice);
+ok('f: after a teleport E opens it without a kick', await until(() => doorState === 1, 1000) && !got(alice, 'sfx', m => m.s === 'crash').length);
+
 for (const c of all) c.close();
 console.log(ok.fails() ? `${ok.fails()} FAILED` : 'ALL OK');
 process.exit(ok.fails() ? 1 : 0);

@@ -647,6 +647,23 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
 - **Adrenaline syringe** (buy menu, Equipment, **$400**; classic rounds on bomb and hostage maps). With one, your
   revive takes **2 seconds** instead of 5 and uses it up; but the one you revive gets up with shaking aim and blurred
   sight that fade over **20 seconds**. One at a time; a survivor keeps it into the next round; lost when you die.
+- **Suppressor** (buy menu, Equipment, **$400**, both teams). It goes on all your **pistols, SMGs and rifles** (not
+  shotguns, snipers, the M249, launchers or the truck's PKT) until you die; a survivor keeps it. Suppressed shots do
+  **10% less damage**, sound quieter and different and are **heard only nearby**, and have **no muzzle flash**: no
+  flash of light to give you away in the dark, and no spark to set off leaking gas. Bots don't hear them. A small
+  dark tube shows on the gun in your hands.
+- **Close combat** (bots don't use it):
+  - **Disarm from behind:** sneak up behind an enemy (within 1.5 m, inside his back 120°, nothing in between) and
+    press **E** (the hint says "Press E to disarm ..."): the gun in his hands is yours. It goes into your own rifle or
+    pistol slot if that's free, otherwise it drops on the floor in front of you (he can't walk over it to take it back
+    for 3 s). He keeps his other weapons, and his knife comes out ("You were disarmed!"). 3 s between tries. Not in
+    Gun Game or Zombie mode.
+  - **Kick a door open:** press **E** at a closed door **while running**: it slams open, and whoever stands just
+    behind it takes 15 damage, is shoved back and his aim is knocked.
+  - **Hold a door shut:** **crouch** and **hold E** at a closed door (a quick tap still just opens it). Anyone pressing
+    **E** from the other side pushes instead (hold E); a bar shows how many hold and how many push. When more push
+    than hold, for a second, the door bursts open and shoves the holders back; ties go to the holders. Bots can't open
+    a door that's held shut.
 - **Blood trails** — a player hit by a **bullet, a knife or shrapnel** (any explosion except fire) starts to
   **bleed**: drops of blood fall on the floor behind him as he moves, about one every 0.7 m, and now and then while
   he stands still. It's for tracking a wounded enemy, not for killing him: bleeding costs little or no health.
@@ -844,7 +861,7 @@ The HUD shows the active party modes under the timer.
 | Ctrl | duck | Shift | walk (silent) |
 | Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
-| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, car trunk, zip line on/off, CCTV desk, lift, valves, chimney (top); hold: revive a teammate (+ walk: drag him), interrogate a downed enemy, a uniform (crouched), light the fireplace, a breaker / the generator / the lift's winch (looking at it); hostage shield (T) | G | drop weapon |
+| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, car trunk, zip line on/off, CCTV desk, lift, valves, chimney (top); hold: revive a teammate (+ walk: drag him), interrogate a downed enemy, a uniform (crouched), light the fireplace, a breaker / the generator / the lift's winch (looking at it); hostage shield (T); behind an enemy: disarm him; running at a door: kick it open; crouched, hold at a door: hold it shut | G | drop weapon |
 | 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |
 | Q | last weapon | Wheel | switch weapon |
 | B | buy menu | O | buy equipment |

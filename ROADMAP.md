@@ -200,10 +200,10 @@ Builds on: grenades, satchels, the bomb, disguise, downed, dragging (group 1).
 
 Builds on: the shooting code (with bullets through walls from group 2), gas, darkness, doors.
 
-1. **Suppressors.** Buy one for your gun. It's quieter, does a bit less damage, and has no muzzle flash, so it won't
+1. **Suppressors.** *(Done 2026-11-11, on `feature/closecombat`: lib/closecombat.js; $400, pistols/SMGs/rifles, 90% damage, heard only nearby, no flash, no gas spark.)* Buy one for your gun. It's quieter, does a bit less damage, and has no muzzle flash, so it won't
    ignite gas and doesn't show you in the dark.
-2. **Disarm from behind.** Sneak up behind an enemy and snatch the gun out of his hands, leaving him with only a knife.
-3. **Door fights.** Kick a door open to knock down whoever stands behind it, or hold a door shut while someone pushes
+2. **Disarm from behind.** *(Done 2026-11-11, on `feature/closecombat`: E within 1.5 m in his back 120°; the gun to your free slot or the floor; he gets his knife out, keeps the rest; 3 s cooldown.)* Sneak up behind an enemy and snatch the gun out of his hands, leaving him with only a knife.
+3. **Door fights.** *(Done 2026-11-11, on `feature/closecombat`: E while running kicks (15 damage + shove); crouch + hold E holds; more pushers than holders for 1 s bursts it open, ties to the holders.)* Kick a door open to knock down whoever stands behind it, or hold a door shut while someone pushes
    from the other side. The stronger push wins.
 
 ## 9. Sight (`feature/sight`, wave 2, after group 3)

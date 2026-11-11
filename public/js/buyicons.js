@@ -103,7 +103,7 @@ export function makeBuyIcons(renderer, ids) {
   scene.add(key, fill, new THREE.HemisphereLight(0xfff4e0, 0x6a5030, 1.4));
   const prev = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
   for (const id of ids) {
-    if (['vest', 'vesthelm', 'kit', 'nvg', 'camo', 'adren', 'sup'].includes(id)) { icons.set(id, drawn(id)); continue; } // wounds: + adren
+    if (['vest', 'vesthelm', 'kit', 'nvg', 'camo', 'adren', 'sup'].includes(id)) { icons.set(id, drawn(id)); continue; } // wounds: + adren; closecombat: + sup
     let obj;
     try {
       obj = id === 'mortar' ? buildMortarSetup(50) : id === 'pmn' || id === 'mon50' ? buildPlacedMine(id, 0.01, 0.01) : id === 'drone' ? buildDrone() : buildGun(id);
