@@ -11,7 +11,7 @@ import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, setGlow, ambientAt, glowAt, maskLamps, setNvg } from './roomlight.js';
 import { ESCAPE } from '/shared/hostage-escape.js'; // escape: hostages try to escape, zip ties
-import { adaptEyes, resetEyes } from './eyes.js'; // eyes adjust to darkness (ROADMAP 9.1)
+import { adaptEyes, resetEyes, nightEyes } from './eyes.js'; // eyes adjust to darkness (ROADMAP 9.1)
 import { initCarry, carrying, carrySlotOk, carryLimitKeys, carrySpeed, carryPose, carryRay } from './hostage-carry.js'; // carry: wounded hostages
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
@@ -3659,7 +3659,7 @@ function updateHud(now) {
   // (watching a security camera: its black and white picture instead)
   const nvgFilter = (me.alive && gadgets.screenFilter()) || (me.alive && me.nvgOn ? 'brightness(1.5) contrast(1.15) grayscale(1) sepia(1) hue-rotate(50deg) saturate(3.5)' : '');
   if (renderer.domElement.style.filter !== nvgFilter) renderer.domElement.style.filter = nvgFilter; // only when it changes
-  setNvg(me.alive && me.nvgOn && !gadgets.watching() ? 0.5 : 0);
+  setNvg(!me.alive || gadgets.watching() ? 0 : me.nvgOn ? 0.5 : nightEyes());
   if (!me.joined) return;
   const id = current(), def = WEAPONS[id];
   hud.status(me, me.alive ? id : null);
