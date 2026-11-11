@@ -76,6 +76,7 @@ function drawn(kind) {
     g.fillStyle = 'rgba(0,0,0,0.45)';
     g.beginPath(); g.arc(78, 52, 11, 0, 7); g.arc(122, 52, 11, 0, 7); g.fill();
   } else if (kind === 'adren') drawSyringe(g); // wounds
+  else if (kind === 'sup') { g.fillRect(40, 40, 120, 26); g.fillRect(160, 46, 14, 14); g.fillStyle = 'rgba(0,0,0,0.35)'; for (let x = 52; x < 150; x += 16) g.fillRect(x, 40, 4, 26); } // closecombat: a suppressor tube
   else if (kind === 'camo') {
     // a ghillie suit: a shaggy cloak of strips
     g.beginPath(); g.ellipse(100, 30, 18, 16, 0, 0, 7); g.fill();
@@ -102,7 +103,7 @@ export function makeBuyIcons(renderer, ids) {
   scene.add(key, fill, new THREE.HemisphereLight(0xfff4e0, 0x6a5030, 1.4));
   const prev = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
   for (const id of ids) {
-    if (['vest', 'vesthelm', 'kit', 'nvg', 'camo', 'adren'].includes(id)) { icons.set(id, drawn(id)); continue; } // wounds: + adren
+    if (['vest', 'vesthelm', 'kit', 'nvg', 'camo', 'adren', 'sup'].includes(id)) { icons.set(id, drawn(id)); continue; } // wounds: + adren
     let obj;
     try {
       obj = id === 'mortar' ? buildMortarSetup(50) : id === 'pmn' || id === 'mon50' ? buildPlacedMine(id, 0.01, 0.01) : id === 'drone' ? buildDrone() : buildGun(id);

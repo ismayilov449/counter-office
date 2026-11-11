@@ -158,6 +158,7 @@ export const ITEMS = {
   nvg: { name: 'Nightvision', price: 1250 },
   camo: { name: 'Ghillie camo', price: 1000 },
   adren: { name: 'Adrenaline', price: 400 }, // wounds: the syringe (a 2 s revive; lib/wounds.js)
+  sup: { name: 'Suppressor', price: 400 }, // closecombat: on all your pistols, SMGs and rifles until you die (lib/closecombat.js)
 };
 
 // CS 1.6 style buy menu: number keys pick a category, then an item.
@@ -169,7 +170,7 @@ export const BUY_COLUMNS = [
   { title: 'SMGs', items: ['mac10', 'tmp', 'mp5', 'ump45', 'p90'] },
   { title: 'Rifles', items: ['galil', 'famas', 'ak47', 'm4a1', 'scout', 'sg552', 'aug', 'sg550', 'g3sg1', 'awp'] },
   { title: 'Heavy', items: ['m249', 'rpg', 'rpg26', 'mortar', 'drone'] },
-  { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg', 'adren'] }, // wounds: + adren
+  { title: 'Equipment', items: ['vest', 'vesthelm', 'flash', 'he', 'smoke', 'molotov', 'kit', 'nvg', 'adren', 'sup'] }, // wounds: + adren; closecombat: + sup
   { title: 'Mines & camo', items: ['pmn', 'mon50', 'satchel', 'camo', 'jammer'] },
 ];
 

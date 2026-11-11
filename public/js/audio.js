@@ -31,6 +31,7 @@ const GUN = {
   ak47: { crack: 3400, body: 950, boom: 95, dur: 0.16, gain: 1.0, tail: 0.5 },
   m4a1: { crack: 4100, body: 1150, boom: 110, dur: 0.13, gain: 0.88, tail: 0.42 },
   m4a1s: { suppressed: true, body: 1050, gain: 0.5 },
+  sup: { suppressed: true, body: 1150, gain: 0.42, tail: 0.04 }, // closecombat: any suppressed gun ('sshot')
   sg552: { crack: 3800, body: 1050, boom: 100, dur: 0.14, gain: 0.92, tail: 0.45 },
   aug: { crack: 4000, body: 1100, boom: 105, dur: 0.13, gain: 0.9, tail: 0.44 },
   scout: { crack: 3000, body: 800, boom: 80, dur: 0.28, gain: 1.15, tail: 0.75, after: 'bolt' },
@@ -189,7 +190,7 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8] };
+const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8], sshot: [1, 3] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -472,6 +473,8 @@ export const audio = {
     if (pos && this.vent) pos = this.vent(pos) || pos; // underground: heard through an air vent, it comes out of the grille (public/js/underground.js)
     const out = this.out(pos, FAR[name], this.muffled);
     switch (name) {
+      case 'sshot': arg = 'sup'; // closecombat: a suppressed shot: the 'shot' below, quieter and nearer (FAR.sshot)
+      // falls through
       case 'shot': {
         const s = GUN[arg] || GUN.glock;
         const dist = pos ? Math.hypot(pos[0] - listenerPos.x, pos[1] - listenerPos.y, pos[2] - listenerPos.z) : 0;

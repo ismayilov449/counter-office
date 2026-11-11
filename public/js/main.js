@@ -45,6 +45,7 @@ import { createPower } from './power.js'; // power: the breaker panel, the gener
 import * as stealth from './stealth.js'; // stealth: the chimney, the creaking boards, hiding in a car's trunk
 import * as ug from './underground.js'; // underground: no radar underground, the echo, the air vents (Mansion)
 import * as walls from './walls.js'; // walls: see-through bullet holes, burst pipes, live wires, floating bodies (Mansion)
+import * as cc from './closecombat.js'; // closecombat: suppressors, disarming from behind, door fights
 import * as xp from './explosives.js'; // explosives: throw a grenade back, booby-trapped bodies, the dead man's switch, cut the wire
 
 const $ = id => document.getElementById(id);
@@ -468,12 +469,13 @@ function fireBullet(id, def, now) {
     else if (tr.wall) { fx.decal(tr.end, tr.wall.n); if (!def.pellets || Math.random() < 0.4) fx.sparks(tr.end, tr.wall.n); }
     if (def.sniper || Math.random() < (def.pellets ? 0.25 : 0.5)) fx.tracer(muzzle, tr.end);
   }
-  fx.flashLight(muzzle, 40, 0.05);
+  const sup = cc.sup(id); // closecombat: a suppressor (quiet, no muzzle flash)
+  if (!sup) fx.flashLight(muzzle, 40, 0.05);
   me.flashUntil = now + 45;
   ejectCasing();
   net.send(def.pellets ? { t: 'shoot', o, ds: dirs, w: id, rt: serverNow() - interpMs } : { t: 'shoot', o, d: dirs[0], w: id, rt: serverNow() - interpMs });
-  audio.play('shot', null, id === 'm4a1' ? 'm4a1s' : id);
-  ug.shot(o, id); // underground: its echo
+  audio.play(sup ? 'sshot' : 'shot', null, id === 'm4a1' ? 'm4a1s' : id); // closecombat: (sshot)
+  if (!sup) ug.shot(o, id); // underground: its echo (closecombat: none suppressed)
 
   me.punchP = Math.min(0.075, me.punchP + def.recoil * 0.45 * (1 + Math.min(me.shotsFired, 6) * 0.07));
   if (me.shotsFired > 3) me.punchY = clamp(me.punchY + (Math.random() - 0.5) * def.recoil * 0.5, -0.025, 0.025);
@@ -1402,6 +1404,7 @@ function owns(id) {
   if (id === 'kit') return me.kit;
   if (id === 'nvg') return me.nvg;
   if (id === 'adren') return !!me.inv?.adren; // wounds: the adrenaline syringe
+  if (id === 'sup') return !!me.inv?.sup; // closecombat: the suppressor
   return false;
 }
 
@@ -2972,16 +2975,16 @@ const net = new Net({
       for (const [dx, dy, dz, e, b] of m.tr) if (b) fx.blood([m.o[0] + dx * e, m.o[1] + dy * e, m.o[2] + dz * e]);
       return;
     }
-    audio.play('shot', m.o, m.w === 'm4a1' ? 'm4a1s' : m.w);
-    ug.shot(m.o, m.w); // underground: its echo
+    audio.play(m.sup ? 'sshot' : 'shot', m.o, m.w === 'm4a1' ? 'm4a1s' : m.w); // closecombat: (sshot: suppressed, heard only nearby)
+    if (!m.sup) ug.shot(m.o, m.w); // underground: its echo
     let from = m.o;
     const muzzle = r?.model.userData.gun?.userData.muzzle;
     if (muzzle && r.model.visible) {
       muzzle.getWorldPosition(_v);
       from = [_v.x, _v.y, _v.z];
-      fx.thirdPersonFlash(muzzle);
+      if (!m.sup) fx.thirdPersonFlash(muzzle); // closecombat: no flash suppressed
     }
-    fx.flashLight(from, 30, 0.05);
+    if (!m.sup) fx.flashLight(from, 30, 0.05); // closecombat: (nor its light in the dark)
     for (const [dx, dy, dz, e, b, hw] of m.tr) {
       const d = [dx, dy, dz];
       const end = [m.o[0] + dx * e, m.o[1] + dy * e, m.o[2] + dz * e];
@@ -3303,6 +3306,7 @@ initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }
 initCarry({ me, remotes, hostages }); // carry
 initWounds({ net, me, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // body (integration: + in a trunk: E gets out first, as on the server)
+cc.initCloseCombat({ me }); // closecombat
 xp.initExplosives({ me, game, net, hud, fx, audio, scene, remotes, current: () => current(), coll: () => coll, eyePos, aimDir, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // explosives: (after initBody: grabbing a grenade's hint goes over a revive's)
 
 // The Mansion's gadgets: the zip line (see gadgets.js).
@@ -3654,7 +3658,7 @@ function updateViewModel(dt, now) {
   vm.position.set(x, y, z);
   vm.rotation.set(rx, ry, rz);
   if (u.flash) {
-    u.flash.visible = now < me.flashUntil;
+    u.flash.visible = now < me.flashUntil && !cc.sup(current()); // closecombat: no flash suppressed
     u.flash.material.rotation = Math.random() * Math.PI;
   }
 }
@@ -4114,6 +4118,7 @@ function frame() {
   ug.update(dt, now, camera); // underground
   walls.update(dt, now, camera); // walls:
   xp.frame(); // explosives: booby traps' pins up close, dead man's switch lights and warnings
+  cc.frame(vm, current()); // closecombat: the suppressor on the gun in our hands
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();

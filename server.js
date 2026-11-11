@@ -46,6 +46,7 @@ import { waterTop } from './shared/flood.js'; // cat × flood: the cat keeps out
 import { createBets } from './lib/bet.js'; // bet feature: F3 bet on yourself
 import { createStealth } from './lib/stealth.js'; // stealth: the chimney, hiding in a car's trunk
 import { createUnderground } from './lib/underground.js'; // underground: no radar underground, the echo, the air vents
+import { createCloseCombat } from './lib/closecombat.js'; // closecombat: suppressors, disarming from behind, door fights
 import { createExplosives } from './lib/explosives.js'; // explosives: throw a grenade back, booby-trapped bodies, the dead man's switch, cut the wire
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -1599,6 +1600,8 @@ const escape = createEscape({ game, players, map: () => MAP, world: () => world,
 // Carrying wounded hostages (lib/hostage-carry.js)
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
+// closecombat: ROADMAP group 8 (lib/closecombat.js)
+const cc = createCloseCombat({ game, players, send, broadcast, sendMe: p => sendMe(p), now });
 // explosives: ROADMAP group 7 (lib/explosives.js)
 const explosives = createExplosives({ game, players, send, broadcast, sendMe: p => sendMe(p), corpses: () => disguise.corpses, now, world:() => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n), explodeSatchel: s => explodeSatchel(s), explodeBomb: () => explodeBomb() });
 const bots = new BotManager({
@@ -2382,7 +2385,7 @@ function onShoot(p, m) {
   if (carry.noFire(p, m.w)) return; // carry: pistol only
   if (wounds.noFire(p, m.w)) return; // wounds: dragging (pistol only), interrogating, the downed suicide
   p.protectUntil = 0;
-  const w = m.w, def = WEAPONS[w];
+  const w = m.w, def = cc.def(p, w); // closecombat: a suppressed gun (less damage, def.sup)
   if (!def || def.grenade || def.mortar || w === 'c4') return; // (the mortar fires with a 'mortar' message)
   // Zombies only have claws, and only zombies have claws.
   if (!!p.zombie !== (w === 'claws')) return;
@@ -2411,7 +2414,7 @@ function onShoot(p, m) {
   if (isHNS() && p.team === 'CT' && game.phase === 'live' && t < (game.hideUntil || 0)) return;
   p.lastShot = t;
   if (!def.melee) disguise.reveal(p, 'shot'); // Disguise: a shot gives you away
-  if (!def.melee) bots.heard(p, o);
+  if (!def.melee && !def.sup) bots.heard(p, o); // closecombat: (bots don't hear a suppressed shot)
   cat.shot(p, o, def.rocket ? [] : dirs, !!def.melee); // cat: a bullet throws it, gunfire scares it (a rocket: its blast)
   if (item) item.mag--;
   if (def.rocket) {
@@ -2496,7 +2499,7 @@ function onShoot(p, m) {
   for (const i of shotCams) breakCam(i, p);
 
   if (def.melee && hits.some(h => h.q)) disguise.reveal(p, 'knife'); // Disguise: so does knifing someone
-  broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces }, q => q !== p);
+  broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces, sup: def.sup ? 1 : undefined }, q => q !== p); // closecombat: (sup: quiet, no flash)
   if (!hits.length) return;
   const info = {};
   for (const h of hits) {
@@ -3521,6 +3524,7 @@ function onBuy(p, id) {
   } else if (id === 'camo') {
     if (p.camo) return fail('You already have camouflage.');
   }
+  if (id === 'sup' && p.inv.sup) return fail('You already have a suppressor.'); // closecombat
   if (id === 'adren' && wounds.cantBuy(p)) return fail(wounds.cantBuy(p)); // wounds: the adrenaline syringe (one, classic rounds)
   if (isDM()) price = 0;
   if (p.money < price) return fail('You have insufficient funds!');
@@ -3544,6 +3548,7 @@ function onBuy(p, id) {
   else if (id === 'kit') p.kit = true;
   else if (id === 'nvg') p.nvg = true;
   else if (id === 'camo') p.camo = true;
+  if (id === 'sup') p.inv.sup = 1; // closecombat: the suppressor (on every pistol, SMG and rifle you hold until you die)
   if (id === 'adren') p.inv.adren = 1; // wounds: the syringe (in the inventory: kept by a survivor, lost with a death)
   send(p, { t: 'sfx', s: 'buy' });
   sendMe(p);
@@ -3585,6 +3590,7 @@ function onSell(p, id) {
   } else if (id === 'kit') p.kit = false;
   else if (id === 'nvg') p.nvg = false;
   else if (id === 'camo') { p.camo = false; p.camoOn = false; }
+  if (id === 'sup') { if (!p.inv.sup) return fail('You don\'t have it any more.'); p.inv.sup = 0; } // closecombat
   if (id === 'adren') { if (!p.inv.adren) return fail('You don\'t have it any more.'); p.inv.adren = 0; } // wounds: the syringe
   p.buys.splice(i, 1);
   if (wdef?.perTeam) countTeamBuy(p.team, id, -1);
