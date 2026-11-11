@@ -187,13 +187,13 @@ Builds on: the hostage fix, the human shield, dragging (group 1).
 
 Builds on: grenades, satchels, the bomb, disguise, downed, dragging (group 1).
 
-1. **Throw a grenade back.** *(Done 2026-11-11, on `feature/explosives`: lib/explosives.js; E within 1.5 m with ≥0.8 s of fuse left, Mouse1 throws.)* A grenade lands at your feet: grab it and throw it back. You have about a second, and a
+1. **Throw a grenade back.** *(Done 2026-11-11, on `main`: lib/explosives.js; E within 1.5 m with ≥0.8 s of fuse left, Mouse1 throws.)* A grenade lands at your feet: grab it and throw it back. You have about a second, and a
    mistake is fatal. *First: grenade handling, which the booby trap builds on.*
-2. **Booby-trapped body.** *(Done 2026-11-11, on `feature/explosives`: crouch + hold E 2 s; E or the uniform sets it off; a tiny pin within 2.5 m. Dragging can't: dead bodies aren't draggable yet.)* A Terrorist hides a grenade under a dead teammate. Whoever inspects the body, takes its
+2. **Booby-trapped body.** *(Done 2026-11-11, on `main`: crouch + hold E 2 s; E or the uniform sets it off; a tiny pin within 2.5 m. Dragging can't: dead bodies aren't draggable yet.)* A Terrorist hides a grenade under a dead teammate. Whoever inspects the body, takes its
    uniform or drags it sets it off. It punishes careless disguises.
-3. **Dead man's switch.** *(Done 2026-11-11, on `feature/explosives`: right mouse with the phone arms it; killed or downed: his satchels go off; CTs who see him within 20 m are told.)* A Terrorist with satchels out can hold a dead man's switch. If he's killed, all his satchels go
+3. **Dead man's switch.** *(Done 2026-11-11, on `main`: right mouse with the phone arms it; killed or downed: his satchels go off; CTs who see him within 20 m are told.)* A Terrorist with satchels out can hold a dead man's switch. If he's killed, all his satchels go
    off. Shooting him becomes a terrible decision. It pairs with the satchels and downed.
-4. **Cut the wire.** *(Done 2026-11-11, on `feature/explosives`: 1 red, 2 blue while defusing; a coin flip.)* While defusing the bomb or a satchel you can gamble: cut the red or the blue wire. Guess right and
+4. **Cut the wire.** *(Done 2026-11-11, on `main`: 1 red, 2 blue while defusing; a coin flip.)* While defusing the bomb or a satchel you can gamble: cut the red or the blue wire. Guess right and
    it's defused instantly; guess wrong and it explodes. For desperate last seconds.
 
 ## 8. Close combat (`feature/closecombat`, wave 2, after group 2)
