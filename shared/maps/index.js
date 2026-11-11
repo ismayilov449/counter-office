@@ -6,9 +6,9 @@ import inferno from './inferno.js';
 import assault from './assault.js';
 import mansionNight from './mansion_night.js';
 
-export const MAPS = { [dusty.id]: dusty, [dust2.id]: dust2, [mansion.id]: mansion, [aim.id]: aim, [inferno.id]: inferno, [assault.id]: assault, [mansionNight.id]: mansionNight };
+export const MAPS = { [mansion.id]: mansion, [dusty.id]: dusty, [dust2.id]: dust2, [aim.id]: aim, [inferno.id]: inferno, [assault.id]: assault, [mansionNight.id]: mansionNight };
 export const MAP_IDS = Object.keys(MAPS);
-export const DEFAULT_MAP = dusty.id;
+export const DEFAULT_MAP = mansion.id;
 
 // Zones only count above ground (not in the tunnels).
 function inRect(z, p) {

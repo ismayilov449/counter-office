@@ -1909,17 +1909,18 @@ function enterCar(id, state) {
   me.scope = 0;
   stopUse('mouse');
   audio.play('door');
-  hud.small('Driving — W/S gas & brake, A/D steer, Space handbrake, V camera, Mouse 1 horn, E get out', 5);
+  hud.small(`Driving — W/S gas & brake, A/D steer, Space handbrake, V camera, Mouse 1 horn, ${me.car.type === 'pickup' ? 'Q the machine gun, ' : ''}E get out`, 5);
 }
 
 function enterRide(id, seat, gunner) {
+  if (me.driving != null) { const c = cars.get(me.driving); if (c && me.car) Object.assign(c, { p: me.car.p.slice(), yaw: me.car.yaw, speed: 0, buf: [] }); me.driving = null; me.car = null; } // (from the wheel to the PKT: Q)
   me.riding = { id, seat, gunner: !!gunner };
   me.reload = null;
   me.scope = 0;
   stopUse('mouse');
   audio.play('door');
   refreshViewModel();
-  hud.small(gunner ? 'You are on the PKT machine gun — aim with the mouse, hold Mouse 1 to fire (unlimited ammo), E to get off'
+  hud.small(gunner ? 'You are on the PKT machine gun — aim with the mouse, hold Mouse 1 to fire (unlimited ammo), Q to drive (when the seat is free), E to get off'
     : 'You are a passenger — look around and shoot out of the windows, E to get out', 5);
 }
 
@@ -2381,7 +2382,13 @@ document.addEventListener('keydown', e => {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
     case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
-    case 'KeyQ': if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
+    case 'KeyQ':
+      if (me.alive && (me.car?.type === 'pickup' || me.riding?.gunner)) {
+        if (me.car && Math.abs(me.car.speed) > 2) hud.small('Stop the truck first', 1.5);
+        else net.send({ t: 'seat' });
+        break;
+      }
+      if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': startReload(); break;
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
     case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;

@@ -60,7 +60,7 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
 |-----------------|------------|-----------------------------------------------|
 | `PORT`          | 3000       | HTTP port                                     |
 | `HTTPS_PORT`    | 3443       | HTTPS port                                    |
-| `MAP`           | de_dusty   | Starting map (`de_dusty`, `de_dust2`, `cs_mansion`, `cs_mansion_night`, `aim_map`, `de_inferno`, `cs_assault`) |
+| `MAP`           | cs_mansion | Starting map (`cs_mansion`, `de_dusty`, `de_dust2`, `cs_mansion_night`, `aim_map`, `de_inferno`, `cs_assault`) |
 | `MAP_ROTATION`  | on         | `0` keeps the same map after a match ends     |
 | `ROUNDS_TO_WIN` | 10         | Rounds needed to win the match                |
 | `ROUND_TIME`    | 115        | Round length in seconds                       |
@@ -399,7 +399,8 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and
     ladder at each end.
   - The lawn by the left door has a **pickup truck** with a **PKT machine gun** in the back. It has two seats: the
-    first one in drives, the second stands at the PKT (aim with the mouse, hold Mouse 1, unlimited ammo).
+    first one in drives, the second stands at the PKT (aim with the mouse, hold Mouse 1, unlimited ammo). Alone, press
+    **Q** to move between the wheel and the PKT (stop the truck first); it works whenever the other seat is free.
 - **cs_mansion_night** — **Mansion at night**: the same map, everything in it the same, on a clear night. It's a map of
   its own: pick it in the admin panel (Change map), vote for it at the end of a match, or start the server with
   `MAP=cs_mansion_night`; the rotation plays it after cs_assault.

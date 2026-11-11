@@ -791,6 +791,28 @@ function enterCar(p, c) {
   broadcast({ t: 'sfx', s: 'door', p: c.p });
 }
 
+// Q in the pickup: one man moves between the wheel and the PKT in the back while the other seat is free.
+function swapSeat(p) {
+  const c = carOf(p);
+  if (!c || c.type !== 'pickup' || c.wrecked || !p.alive || game.phase === 'freeze') return;
+  const car = { p: c.p, yaw: c.yaw };
+  if (c.driver === p.id && c.riders[0] == null) {
+    Object.assign(c, { driver: null, speed: 0, steer: 0 });
+    c.riders[0] = p.id;
+    p.driving = null;
+    p.riding = { car: c.id, seat: 1 };
+    p.p = seatPos(c, 1);
+    send(p, { t: 'ride', id: c.id, seat: 1, gunner: true, car });
+  } else if (c.riders[0] === p.id && c.driver == null) {
+    c.riders[0] = null;
+    c.driver = p.id;
+    p.riding = null;
+    p.driving = c.id;
+    p.p = seatPos(c, 0);
+    send(p, { t: 'drive', id: c.id, car });
+  }
+}
+
 // ---- car damage: bullets and grenades wear a car down; at zero it explodes, killing whoever is inside
 function damageCar(c, dmg, attacker) {
   if (!c || c.wrecked || dmg <= 0) return;
@@ -3848,6 +3870,9 @@ function handle(p, m) {
       break;
     case 'cctv':
       onCctv(p, m);
+      break;
+    case 'seat':
+      swapSeat(p);
       break;
     case 'horn':
       if (p.driving != null && !world.cars[p.driving]?.wrecked && t - (p.lastHorn || 0) > 400) {
