@@ -394,7 +394,7 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - **Light switches** in every room, like the original (press **E**). Switched-off rooms go dark —
     use the flashlight (**F**) or nightvision (**N**).
     **Your eyes adjust to the dark:** coming from a lit room, the flashlight or nightvision into darkness, you see
-    almost nothing at first; after a couple of seconds your eyes adjust, and after a few more you see a bit better
+    almost nothing at first; after a couple of seconds your eyes adjust, and after a few more you see much better
     than at first. Back into the light it's bright again at once.
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and
     ladder at each end.
