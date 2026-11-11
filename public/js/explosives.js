@@ -1,9 +1,10 @@
 // Explosives (ROADMAP group 7), the browser's side (rules in shared/explosives.js; server: lib/explosives.js).
 // main.js calls in at a few hooks marked "explosives:".
 // 7.1 the E hint over an HE grenade by our feet, the grenade in our hand (a countdown; Mouse1 throws it back).
+import * as THREE from 'three';
 import { XP } from '/shared/explosives.js';
 
-let C = null; // from main.js: { me, net, hud, fx, audio, coll(), eyePos(), aimDir(yaw, pitch), busy() }
+let C = null; // from main.js: { scene, me, game, remotes, net, hud, fx, audio, current(), coll(), eyePos(), aimDir(yaw, pitch), busy() }
 let hot = null; // the grenade in our hand: { until (performance.now() ms) }
 
 const flat3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -15,6 +16,16 @@ export function initExplosives(ctx) {
   C.hud.hint = function (text) {
     return hint0.call(this, ourHint() ?? text);
   };
+  const progress0 = C.hud.progress;
+  C.hud.progress = function (label, frac) {
+    if (label != null) label = progressLabel(C.me.act?.a) ?? label;
+    return progress0.call(this, label, frac);
+  };
+}
+
+function progressLabel(a) {
+  if (a === 'xpTrap') return 'Hiding the grenade under the body...';
+  return null;
 }
 
 function ourHint() {
@@ -57,7 +68,46 @@ export function throwBack() {
   return true;
 }
 
+// ---- 7.2 booby-trapped bodies: a Terrorist's hint over a dead teammate, the progress label, a tiny pin up close.
+const traps = new Map(); // body id -> the pin (a mesh), at the body as the server has it
+let pinGeo = null, pinMat = null;
+
+function mateBody() {
+  const me = C.me;
+  for (const r of C.remotes.values()) {
+    if (r.alive || r.team !== me.team || r.model.userData.gibAll || !r.buf.length || traps.has(r.id)) continue;
+    if (Math.hypot(r.p[0] - me.p[0], r.p[2] - me.p[2]) < XP.trapReach && Math.abs(r.p[1] - me.p[1]) < XP.trapReachY) return r;
+  }
+  return null;
+}
+// The hint chain (main.js, just over the uniform's line, as on the server).
+export function hint(text) {
+  const me = C.me;
+  if (me.team !== 'T' || !(me.inv.he > 0) || C.game.phase !== 'live' || me.act) return text;
+  const r = mateBody();
+  if (!r) return text;
+  if (me.crouch) return `Hold E to hide your HE grenade under ${r.name}'s body (${XP.trap} s): the first enemy who touches it sets it off`;
+  return text || `Crouch and hold E to booby-trap ${r.name}'s body with your HE grenade`;
+}
+// Every frame: the pins show only up close.
+export function frame() {
+  for (const m of traps.values()) m.visible = Math.hypot(m.position.x - C.me.p[0], m.position.y - C.me.p[1], m.position.z - C.me.p[2]) < XP.pinSeen;
+}
+function syncTraps(list) {
+  for (const [id, m] of traps) { m.parent?.remove(m); traps.delete(id); }
+  pinGeo ||= new THREE.TorusGeometry(0.02, 0.004, 4, 10).rotateX(Math.PI / 2);
+  pinMat ||= new THREE.MeshBasicMaterial({ color: 0xb8a060 });
+  for (const [id, x, y, z] of list) {
+    const m = new THREE.Mesh(pinGeo, pinMat);
+    m.position.set(x + 0.18, y + 0.03, z + 0.12); // (by the body's side, on the floor)
+    m.visible = false;
+    C.scene.add(m);
+    traps.set(id, m);
+  }
+}
+
 export const handlers = {
+  xpTraps(m) { syncTraps(m.list); },
   // somebody picked a grenade up: it's gone from the floor
   xpGrab(m) {
     const i = C.fx.nades.findIndex(n => n.xpId === m.id);

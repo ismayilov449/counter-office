@@ -3293,7 +3293,7 @@ initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }
 initCarry({ me, remotes, hostages }); // carry
 initWounds({ net, me, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // body (integration: + in a trunk: E gets out first, as on the server)
-xp.initExplosives({ me, net, hud, fx, audio, scene, remotes, current: () => current(), coll: () => coll, eyePos, aimDir, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // explosives: (after initBody: grabbing a grenade's hint goes over a revive's)
+xp.initExplosives({ me, game, net, hud, fx, audio, scene, remotes, current: () => current(), coll: () => coll, eyePos, aimDir, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // explosives: (after initBody: grabbing a grenade's hint goes over a revive's)
 
 // The Mansion's gadgets: the zip line (see gadgets.js).
 const gadgets = createGadgets({
@@ -3729,6 +3729,7 @@ function updateHud(now) {
     hint = circuits.hint(hint); // power: aimed at a breaker, the generator or the lift's winch (after the valves, before the old uses); a dead switch says why
     if ((gh = flood.hint()) || (gh = gas.hint())) hint = gh; // Floodgate, gas: their valves
     hint = disguise.hint(hint, () => canPlantHere() || canDefuseHere()); // Disguise: crouched over a dead enemy (not where E plants or defuses)
+    hint = xp.hint(hint); // explosives: a crouched Terrorist with an HE over a dead mate (over the uniform, under the shield, as on the server)
     hint = shieldHint(hint); // shield: grab / let go / held
     hint = tieHint(hint); // escape: a crouched Terrorist zip-ties (before the shield, as on the server)
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
@@ -4091,6 +4092,7 @@ function frame() {
   stealth.frame(dt, now, camera); // stealth: the fire, the sooty footprints, creaks, the trunk's view
   ug.update(dt, now, camera); // underground
   walls.update(dt, now, camera); // walls:
+  xp.frame(); // explosives: booby traps' pins up close, dead man's switch lights and warnings
   updateDaze(now);
   updateMortarHud();
   updateOwnMortarModel();

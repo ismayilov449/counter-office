@@ -18,7 +18,7 @@ async function setup() {
   else for (const c of all) c.clear();
   bob.send({ t: 'buy', item: 'he' });
   await sleep(300);
-  const base = bob.p.slice();
+  const base = [-22.25, 4.27, 8.941]; // (an open floor by the T spawn)
   // Alice 2 m east of Bob, both on Bob's spawn spot's floor
   alice.at([base[0] + 2, base[1], base[2]], -Math.PI / 2);
   bob.at(base, Math.PI / 2);

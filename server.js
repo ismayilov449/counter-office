@@ -1578,7 +1578,7 @@ const escape = createEscape({ game, players, map: () => MAP, world: () => world,
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
 // explosives: ROADMAP group 7 (lib/explosives.js)
-const explosives = createExplosives({ game, players, send, broadcast, now, world: () => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n) });
+const explosives = createExplosives({ game, players, send, broadcast, sendMe: p => sendMe(p), corpses: () => disguise.corpses, now,world: () => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n) });
 const bots = new BotManager({
   players: () => players, game: () => game, map: () => MAP, world: () => world, cfg: () => CFG, now,
   inTeam, enemies: (a, b) => !mates(a, b) && !b.playingDead /* body: bots take a "corpse" for dead */, mode: () => CFG.gameMode, mapMode: () => mapMode(MAP), phase: () => game.phase,
@@ -2150,6 +2150,7 @@ function updateActions(t) {
     if (a.type.startsWith('pw')) { circuits.act(p, a, t); continue; } // power: a breaker, the generator, cutting the lift's cable
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'disguise') { disguise.act(p, a, t); continue; } // Disguise: changing into a dead enemy's uniform
+    if (a.type === 'xpTrap') { explosives.act(p, a, t); continue; } // explosives: hiding a grenade under a dead mate
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
       continue;
@@ -2251,6 +2252,7 @@ function onUse(p, m, t) {
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   const plantHere = game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p);
   const defuseHere = game.phase === 'live' && p.team === 'CT' && game.bomb.state === 'planted' && dist3(p.p, game.bomb.p) < 1.8;
+  if (explosives.useBody(p, t)) return; // explosives: a CT touching a booby-trapped body sets it off; a crouched T with an HE traps a dead mate
   if (!plantHere && !defuseHere && disguise.tryStart(p, t)) return; // Disguise: crouched over a dead enemy, hold E to put on their uniform
   if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
   if (gas.use(p, t)) return; // gas: hold E at a leaking pipe's valve to shut it
