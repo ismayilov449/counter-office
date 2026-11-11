@@ -80,18 +80,50 @@ function mateBody() {
   }
   return null;
 }
-// The hint chain (main.js, just over the uniform's line, as on the server).
+// The hint chain (main.js, just over the uniform's line, as on the server); with the detonator out, the switch.
 export function hint(text) {
   const me = C.me;
+  if (C.current() === 'phone') return dmsIds.has(me.id) ? "DEAD MAN'S SWITCH ARMED: if you die or go down, your satchels go off (right-click to let go)" : `${text} · right-click: dead man's switch`;
   if (me.team !== 'T' || !(me.inv.he > 0) || C.game.phase !== 'live' || me.act) return text;
   const r = mateBody();
   if (!r) return text;
   if (me.crouch) return `Hold E to hide your HE grenade under ${r.name}'s body (${XP.trap} s): the first enemy who touches it sets it off`;
   return text || `Crouch and hold E to booby-trap ${r.name}'s body with your HE grenade`;
 }
-// Every frame: the pins show only up close.
+// Every frame: the pins show only up close; armed switches blink red in their holders' hands, and a CT who sees one
+// is told (every few seconds while he does).
+let warnedAt = 0;
 export function frame() {
-  for (const m of traps.values()) m.visible = Math.hypot(m.position.x - C.me.p[0], m.position.y - C.me.p[1], m.position.z - C.me.p[2]) < XP.pinSeen;
+  const me = C.me, now = performance.now();
+  for (const m of traps.values()) m.visible = Math.hypot(m.position.x - me.p[0], m.position.y - me.p[1], m.position.z - me.p[2]) < XP.pinSeen;
+  for (const r of C.remotes.values()) {
+    const l = r.model.userData.xpDms, on = dmsIds.has(r.id) && r.alive;
+    if (!on) { if (l) l.visible = false; continue; }
+    if (!l) r.model.add(r.model.userData.xpDms = dmsLight());
+    r.model.userData.xpDms.visible = Math.floor(now / 250) % 2 === 0;
+    if (me.team !== 'CT' || !me.alive || now - warnedAt < 3000) continue;
+    const e = C.eyePos(), c = [r.p[0], r.p[1] + 1.1, r.p[2]], d = [c[0] - e[0], c[1] - e[1], c[2] - e[2]], len = Math.hypot(...d);
+    const look = C.aimDir(me.yaw, me.pitch);
+    if (len > XP.warn || (d[0] * look[0] + d[1] * look[1] + d[2] * look[2]) / len < 0.6) continue;
+    const wall = C.coll().raycast(e, d.map(v => v / len), len);
+    if (wall && wall.t < len - 0.3) continue;
+    warnedAt = now;
+    C.hud.small(`${r.name} holds a DEAD MAN'S SWITCH: kill him or knock him down and his satchels go off`, 3);
+  }
+}
+const dmsIds = new Set();
+let dmsGeo = null, dmsMat = null;
+function dmsLight() {
+  dmsGeo ||= new THREE.SphereGeometry(0.035, 6, 4);
+  dmsMat ||= new THREE.MeshBasicMaterial({ color: 0xff2010 });
+  const m = new THREE.Mesh(dmsGeo, dmsMat);
+  m.position.set(0.28, 1.15, -0.25); // (about his right hand, held out in front)
+  return m;
+}
+// Right-click with the detonator out (main.js secondary()).
+export function dms() {
+  C.net.send({ t: 'xpDms' });
+  C.audio.play('click');
 }
 function syncTraps(list) {
   for (const [id, m] of traps) { m.parent?.remove(m); traps.delete(id); }
@@ -108,6 +140,7 @@ function syncTraps(list) {
 
 export const handlers = {
   xpTraps(m) { syncTraps(m.list); },
+  xpDms(m) { dmsIds.clear(); for (const id of m.ids) dmsIds.add(id); },
   // somebody picked a grenade up: it's gone from the floor
   xpGrab(m) {
     const i = C.fx.nades.findIndex(n => n.xpId === m.id);

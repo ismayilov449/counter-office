@@ -1314,7 +1314,8 @@ function secondary() {
     holdNade(false);
   } else if (def.mortar && me.mortar?.phase === 'aim') {
     openMortarMap(true);
-  }
+  } else if (id === 'phone') xp.dms(); // explosives: the dead man's switch
+
 }
 
 function canPlantHere() {
