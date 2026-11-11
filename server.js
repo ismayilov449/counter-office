@@ -37,7 +37,8 @@ import { createCat } from './lib/cat.js'; // the mansion's cat
 import { createDisguise } from './lib/disguise.js'; // Disguise
 import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createWounds } from './lib/wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
-import { createEscape } from './lib/hostage-escape.js'; // hostages try to escape (ROADMAP 6.1), zip ties
+import { createEscape } from './lib/hostage-escape.js';
+import { createCarry } from './lib/hostage-carry.js'; // carrying wounded hostages (ROADMAP 6.2) // hostages try to escape (ROADMAP 6.1), zip ties
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
 import { createWalls } from './lib/walls.js'; // walls: bullets through wood and plaster, burst pipes, live wires, wet floors
@@ -1572,6 +1573,9 @@ function swapHns() {
 const escape = createEscape({ game, players, map: () => MAP, world: () => world, now, send, broadcast, near: p => world.move(null, p, 2),
   reach: (p, h) => hostageInReach(p, h), route: (a, b, cb) => bots.route(a, b, cb), lead: (p, h) => leadHostage(p, h),
   openDoorNear: pos => { const d = nearestDoor({ p: pos }); if (!d || d.dist > 1.6 || world.doorStates[d.i] !== 0) return false; useDoor({ p: pos, ws: {} }, d.i); return world.doorStates[d.i] !== 0 || !!game.doorOpening?.[d.i]; } }); // (false: something was in the door's way)
+// Carrying wounded hostages (lib/hostage-carry.js)
+const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
+  rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
 const bots = new BotManager({
   players: () => players, game: () => game, map: () => MAP, world: () => world, cfg: () => CFG, now,
   inTeam, enemies: (a, b) => !mates(a, b) && !b.playingDead /* body: bots take a "corpse" for dead */, mode: () => CFG.gameMode, mapMode: () => mapMode(MAP), phase: () => game.phase,
@@ -2238,6 +2242,7 @@ function onUse(p, m, t) {
   if (wounds.use(p, t)) return; // wounds: interrogate a downed enemy (hold E 3 s)
   if (!p.alive || p.act) return;
   if (p.shield == null && MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at; a hostage held lets go first)
+  if (carry.use(p, t)) return; // carry: a CT picks up a badly hurt hostage or puts his down
   if (escape.use(p, t)) return; // escape: a crouched Terrorist zip-ties a hostage, a CT cuts the ties (before the shield and the lead)
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   const plantHere = game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p);
@@ -2346,6 +2351,7 @@ function onShoot(p, m) {
   if (!p.alive || game.phase === 'freeze' || p.piloting != null || busy(p)) return;
   if (bleed.busy(p)) return; // blood trails: no shooting while bandaging
   if (body.noFire(p, m.w)) return; // body: down (pistol only), playing dead, reviving
+  if (carry.noFire(p, m.w)) return; // carry: pistol only
   if (wounds.noFire(p, m.w)) return; // wounds: dragging (pistol only), interrogating, the downed suicide
   p.protectUntil = 0;
   const w = m.w, def = WEAPONS[w];
@@ -2406,6 +2412,7 @@ function onShoot(p, m) {
     }
     for (const h of game.hostages) {
       if (h.state === 'dead' || h.state === 'rescued') continue;
+      if (h.carriedBy != null) { const hit = carry.ray(h, p, o, d, m.rt, best ? best.t : wallT); if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit }; continue; } // carry: across its carrier's shoulders
       if (h.heldBy != null) { const hit = shield.rayHostage(h, p, o, d, m.rt, best ? best.t : wallT); if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit }; continue; } // shield: a held hostage's own hitboxes
       const hit = rayPlayer(o, d, h.p, false, best ? best.t : wallT);
       if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit };
@@ -4036,6 +4043,7 @@ function tick() {
     for (const ev of updateHostages(game.hostages, players, dt, p => world.move(null, p, 2), t)) {
       if (ev.type === 'lost' && ev.leader) send(ev.leader, { t: 'msg', text: 'A hostage lost track of you!' });
     }
+    carry.tick(); // carry: badly hurt hostages stop walking, carried ones go with their carriers
     escape.tick(t, dt); // escape: unwatched hostages sneak off, ties work loose
     for (const h of game.hostages) if ((h.state === 'follow' || h.state === 'escape') && inRescueZone(MAP, h.p)) rescueHostage(h);
   }
@@ -4082,7 +4090,7 @@ function tick() {
     sc: game.score,
     dr: game.drops.map(d => [d.id, d.w, r2(d.p[0]), r2(d.p[1]), r2(d.p[2])]),
     b: { s: b.state, p: b.p, tl: b.state === 'planted' ? Math.max(0, (b.explodeAt - t) / 1000) : 0 },
-    hs: game.hostages.map(h => [h.id, r2(h.p[0]), r2(h.p[1]), r2(h.p[2]), r2(h.yaw), HOSTAGE_STATE[h.state], h.leader || 0, escape.tied(h)]), // (escape: 1 while zip-tied)
+    hs: game.hostages.map(h => [h.id, r2(h.p[0]), r2(h.p[1]), r2(h.p[2]), r2(h.yaw), HOSTAGE_STATE[h.state], h.leader || 0, escape.tied(h), carry.hurt(h), h.carriedBy || 0]), // (escape: 1 while zip-tied; carry: badly hurt, the carrier)
     cars: world.cars.map(c => [c.id, r2(c.p[0]), r2(c.p[1]), r2(c.p[2]), r2(c.yaw), r2(c.speed), r2(c.steer), c.driver || 0, Math.max(0, Math.round(c.hp)), c.riders[0] || 0, c.riders[1] || 0, c.wrecked ? 1 : 0]),
   };
   let all = '', changed = '';

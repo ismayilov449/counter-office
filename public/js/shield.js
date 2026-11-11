@@ -66,7 +66,7 @@ export function shieldHint(hint) {
   if (me.zip || me.cctv || me.driving != null || me.riding || me.drone) return hint;
   if (me.team === 'T' && !me.act && (C.game.phase === 'live' || C.game.phase === 'warmup')) {
     for (const h of C.hostages.values()) {
-      if (h.state > 1 || held.has(h.id)) continue;
+      if (h.state > 1 || held.has(h.id) || h.carrier) continue; // (carry: not one on a CT's shoulders)
       if (Math.hypot(me.p[0] - h.p[0], me.p[1] - h.p[1], me.p[2] - h.p[2]) < SHIELD.reach && Math.abs(me.p[1] - h.p[1]) < 1 && seen(h)) return 'Press E to grab the hostage as a human shield';
     }
   }

@@ -103,6 +103,9 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     stops it; only once it's inside the CT base (the rescue zone) does it count as rescued. A crouched Terrorist holds **E** on a hostage for 2 s to
     **zip-tie** it: it can't escape or be led until a CT holds **E** for 2 s to cut the ties (then it follows him).
     The ties work loose after 60 s.
+  - **Wounded hostages** (40 HP or less) can't walk: they won't follow, escape or be led. A CT presses **E** on one to
+    **carry** it across his shoulders: walking pace, pistol only, no jumping or ducking; **E** puts it down (so does
+    going down or dying). Carried into the CT base it's rescued. Shots can hit the hostage on his shoulders.
   - Four **doors** lead into the house: the **front door** (porch), the **left door** (south side), the
     **kitchen back door** (west, behind the house, up three stone steps) and the kitchen's **side door** from the
     garage. Press **E** to open or close them — they

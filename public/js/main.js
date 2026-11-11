@@ -11,6 +11,7 @@ import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, setGlow, ambientAt, glowAt, maskLamps, setNvg } from './roomlight.js';
 import { ESCAPE } from '/shared/hostage-escape.js'; // escape: hostages try to escape, zip ties
+import { initCarry, carrying, carrySlotOk, carryLimitKeys, carrySpeed, carryPose, carryRay } from './hostage-carry.js'; // carry: wounded hostages
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
@@ -328,6 +329,7 @@ function refreshViewModel() {
 function switchSlot(slot, silent = false) {
   if (!weaponOf(slot) || me.drone) return;
   if (!shieldSlotOk(slot)) return; // shield: only the pistol while holding a hostage
+  if (!carrySlotOk(slot)) return; // carry: only the pistol while carrying a hostage
   if (body.blocksSlot(slot)) return; // body: only the pistol while down
   if (wounds.blocksSlot(slot)) return; // wounds: only the pistol while dragging a teammate
   if (slot === me.slot && vmId === current()) return;
@@ -421,6 +423,7 @@ function localTrace(o, d, range) {
   for (const hs of hostages.values()) {
     if (hs.state > 1) continue;
     if (shieldHeldBy(hs.id) != null) { const h = shieldRay(hs, o, d, t); if (h) { t = h.t; hitR = hs; } continue; } // shield: a held hostage's hitboxes
+    if (hs.carrier) { const h = carryRay(hs, o, d, t); if (h) { t = h.t; hitR = hs; } continue; } // carry: across its carrier's shoulders
     const h = rayPlayer(o, d, hs.p, false, t);
     if (h) { t = h.t; hitR = hs; }
   }
@@ -1945,7 +1948,7 @@ function clearHostages() {
 
 function syncHostages(list, time) {
   const seen = new Set();
-  for (const [id, x, y, z, yaw, st, leader, tied] of list || []) {
+  for (const [id, x, y, z, yaw, st, leader, tied, hurt, carrier] of list || []) {
     seen.add(id);
     let h = hostages.get(id);
     if (!h) {
@@ -1960,6 +1963,9 @@ function syncHostages(list, time) {
     h.state = st;
     h.leader = leader;
     h.tied = !!tied; // escape: zip-tied (arms down behind its back)
+    if (carrier && carrier === me.id && h.carrier !== me.id) switchSlot('secondary', true); // carry: picked up, out comes the pistol
+    h.hurt = !!hurt; // carry: badly hurt, it can't walk
+    h.carrier = carrier || 0;
   }
   for (const [id, h] of hostages) if (!seen.has(id)) { scene.remove(h.model); disposeOwn(h.model); hostages.delete(id); } // new ones each round
 }
@@ -1984,13 +1990,14 @@ function updateHostageModels(dt) {
       posePlayer(h.model, false, h.tied ? -0.4 : h.state === 1 ? 0 : 1.1, h.walk, Math.min(1, moved / dt / 4));
     }
     shieldPoseHostage(h); // shield: a held hostage leans against its holder
+    carryPose(h); // carry: across its carrier's shoulders
   }
 }
 
 // escape: a Terrorist by a hostage that isn't tied: crouched, E zip-ties it; standing, the shield's hint says so too.
 function tieHint(hint) {
   if (me.team !== 'T' || shieldHolding() || !(game.phase === 'live' || game.phase === 'warmup')) return hint;
-  const h = [...hostages.values()].find(x => x.state <= 1 && !x.tied && Math.hypot(me.p[0] - x.p[0], me.p[1] - x.p[1], me.p[2] - x.p[2]) < ESCAPE.reach && hostageInSight(x));
+  const h = [...hostages.values()].find(x => x.state <= 1 && !x.tied && !x.carrier && Math.hypot(me.p[0] - x.p[0], me.p[1] - x.p[1], me.p[2] - x.p[2]) < ESCAPE.reach && hostageInSight(x));
   if (!h) return hint;
   return me.crouch ? `Hold E to zip-tie the hostage (${ESCAPE.tie} s)` : `${hint || 'A hostage'} · crouch + hold E to zip-tie it`;
 }
@@ -1998,7 +2005,7 @@ function tieHint(hint) {
 function nearestHostage() {
   let best = null, bd = 2.2;
   for (const h of hostages.values()) {
-    if (h.state > 1) continue;
+    if (h.state > 1 || h.carrier) continue; // (carry: not one on a CT's shoulders)
     const d = Math.hypot(me.p[0] - h.p[0], me.p[1] - h.p[1], me.p[2] - h.p[2]);
     if (d < bd && hostageInSight(h)) { bd = d; best = h; }
   }
@@ -3279,6 +3286,7 @@ const net = new Net({
 });
 const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map, downed: () => body.downed() }); // blood trails (public/js/blood.js)
 initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
+initCarry({ me, remotes, hostages }); // carry
 initWounds({ net, me, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // body (integration: + in a trunk: E gets out first, as on the server)
 
@@ -3323,6 +3331,7 @@ function updateLocal(dt, now) {
   const frozen = game.phase === 'freeze' || !!me.act || localUse || ui.chat || !locked || seekerWaiting() || !!me.mortar || body.frozen(); // body: playing dead
 
   shieldLimitKeys(keys); // shield: no ducking or jumping while holding a hostage
+  carryLimitKeys(keys); // carry: nor while carrying one
   const wantCrouch = (!ui.chat && (keys.has('ControlLeft') || keys.has('ControlRight'))) || !!me.mortar || body.crouched(); // body: crawling
   // Ducking in the air pulls the legs up half way, as in CS: a crouch-jump reaches higher (into vents and windows).
   // Standing up in the air lets them down again, if there's room below.
@@ -3358,6 +3367,7 @@ function updateLocal(dt, now) {
   if (me.crouch) speed *= 0.34;
   else if (walking) speed *= 0.52;
   speed = shieldSpeed(speed, def); // shield: walking pace while holding a hostage
+  speed = carrySpeed(speed, def); // carry: walking pace while carrying a hostage
   const wet = inWater(map.water, me.p);
   if (wet) speed *= 0.7;
   speed *= 1 - 0.45 * Math.min(1, dazed(performance.now()));
@@ -3677,7 +3687,9 @@ function updateHud(now) {
     } else if (me.mortar) hint = '';
     else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : mortarCanSetUp(me.p) ? 'Click to set up the mortar (the first shell blasts through the roof)' : NO_SKY;
     else if (me.riding) hint = 'Press E to get out of the car';
+    else if (me.team === 'CT' && carrying()) hint = 'Press E to put the hostage down — carry it to the CT base'; // carry
     else if (hostage?.tied) hint = `Hold E to cut the hostage's zip ties (${ESCAPE.untie} s)`; // escape
+    else if (hostage?.hurt) hint = "Press E to carry the wounded hostage (it can't walk)"; // carry
     else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the CT base';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if ((gh = gadgets.hint())) hint = gh;
