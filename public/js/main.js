@@ -2373,6 +2373,7 @@ document.addEventListener('keydown', e => {
     if (step) { aimMortar(...step); return; }
   }
   if (e.repeat) return;
+  if (me.alive && xp.key(e.code)) return; // explosives: 1 / 2 cut the red / blue wire while defusing
   if (me.alive && gadgets.key(e.code)) return; // (1-4 switch cameras at the CCTV desk)
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {

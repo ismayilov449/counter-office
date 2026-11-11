@@ -25,7 +25,17 @@ export function initExplosives(ctx) {
 
 function progressLabel(a) {
   if (a === 'xpTrap') return 'Hiding the grenade under the body...';
+  if (a === 'defuse' || a === 'satchel') return `${a === 'defuse' ? 'Defusing the bomb' : 'Defusing the satchel charge'}... or gamble: 1 cuts the red wire, 2 the blue`;
   return null;
+}
+
+// 7.4 Keys 1 and 2 while defusing the bomb or a satchel (instead of switching guns): cut the red or the blue wire.
+export function key(code) {
+  const a = C.me.act?.a, c = { Digit1: 0, Digit2: 1, Numpad1: 0, Numpad2: 1 }[code];
+  if ((a !== 'defuse' && a !== 'satchel') || c === undefined) return false;
+  C.net.send({ t: 'xpWire', c });
+  C.audio.play('click');
+  return true;
 }
 
 function ourHint() {

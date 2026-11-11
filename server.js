@@ -1578,7 +1578,7 @@ const escape = createEscape({ game, players, map: () => MAP, world: () => world,
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
 // explosives: ROADMAP group 7 (lib/explosives.js)
-const explosives = createExplosives({ game, players, send, broadcast, sendMe: p => sendMe(p), corpses: () => disguise.corpses, now,world: () => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n), explodeSatchel: s => explodeSatchel(s) });
+const explosives = createExplosives({ game, players, send, broadcast, sendMe: p => sendMe(p), corpses: () => disguise.corpses, now,world: () => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n), explodeSatchel: s => explodeSatchel(s), explodeBomb: () => explodeBomb() });
 const bots = new BotManager({
   players: () => players, game: () => game, map: () => MAP, world: () => world, cfg: () => CFG, now,
   inTeam, enemies: (a, b) => !mates(a, b) && !b.playingDead /* body: bots take a "corpse" for dead */, mode: () => CFG.gameMode, mapMode: () => mapMode(MAP), phase: () => game.phase,
