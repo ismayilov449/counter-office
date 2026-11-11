@@ -3678,7 +3678,7 @@ function updateHud(now) {
     else if (current() === 'mortar') hint = skyOpen(me.p) ? 'Click to set up the mortar' : mortarCanSetUp(me.p) ? 'Click to set up the mortar (the first shell blasts through the roof)' : NO_SKY;
     else if (me.riding) hint = 'Press E to get out of the car';
     else if (hostage?.tied) hint = `Hold E to cut the hostage's zip ties (${ESCAPE.untie} s)`; // escape
-    else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the street';
+    else if (hostage) hint = hostage.state === 1 && hostage.leader === me.id ? 'Press E to tell the hostage to wait' : 'Press E to lead the hostage to the CT base';
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if ((gh = gadgets.hint())) hint = gh;
     else if ((gh = elevator.hint())) hint = gh; // elevator

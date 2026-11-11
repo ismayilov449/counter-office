@@ -92,14 +92,15 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   stairs, furniture, fountain plaza, hedges, shed and street), on a bright sunny day.
   - Terrorists start **upstairs** in the mansion with the hostages; CTs start on the **street** east of
     the estate. A CT presses **E** on a hostage (within reach and in sight: not through a
-    wall, a shut door or a window) to make it follow and leads it to the street (rescue zone); E again tells it to
+    wall, a shut door or a window) to make it follow and leads it to the **CT base** on the street (the rescue zone); E again tells it to
     wait. Hostages follow round door frames and corners without getting stuck.
   - CTs win by rescuing every living hostage or eliminating the Terrorists; Terrorists win by
     eliminating the CTs or running out the clock. Rescue: +$1000 for the rescuer, +$150 for the other
-    CTs. Killing a hostage costs $1500.
+    CTs. Killing a hostage costs $1500. If every hostage dies and none was rescued, the team that killed the last
+    one **loses the round** at once (no killer, e.g. drowned: the Terrorists lose).
   - **Hostages try to escape** (every hostage map): a hostage no Terrorist has had in sight (12 m) for 20 s sneaks
-    off to the street on its own, opening doors on the way; both teams are told. A Terrorist who gets within 4 m of it
-    stops it; if it reaches the street it counts as rescued. A crouched Terrorist holds **E** on a hostage for 2 s to
+    off to the CT base on its own, opening doors on the way; both teams are told. A Terrorist who gets within 4 m of it
+    stops it; only once it's inside the CT base (the rescue zone) does it count as rescued. A crouched Terrorist holds **E** on a hostage for 2 s to
     **zip-tie** it: it can't escape or be led until a CT holds **E** for 2 s to cut the ties (then it follows him).
     The ties work loose after 60 s.
   - Four **doors** lead into the house: the **front door** (porch), the **left door** (south side), the

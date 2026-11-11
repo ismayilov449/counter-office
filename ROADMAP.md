@@ -21,7 +21,7 @@ group can start from `main`.
 | 3 | Power & machinery | 3.1 Circuit breaker per floor + garage generator · 3.2 Power surge · 3.3 Cut the elevator cable |
 | 4 | Stealth & hiding | 4.1 The chimney · 4.2 Creaking floorboards · 4.3 Hide in the car trunk |
 | 5 | Underground & vents | 5.1 No radar underground · 5.2 Echo in the tunnels · 5.3 Air vents |
-| 6 | Hostages | 6.1 Hostages try to escape (zip ties) · 6.2 Carrying wounded hostages |
+| 6 | Hostages | 6.1 Hostages try to escape (zip ties) — **done 2026-11-11** · 6.2 Carrying wounded hostages |
 | 7 | Explosives | 7.1 Throw a grenade back · 7.2 Booby-trapped body · 7.3 Dead man's switch · 7.4 Cut the wire |
 | 8 | Close combat | 8.1 Suppressors · 8.2 Disarm from behind · 8.3 Door fights |
 | 9 | Sight | 9.1 Eyes adjust to darkness · 9.2 Night windows act as mirrors · 9.3 Visible breath in the cold |
@@ -178,7 +178,7 @@ Links: smoke from fires also travels through the vents (group 10).
 
 Builds on: the hostage fix, the human shield, dragging (group 1).
 
-1. **Hostages try to escape.** A hostage left unwatched sneaks towards a door, so Terrorists must guard them or zip-tie
+1. **Hostages try to escape.** *(Done 2026-11-11, on `main`: lib/hostage-escape.js; unwatched 20 s, caught within 4 m, ties loose after 60 s.)* A hostage left unwatched sneaks towards a door, so Terrorists must guard them or zip-tie
    them (hold E). CTs cut the ties to lead them out. It pairs with the human shield.
 2. **Carrying wounded hostages.** A badly hurt hostage can't walk. A CT has to carry them on his shoulder, slowly and
    with only a pistol. *Reuses dragging from group 1.*

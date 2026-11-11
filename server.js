@@ -1364,7 +1364,7 @@ function startRound() {
     notify(`Hide and Seek! Seekers: you are let out in ${CFG.hnsHide} seconds — then knife every hider.`, true, q => q.team === 'CT');
   } else if (mapMode(MAP) !== 'bomb') {
     if (isHostageMap()) {
-      notify('Rescue the hostages! CTs: press E on a hostage to lead it to the street.', false, q => q.team === 'CT');
+      notify('Rescue the hostages! CTs: press E on a hostage to lead it to the CT base (rescue zone).', false, q => q.team === 'CT');
       notify('Guard the hostages in the mansion!', false, q => q.team === 'T');
     }
   } else if (ts.length) {
@@ -1776,6 +1776,13 @@ function checkRoundEnd() {
     const rescued = game.hostages.filter(h => h.state === 'rescued').length;
     const waiting = game.hostages.filter(h => h.state === 'idle' || h.state === 'follow' || h.state === 'escape').length;
     if (rescued > 0 && waiting === 0) endRound('CT', 'All hostages have been rescued', 3500);
+    else if (!rescued && !waiting && game.hostages.length) {
+      // Every hostage dead, none rescued: the team that killed the last one loses. Nobody's kill (drowned, a blast
+      // nobody set off): the Terrorists lose, keeping them alive was their job.
+      const last = game.hostages.reduce((a, h) => (h.doneAt > a.doneAt ? h : a));
+      if (last.killedBy === 'CT') endRound('T', 'The Counter-Terrorists killed the last hostage');
+      else endRound('CT', last.killedBy === 'T' ? 'The Terrorists killed the last hostage' : 'All hostages are dead');
+    }
   }
 }
 
@@ -2255,7 +2262,7 @@ function onUse(p, m, t) {
         send(p, { t: 'msg', text: 'The hostage will wait here.' });
       } else {
         leadHostage(p, h);
-        send(p, { t: 'msg', text: 'The hostage is following you. Lead it to the street!' });
+        send(p, { t: 'msg', text: 'The hostage is following you. Lead it to the CT base!' });
       }
       broadcast({ t: 'sfx', s: 'hostage', p: h.p });
       return;
@@ -3370,6 +3377,7 @@ function hurtHostage(h, attacker, dmg, weapon) {
   h.state = 'dead';
   h.doneAt = now();
   h.leader = null;
+  h.killedBy = attacker?.team || null; // (who killed the last one loses: checkRoundEnd)
   if (attacker) {
     addMoney(attacker, -1500);
     sendMe(attacker);
