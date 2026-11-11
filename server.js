@@ -938,6 +938,7 @@ function nearestDoor(p) {
 
 // Doors open away from whoever uses them, and won't swing into someone standing in the way.
 function useDoor(p, i) {
+  if (cc.heldShut(i, p)) return; // closecombat: held shut from the other side (bots too)
   const d = MAP.doors[i];
   const next = world.doorStates[i] === 0 ? openingSide(d, p.p) : 0;
   const box = doorBox(d, next);
@@ -1602,7 +1603,9 @@ const carry = createCarry({ game, players, send, broadcast, world: () => world, 
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
 // closecombat: ROADMAP group 8 (lib/closecombat.js)
 const cc = createCloseCombat({ game, players, send, broadcast, sendMe: p => sendMe(p), now, mates: (a, b) => mates(a, b), eyeOf: p => eyeOf(p), lineOfSight: (a, b) => lineOfSight(a, b), spawnDrop: (...a) => spawnDrop(...a), noDisarm: () => isGG() || isZM(),
-  blocked: q => busy(q) || q.driving != null || q.riding != null || q.piloting != null || q.shield != null || body.lying(q) || game.hostages.some(h => h.carriedBy === q.id) });
+  blocked: q => busy(q) || q.driving != null || q.riding != null || q.piloting != null || q.shield != null || body.lying(q) || game.hostages.some(h => h.carriedBy === q.id),
+  map: () => MAP, world: () => world, useDoor: (p, i) => useDoor(p, i), applyDamage: (...a) => applyDamage(...a), ff: () => CFG.friendlyFire,
+  doorBlocked: box => game.hostages.some(h => h.state !== 'dead' && h.state !== 'rescued' && overlapsAny([box], h.p[0], h.p[1], h.p[2], PLAYER.radius, PLAYER.height)) || world.cars.some(c => carBoxes(c).some(b => [0, 1, 2].every(k => b.min[k] < box.max[k] && b.max[k] > box.min[k]))) });
 // explosives: ROADMAP group 7 (lib/explosives.js)
 const explosives = createExplosives({ game, players, send, broadcast, sendMe: p => sendMe(p), corpses: () => disguise.corpses, now, world:() => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n), explodeSatchel: s => explodeSatchel(s), explodeBomb: () => explodeBomb() });
 const bots = new BotManager({
@@ -2173,6 +2176,7 @@ function updateActions(t) {
     if (a.type === 'tie' || a.type === 'untie') { escape.act(p, a, t); continue; } // escape: zip-tying a hostage, cutting the ties
     if (a.type === 'gasValve') { gas.valve(p, a, t); continue; } // gas: shutting a valve
     if (a.type === 'elevforce') { elevator.act(p, a, t); continue; } // elevator: prying the lift's doors (any phase)
+    if (a.type.startsWith('cc')) { cc.act(p, a, t); continue; } // closecombat: holding a door shut, pushing it (any phase)
     if (a.type.startsWith('pw')) { circuits.act(p, a, t); continue; } // power: a breaker, the generator, cutting the lift's cable
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'disguise') { disguise.act(p, a, t); continue; } // Disguise: changing into a dead enemy's uniform
@@ -2260,7 +2264,7 @@ function hostageInReach(p, h) {
 // (breakers, the generator, the winch), then the fireplace and the chimney's top (stealth); among the old uses, into a
 // car's trunk just before getting into a car (stealth). The air vents have no E use (a hint only).
 function onUse(p, m, t) {
-  if (!m.on) { p.act = null; return; }
+  if (!m.on) { cc.release(p, t); p.act = null; return; } // closecombat: (a quick crouched tap on a door just opens it)
   if (p.piloting != null) { const d = game.drones.find(x => x.id === p.piloting); if (d) loseDrone(d, 'released'); else p.piloting = null; return; }
   if (p.alive && !p.act) {
     if (p.zip) { zipOff(p, t, 'letgo'); return; }
@@ -2341,7 +2345,7 @@ function onUse(p, m, t) {
   }
   if (MAP.cctv && !p.bot && atDesk(p)) { cctvOn(p); return; }
   const sw = nearestSwitch(p), door = nearestDoor(p);
-  if (door && (!sw || door.dist < dist2(p.p, sw.p))) { useDoor(p, door.i); return; }
+  if (door && (!sw || door.dist < dist2(p.p, sw.p))) { if (!cc.door(p, door.i, t)) useDoor(p, door.i); return; } // closecombat: running kicks it, crouched holds it shut, against a holder you push
   if (sw && circuits.onSwitch(p, sw)) return; // power: a switch on the house's power (its circuit, a burst bulb)
   if (sw && game.lights.power === false && MAP.fusebox.groups.includes(sw.group)) {
     send(p, { t: 'msg', text: 'No power — someone pulled the lever at the fuse box in the cellar.' });

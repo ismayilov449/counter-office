@@ -3300,7 +3300,7 @@ const net = new Net({
   },
   ...disguise.handlers, // Disguise: disguiseOn / disguiseOff / disguiseFx
   ...xp.handlers, // explosives: xpGrab, xpHot, xpTraps, xpDms
-  ...cc.handlers, // closecombat: ccDisarmed
+  ...cc.handlers, // closecombat: ccDisarmed, ccDoor, ccShove
 });
 const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map, downed: () => body.downed() }); // blood trails (public/js/blood.js)
 initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
@@ -3775,6 +3775,7 @@ function updateHud(now) {
   if (me.act?.a === 'flood') hud.progress(flood.actLabel(), me.act.pr); // Floodgate
   if (me.act && circuits.progress(me.act.a)) hud.progress(circuits.progress(me.act.a), me.act.pr); // power
   if (me.act && stealth.progressLabel(me.act.a)) hud.progress(stealth.progressLabel(me.act.a), me.act.pr); // stealth: lighting the fireplace
+  if (me.act && cc.progress(me.act.a)) hud.progress(cc.progress(me.act.a), me.act.pr); // closecombat: holding a door shut, pushing it
 
   let target = null;
   if (me.alive) {

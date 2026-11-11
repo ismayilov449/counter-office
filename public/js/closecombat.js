@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { WEAPONS, slotKey } from '/shared/weapons.js';
 import { CC, supFits, behind } from '/shared/closecombat.js';
 
-let C = null; // { me, ... } from main.js
+let C = null; // { me, game, remotes, switchSlot, eyePos, coll(), isMate(r), lying(r), off() } from main.js
 export function initCloseCombat(ctx) { C = ctx; }
 
 // ---- 8.1 suppressors
@@ -40,12 +40,28 @@ function disarmTarget() {
   }
   return null;
 }
+// The E hint: an enemy's back (over everything but a trunk, as on the server); a closed door: running kicks it,
+// crouched holds it shut (the server's order: the disarm comes long before the doors).
 export function hint(h) {
   const r = disarmTarget();
-  return r ? `Press E to disarm ${r.name || 'him'} (snatch his ${WEAPONS[r.w]?.name || 'gun'})` : h;
+  if (r) return `Press E to disarm ${r.name || 'him'} (snatch his ${WEAPONS[r.w]?.name || 'gun'})`;
+  if (h !== 'Press E to open the door') return h;
+  if (Math.hypot(C.me.v[0], C.me.v[2]) >= CC.run) return 'Press E to KICK the door open (you\'re running)';
+  return C.me.crouch ? 'Press E to open the door · hold E to hold it shut' : 'Press E to open the door · crouch + hold E to hold it shut · run + E kicks it';
+}
+
+// ---- 8.3 door fights: the progress bar while holding a door shut or pushing it (counts from the server)
+let counts = { h: 0, p: 0 };
+export function progress(a) {
+  if (a === 'ccHold') return `Holding the door shut (${counts.h} holding vs ${counts.p} pushing)`;
+  if (a === 'ccPush') return counts.p > counts.h ? `Forcing the door (${counts.p} vs ${counts.h})...` : `Pushing the door: they're holding it (${counts.p} vs ${counts.h}), get help!`;
+  return null;
 }
 
 export const handlers = {
   // our gun was snatched: the knife comes out (the server has already taken the gun from our inventory)
   ccDisarmed() { C.switchSlot('knife', true); },
+  ccDoor(m) { counts = { h: m.h, p: m.p }; },
+  // a door swung into where we stood: moved beside its leaf (the knock follows in its own message)
+  ccShove(m) { C.me.p[0] = m.p[0]; C.me.p[2] = m.p[2]; },
 };
