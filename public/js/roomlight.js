@@ -15,7 +15,10 @@ const uniforms = {
   // How much of the sky light gets in; on night maps GLOW + the glow for a lit room (the glow rides on this one value
   // because the room loop runs for every pixel: a second array in it cost ~10% of a frame on swiftshader).
   uRoomAmb: { value: new Array(N).fill(1) },
+  // Nightvision: flat light on every surface, dark room or not (the screen's CSS filter alone can't lift black: 0 x 2.3 = 0).
+  uNvg: { value: 0 },
 };
+export const setNvg = k => { uniforms.uNvg.value = k; };
 const GLOW = 2; // (a sky-light share is at most 1)
 
 // A lamp lights only its own room (integration 2026-11-08): point lights cast no shadows, so a lamp lit the rooms round
@@ -113,6 +116,7 @@ function onBeforeCompile(shader) {
   shader.uniforms.uRoomMin = uniforms.uRoomMin;
   shader.uniforms.uRoomMax = uniforms.uRoomMax;
   shader.uniforms.uRoomAmb = uniforms.uRoomAmb;
+  shader.uniforms.uNvg = uniforms.uNvg;
   for (const k of ['uLampAMin', 'uLampAMax', 'uLampBMin', 'uLampBMax']) shader.uniforms[k] = uniforms[k]; // (a lamp lights its own room)
   shader.vertexShader = 'varying vec3 vRoomPos;\n' + shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
     vec4 roomWp = vec4( transformed, 1.0 );
@@ -124,6 +128,7 @@ function onBeforeCompile(shader) {
 uniform vec3 uRoomMin[ ${N} ];
 uniform vec3 uRoomMax[ ${N} ];
 uniform float uRoomAmb[ ${N} ];
+uniform float uNvg;
 #if NUM_POINT_LIGHTS > 0
 uniform vec3 uLampAMin[ NUM_POINT_LIGHTS ];
 uniform vec3 uLampAMax[ NUM_POINT_LIGHTS ];
@@ -148,7 +153,7 @@ float lampIn( vec3 a0, vec3 a1, vec3 b0, vec3 b1 ) {
   roomAmb = roomAmb > ${GLOW.toFixed(1)} ? ${LIT} : roomAmb;`)
     .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replace(SUN_LINE, `${SUN_LINE}\n\t\tdirectLight.color *= 1.0 - roomIn;`)
       .replace(POINT_LINE, `${POINT_LINE}\n\t\tdirectLight.color *= lampIn( uLampAMin[ i ], uLampAMax[ i ], uLampBMin[ i ], uLampBMax[ i ] );`))
-    .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n\treflectedLight.indirectDiffuse *= roomAmb;\n\treflectedLight.indirectDiffuse += roomGlow * vec3( 1.0, 0.8, 0.56 ) * BRDF_Lambert( material.diffuseColor );');
+    .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n\treflectedLight.indirectDiffuse *= roomAmb;\n\treflectedLight.indirectDiffuse += roomGlow * vec3( 1.0, 0.8, 0.56 ) * BRDF_Lambert( material.diffuseColor );\n\treflectedLight.indirectDiffuse += uNvg * BRDF_Lambert( material.diffuseColor );');
 }
 
 // Every Lambert and Phong material has it from the start (set on their prototypes when this module loads), so a

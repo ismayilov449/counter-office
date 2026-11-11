@@ -38,11 +38,11 @@ export const WEAPONS = {
   sg550: primary('sniper', { name: 'Krieg 550 Commando', team: 'CT', price: 4200, damage: 70, rate: 0.25, mag: 30, reserve: 90, reload: 3.35, spread: 0.0015, unscoped: 0.045, moveSpread: 0.1, spreadInc: 0.004, recoil: 0.022, rangeMod: 0.98, pen: 0.775, speed: 5.4, zoom: [30, 12], sniper: true, autoSniper: true, ammoPrice: 60 }),
   awp: primary('sniper', { name: 'AWP', auto: false, price: 4750, damage: 115, rate: 1.45, mag: 10, reserve: 30, reload: 2.9, spread: 0.0008, unscoped: 0.08, moveSpread: 0.12, spreadInc: 0, recoil: 0.06, rangeMod: 0.99, pen: 0.97, speed: 5.3, zoom: [30, 11], sniper: true, killReward: 100, ammoPrice: 125 }),
 
-  // Rocket launcher: CTs buy it, anyone can pick it up. The rocket flies, then explodes (see server explodeRocket).
-  rpg: primary('launcher', { name: 'RPG-7', team: 'CT', auto: false, price: 6000, damage: 500, rocket: true, blast: 9, rocketSpeed: 38, rate: 1.0, mag: 1, reserve: 3, reload: 3.0, spread: 0.002, moveSpread: 0.03, spreadInc: 0, recoil: 0.07, rangeMod: 1, pen: 0.95, speed: 5.0, killReward: 300, ammoPrice: 600 }),
-  // RPG-26: a throwaway one-shot tube for the Terrorists (one per team each round; anyone can pick up an unused one).
+  // Rocket launcher: both teams buy it, only while the admin allows it (CFG.rpg7); anyone can pick it up. The rocket flies, then explodes (see server explodeRocket).
+  rpg: primary('launcher', { name: 'RPG-7', auto: false, price: 6000, damage: 500, rocket: true, blast: 9, rocketSpeed: 38, rate: 1.0, mag: 1, reserve: 3, reload: 3.0, spread: 0.002, moveSpread: 0.03, spreadInc: 0, recoil: 0.07, rangeMod: 1, pen: 0.95, speed: 5.0, killReward: 300, ammoPrice: 600 }),
+  // RPG-26: a throwaway one-shot tube for both teams (anyone can pick up an unused one).
   // A smaller warhead than the RPG-7's and less accurate; once fired the empty tube is thrown away (disposable).
-  rpg26: primary('launcher', { name: 'RPG-26', team: 'T', auto: false, price: 3500, damage: 400, rocket: true, disposable: true, perTeam: 1, blast: 6, rocketSpeed: 34, rate: 1.0, mag: 1, reserve: 0, reload: 0, spread: 0.012, moveSpread: 0.05, spreadInc: 0, recoil: 0.06, rangeMod: 1, pen: 0.95, speed: 5.4, killReward: 300 }),
+  rpg26: primary('launcher', { name: 'RPG-26', auto: false, price: 3500, damage: 400, rocket: true, disposable: true, blast: 6, rocketSpeed: 34, rate: 1.0, mag: 1, reserve: 0, reload: 0, spread: 0.012, moveSpread: 0.05, spreadInc: 0, recoil: 0.06, rangeMod: 1, pen: 0.95, speed: 5.4, killReward: 300 }),
   // 82-BM-37 mortar: set it up on open ground (setup seconds), then aim like a real crew: a bearing and an elevation
   // (in mils, see mortarRange); the shell drops there a few seconds later with some spread (server onMortar).
   // One per team; heavy to carry.
@@ -69,9 +69,9 @@ export const WEAPONS = {
   // you hold the detonator, an old phone, and Mouse1 sets it off from anywhere (see SATCHEL).
   satchel: { name: 'Satchel charge', slot: 6, cls: 'satchel', satchel: true, team: 'T', price: 1200, max: 1, speed: 6.3 },
   phone: { name: 'Detonator', slot: 6, cls: 'phone', speed: 6.3 },
-  // FPV drone (Terrorists, one per team each round): 6 takes out its remote (with the mines), Mouse1 launches it, and
+  // FPV drone (both teams): 6 takes out its remote (with the mines), Mouse1 launches it, and
   // you fly it through its camera while you crouch with the remote; see DRONE.
-  drone: { name: 'FPV drone', slot: 6, cls: 'drone', device: true, team: 'T', price: 5500, max: 1, perTeam: 1, speed: 6.3 },
+  drone: { name: 'FPV drone', slot: 6, cls: 'drone', device: true, price: 5500, max: 1, speed: 6.3 },
   // The drone's bomb in the air: falls and goes off where it lands, an HE grenade's blast (never in anyone's hands).
   dronebomb: { name: 'Drone bomb', slot: 4, cls: 'grenade', impact: true, fuse: 6, speed: 6.3 },
 };

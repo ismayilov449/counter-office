@@ -9,7 +9,7 @@ import { CAR, seatPos, stepCar } from '/shared/vehicles.js';
 import { CollisionWorld } from '/shared/collision.js';
 import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
-import { setRooms, setGlow, ambientAt, glowAt, maskLamps } from './roomlight.js';
+import { setRooms, setGlow, ambientAt, glowAt, maskLamps, setNvg } from './roomlight.js';
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
 import { skyOf } from '/shared/maps/sky.js';
@@ -1412,6 +1412,7 @@ function ammoLabel(action) {
 function cantBuy(id) {
   const i = itemInfo(id);
   if (!availableTo(id, me.team)) return `${i.team === 'CT' ? 'CT' : 'T'} only`;
+  if (id === 'rpg' && !game.cfg.rpg7) return 'Off (admin)';
   if (id === 'kit' && (game.mode !== 'bomb' || game.cfg.gameMode !== 'classic')) return 'Bomb maps only';
   if (id === 'adren' && (game.mode === 'elim' || game.cfg.gameMode !== 'classic')) return 'Classic only'; // wounds: no downed state elsewhere
   if (isZM() && (MINES.includes(id) || id === 'camo' || id === 'mortar' || id === 'jammer' || id === 'satchel' || id === 'drone')) return 'Not in Zombie';
@@ -3617,8 +3618,9 @@ const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStar
 function updateHud(now) {
   hud.overlays(now, me.alive && me.nvgOn && !gadgets.watching());
   // (watching a security camera: its black and white picture instead)
-  const nvgFilter = (me.alive && gadgets.screenFilter()) || (me.alive && me.nvgOn ? 'brightness(2.3) contrast(1.15) grayscale(1) sepia(1) hue-rotate(50deg) saturate(3.5)' : '');
+  const nvgFilter = (me.alive && gadgets.screenFilter()) || (me.alive && me.nvgOn ? 'brightness(1.5) contrast(1.15) grayscale(1) sepia(1) hue-rotate(50deg) saturate(3.5)' : '');
   if (renderer.domElement.style.filter !== nvgFilter) renderer.domElement.style.filter = nvgFilter; // only when it changes
+  setNvg(me.alive && me.nvgOn && !gadgets.watching() ? 0.5 : 0);
   if (!me.joined) return;
   const id = current(), def = WEAPONS[id];
   hud.status(me, me.alive ? id : null);

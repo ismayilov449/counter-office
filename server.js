@@ -66,6 +66,7 @@ const CFG = {
   maxMoney: 16000,
   friendlyFire: env.FRIENDLY_FIRE === '1',
   rotateMaps: env.MAP_ROTATION !== '0',
+  rpg7: env.RPG7 === '1', // the RPG-7 in the buy menu (off: it bombarded the house too easily)
   gameMode: ['gungame', 'zombie', 'deathmatch', 'hns'].includes(env.GAME_MODE) ? env.GAME_MODE : 'classic',
   // Bots fill both teams up to perTeam players each (8 = 8 vs 8); 0 turns them off.
   bots: { perTeam: num(env.BOTS, 8), difficulty: BOT_LEVELS[env.BOT_LEVEL] ? env.BOT_LEVEL : 'hard' },
@@ -252,6 +253,7 @@ const SETTINGS = {
   autoBalance: bool,
   halftime: bool,
   rotateMaps: bool,
+  rpg7: bool,
 };
 const savedSettings = {};
 try {
@@ -3427,6 +3429,7 @@ function onBuy(p, id) {
   const def = wdef || idef;
   if (!def || def.price == null) return;
   if (def.team && def.team !== p.team) return fail('Your team cannot buy that.');
+  if (id === 'rpg' && !CFG.rpg7) return fail('The RPG-7 is switched off by the admin.');
   if ((MINES.includes(id) || id === 'camo' || id === 'jammer' || id === 'satchel' || id === 'drone') && isZM()) return fail('Not in Zombie mode.');
   if (id === 'jammer' && (game.jamUsed?.[p.team] || [...players.values()].some(q => q !== p && q.team === p.team && q.inv.jammer > 0))) {
     return fail('Your team already has its signal jammer this round.');
@@ -3437,7 +3440,7 @@ function onBuy(p, id) {
     const holder = [...players.values()].find(q => q !== p && (isDM() || q.team === p.team) && q.inv.primary?.id === 'mortar');
     if (holder) return fail(isDM() ? `${holder.name} already has the mortar.` : `Your team already has a mortar (${holder.name}).`);
   }
-  // The RPG-26 and the drone: one per team each round (in Deathmatch and warmup, one in anyone's hands at a time).
+  // Items with a perTeam limit: so many per team each round (in Deathmatch and warmup, one in anyone's hands at a time).
   if (wdef?.perTeam) {
     const free = isDM() || game.phase === 'warmup';
     const has = q => q.inv.primary?.id === id || q.inv[id] > 0 || (id === 'drone' && game.drones.some(d => d.owner === q.id && d.state !== 'fall'));
@@ -3586,7 +3589,7 @@ function passwordOk(given) {
 const SETTING_LABELS = {
   gameMode: 'Game mode', startMoney: 'Start money', roundsToWin: 'Rounds to win', roundTime: 'Round time', freezeTime: 'Freeze time',
   buyTime: 'Buy time', bombTime: 'C4 timer', friendlyFire: 'Friendly fire', autoBalance: 'Auto team balance', halftime: 'Halftime side switch',
-  rotateMaps: 'Map rotation', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
+  rotateMaps: 'Map rotation', rpg7: 'RPG-7', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
 };
 
 function adminState() {
