@@ -1601,7 +1601,8 @@ const escape = createEscape({ game, players, map: () => MAP, world: () => world,
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
 // closecombat: ROADMAP group 8 (lib/closecombat.js)
-const cc = createCloseCombat({ game, players, send, broadcast, sendMe: p => sendMe(p), now });
+const cc = createCloseCombat({ game, players, send, broadcast, sendMe: p => sendMe(p), now, mates: (a, b) => mates(a, b), eyeOf: p => eyeOf(p), lineOfSight: (a, b) => lineOfSight(a, b), spawnDrop: (...a) => spawnDrop(...a), noDisarm: () => isGG() || isZM(),
+  blocked: q => busy(q) || q.driving != null || q.riding != null || q.piloting != null || q.shield != null || body.lying(q) || game.hostages.some(h => h.carriedBy === q.id) });
 // explosives: ROADMAP group 7 (lib/explosives.js)
 const explosives = createExplosives({ game, players, send, broadcast, sendMe: p => sendMe(p), corpses: () => disguise.corpses, now, world:() => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n), explodeSatchel: s => explodeSatchel(s), explodeBomb: () => explodeBomb() });
 const bots = new BotManager({
@@ -2271,6 +2272,7 @@ function onUse(p, m, t) {
   if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
   if (wounds.use(p, t)) return; // wounds: interrogate a downed enemy (hold E 3 s)
   if (!p.alive || p.act) return;
+  if (cc.disarm(p, t)) return; // closecombat: an enemy's back within reach: snatch the gun in his hands
   if (p.shield == null && MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at; a hostage held lets go first)
   if (carry.use(p, t)) return; // carry: a CT picks up a badly hurt hostage or puts his down
   if (escape.use(p, t)) return; // escape: a crouched Terrorist zip-ties a hostage, a CT cuts the ties (before the shield and the lead)

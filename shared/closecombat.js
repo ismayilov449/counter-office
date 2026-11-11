@@ -3,7 +3,8 @@
 //     shot does `damage` of the damage, is heard only nearby, has no muzzle flash (no light in the dark, no spark
 //     for the gas).
 // 8.2 Disarm from behind: E within `reach` m of an enemy, inside his back arc (`arc` radians each side of straight
-//     behind), snatches the gun in his hands. `cooldown` s between tries.
+//     behind), snatches the gun in his hands. `cooldown` s between tries. Dropped (our slot is full): he can't walk
+//     over it to take it back for `dropGuard` s.
 // 8.3 Door fights: E while running (at least `run` m/s) kicks a closed door open: `damage` and a shove (`push` m/s)
 //     to anyone within `hitReach` m behind it. Crouched, hold E on a closed door to hold it shut (a tap under `tap` s
 //     still just opens it); E from the other side pushes. More pushers than holders for `win` s: it bursts open.
@@ -11,7 +12,7 @@ import { WEAPONS } from './weapons.js';
 
 export const CC = {
   damage: 0.9,
-  reach: 1.5, reachY: 0.8, arc: Math.PI / 3, cooldown: 3,
+  reach: 1.5, reachY: 0.8, arc: Math.PI / 3, cooldown: 3, dropGuard: 3,
   run: 4.2, hitReach: 1.5, kickDamage: 15, push: 7, aim: 0.4,
   tap: 0.3, win: 1,
 };

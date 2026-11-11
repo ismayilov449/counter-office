@@ -3300,13 +3300,14 @@ const net = new Net({
   },
   ...disguise.handlers, // Disguise: disguiseOn / disguiseOff / disguiseFx
   ...xp.handlers, // explosives: xpGrab, xpHot, xpTraps, xpDms
+  ...cc.handlers, // closecombat: ccDisarmed
 });
 const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map, downed: () => body.downed() }); // blood trails (public/js/blood.js)
 initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
 initCarry({ me, remotes, hostages }); // carry
 initWounds({ net, me, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // body (integration: + in a trunk: E gets out first, as on the server)
-cc.initCloseCombat({ me }); // closecombat
+cc.initCloseCombat({ me, game, net, hud, remotes, switchSlot, eyePos, coll: () => coll, isMate: r => isMate(r), lying: r => body.lying(r), off: () => isGG() || isZM() }); // closecombat
 xp.initExplosives({ me, game, net, hud, fx, audio, scene, remotes, current: () => current(), coll: () => coll, eyePos, aimDir, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // explosives: (after initBody: grabbing a grenade's hint goes over a revive's)
 
 // The Mansion's gadgets: the zip line (see gadgets.js).
@@ -3758,6 +3759,7 @@ function updateHud(now) {
     hint = shieldHint(hint); // shield: grab / let go / held
     hint = tieHint(hint); // escape: a crouched Terrorist zip-ties (before the shield, as on the server)
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
+    hint = cc.hint(hint); // closecombat: an enemy's back within reach (over the lift, as on the server); a door: kick it running, crouch + hold E to hold it shut
   }
   if (!hint && (gh = ug.hint())) hint = gh; // underground: by an air vent (no E use: only when nothing else is said)
   if ((gh = stealth.inside())) hint = gh; // stealth: in a trunk, E jumps out (before anything else, as on the server)
