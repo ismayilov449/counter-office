@@ -107,6 +107,8 @@ export function ambientAt(p) {
   });
   return k;
 }
+// Is a point ([x, y, z]) in one of the rooms (under a roof)?
+export const indoors = p => rooms.some(r => p[0] > r.min[0] && p[0] < r.max[0] && p[1] > r.min[1] && p[1] < r.max[1] && p[2] > r.min[2] && p[2] < r.max[2]);
 
 const SUN_LINE = 'getDirectionalLightInfo( directionalLight, directLight );';
 const POINT_LINE = 'getPointLightInfo( pointLight, geometryPosition, directLight );';

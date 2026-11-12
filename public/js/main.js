@@ -11,7 +11,8 @@ import { doorCenter } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, setGlow, ambientAt, glowAt, maskLamps, setNvg } from './roomlight.js';
 import { ESCAPE } from '/shared/hostage-escape.js'; // escape: hostages try to escape, zip ties
-import { adaptEyes, resetEyes, nightEyes } from './eyes.js'; // eyes adjust to darkness (ROADMAP 9.1)
+import { adaptEyes, resetEyes, nightEyes } from './eyes.js';
+import { initBreath, breathe } from './breath.js'; // visible breath in the cold (ROADMAP 9.3) // eyes adjust to darkness (ROADMAP 9.1)
 import { initCarry, carrying, carrySlotOk, carryLimitKeys, carrySpeed, carryPose, carryRay } from './hostage-carry.js'; // carry: wounded hostages
 import { createPlayerModel, createHostageModel, setPlayerWeapon, posePlayer, poseEmote, clearEmote, createNameTag, createViewModel, createDropModel, createPlantedBomb, createGibPieces, tearOff, mendModel, setFaded } from './models.js';
 import { buildMortarSetup, buildPlacedMine, buildPlacedJammer, buildPlacedSatchel, buildDrone } from './guns.js';
@@ -1619,6 +1620,7 @@ function updateRemotes(dt) {
       if (em && performance.now() - r.emote.start < em.secs * 1000) poseEmote(r.model, r.emote.id, (performance.now() - r.emote.start) / 1000);
       else if (r.emote) { r.emote = null; clearEmote(r.model); showEmoteLabel(r, null); }
       shieldPoseRemote(r); // shield: the arm round a held hostage's neck
+      if (!killcam) breathe(r, speed, dt); // breath: puffs in the cold
       if (speed > 4 && speed < 15 && !killcam) {
         r.stepAcc += moved;
         if (r.stepAcc > 2.4) { r.stepAcc = 0; audio.play('step', s.p, surfaceAt(s.p)); }
@@ -4155,6 +4157,7 @@ function frame() {
   if (shotRequested) saveScreenshot();
 }
 flood.init({ scene, net, fx, me, game, applyLights: l => applyLights(l) }); // Floodgate
+initBreath({ fx, map: () => map, level: flood.level, camera }); // breath
 stealth.init({ scene, me, net, hud, fx, game, remotes, cars, coll: () => coll, map: () => map, replay: () => !!killcam }); // stealth: its browser side (public/js/stealth.js)
 ug.init({ scene, net, me, hud, fx, coll: () => coll, indoors: p => indoors(p) }); // underground
 walls.init({ scene, net, fx, me, game, coll: () => coll, remotes, hud, map: () => map }); // walls:

@@ -359,6 +359,7 @@ export function hint() {
   if (!usable()) return '';
   return st.open ? `Hold E to close the valve (${FLOOD.hold} s) — the water drains away slowly` : `Hold E to open the valve (${FLOOD.hold} s) — it floods the drain, then the cellar and the tunnel`;
 }
+export const level = () => st.level; // (breath.js: the cellar's water is cold)
 export const actLabel = () => (st.open ? 'Closing the valve...' : 'Opening the valve...');
 // (for the tests: dev/test-scripts/flood/)
 export const debug = () => ({ level: st.level, target: st.target, open: st.open, turning: st.turning, air: st.air, surf: !!surf?.visible, areas: surfKey,

@@ -396,6 +396,8 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     **Your eyes adjust to the dark:** coming from a lit room, the flashlight or nightvision into darkness, you see
     almost nothing at first; after a couple of seconds your eyes adjust, and after a few more you see much better
     than at first. Back into the light it's bright again at once.
+    **Breath in the cold:** outside on the night map and above the water in the flooded cellar, everyone breathes out a
+    small white puff every couple of seconds (faster after running), seen within 25 m. It can give a hidden player away.
   - **Water tunnel** under the north lawn from behind the mansion to the street, with a manhole and
     ladder at each end.
   - The lawn by the left door has a **pickup truck** with a **PKT machine gun** in the back. It has two seats: the
