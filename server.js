@@ -1639,7 +1639,7 @@ body.onPlayDead(p => { if (p.zip) zipOff(p, now(), 'letgo'); if (p.cctv) cctvOff
 // body × shield: a corpse holds no hostage (let go as a real death would: 'died'); × disguise: a wearer who drops is
 // seen through ('went down'); × elevator: no lift target
 body.onPlayDead(p => { shield.letGo(p, 'died'); disguise.reveal(p, 'downed'); p.elevAim = null; });
-const wounds = createWounds({ players, game, cfg: CFG, map: () => MAP, now, send, broadcast, sendMe, killPlayer, inTeam, busy, disguise, under: pos => ug.under(pos) }); // wounds: (lib/wounds.js); wounds x underground: the interrogation skips teammates underground
+const wounds = createWounds({ players, game, cfg: CFG, map: () => MAP, now, send, broadcast, sendMe, killPlayer, inTeam, busy, disguise, under: pos => ug.under(pos), dragged: (p, id) => explosives.dragged(p, id) }); // wounds: (lib/wounds.js); wounds x underground: the interrogation skips teammates underground
 
 // bet feature: F3 bet on yourself (lib/bet.js)
 const bet = createBets({ players, game, cfg: CFG, now, send, broadcast, sendMe, mates, inTeam });

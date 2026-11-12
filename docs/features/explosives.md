@@ -46,9 +46,8 @@ See README.md under the satchel charge ("Dead man's switch") and "Explosives tri
 - 7.2: bodies come from lib/disguise.js (`disguise.corpses`), so it works where uniforms do (classic, live rounds).
   The trigger is any CT's E within the uniform's reach of the body (standing = inspect, crouched = the uniform); the
   blast is an HE (`explodeNade`) owned by the trapper. Terrorists' E on a trapped mate does nothing. One trap per
-  body; cleared each round and when the body's man is back up / gone. **Dragging can't set it off: dead bodies can't
-  be dragged in the game yet** (lib/drag.js only drags downed teammates). When corpse dragging comes, call the blast
-  from there (export a `blowTrap(id)` — it's internal now).
+  body; cleared each round and when the body's man is back up / gone. Dragging it sets it off too (2026-11-12): lib/wounds.js's
+  body drag calls `explosives.dragged(p, id)` (an enemy's drag only).
 - 7.3: armed per life (`spawnSeq`) while `p.w === 'phone'` and he has satchels out this life. The tick checks
   "dead or downed" before "phone away", because a downed man's weapon is switched to the pistol by body.js. CT warning:
   browser-side, an armed T within 20 m, in front (cos > 0.6) and in sight: a small HUD line every 3 s.

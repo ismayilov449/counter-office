@@ -559,8 +559,8 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     press **E** to grab it ("GRENADE IN YOUR HAND" counts down) and **Mouse1** to throw it back with the fuse it has
     left (its kills are yours). Too slow and it goes off in your hand: you die.
   - **Booby-trapped body** (classic live rounds, like the uniforms): a Terrorist with an HE grenade crouches over a dead teammate and holds **E** for 2 s to
-    hide the grenade under him. The first CT who presses **E** on that body (to look, or to take its uniform) sets it
-    off. Look closely: a tiny grenade pin lies by a trapped body (you only see it within 2.5 m).
+    hide the grenade under him. The first CT who presses **E** on that body (to look, or to take its uniform) or drags it
+    sets it off. Look closely: a tiny grenade pin lies by a trapped body (you only see it within 2.5 m).
   - **Cut the wire:** while defusing the bomb or a satchel charge (holding **E**), press **1** to cut the red wire or
     **2** for the blue one: the right wire defuses it at once, the wrong one sets it off. For desperate last seconds.
 - **FPV drone** (buy menu → 5 Heavy, both teams, $5500, no limit; not in Zombie mode). Press **6** to take out its remote (with the mines) and **Mouse1** to
@@ -623,6 +623,9 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   - Not as the last one standing on your team (the round wouldn't end, so it would fool nobody); if your teammates all
     fall while you're playing dead, you get up. Only team chat while playing dead. Only with your feet on the ground
     (not in mid-air, on a ladder or swimming). The cat may come and meow at you.
+- **Drag a dead body** (live rounds, anyone's body): hold **E** and **walk** over it to drag it along behind you, at the
+  same slow pace and with only your pistol, to hide it or pull it out of sight. Let go of **E** to drop it. A body
+  blown apart can't be dragged. Dragging a booby-trapped enemy body sets it off.
 - **Drag a downed teammate.** Hold **E** on him (the revive starts) and **walk**: you drag him behind you, slowly
   (1.3 m/s) and with only your pistol in your other hand. Stand still with E held and the revive goes on from where it
   was; let go of E and you let go of him. He follows your path about a metre behind you (round corners, through
@@ -863,7 +866,7 @@ The HUD shows the active party modes under the timer.
 | Ctrl | duck | Shift | walk (silent) |
 | Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
-| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, car trunk, zip line on/off, CCTV desk, lift, valves, chimney (top); hold: revive a teammate (+ walk: drag him), interrogate a downed enemy, a uniform (crouched), light the fireplace, a breaker / the generator / the lift's winch (looking at it); hostage shield (T); behind an enemy: disarm him; running at a door: kick it open; crouched, hold at a door: hold it shut | G | drop weapon |
+| E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, car trunk, zip line on/off, CCTV desk, lift, valves, chimney (top); hold: revive a teammate (+ walk: drag him; walk over a dead body: drag it), interrogate a downed enemy, a uniform (crouched), light the fireplace, a breaker / the generator / the lift's winch (looking at it); hostage shield (T); behind an enemy: disarm him; running at a door: kick it open; crouched, hold at a door: hold it shut | G | drop weapon |
 | 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |
 | Q | last weapon | Wheel | switch weapon |
 | B | buy menu | O | buy equipment |

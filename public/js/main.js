@@ -3307,7 +3307,7 @@ const net = new Net({
 const bleed = new BloodTrails(scene, { me, remotes, net, hud, audio, coll: () => coll, map: () => map, downed: () => body.downed() }); // blood trails (public/js/blood.js)
 initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }); // shield: its messages and state
 initCarry({ me, remotes, hostages }); // carry
-initWounds({ net, me, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
+initWounds({ net, me, game, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // body (integration: + in a trunk: E gets out first, as on the server)
 cc.initCloseCombat({ me, game, net, hud, remotes, switchSlot, eyePos, coll: () => coll, isMate: r => isMate(r), lying: r => body.lying(r), off: () => isGG() || isZM() }); // closecombat
 xp.initExplosives({ me, game, net, hud, fx, audio, scene, remotes, current: () => current(), coll: () => coll, eyePos, aimDir, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // explosives: (after initBody: grabbing a grenade's hint goes over a revive's)

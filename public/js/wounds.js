@@ -103,6 +103,18 @@ function clearMe() {
 // ---------------------------------------------------------------- the server's rules, for the hints
 
 // A downed teammate I would take hold of (E held and walking): within reach, the nearest.
+// the nearest dead body within reach (any team's, not blown apart; live rounds), for its drag
+function bodyTarget() {
+  const me = A.me;
+  if (A.game?.phase !== 'live') return null;
+  let best = null, bd = Infinity;
+  for (const r of A.remotes.values()) {
+    if (r.alive || r.model?.userData.gibAll || !r.buf.length || st.d.some(e => e[1] === r.id)) continue;
+    const d = Math.hypot(r.p[0] - me.p[0], r.p[2] - me.p[2]);
+    if (d <= WOUNDS.drag.reach && Math.abs(r.p[1] - me.p[1]) < 1.2 && d < bd) { best = r; bd = d; }
+  }
+  return best;
+}
 function dragTarget() {
   const me = A.me;
   let best = null, bd = Infinity;
@@ -143,9 +155,10 @@ function wrapHud() {
     let h = text;
     // (down, the hint line would sit on body.js's "YOU'RE DOWN" panel: our words go on a line under it, downLine)
     if (me.alive && body.downed()) h = '';
+    else if (me.alive && st.dragging != null && A.remotes.get(st.dragging)?.alive === false) h = `Dragging ${A.nameOf(st.dragging)}'s body — let go of E to drop it`;
     else if (me.alive && st.dragging != null) h = `Dragging ${A.nameOf(st.dragging)} — stand still to revive, let go of E to drop him`;
     else if (typeof text === 'string' && text.startsWith('Hold E to revive')) h = `${text} · walk to drag him`;
-    else if (eFree()) { const q = askTarget(); if (q) h = `Hold E to interrogate ${q.name} (${WOUNDS.ask} s)`; }
+    else if (eFree()) { const q = askTarget(); if (q) h = `Hold E to interrogate ${q.name} (${WOUNDS.ask} s)`; else if (!h) { const r = bodyTarget(); if (r) h = `Hold E and walk to drag ${r.name}'s body`; } }
     return hint0.call(this, h);
   };
   hud.progress = function (label, frac) {
@@ -354,7 +367,7 @@ export const wounds = {
     // E held and walking over a downed teammate: drag him (from his revive, or straight away); standing still with E
     // held: the revive goes on (the server does both)
     const eHeld = me.usingKey || me.usingMouse, moving = MOVE.some(k => A.keys.has(k));
-    if (me.alive && st.dragging == null && eHeld && moving && now - st.sentAt > 400 && !body.downed() && (me.act?.a === 'bodyRevive' || (!me.act && dragTarget()))) {
+    if (me.alive && st.dragging == null && eHeld && moving && now - st.sentAt > 400 && !body.downed() && (me.act?.a === 'bodyRevive' || (!me.act && (dragTarget() || bodyTarget())))) {
       A.net.send({ t: 'wdDrag', on: 1 });
       st.sentAt = now;
       st.stillAt = now;
