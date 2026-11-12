@@ -24,8 +24,8 @@ group can start from `main`.
 | 6 | Hostages | 6.1 Hostages try to escape (zip ties) — **done 2026-11-11** · 6.2 Carrying wounded hostages — **done 2026-11-11** |
 | 7 | Explosives | 7.1 Throw a grenade back · 7.2 Booby-trapped body · 7.3 Dead man's switch · 7.4 Cut the wire |
 | 8 | Close combat | 8.1 Suppressors · 8.2 Disarm from behind · 8.3 Door fights |
-| 9 | Sight | 9.1 Eyes adjust to darkness — **done 2026-11-11** · 9.2 Night windows act as mirrors · 9.3 Visible breath in the cold — **done 2026-11-12** |
-| 10 | Fire | 10.1 Real fire that spreads · 10.2 Fuel cans in the garage · 10.3 Throw a lit lighter · 10.4 Fire hose |
+| 9 | Sight | 9.1 Eyes adjust to darkness — **done 2026-11-11** · ~~9.2 Night windows act as mirrors~~ (dropped) · 9.3 Visible breath in the cold — **done 2026-11-12** |
+| 10 | Fire | ~~10.1–10.4~~ **dropped 2026-11-12 at the user's request** |
 
 Each feature's full description is in its group's section below.
 
@@ -212,13 +212,15 @@ Builds on: the room lighting, the blackout and circuits (group 3), night vision,
 
 1. **Eyes adjust to darkness.** *(Done 2026-11-11, on `main`: public/js/eyes.js, through the tone-mapping exposure, no extra draw calls.)* After a light or a flashlight, the dark is pitch black at first. Over a few seconds your
    eyes slowly adjust and you see more. It makes the blackout and night vision far more real.
-2. **Night windows act as mirrors.** At night, from inside a lit room you can't see out, because the glass only reflects
+2. ~~**Night windows act as mirrors.**~~ **Dropped on 2026-11-12 at the user's request.** At night, from inside a lit room you can't see out, because the glass only reflects
    the room. Everyone outside sees you clearly. Turn the light off and it flips. *Must be faked cheaply (no real
    reflections) for the Intel laptops.*
 3. **Visible breath in the cold.** *(Done 2026-11-12, on `main`: public/js/breath.js; a puff every 2.6 s, 1.3 s after running, within 25 m, one smoke sprite each.)* Outside at night and in the flooded cellar, everyone's breath shows as small puffs,
    which give away hidden players. There is no walk-in freezer on the map.
 
 ## 10. Fire (`feature/fire`, wave 2, after groups 2, 3 and 4)
+
+**Dropped on 2026-11-12 at the user's request: none of group 10 will be built.** (Kept below for the record.)
 
 Builds on: gas, the molotov, the floodgate, the materials and wet floors (group 2), the generator (group 3), the
 fireplace (group 4), the vents (group 5).
