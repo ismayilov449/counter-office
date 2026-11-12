@@ -17,8 +17,8 @@ export const WEAPONS = {
   fiveseven: pistol({ name: 'Five-SeveN', team: 'CT', price: 750, damage: 20, rate: 0.15, mag: 20, reserve: 100, reload: 2.7, spread: 0.009, spreadInc: 0.004, recoil: 0.012, rangeMod: 0.885, pen: 0.75, ammoPrice: 50 }),
   elite: pistol({ name: 'Dual Berettas', team: 'T', price: 800, damage: 36, rate: 0.12, mag: 30, reserve: 120, reload: 4.5, spread: 0.012, spreadInc: 0.005, recoil: 0.015, rangeMod: 0.75, pen: 0.575, ammoPrice: 20 }),
 
-  m3: primary('shotgun', { name: 'M3 Super 90', auto: false, price: 1700, damage: 20, pellets: 9, pelletSpread: 0.06, rate: 0.88, mag: 8, reserve: 32, reload: 3.5, spread: 0, moveSpread: 0.02, recoil: 0.06, rangeMod: 0.7, pen: 0.5, speed: 5.9, killReward: 900, ammoPrice: 65 }),
-  xm1014: primary('shotgun', { name: 'XM1014', price: 3000, damage: 20, pellets: 6, pelletSpread: 0.065, rate: 0.25, mag: 7, reserve: 32, reload: 3.0, spread: 0, moveSpread: 0.02, recoil: 0.04, rangeMod: 0.7, pen: 0.5, speed: 6.0, killReward: 900, ammoPrice: 65 }),
+  m3: primary('shotgun', { name: 'M3 Super 90', auto: false, price: 1700, damage: 26, pellets: 9, pelletSpread: 0.06, rate: 0.88, mag: 8, reserve: 32, reload: 3.5, spread: 0, moveSpread: 0.02, recoil: 0.06, rangeMod: 0.7, pen: 0.5, speed: 5.9, killReward: 900, ammoPrice: 65 }),
+  xm1014: primary('shotgun', { name: 'XM1014', price: 3000, damage: 26, pellets: 6, pelletSpread: 0.065, rate: 0.25, mag: 7, reserve: 32, reload: 3.0, spread: 0, moveSpread: 0.02, recoil: 0.04, rangeMod: 0.7, pen: 0.5, speed: 6.0, killReward: 900, ammoPrice: 65 }),
 
   mac10: primary('smg', { name: 'MAC-10', team: 'T', price: 1400, damage: 29, rate: 0.07, mag: 30, reserve: 100, reload: 3.2, spread: 0.014, moveSpread: 0.02, spreadInc: 0.002, recoil: 0.008, rangeMod: 0.82, pen: 0.475, speed: 6.3, killReward: 600, ammoPrice: 25 }),
   tmp: primary('smg', { name: 'TMP', team: 'CT', price: 1250, damage: 26, rate: 0.07, mag: 30, reserve: 120, reload: 2.1, spread: 0.012, moveSpread: 0.02, spreadInc: 0.002, recoil: 0.007, rangeMod: 0.84, pen: 0.5, speed: 6.3, killReward: 600, ammoPrice: 20 }),
