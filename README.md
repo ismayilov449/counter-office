@@ -645,6 +645,9 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
   nearest of his teammates still on their feet, who shows on your whole team's radar for **5 seconds** (a ring with a
   "?" round his red dot). Not one who is underground (no radar down there): if they all are, he talks but you learn
   nothing. Once per downing. Then finish him if you like.
+- **Execute a downed enemy.** **Crouch** and hold **E** on a downed enemy in front of you for **2 seconds**, keeping
+  still (a step or standing up stops it): you finish him with your knife, silently. The kill is yours (a knife kill).
+  He sees it coming ("... is finishing you off") and can still end it himself first.
 - **End it yourself.** Down and waiting for a revive, you may see an enemy coming first: **hold K for 5 seconds** and
   you shoot yourself with your pistol (let go of K to stop). Everyone sees the pistol at your head and hears the shot;
   an interrogation not yet finished gets nothing. The kill goes to whoever downed you (bets too); the feed says
@@ -678,6 +681,14 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
     **E** from the other side pushes instead (hold E); a bar shows how many hold and how many push. When more push
     than hold, for a second, the door bursts open and shoves the holders back; ties go to the holders. Bots can't open
     a door that's held shut.
+- **Blood & horror** (every map):
+  - A **pool of blood** grows under every dead body over 10 seconds (and moves with it when it's dragged).
+  - A **head shot**, or a **shotgun** hit within 6 m, sprays blood on the wall behind the victim (up to 2.5 m behind).
+  - A kill **within 2 m of you** splashes blood on your screen; it runs down and fades in 4 seconds.
+  - The dying **groan** or last breath, heard within 25 m (a head shot dies silent); a **downed** player moans every 7
+    to 14 seconds, which gives him away.
+  - **Alone, hurt and in the dark** (30 HP or less, no teammate within 15 m, your eyes used to the dark) you hear your
+    own **heartbeat**, faster as your health drops, and the edges of your view pulse dark red.
 - **Blood trails** — a player hit by a **bullet, a knife or shrapnel** (any explosion except fire) starts to
   **bleed**: drops of blood fall on the floor behind him as he moves, about one every 0.7 m, and now and then while
   he stands still. It's for tracking a wounded enemy, not for killing him: bleeding costs little or no health.

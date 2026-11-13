@@ -191,6 +191,36 @@ function tone(dest, t0, { freq, freqEnd, dur, type = 'sine', gain = 0.3 }) {
   o.stop(t0 + dur + 0.05);
 }
 
+// gore (ROADMAP 12.4, 12.5): a human voice, roughly: a buzzing throat (sawtooth, pitch f0 -> f1, a slow wobble)
+// through two mouth resonances (formants), with breath over it.
+function throat(dest, t0, { f0, f1, dur, gain, form = [650, 1100], wob = 0 }) {
+  const o = ctx.createOscillator(), g = ctx.createGain(), mix = ctx.createGain();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(f0, t0);
+  o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+  if (wob) {
+    const l = ctx.createOscillator(), lg = ctx.createGain();
+    l.frequency.value = 5 + Math.random() * 2;
+    lg.gain.value = wob;
+    l.connect(lg).connect(o.frequency);
+    l.start(t0); l.stop(t0 + dur + 0.05);
+  }
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.08);
+  g.gain.setValueAtTime(gain, t0 + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g);
+  for (const [i, f] of form.entries()) {
+    const b = ctx.createBiquadFilter();
+    b.type = 'bandpass'; b.frequency.value = f; b.Q.value = 6;
+    g.connect(b).connect(mix);
+    if (i) mix.gain.value = 0.9;
+  }
+  mix.connect(dest);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+  burst(dest, t0, { dur: dur * 0.9, type: 'bandpass', freq: 1300, q: 1.2, gain: gain * 0.35 });
+}
+
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
 const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8], sshot: [1, 3] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
@@ -617,6 +647,19 @@ export const audio = {
         master.gain.linearRampToValueAtTime(v, t + 0.25 + 4 * s);
         break;
       }
+      case 'groan': // gore 12.4: a dying man's last groan, falling away
+        throat(out, t, { f0: 125 + Math.random() * 25, f1: 62, dur: 0.9 + Math.random() * 0.3, gain: 1.6, form: [600, 1000] });
+        break;
+      case 'breath': // gore 12.4: or only his last breath going out
+        burst(out, t, { dur: 0.9, type: 'bandpass', freq: 900, freqEnd: 400, q: 1.5, gain: 0.7 });
+        break;
+      case 'moan': // gore 12.4: a downed man moaning in pain
+        throat(out, t, { f0: 150 + Math.random() * 40, f1: 115, dur: 1.1 + Math.random() * 0.5, gain: 1.1, form: [520, 900], wob: 9 });
+        break;
+      case 'heartbeat': // gore 12.5: our own heart, lub-dub, in our head (arg: louder 0..1)
+        tone(master, t, { freq: 62, freqEnd: 40, dur: 0.14, gain: 0.5 + 0.4 * (arg ?? 0) });
+        tone(master, t + 0.2, { freq: 55, freqEnd: 36, dur: 0.12, gain: 0.35 + 0.3 * (arg ?? 0) });
+        break;
       case 'gib':
         // a body bursting: a wet crunch, a thump and a spatter of drips
         burst(out, t, { dur: 0.4, type: 'lowpass', freq: 1800, freqEnd: 250, gain: 1.3 });

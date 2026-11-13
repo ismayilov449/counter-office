@@ -16,3 +16,5 @@ export function adaptEyes(light, dt) {
 // the faint light of eyes used to the dark (0 .. see)
 export const nightEyes = () => EYES.see * Math.max(0, EYES.deep - e) / EYES.deep;
 export const resetEyes = () => { e = 1; };
+// what the eyes are used to now (0 black .. 1 daylight; gore.js: the heartbeat in the dark)
+export const eyesUsedTo = () => e;

@@ -35,6 +35,7 @@ import { Net } from './net.js';
 import { catLoadMap, catSync, catUpdate, catSound, catWarmModel } from './cat.js'; // the mansion's cat
 import { createGadgets } from './gadgets.js';
 import { BloodTrails } from './blood.js'; // blood trails
+import * as gore from './gore.js'; // gore: blood & horror (ROADMAP group 12)
 import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, shieldSpeed, shieldRay, shieldHint, shieldHolding, shieldPoseRemote, shieldPoseHostage } from './shield.js'; // shield: the human shield
 import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
@@ -466,7 +467,7 @@ function fireBullet(id, def, now) {
   for (const d of dirs) {
     const tr = localTrace(o, d, 250);
     walls.localShot(o, d, id, tr.hitR ? tr.t : 250); // walls: holes in the walls it goes through (not past someone it hit)
-    if (tr.hitR) fx.blood(tr.end);
+    if (tr.hitR) { fx.blood(tr.end); gore.hit(o, d, tr.end, id); } // gore: the splatter on the wall behind
     else if (tr.wall) { fx.decal(tr.end, tr.wall.n); if (!def.pellets || Math.random() < 0.4) fx.sparks(tr.end, tr.wall.n); }
     if (def.sniper || Math.random() < (def.pellets ? 0.25 : 0.5)) fx.tracer(muzzle, tr.end);
   }
@@ -2994,7 +2995,7 @@ const net = new Net({
       const d = [dx, dy, dz];
       const end = [m.o[0] + dx * e, m.o[1] + dy * e, m.o[2] + dz * e];
       if (Math.random() < (m.tr.length > 1 ? 0.25 : 0.6)) fx.tracer(from, end);
-      if (b) fx.blood(end);
+      if (b) { fx.blood(end); gore.hit(m.o, d, end, m.w); } // gore: the splatter on the wall behind
       else if (hw) {
         const hit = coll.raycast(m.o, d, e + 0.1);
         if (hit) { fx.decal(end, hit.n); if (m.tr.length === 1 || Math.random() < 0.4) fx.sparks(end, hit.n); }
@@ -3031,6 +3032,7 @@ const net = new Net({
     }
     announceKill(m, killer);
     const r = remotes.get(m.v);
+    gore.kill(m, m.v === me.id ? me.p : r?.p); // gore: blood on our screen up close, the dying groan
     if (r && r.alive) { r.alive = false; r.deadT = 0; }
     if (m.gib) {
       // Our own death in the kill cam: the body bursts when the replay gets there.
@@ -3230,6 +3232,7 @@ const net = new Net({
     fx.clearCraters();
     fx.clearGibs();
     bleed.clear(); // blood trails
+    gore.round(); // gore: clean walls, no bodies
     me.daze = null;
     fx.clearFires();
     fx.clearSmoke(); // (the last round's smoke mustn't hang under the ceiling into the new one)
@@ -3312,6 +3315,7 @@ initShield({ me, net, hud, audio, hostages, game, switchSlot, coll: () => coll }
 initCarry({ me, remotes, hostages }); // carry
 initWounds({ net, me, game, remotes, hud, keys, audio, switchSlot, weaponOf, nameOf, canvas: renderer.domElement, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk(), blockE: () => shieldHolding() || canPlantHere() || canDefuseHere() }); // wounds: (before initBody: body.js's hints go over these)
 initBody({ net, me, game, remotes, hud, keys, firing: () => mouse1, switchSlot, weaponOf, nameOf, teamOf, audio, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // body (integration: + in a trunk: E gets out first, as on the server)
+gore.initGore({ scene, me, remotes, audio, coll: () => coll, floor: (x, y, z) => (bleed.coll ? bleed.floor(x, y, z) : null), lying: r => body.lying(r) }); // gore
 cc.initCloseCombat({ me, game, net, hud, remotes, switchSlot, eyePos, coll: () => coll, isMate: r => isMate(r), lying: r => body.lying(r), off: () => isGG() || isZM() }); // closecombat
 xp.initExplosives({ me, game, net, hud, fx, audio, scene, remotes, current: () => current(), coll: () => coll, eyePos, aimDir, busy: () => gadgets.busy() || !!me.drone || stealth.inTrunk() }); // explosives: (after initBody: grabbing a grenade's hint goes over a revive's)
 
@@ -4140,6 +4144,7 @@ function frame() {
   updateFires(dt, now);
   updateZombieGrowls(now);
   bleed.update(dt, now, !!killcam); // blood trails
+  gore.frame(now, !!killcam); // gore: the pools under the dead, the moans, the heartbeat
   fx.update(dt, camera);
   gas.update(dt, now); // gas: the shimmer, the hiss, "You smell gas"
   world?.update(dt, camera.position);

@@ -34,7 +34,7 @@ const MAX_FLAMES = 600;
 // Flat marks stuck on surfaces (bullet holes, soot), all drawn as one instanced mesh. tag: what the mark is on, so
 // remove() can take the marks off something that broke.
 const _o = new THREE.Object3D();
-class Stamps {
+export class Stamps { // (gore.js: blood splatter on walls)
   constructor(group, geo, mat, max) {
     this.mesh = new THREE.InstancedMesh(geo, mat, max);
     this.mesh.count = 0;
@@ -84,7 +84,7 @@ const MAX_CASINGS = 48;
 const MAX_GIB_SETS = 12;
 
 // An irregular blood splat: a dark pool with blobs and droplets around it (alpha in the texture).
-function splatTexture() {
+export function splatTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 128;
   const g = c.getContext('2d');

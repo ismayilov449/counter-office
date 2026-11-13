@@ -127,12 +127,12 @@ function dragTarget() {
 }
 
 // The downed enemy E would interrogate (as the server: close, in front, not yet interrogated, nobody else at it).
-// (An enemy on the floor is downed: one playing dead is a corpse to us.)
-function askTarget() {
+// (An enemy on the floor is downed: one playing dead is a corpse to us.) exec (crouched, 12.6): interrogated or not.
+function askTarget(exec = false) {
   const me = A.me;
   let best = null, bd = Infinity;
   for (const r of A.remotes.values()) {
-    if (!r.alive || r.team === me.team || !body.lying(r) || st.asked.has(r.id) || st.asks.some(e => e[1] === r.id)) continue;
+    if (!r.alive || r.team === me.team || !body.lying(r) || (st.asked.has(r.id) && !exec) || st.asks.some(e => e[1] === r.id)) continue;
     const d = Math.hypot(r.p[0] - me.p[0], r.p[2] - me.p[2]);
     if (d > BODY.reach || Math.abs(r.p[1] - me.p[1]) > 1.2 || d >= bd) continue;
     if (d > 0.9 && Math.abs(wrapA(Math.atan2(-(r.p[0] - me.p[0]), -(r.p[2] - me.p[2])) - me.yaw)) > 1.05) continue;
@@ -158,14 +158,14 @@ function wrapHud() {
     else if (me.alive && st.dragging != null && A.remotes.get(st.dragging)?.alive === false) h = `Dragging ${A.nameOf(st.dragging)}'s body — let go of E to drop it`;
     else if (me.alive && st.dragging != null) h = `Dragging ${A.nameOf(st.dragging)} — stand still to revive, let go of E to drop him`;
     else if (typeof text === 'string' && text.startsWith('Hold E to revive')) h = `${text} · walk to drag him`;
-    else if (eFree()) { const q = askTarget(); if (q) h = `Hold E to interrogate ${q.name} (${WOUNDS.ask} s)`; else if (!h) { const r = bodyTarget(); if (r) h = `Hold E and walk to drag ${r.name}'s body`; } }
+    else if (eFree()) { const q = askTarget(me.crouch); if (q) h = me.crouch ? `Hold E to finish ${q.name} off with your knife (${WOUNDS.exec} s) — keep still` : `Hold E to interrogate ${q.name} (${WOUNDS.ask} s) · crouch + hold E to finish him off`; else if (!h) { const r = bodyTarget(); if (r) h = `Hold E and walk to drag ${r.name}'s body`; } }
     return hint0.call(this, h);
   };
   hud.progress = function (label, frac) {
     const me = A.me;
-    if (label != null && me.act?.a === 'wdAsk') {
+    if (label != null && (me.act?.a === 'wdAsk' || me.act?.a === 'wdExec')) {
       const e = st.asks.find(x => x[0] === me.id);
-      label = `Interrogating ${e ? A.nameOf(e[1]) : ''}...`;
+      label = `${me.act.a === 'wdExec' ? 'Finishing off' : 'Interrogating'} ${e ? A.nameOf(e[1]) : ''}...`;
     } else if (label != null && me.act?.a === 'bodyRevive' && me.inv?.adren) label = `${label.replace(/\.\.\.$/, '')} (adrenaline)...`;
     return progress0.call(this, label, frac);
   };
@@ -195,7 +195,7 @@ function downLine() {
   const me = A.me;
   if (!me.alive || !body.downed() || st.ends.has(me.id)) return '';
   const ask = st.asks.find(e => e[1] === me.id);
-  if (ask) return `${A.nameOf(ask[0])} is interrogating you — hold K to end it first (${WOUNDS.suicide} s)`;
+  if (ask) return `${A.nameOf(ask[0])} is ${ask[3] ? 'finishing you off' : 'interrogating you'} — hold K to end it first (${WOUNDS.suicide} s)`;
   if (st.draggedBy != null) return `${A.nameOf(st.draggedBy)} is dragging you · hold K to end it yourself (${WOUNDS.suicide} s)`;
   return `Hold K to end it yourself (${WOUNDS.suicide} s)`;
 }

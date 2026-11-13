@@ -15,6 +15,7 @@ export const WOUNDS = {
     hold: 800, // ms after a drag the server keeps the body where the drag left it, until his browser agrees (lib/wounds.js)
   },
   ask: 3, // s holding E on a downed enemy to interrogate him
+  exec: 2, // s crouched, holding E on a downed enemy to finish him with the knife (ROADMAP 12.6), keeping still
   reveal: 5, // s the teammate he gives away shows on the interrogator's team's radar
   suicide: 5, // s a downed player holds K to shoot himself
   // wounds: level 1 fresh, 0.5 bandaged (a bandage halves the effect), 0 none; they last until death or the round ends
