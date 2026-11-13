@@ -45,6 +45,13 @@ in `data/admin.json`, where you can change it (or set `ADMIN_PASSWORD`). From th
 - turn on **party modes** (low gravity, headshots only, big heads, one weapon for everyone),
 - change the start money, rounds to win, round/freeze/buy time, C4 timer, friendly fire, auto team balance, halftime
   and map rotation (saved in `data/settings.json`; round times apply from the next round, start money from the next match),
+- switch the **War** options for the two Mansion maps (both off by default):
+  - **Calls for help**: a downed player screams for a medic ("Medic!", a groan in between) about every 5 seconds,
+    heard by both teams within 30 m, muffled through walls. Will you go out to save him? The enemy knows you will.
+  - **No kill confirmation**: while the round is on, there's no hit marker or hit sound, no kill feed and no kill
+    announcements. On the team bar and the scoreboard, every enemy looks alive and nobody's kill count moves, even for
+    the dead. You only know he's dead if you go and look. The round's kill feed shows when it ends, and the kill money
+    is paid then too.
 - **restart the match**, **change the map** now, send a message to everyone,
 - see everyone's team, kills, deaths and ping, **move** a player to T / CT / spectators, or **kick** them.
 
@@ -69,6 +76,8 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
 | `BOMB_TIME`     | 40         | C4 timer                                      |
 | `START_MONEY`   | 800        | Money at match start (players can also change it in the Esc menu; saved in `data/settings.json`) |
 | `FRIENDLY_FIRE` | off        | `1` to enable                                 |
+| `MEDIC_CALLS`   | off        | `1`: War, the downed call for help (Mansion maps) |
+| `NO_KILL_CONFIRM` | off      | `1`: War, no kill confirmation until the round ends (Mansion maps) |
 | `GAME_MODE`     | classic    | `gungame` Gun Game, `zombie` Zombie mode, `deathmatch` Deathmatch, `hns` Hide and Seek |
 | `BOTS`          | 8          | Fill each team up to this many players with bots (8 = 8 vs 8); `0` turns bots off |
 | `BOT_LEVEL`     | hard       | Bot level: `easy`, `normal` or `hard` |

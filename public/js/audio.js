@@ -223,7 +223,7 @@ function throat(dest, t0, { f0, f1, dur, gain, form = [650, 1100], wob = 0 }) {
 
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], crumble: [8, 0.8], sshot: [1, 3] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
+const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], medic: [5, 0.8], crumble: [8, 0.8], sshot: [1, 3] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -655,6 +655,11 @@ export const audio = {
         break;
       case 'moan': // gore 12.4: a downed man moaning in pain
         throat(out, t, { f0: 150 + Math.random() * 40, f1: 115, dur: 1.1 + Math.random() * 0.5, gain: 1.1, form: [520, 900], wob: 9 });
+        break;
+      case 'medic': // war 13.1: a downed man shouting "Me-dic!", hoarse
+        throat(out, t, { f0: 235, f1: 215, dur: 0.26, gain: 2.2, form: [520, 1850] });
+        throat(out, t + 0.28, { f0: 250, f1: 165, dur: 0.34, gain: 2, form: [330, 2300] });
+        burst(out, t + 0.6, { dur: 0.04, type: 'highpass', freq: 2500, gain: 0.7 });
         break;
       case 'heartbeat': // gore 12.5: our own heart, lub-dub, in our head (arg: louder 0..1)
         tone(master, t, { freq: 62, freqEnd: 40, dur: 0.14, gain: 0.5 + 0.4 * (arg ?? 0) });

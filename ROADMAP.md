@@ -13,8 +13,9 @@ group can start from `main`.
 **done 2026-11-13, on `main`**.
 **New (2026-11-13): group 12, Blood & horror** (blood pools, wall splatter, blood on screen, dying sounds, the heartbeat,
 executions), added at the user's request; **done 2026-11-13, on `main`** (the user tested it in game).
-**New (2026-11-13): group 13, War** (the wounded call for help, no kill confirmation), added at the user's request; not
-started. Both only on cs_mansion and cs_mansion_night, each switched on and off in the admin settings like the RPG-7.
+**New (2026-11-13): group 13, War** (the wounded call for help, no kill confirmation), added at the user's request;
+**built 2026-11-13, on `main`**. Both only on cs_mansion and cs_mansion_night, each switched on and off in the admin
+settings like the RPG-7.
 
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)
@@ -35,7 +36,7 @@ started. Both only on cs_mansion and cs_mansion_night, each switched on and off 
 | 10 | Fire | ~~10.1–10.4~~ **dropped 2026-11-12 at the user's request** |
 | 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk — **done 2026-11-13** |
 | 12 | Blood & horror (new 2026-11-13) | 12.1 Blood pools under bodies · 12.2 Splatter on walls · 12.3 Blood on your screen · 12.4 Dying sounds · 12.5 The heartbeat when alone · 12.6 Executions — **done 2026-11-13** |
-| 13 | War (new 2026-11-13, both Mansion maps, admin switches) | 13.1 The wounded call for help · 13.2 No kill confirmation |
+| 13 | War (new 2026-11-13, both Mansion maps, admin switches) | 13.1 The wounded call for help · 13.2 No kill confirmation — **built 2026-11-13** |
 
 Each feature's full description is in its group's section below.
 
@@ -304,6 +305,11 @@ the pool, the wall splatter, the screen blood, no page errors). 12.4 and 12.5 (a
 
 ## 13. War (`feature/war`, added 2026-11-13)
 
+*(Built 2026-11-13, on `main`: shared/war.js (warOn, MEDIC), CFG.medicCalls / CFG.noKillConfirm (MEDIC_CALLS,
+NO_KILL_CONFIRM) with the admin page's two checkboxes; 13.1 in public/js/gore.js and audio.js ('medic'); 13.2 in main.js
+(hud.killfeed held back, hit marker, announcements, scoreboard) and server.js (the team bar, the kill money paid at
+endRound). Test: realism/t3-war.mjs 7/7 (server). Not checked in a browser or by ear: waiting for the user.)*
+
 Make it feel like a war, not a game. **Both features work only on cs_mansion and cs_mansion_night**, and each has its
 own **admin switch, made the same way as the RPG-7's**:
 - a `CFG` flag in server.js with an env var (`MEDIC_CALLS=1`, `NO_KILL_CONFIRM=1`), **off by default** like `RPG7`;
@@ -322,8 +328,8 @@ On any other map, or with the switch off, the game works as it does today.
    killed him or he's lying there wounded until you go and look. The kill feed of the whole round shows at the round
    end (and the scoreboard still counts kills, but only updates at the round end). *The server sends the kill
    messages as today; the browser holds them back while the switch is on (hud.js `killfeed` and the hit marker in
-   main.js). Spectators and the dead still see the feed (they could tell the living by voice
-   anyway).* Open question for the user: hide it from the dead too?
+   main.js). **The dead don't see it either** (the user's choice, 2026-11-13); nor does the team bar or the scoreboard
+   show who is dead on the other team, and the kill money waits for the round's end.*
 
 ---
 

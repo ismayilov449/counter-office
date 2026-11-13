@@ -38,6 +38,7 @@ import { createDisguise } from './lib/disguise.js'; // Disguise
 import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createWounds } from './lib/wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
 import { createEscape } from './lib/hostage-escape.js';
+import { warOn } from './shared/war.js'; // war: ROADMAP group 13
 import { createCarry } from './lib/hostage-carry.js'; // carrying wounded hostages (ROADMAP 6.2) // hostages try to escape (ROADMAP 6.1), zip ties
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
@@ -71,6 +72,10 @@ const CFG = {
   friendlyFire: env.FRIENDLY_FIRE === '1',
   rotateMaps: env.MAP_ROTATION !== '0',
   rpg7: env.RPG7 === '1', // the RPG-7 in the buy menu (off: it bombarded the house too easily)
+  // War (ROADMAP group 13), both Mansion maps only (shared/war.js): the downed call for a medic; no hit marker, kill
+  // feed or kill money until the round ends
+  medicCalls: env.MEDIC_CALLS === '1',
+  noKillConfirm: env.NO_KILL_CONFIRM === '1',
   gameMode: ['gungame', 'zombie', 'deathmatch', 'hns'].includes(env.GAME_MODE) ? env.GAME_MODE : 'classic',
   // Bots fill both teams up to perTeam players each (8 = 8 vs 8); 0 turns them off.
   bots: { perTeam: num(env.BOTS, 8), difficulty: BOT_LEVELS[env.BOT_LEVEL] ? env.BOT_LEVEL : 'hard' },
@@ -258,6 +263,8 @@ const SETTINGS = {
   halftime: bool,
   rotateMaps: bool,
   rpg7: bool,
+  medicCalls: bool,
+  noKillConfirm: bool,
 };
 const savedSettings = {};
 try {
@@ -385,9 +392,13 @@ function sendTeamBar() {
     return { q, full, enemy: [q.id, q.alive ? 1 : 0, full[2], -1, -1, [], 0] };
   });
   body.fakeBar(rows); // body: someone playing dead looks dead
+  // war 13.2: while the round is on, the enemies all look alive, even to the dead
+  const hide = game.phase === 'live' && warOn(CFG.noKillConfirm, MAP);
+  for (const r of rows) if (r.q.alive) r.q.barGun = r.full[2];
+  if (hide) for (const r of rows) { r.enemy[1] = 1; if (!r.q.alive) r.enemy[2] = r.q.barGun || r.enemy[2]; } // (the gun he last held, not the dead's knife)
   for (const p of players.values()) {
     if (!p.joined) continue;
-    const all = !inTeam(p) || !p.alive;
+    const all = (!inTeam(p) || !p.alive) && !hide;
     send(p, { t: 'bar', l: rows.map(r => (all || r.q.team === p.team ? r.full : r.enemy)) });
   }
 }
@@ -1333,6 +1344,7 @@ function swapSides() {
 }
 
 function startRound() {
+  for (const p of players.values()) p.warOwed = 0; // war 13.2: (a round that never ended)
   if (game.halftimePending) swapSides();
   if (game.hnsSwap) swapHns();
   balanceTeams();
@@ -1888,6 +1900,7 @@ function endRound(winner, reason, bonus = 3250) {
   for (const p of players.values()) {
     p.act = null;
     for (const h of game.hostages) if (h.state === 'follow') { h.state = 'idle'; h.leader = null; }
+    if (p.warOwed) { addMoney(p, p.warOwed); p.warOwed = 0; } // war 13.2: the round's kill money, now
     if (p.team === winner) addMoney(p, bonus);
     else if (p.team === loser) addMoney(p, lossBonus + (loser === 'T' && game.plantedThisRound ? 800 : 0));
     sendMe(p);
@@ -1982,7 +1995,9 @@ function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
       addMoney(killer, -3300);
     } else {
       killer.kills++;
-      addMoney(killer, WEAPONS[weapon]?.killReward ?? 300);
+      // war 13.2: no kill money to give it away until the round ends (endRound pays it)
+      if (game.phase === 'live' && warOn(CFG.noKillConfirm, MAP)) killer.warOwed = (killer.warOwed || 0) + (WEAPONS[weapon]?.killReward ?? 300);
+      else addMoney(killer, WEAPONS[weapon]?.killReward ?? 300);
       if (game.phase !== 'warmup') {
         killer.rs ||= { kills: 0, dmg: 0, rescues: 0, obj: null };
         streak = ++killer.rs.kills;
@@ -3659,7 +3674,7 @@ function passwordOk(given) {
 const SETTING_LABELS = {
   gameMode: 'Game mode', startMoney: 'Start money', roundsToWin: 'Rounds to win', roundTime: 'Round time', freezeTime: 'Freeze time',
   buyTime: 'Buy time', bombTime: 'C4 timer', friendlyFire: 'Friendly fire', autoBalance: 'Auto team balance', halftime: 'Halftime side switch',
-  rotateMaps: 'Map rotation', rpg7: 'RPG-7', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
+  rotateMaps: 'Map rotation', rpg7: 'RPG-7', medicCalls: 'Calls for help', noKillConfirm: 'No kill confirmation', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
 };
 
 function adminState() {

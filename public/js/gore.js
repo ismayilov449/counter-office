@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { WEAPONS } from '/shared/weapons.js';
 import { Stamps, splatTexture } from './effects.js';
 import { eyesUsedTo } from './eyes.js';
+import { MEDIC } from '/shared/war.js';
 
 export const GORE = {
   pool: { grow: 10, size: 1.6, max: 16 }, // s to full size, m across, bodies at once
@@ -20,7 +21,7 @@ export const GORE = {
   beat: { hp: 30, mates: 15, dark: 0.45 }, // HP or less, no teammate within m, eyes used to darker than this
 };
 
-let C = null; // from main.js: { scene, me, remotes, audio, coll(), floor(x, y, z) (blood.js), lying(r) (body.js) }
+let C = null; // from main.js: { scene, me, remotes, audio, coll(), floor(x, y, z) (blood.js), lying(r) (body.js), medic() (war 13.1 on) }
 let pools = null, splats = null, screenEl = null, beatEl = null;
 const live = new Map(); // dead body id -> { born, at: [x, y, z], f: its floor }
 const _o = new THREE.Object3D();
@@ -142,13 +143,22 @@ function splash() {
 // ---- 12.4 the downed moan, 12.5 the heartbeat (every frame)
 
 const moans = new Map(); // downed id -> next moan at (ms)
+const calls = new Map(); // war 13.1: downed id -> how many times he has called (a medic call, then a groan, ...)
 let nextBeat = 0, beatOn = false;
 function updateSounds(now) {
+  const medic = C.medic?.();
   for (const r of C.remotes.values()) {
-    if (!r.alive || !C.lying(r)) { moans.delete(r.id); continue; }
+    if (!r.alive || !C.lying(r)) { moans.delete(r.id); calls.delete(r.id); continue; }
     const at = moans.get(r.id);
-    if (at == null) { moans.set(r.id, now + 1500 + Math.random() * 3000); continue; }
+    if (at == null) { moans.set(r.id, now + (medic ? 400 : 1500 + Math.random() * 3000)); continue; }
     if (now < at) continue;
+    if (medic) { // war 13.1: "Medic!" every few seconds, heard by both teams, muffled through walls
+      moans.set(r.id, now + MEDIC.every * (0.8 + Math.random() * 0.4) * 1000);
+      const n = calls.get(r.id) || 0, at3 = [r.p[0], r.p[1] + 0.3, r.p[2]];
+      calls.set(r.id, n + 1);
+      if (Math.hypot(r.p[0] - C.me.p[0], r.p[2] - C.me.p[2]) < MEDIC.heard) shout(n % 3 === 2 ? 'moan' : 'medic', at3);
+      continue;
+    }
     moans.set(r.id, now + (GORE.moan[0] + Math.random() * (GORE.moan[1] - GORE.moan[0])) * 1000);
     if (Math.hypot(r.p[0] - C.me.p[0], r.p[2] - C.me.p[2]) < GORE.dying) C.audio.play('moan', [r.p[0], r.p[1] + 0.3, r.p[2]]);
   }
@@ -162,6 +172,15 @@ function updateSounds(now) {
   nextBeat = now + 60000 / bpm(me.hp);
   C.audio.play('heartbeat', null, k);
   beatEl.style.opacity = String(0.45 + 0.5 * k);
+}
+// a sound from a downed man, muffled when there's a wall between him and us
+function shout(name, at) {
+  const me = C.me, e = [me.p[0], me.p[1] + 1.5, me.p[2]], d = [at[0] - e[0], at[1] - e[1], at[2] - e[2]], len = Math.hypot(...d);
+  const wall = len > 0.1 && C.coll().raycast(e, d.map(v => v / len), len, 'bullet');
+  const was = C.audio.muffled;
+  C.audio.muffled = !!wall && wall.t < len - 0.3;
+  C.audio.play(name, at);
+  C.audio.muffled = was;
 }
 const bpm = hp => 70 + (GORE.beat.hp - hp) * 2.5; // 70 at 30 HP, 140 at 2 HP
 
@@ -178,6 +197,7 @@ export function round() {
   splats.clear();
   live.clear();
   moans.clear();
+  calls.clear();
   pools.count = 0;
 }
 

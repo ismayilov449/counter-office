@@ -102,6 +102,8 @@
         <label class="check"><input id="s-friendlyFire" type="checkbox"> Friendly fire</label>
         <label class="check"><input id="s-rotateMaps" type="checkbox"> Rotate maps when nobody votes</label>
         <label class="check"><input id="s-rpg7" type="checkbox"> RPG-7 in the buy menu (both teams)</label>
+        <label class="check"><input id="s-medicCalls" type="checkbox"> Calls for help: the downed scream for a medic (Mansion maps)</label>
+        <label class="check"><input id="s-noKillConfirm" type="checkbox"> No kill confirmation until the round ends (Mansion maps)</label>
       </div>
       <h2 style="margin-top:16px">Bots</h2>
       <div class="grid">
@@ -141,7 +143,7 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const NUMS = ['roundsToWin', 'roundTime', 'freezeTime', 'buyTime', 'bombTime', 'dmFrags', 'dmMinutes'];
-const BOOLS = ['autoBalance', 'halftime', 'friendlyFire', 'rotateMaps', 'rpg7'];
+const BOOLS = ['autoBalance', 'halftime', 'friendlyFire', 'rotateMaps', 'rpg7', 'medicCalls', 'noKillConfirm'];
 const PARTY = ['lowGravity', 'headshotsOnly', 'bigHeads'];
 const MODES = { classic: 'Classic', gungame: 'Gun Game', zombie: 'Zombie mode', deathmatch: 'Deathmatch', hns: 'Hide and Seek' };
 let password = '';
