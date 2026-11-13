@@ -11,6 +11,8 @@ group can start from `main`.
 
 **New (2026-11-13): group 11, Realism** (hearing loss, hostages panic, hostages talk), added at the user's request;
 not started. It builds on things already in `main`, so it can start from `main` at any time.
+**New (2026-11-13): group 12, Blood & horror** (blood pools, wall splatter, blood on screen, dying sounds, the heartbeat,
+executions), added at the user's request; not started. It can start from `main` at any time, alongside group 11.
 
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)
@@ -30,6 +32,7 @@ not started. It builds on things already in `main`, so it can start from `main` 
 | 9 | Sight | 9.1 Eyes adjust to darkness — **done 2026-11-11** · ~~9.2 Night windows act as mirrors~~ (dropped) · 9.3 Visible breath in the cold — **done 2026-11-12** |
 | 10 | Fire | ~~10.1–10.4~~ **dropped 2026-11-12 at the user's request** |
 | 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk |
+| 12 | Blood & horror (new 2026-11-13) | 12.1 Blood pools under bodies · 12.2 Splatter on walls · 12.3 Blood on your screen · 12.4 Dying sounds · 12.5 The heartbeat when alone · 12.6 Executions |
 
 Each feature's full description is in its group's section below.
 
@@ -51,6 +54,7 @@ wave 1 group(s) it builds on.
 | 9 | Sight | `feature/sight` | 2 | 3 | — |
 | 10 | Fire | `feature/fire` | 2 | 2, 3, 4 | — (it links to almost everything, so it goes last) |
 | 11 | Realism | `feature/realism` | 3 | — (all it needs is in `main`) | — |
+| 12 | Blood & horror | `feature/blood-horror` | 3 | — (all it needs is in `main`) | — |
 
 **Rolling start, not strict waves:** start wave 1 (groups 1–5). Whenever a wave 1 group is tested and merged, start the
 groups that were waiting on it:
@@ -265,6 +269,28 @@ the human shield, the radio messages.
 3. **Hostages talk.** A hostage the CTs rescue or lead tells them roughly where the Terrorists are: "Two of them
    upstairs!", "One in the garage!". What they say comes from what they last saw, so it can be out of date. The line
    shows as a radio message to the CT team. *First 11.2, so a hostage knows when they've seen a fight.*
+
+---
+
+## 12. Blood & horror (`feature/blood-horror`, added 2026-11-13)
+
+Builds on: the blood decals and trails (shared/blood.js, public/js BloodTrails), the bodies (lib/disguise.js corpses),
+downed and wounds (group 1), the sound (public/js/audio.js), the night map's darkness. Everything must stay cheap to
+draw on the Intel laptops: decals and overlays, no new lights.
+
+1. **Blood pools under bodies.** A dead body slowly grows a dark pool under it over about 10 seconds. A big pool tells
+   others how long ago someone died. *One flat decal per body that scales up; it moves with the body when dragged.*
+2. **Splatter on walls.** A headshot or a close shotgun hit sprays blood onto the wall behind the target, along the
+   bullet's line. *The existing blood decals, aimed at the wall behind.*
+3. **Blood on your screen.** Someone killed right next to you (about 2 m) splashes drops onto your view that slowly run
+   down and fade. *One overlay, only for the players that close.*
+4. **Dying sounds.** A dying player gives a short groan or last breath that nearby players hear from the body. A
+   headshot kill dies silent. Downed players moan now and then, which gives them away.
+5. **The heartbeat when alone.** Low HP, in the dark and no teammate within 15 m: you hear your own heartbeat, faster as
+   your HP drops, and the edges of your screen pulse dark. *Sound plus one overlay.*
+6. **Executions.** Hold E over a downed enemy to finish him with the knife (2 s). It's quick and silent, but you're
+   stuck in place while you do it. The kill counts as a knife kill. *Uses group 1's downed state; E's order puts it
+   after the interrogation (crouch + E stays the interrogation).*
 
 ---
 
