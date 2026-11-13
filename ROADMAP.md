@@ -288,9 +288,9 @@ draw on the Intel laptops: decals and overlays, no new lights.
    headshot kill dies silent. Downed players moan now and then, which gives them away.
 5. **The heartbeat when alone.** Low HP, in the dark and no teammate within 15 m: you hear your own heartbeat, faster as
    your HP drops, and the edges of your screen pulse dark. *Sound plus one overlay.*
-6. **Executions.** Hold E over a downed enemy to finish him with the knife (2 s). It's quick and silent, but you're
-   stuck in place while you do it. The kill counts as a knife kill. *Uses group 1's downed state; E's order puts it
-   after the interrogation (crouch + E stays the interrogation).*
+6. **Executions.** Crouch and hold E over a downed enemy to finish him with the knife (2 s). It's quick and silent, but you're
+   stuck in place while you do it. The kill counts as a knife kill. *Uses group 1's downed state; Standing E stays the interrogation (3 s);
+   crouched E is the execution.*
 
 ---
 
