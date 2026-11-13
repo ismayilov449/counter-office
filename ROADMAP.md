@@ -9,6 +9,9 @@ sections 0 and 9; each group's notes stay in `docs/features/<group>.md`). **Next
 explosives, close combat, sight, fire). All of wave 1 is in `main` (fast-forwarded 2026-11-09), so every wave 2
 group can start from `main`.
 
+**New (2026-11-13): group 11, Realism** (hearing loss, hostages panic, hostages talk), added at the user's request;
+not started. It builds on things already in `main`, so it can start from `main` at any time.
+
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)
 
@@ -26,6 +29,7 @@ group can start from `main`.
 | 8 | Close combat | 8.1 Suppressors · 8.2 Disarm from behind · 8.3 Door fights |
 | 9 | Sight | 9.1 Eyes adjust to darkness — **done 2026-11-11** · ~~9.2 Night windows act as mirrors~~ (dropped) · 9.3 Visible breath in the cold — **done 2026-11-12** |
 | 10 | Fire | ~~10.1–10.4~~ **dropped 2026-11-12 at the user's request** |
+| 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk |
 
 Each feature's full description is in its group's section below.
 
@@ -46,6 +50,7 @@ wave 1 group(s) it builds on.
 | 8 | Close combat | `feature/closecombat` | 2 | 2 | — |
 | 9 | Sight | `feature/sight` | 2 | 3 | — |
 | 10 | Fire | `feature/fire` | 2 | 2, 3, 4 | — (it links to almost everything, so it goes last) |
+| 11 | Realism | `feature/realism` | 3 | — (all it needs is in `main`) | — |
 
 **Rolling start, not strict waves:** start wave 1 (groups 1–5). Whenever a wave 1 group is tested and merged, start the
 groups that were waiting on it:
@@ -242,6 +247,24 @@ fireplace (group 4), the vents (group 5).
 
 Links to wire: the lit fireplace closes the chimney (group 4); smoke travels through the vents (group 5); the generator's
 fuel (group 3); soaked floors electrocute with live wires (group 2).
+
+---
+
+## 11. Realism (`feature/realism`, added 2026-11-13)
+
+Builds on: grenades and the shotguns, the game's sound (lib/audio), the hostages (group 6, the escape and carrying),
+the human shield, the radio messages.
+
+1. **Hearing loss.** A grenade going off or a shotgun fired right next to you muffles every sound for a few seconds,
+   with a high ringing tone that fades out. The closer the blast, the longer it lasts. A flashbang already blinds you;
+   now you're deaf too for a moment, and you can't hear footsteps coming. *Sound only (a low-pass filter on the master
+   volume and one tone), no drawing cost.*
+2. **Hostages panic.** Hostages duck and cover their heads at nearby gunfire and explosions. A hostage left alone
+   too long during a fight may bolt on their own, and a running hostage can be hit in the crossfire. Rescuing them
+   gets harder and more real. *Ties into 6.1 (escaping hostages run the same way) and the human shield.*
+3. **Hostages talk.** A hostage the CTs rescue or lead tells them roughly where the Terrorists are: "Two of them
+   upstairs!", "One in the garage!". What they say comes from what they last saw, so it can be out of date. The line
+   shows as a radio message to the CT team. *First 11.2, so a hostage knows when they've seen a fight.*
 
 ---
 
