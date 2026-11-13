@@ -703,6 +703,7 @@ function hurtPiece(pc, dmg, out) {
 // so a wall it breaks still shielded them.
 function blastMap(at, weapon) {
   cat.blast(at, weapon); // cat: thrown or scared by every explosion
+  escape.fright(at, 'blast'); // realism 11.2: and the hostages
   gas.sparkAt(at, weapon); // gas: any explosion sets it off
   const B = BREAK.blast[weapon];
   if (!MAP.breakables || !B) return;
@@ -2451,7 +2452,7 @@ function onShoot(p, m) {
       if (h.state === 'dead' || h.state === 'rescued') continue;
       if (h.carriedBy != null) { const hit = carry.ray(h, p, o, d, m.rt, best ? best.t : wallT); if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit }; continue; } // carry: across its carrier's shoulders
       if (h.heldBy != null) { const hit = shield.rayHostage(h, p, o, d, m.rt, best ? best.t : wallT); if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit }; continue; } // shield: a held hostage's own hitboxes
-      const hit = rayPlayer(o, d, h.p, false, best ? best.t : wallT);
+      const hit = rayPlayer(o, d, h.p, !!h.duck, best ? best.t : wallT); // (realism 11.2: a ducking hostage is smaller)
       if (hit && (!best || hit.t < best.t)) best = { hostage: h, ...hit };
     }
     if (best) best.through = pen.keep(best.t); // walls: the damage the walls on the way left
@@ -2506,6 +2507,7 @@ function onShoot(p, m) {
 
   if (def.melee && hits.some(h => h.q)) disguise.reveal(p, 'knife'); // Disguise: so does knifing someone
   broadcast({ t: 'shot', id: p.id, o, w, alt, tr: traces, sup: def.sup ? 1 : undefined }, q => q !== p); // closecombat: (sup: quiet, no flash)
+  if (!def.melee) escape.fright(o, def.sup ? 'quiet' : 'shot'); // realism 11.2: the hostages that hear it duck
   if (!hits.length) return;
   const info = {};
   for (const h of hits) {
@@ -2545,7 +2547,7 @@ function launchRocket(p, o, d, def, weapon = 'rpg') {
   }
   for (const h of game.hostages) {
     if (h.state === 'dead' || h.state === 'rescued') continue;
-    const hit = rayPlayer(o, d, h.p, false, dist);
+    const hit = rayPlayer(o, d, h.p, !!h.duck, dist);
     if (hit) dist = hit.t;
   }
   const back = Math.max(0, dist - 0.3); // explode just in front of the surface
@@ -4136,7 +4138,7 @@ function tick() {
     sc: game.score,
     dr: game.drops.map(d => [d.id, d.w, r2(d.p[0]), r2(d.p[1]), r2(d.p[2])]),
     b: { s: b.state, p: b.p, tl: b.state === 'planted' ? Math.max(0, (b.explodeAt - t) / 1000) : 0 },
-    hs: game.hostages.map(h => [h.id, r2(h.p[0]), r2(h.p[1]), r2(h.p[2]), r2(h.yaw), HOSTAGE_STATE[h.state], h.leader || 0, escape.tied(h), carry.hurt(h), h.carriedBy || 0]), // (escape: 1 while zip-tied; carry: badly hurt, the carrier)
+    hs: game.hostages.map(h => [h.id, r2(h.p[0]), r2(h.p[1]), r2(h.p[2]), r2(h.yaw), HOSTAGE_STATE[h.state], h.leader || 0, escape.tied(h), carry.hurt(h), h.carriedBy || 0, escape.duck(h)]), // (escape: 1 while zip-tied; carry: badly hurt, the carrier; realism 11.2: ducking)
     cars: world.cars.map(c => [c.id, r2(c.p[0]), r2(c.p[1]), r2(c.p[2]), r2(c.yaw), r2(c.speed), r2(c.steer), c.driver || 0, Math.max(0, Math.round(c.hp)), c.riders[0] || 0, c.riders[1] || 0, c.wrecked ? 1 : 0]),
   };
   let all = '', changed = '';

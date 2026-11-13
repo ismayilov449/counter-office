@@ -106,6 +106,13 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   - **Wounded hostages** (40 HP or less) can't walk: they won't follow, escape or be led. A CT presses **E** on one to
     **carry** it across his shoulders: walking pace, pistol only, no jumping or ducking; **E** puts it down (so does
     going down or dying). Carried into the CT base it's rescued. Shots can hit the hostage on his shoulders.
+  - **Hostages panic** (every hostage map): a gunshot within 12 m (a suppressed one within 3 m) or a blast within 20 m
+    makes the hostages there **duck** for 4 s, hands over their heads (smaller to hit). For 10 s after a scare, a
+    hostage no Terrorist is watching **runs for the CT base** after only 6 s (instead of 20), at a run: catch it as an
+    escaping one (within 4 m), and mind the crossfire.
+  - **Hostages talk**: the first time a CT gets a hostage to follow him (leading it or cutting its ties), it tells
+    the CTs on the radio where it saw Terrorists in the last 30 s ("Two of them upstairs! One in the garage!"), or
+    that it didn't see where they went. It can be out of date.
   - Four **doors** lead into the house: the **front door** (porch), the **left door** (south side), the
     **kitchen back door** (west, behind the house, up three stone steps) and the kitchen's **side door** from the
     garage. Press **E** to open or close them — they
@@ -131,6 +138,8 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
     - **Dust** hangs where something blew up (bots can't see through it for a few seconds).
     - **Shell shock**: close to a blast your ears ring, the screen blurs and sways and you move slower for a few
       seconds; the **blast throws you back** and knocks your aim.
+    - **Hearing loss** (every map): a blast close by muffles every sound for a few seconds under a ringing in your
+      ears (the closer, the longer); footsteps are lost under it. A shotgun fired within 3 m of you does it briefly.
     - **Fire spreads** to furniture, bookshelves and doors: they burn down and break, set what's next to them alight,
       and indoors the smoke gathers under the ceiling and fills the room.
     - **Doors** are blown off their hinges by a blast nearby, or burn away in a fire.

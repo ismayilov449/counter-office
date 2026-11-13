@@ -10,7 +10,7 @@ explosives, close combat, sight, fire). All of wave 1 is in `main` (fast-forward
 group can start from `main`.
 
 **New (2026-11-13): group 11, Realism** (hearing loss, hostages panic, hostages talk), added at the user's request;
-not started. It builds on things already in `main`, so it can start from `main` at any time.
+**done 2026-11-13, on `main`**.
 **New (2026-11-13): group 12, Blood & horror** (blood pools, wall splatter, blood on screen, dying sounds, the heartbeat,
 executions), added at the user's request; not started. It can start from `main` at any time, alongside group 11.
 **New (2026-11-13): group 13, War** (the wounded call for help, no kill confirmation), added at the user's request; not
@@ -33,7 +33,7 @@ started. Both only on cs_mansion and cs_mansion_night, each switched on and off 
 | 8 | Close combat | 8.1 Suppressors · 8.2 Disarm from behind · 8.3 Door fights |
 | 9 | Sight | 9.1 Eyes adjust to darkness — **done 2026-11-11** · ~~9.2 Night windows act as mirrors~~ (dropped) · 9.3 Visible breath in the cold — **done 2026-11-12** |
 | 10 | Fire | ~~10.1–10.4~~ **dropped 2026-11-12 at the user's request** |
-| 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk |
+| 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk — **done 2026-11-13** |
 | 12 | Blood & horror (new 2026-11-13) | 12.1 Blood pools under bodies · 12.2 Splatter on walls · 12.3 Blood on your screen · 12.4 Dying sounds · 12.5 The heartbeat when alone · 12.6 Executions |
 | 13 | War (new 2026-11-13, both Mansion maps, admin switches) | 13.1 The wounded call for help · 13.2 No kill confirmation |
 
@@ -263,14 +263,14 @@ fuel (group 3); soaked floors electrocute with live wires (group 2).
 Builds on: grenades and the shotguns, the game's sound (public/js/audio.js), the hostages (group 6, the escape and carrying),
 the human shield, the radio messages.
 
-1. **Hearing loss.** A grenade going off or a shotgun fired right next to you muffles every sound for a few seconds,
+1. **Hearing loss.** *(Done 2026-11-13, on `main`: public/js/audio.js; a low-pass on everything, the ringing past it, the existing shell shock's trigger; a shotgun within 3 m, mildly.)* A grenade going off or a shotgun fired right next to you muffles every sound for a few seconds,
    with a high ringing tone that fades out. The closer the blast, the longer it lasts. A flashbang already blinds you;
    now you're deaf too for a moment, and you can't hear footsteps coming. *Sound only (a low-pass filter on the master
    volume and one tone), no drawing cost.*
-2. **Hostages panic.** Hostages duck and cover their heads at nearby gunfire and explosions. A hostage left alone
+2. **Hostages panic.** *(Done 2026-11-13, on `main`: lib/hostage-escape.js; PANIC in shared/hostage-escape.js: shots 12 m, blasts 20 m, duck 4 s, bolt after 6 s at 4.2 m/s.)* Hostages duck and cover their heads at nearby gunfire and explosions. A hostage left alone
    too long during a fight may bolt on their own, and a running hostage can be hit in the crossfire. Rescuing them
    gets harder and more real. *Ties into 6.1 (escaping hostages run the same way) and the human shield.*
-3. **Hostages talk.** A hostage the CTs rescue or lead tells them roughly where the Terrorists are: "Two of them
+3. **Hostages talk.** *(Done 2026-11-13, on `main`: lib/hostage-escape.js; Terrorists seen within 20 m in the last 30 s, said once per hostage per round when first led.)* A hostage the CTs rescue or lead tells them roughly where the Terrorists are: "Two of them
    upstairs!", "One in the garage!". What they say comes from what they last saw, so it can be out of date. The line
    shows as a radio message to the CT team. *First 11.2, so a hostage knows when they've seen a fight.*
 

@@ -2,6 +2,9 @@
 import { WEAPONS } from '/shared/weapons.js';
 
 let ctx = null, master = null, noise = null, reverb = null;
+// realism 11.1: everything goes through `deaf` (a low-pass, open until a blast deafens us); the ringing in the ears
+// goes past it on `ears`, so it isn't muffled or turned down with the rest
+let deaf = null, ears = null;
 
 const VOICES = ['bombdef', 'bombpl', 'com_go', 'ctwin', 'terwin', 'ct_fireinhole', 'go', 'letsgo', 'locknload', 'moveout'];
 const voiceBuf = new Map();
@@ -390,7 +393,13 @@ export const audio = {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain();
     master.gain.value = this.volume;
-    master.connect(ctx.destination);
+    deaf = ctx.createBiquadFilter();
+    deaf.type = 'lowpass';
+    deaf.frequency.value = 22000;
+    master.connect(deaf).connect(ctx.destination);
+    ears = ctx.createGain();
+    ears.gain.value = this.volume;
+    ears.connect(ctx.destination);
     noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -418,7 +427,7 @@ export const audio = {
 
   setVolume(v) {
     this.volume = v;
-    if (master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.value = v; }
+    if (master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.value = v; ears.gain.value = v; }
   },
 
   listener(pos, fwd) {
@@ -590,10 +599,18 @@ export const audio = {
         shellBlast(out, t);
         break;
       case 'shellshock': {
-        // a shell landed right next to us: everything goes muffled under a ringing in the ears
+        // a shell landed right next to us (or a shotgun went off by our ear, s small): everything goes muffled and
+        // quieter under a ringing in the ears; the closer, the longer. Footsteps are lost under it.
         const s = arg ?? 1, v = this.volume;
-        tone(master, t + 0.1, { freq: 3700, dur: 4.5 * s, gain: 0.09 * s });
-        tone(master, t + 0.1, { freq: 3712, dur: 3.5 * s, gain: 0.05 * s });
+        tone(ears, t + 0.1, { freq: 3700, dur: 4.5 * s, gain: 0.09 * s });
+        tone(ears, t + 0.1, { freq: 3712, dur: 3.5 * s, gain: 0.05 * s });
+        const f = deaf.frequency;
+        f.cancelScheduledValues(t);
+        f.setValueAtTime(Math.min(f.value, 22000), t);
+        const lo = Math.min(f.value, Math.max(300, 4000 - 3600 * s)); // (a weaker blast never clears a stronger one)
+        f.exponentialRampToValueAtTime(lo, t + 0.08);
+        f.setValueAtTime(lo, t + 0.08 + 1.5 * s);
+        f.exponentialRampToValueAtTime(22000, t + 0.08 + 5 * s);
         master.gain.cancelScheduledValues(t);
         master.gain.setValueAtTime(v, t);
         master.gain.linearRampToValueAtTime(v * (1 - 0.7 * s), t + 0.25);

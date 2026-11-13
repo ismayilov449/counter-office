@@ -428,7 +428,7 @@ function localTrace(o, d, range) {
     if (hs.state > 1) continue;
     if (shieldHeldBy(hs.id) != null) { const h = shieldRay(hs, o, d, t); if (h) { t = h.t; hitR = hs; } continue; } // shield: a held hostage's hitboxes
     if (hs.carrier) { const h = carryRay(hs, o, d, t); if (h) { t = h.t; hitR = hs; } continue; } // carry: across its carrier's shoulders
-    const h = rayPlayer(o, d, hs.p, false, t);
+    const h = rayPlayer(o, d, hs.p, hs.duck, t);
     if (h) { t = h.t; hitR = hs; }
   }
   return { t, wall: hitR ? null : wall, hitR, end: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] };
@@ -1957,7 +1957,7 @@ function clearHostages() {
 
 function syncHostages(list, time) {
   const seen = new Set();
-  for (const [id, x, y, z, yaw, st, leader, tied, hurt, carrier] of list || []) {
+  for (const [id, x, y, z, yaw, st, leader, tied, hurt, carrier, duck] of list || []) {
     seen.add(id);
     let h = hostages.get(id);
     if (!h) {
@@ -1975,6 +1975,7 @@ function syncHostages(list, time) {
     if (carrier && carrier === me.id && h.carrier !== me.id) switchSlot('secondary', true); // carry: picked up, out comes the pistol
     h.hurt = !!hurt; // carry: badly hurt, it can't walk
     h.carrier = carrier || 0;
+    h.duck = !!duck; // realism 11.2: panicked, ducking with its hands over its head
   }
   for (const [id, h] of hostages) if (!seen.has(id)) { scene.remove(h.model); disposeOwn(h.model); hostages.delete(id); } // new ones each round
 }
@@ -1996,7 +1997,7 @@ function updateHostageModels(dt) {
     } else {
       h.model.rotation.x = 0;
       h.walk += moved * 3.2;
-      posePlayer(h.model, false, h.tied ? -0.4 : h.state === 1 ? 0 : 1.1, h.walk, Math.min(1, moved / dt / 4));
+      posePlayer(h.model, h.duck, h.tied ? -0.4 : h.duck ? 2.6 : h.state === 1 ? 0 : 1.1, h.walk, Math.min(1, moved / dt / 4));
     }
     shieldPoseHostage(h); // shield: a held hostage leans against its holder
     carryPose(h); // carry: across its carrier's shoulders
@@ -2979,6 +2980,8 @@ const net = new Net({
     }
     audio.play(m.sup ? 'sshot' : 'shot', m.o, m.w === 'm4a1' ? 'm4a1s' : m.w); // closecombat: (sshot: suppressed, heard only nearby)
     if (!m.sup) ug.shot(m.o, m.w); // underground: its echo
+    // realism 11.1: a shotgun fired by our ear (within 3 m) leaves us half deaf for a moment
+    if (WEAPONS[m.w]?.pellets && me.alive) { const e = eyePos(), d = Math.hypot(m.o[0] - e[0], m.o[1] - e[1], m.o[2] - e[2]); if (d < 3) audio.play('shellshock', null, 0.45 - d * 0.1); }
     let from = m.o;
     const muzzle = r?.model.userData.gun?.userData.muzzle;
     if (muzzle && r.model.visible) {
