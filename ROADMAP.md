@@ -13,6 +13,8 @@ group can start from `main`.
 not started. It builds on things already in `main`, so it can start from `main` at any time.
 **New (2026-11-13): group 12, Blood & horror** (blood pools, wall splatter, blood on screen, dying sounds, the heartbeat,
 executions), added at the user's request; not started. It can start from `main` at any time, alongside group 11.
+**New (2026-11-13): group 13, War** (the wounded call for help, no kill confirmation), added at the user's request; not
+started. Both only on cs_mansion and cs_mansion_night, each switched on and off in the admin settings like the RPG-7.
 
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)
@@ -33,6 +35,7 @@ executions), added at the user's request; not started. It can start from `main` 
 | 10 | Fire | ~~10.1–10.4~~ **dropped 2026-11-12 at the user's request** |
 | 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk |
 | 12 | Blood & horror (new 2026-11-13) | 12.1 Blood pools under bodies · 12.2 Splatter on walls · 12.3 Blood on your screen · 12.4 Dying sounds · 12.5 The heartbeat when alone · 12.6 Executions |
+| 13 | War (new 2026-11-13, both Mansion maps, admin switches) | 13.1 The wounded call for help · 13.2 No kill confirmation |
 
 Each feature's full description is in its group's section below.
 
@@ -55,6 +58,7 @@ wave 1 group(s) it builds on.
 | 10 | Fire | `feature/fire` | 2 | 2, 3, 4 | — (it links to almost everything, so it goes last) |
 | 11 | Realism | `feature/realism` | 3 | — (all it needs is in `main`) | — |
 | 12 | Blood & horror | `feature/blood-horror` | 3 | — (all it needs is in `main`) | — |
+| 13 | War | `feature/war` | 3 | — (all it needs is in `main`) | — |
 
 **Rolling start, not strict waves:** start wave 1 (groups 1–5). Whenever a wave 1 group is tested and merged, start the
 groups that were waiting on it:
@@ -291,6 +295,31 @@ draw on the Intel laptops: decals and overlays, no new lights.
 6. **Executions.** Crouch and hold E over a downed enemy to finish him with the knife (2 s). It's quick and silent, but you're
    stuck in place while you do it. The kill counts as a knife kill. *Uses group 1's downed state; Standing E stays the interrogation (3 s);
    crouched E is the execution.*
+
+---
+
+## 13. War (`feature/war`, added 2026-11-13)
+
+Make it feel like a war, not a game. **Both features work only on cs_mansion and cs_mansion_night**, and each has its
+own **admin switch, made the same way as the RPG-7's**:
+- a `CFG` flag in server.js with an env var (`MEDIC_CALLS=1`, `NO_KILL_CONFIRM=1`), **off by default** like `RPG7`;
+- the flag in the settings validator (`bool`) and in the change log's names ("Calls for help", "No kill confirmation");
+- a checkbox on public/admin.html next to the RPG-7's, and the name in its `BOOLS` list;
+- the browser learns the flags with the other settings, so a switch takes effect from the next round without a restart.
+
+On any other map, or with the switch off, the game works as it does today.
+
+1. **The wounded call for help.** A downed player can't talk normally: every few seconds he screams for a medic
+   ("Medic! I'm hit!", groans), heard by **both teams** from where he lies, about 30 m and muffled through walls. Do you
+   risk going out to save him? The enemy knows you will. *Builds on downed (group 1): the screams stop when he's
+   revived, carried off (the drag keeps them), finished or bleeds out. A few recorded or generated voice lines per
+   team in public/js/audio.js; no drawing cost.* Pairs with 12.4 (dying sounds) and 12.6 (executions).
+2. **No kill confirmation.** No hit marker and no kill feed during the round, for everyone. You don't know if you
+   killed him or he's lying there wounded until you go and look. The kill feed of the whole round shows at the round
+   end (and the scoreboard still counts kills, but only updates at the round end). *The server sends the kill
+   messages as today; the browser holds them back while the switch is on (hud.js `killfeed` and the hit marker in
+   main.js). Spectators and the dead still see the feed, so nothing leaks to the living by voice they couldn't
+   already say.* Shortcut allowed: the dead could be kept blind too if the players prefer; ask the user.
 
 ---
 
