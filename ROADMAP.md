@@ -318,8 +318,8 @@ On any other map, or with the switch off, the game works as it does today.
    killed him or he's lying there wounded until you go and look. The kill feed of the whole round shows at the round
    end (and the scoreboard still counts kills, but only updates at the round end). *The server sends the kill
    messages as today; the browser holds them back while the switch is on (hud.js `killfeed` and the hit marker in
-   main.js). Spectators and the dead still see the feed, so nothing leaks to the living by voice they couldn't
-   already say.* Shortcut allowed: the dead could be kept blind too if the players prefer; ask the user.
+   main.js). Spectators and the dead still see the feed (they could tell the living by voice
+   anyway).* Open question for the user: hide it from the dead too?
 
 ---
 
