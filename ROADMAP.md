@@ -252,7 +252,7 @@ fuel (group 3); soaked floors electrocute with live wires (group 2).
 
 ## 11. Realism (`feature/realism`, added 2026-11-13)
 
-Builds on: grenades and the shotguns, the game's sound (lib/audio), the hostages (group 6, the escape and carrying),
+Builds on: grenades and the shotguns, the game's sound (public/js/audio.js), the hostages (group 6, the escape and carrying),
 the human shield, the radio messages.
 
 1. **Hearing loss.** A grenade going off or a shotgun fired right next to you muffles every sound for a few seconds,
