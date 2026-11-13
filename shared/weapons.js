@@ -67,7 +67,7 @@ export const WEAPONS = {
   jammer: { name: 'Signal jammer', slot: 6, cls: 'mine', device: true, team: 'T', price: 800, max: 1, speed: 6.3 },
   // Satchel charge (buy menu -> Mines & camo, Terrorists): Mouse1 throws it and it sticks to whatever it hits; then
   // you hold the detonator, an old phone, and Mouse1 sets it off from anywhere (see SATCHEL).
-  satchel: { name: 'Satchel charge', slot: 6, cls: 'satchel', satchel: true, team: 'T', price: 1200, max: 1, speed: 6.3 },
+  satchel: { name: 'Satchel charge', slot: 6, cls: 'satchel', satchel: true, price: 1200, max: 1, speed: 6.3 },
   phone: { name: 'Detonator', slot: 6, cls: 'phone', speed: 6.3 },
   // FPV drone (both teams): 6 takes out its remote (with the mines), Mouse1 launches it, and
   // you fly it through its camera while you crouch with the remote; see DRONE.

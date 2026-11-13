@@ -111,7 +111,7 @@ export function frame() {
     if (!on) { if (l) l.visible = false; continue; }
     if (!l) r.model.add(r.model.userData.xpDms = dmsLight());
     r.model.userData.xpDms.visible = Math.floor(now / 250) % 2 === 0;
-    if (me.team !== 'CT' || !me.alive || now - warnedAt < 3000) continue;
+    if (r.team === me.team || !me.alive || now - warnedAt < 3000) continue; // (an enemy holding it: either side has satchels)
     const e = C.eyePos(), c = [r.p[0], r.p[1] + 1.1, r.p[2]], d = [c[0] - e[0], c[1] - e[1], c[2] - e[2]], len = Math.hypot(...d);
     const look = C.aimDir(me.yaw, me.pitch);
     if (len > XP.warn || (d[0] * look[0] + d[1] * look[1] + d[2] * look[2]) / len < 0.6) continue;

@@ -561,17 +561,17 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
 
   It hums, so it can be heard and found. (Bots don't use it, and don't go after it.)
 
-- **Satchel charge** (buy menu → 7 Mines & camo, Terrorists only, $1200, carry 1; not in Zombie mode). Press **6** to
+- **Satchel charge** (buy menu → 7 Mines & camo, both teams, $1200, carry 1; not in Zombie mode). Press **6** to
   take it out and **Mouse1** to throw it: it sticks to the first thing it hits — a wall, a door, the floor, a crate or a
   car (on a car it rides along). Then you hold an old phone (**6** again gets it back): **Mouse1** sets it off, from
   any distance. The blast is about 1.5 HE grenades (up to 150 damage, 10 m; walls protect): it blows doors open, blows
-  up cars and breaks the mansion's walls. It blinks red and chirps quietly, so it can be found. CTs can shoot it (it
+  up cars and breaks the mansion's walls. It blinks red and chirps quietly, so it can be found. The other team can shoot it (it
   goes off) or hold **E** next to it to defuse it (3 s, 1.5 s with a kit, +$200); an explosion nearby sets it off too.
   If its owner dies it stays (and can still be defused), but nobody can set it off. Up to 2 out at once; cleared every
   round. Bots don't use it.
   - **Dead man's switch:** with the phone out, **right mouse** arms it (the hint says ARMED). Killed or knocked down
     while it's armed, all your satchels go off. Right mouse again, or putting the phone away, lets go of it safely.
-    An armed switch blinks red in your hand, and a CT who sees you (within 20 m) is told: shooting you is a decision.
+    An armed switch blinks red in your hand, and an enemy who sees you (within 20 m) is told: shooting you is a decision.
 - **Explosives tricks** (bots don't use them):
   - **Throw a grenade back:** an HE grenade lands by your feet (within 1.5 m) with at least 0.8 s of its fuse left:
     press **E** to grab it ("GRENADE IN YOUR HAND" counts down) and **Mouse1** to throw it back with the fuse it has
