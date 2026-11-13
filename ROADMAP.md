@@ -12,7 +12,7 @@ group can start from `main`.
 **New (2026-11-13): group 11, Realism** (hearing loss, hostages panic, hostages talk), added at the user's request;
 **done 2026-11-13, on `main`**.
 **New (2026-11-13): group 12, Blood & horror** (blood pools, wall splatter, blood on screen, dying sounds, the heartbeat,
-executions), added at the user's request; **built 2026-11-13, on `main`** (browser checks partly done; see below).
+executions), added at the user's request; **done 2026-11-13, on `main`** (the user tested it in game).
 **New (2026-11-13): group 13, War** (the wounded call for help, no kill confirmation), added at the user's request; not
 started. Both only on cs_mansion and cs_mansion_night, each switched on and off in the admin settings like the RPG-7.
 
@@ -34,7 +34,7 @@ started. Both only on cs_mansion and cs_mansion_night, each switched on and off 
 | 9 | Sight | 9.1 Eyes adjust to darkness — **done 2026-11-11** · ~~9.2 Night windows act as mirrors~~ (dropped) · 9.3 Visible breath in the cold — **done 2026-11-12** |
 | 10 | Fire | ~~10.1–10.4~~ **dropped 2026-11-12 at the user's request** |
 | 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk — **done 2026-11-13** |
-| 12 | Blood & horror (new 2026-11-13) | 12.1 Blood pools under bodies · 12.2 Splatter on walls · 12.3 Blood on your screen · 12.4 Dying sounds · 12.5 The heartbeat when alone · 12.6 Executions — **built 2026-11-13** |
+| 12 | Blood & horror (new 2026-11-13) | 12.1 Blood pools under bodies · 12.2 Splatter on walls · 12.3 Blood on your screen · 12.4 Dying sounds · 12.5 The heartbeat when alone · 12.6 Executions — **done 2026-11-13** |
 | 13 | War (new 2026-11-13, both Mansion maps, admin switches) | 13.1 The wounded call for help · 13.2 No kill confirmation |
 
 Each feature's full description is in its group's section below.
@@ -282,10 +282,9 @@ Builds on: the blood decals and trails (shared/blood.js, public/js BloodTrails),
 downed and wounds (group 1), the sound (public/js/audio.js), the night map's darkness. Everything must stay cheap to
 draw on the Intel laptops: decals and overlays, no new lights.
 
-*(Built 2026-11-13, on `main`: public/js/gore.js (GORE numbers there), audio.js (groan, breath, moan, heartbeat), lib/wounds.js
+*(Done 2026-11-13, on `main`: public/js/gore.js (GORE numbers there), audio.js (groan, breath, moan, heartbeat), lib/wounds.js
 (12.6). Checked: 12.6 by test (realism/t2-execute.mjs 9/9; wounds t2 28/28); 12.1-12.3 in the browser (realism/g2-gore.mjs:
-the pool, the wall splatter, the screen blood, no page errors). Not checked yet (testing paused at the user's request):
-12.4 and 12.5 by ear and on screen.)*
+the pool, the wall splatter, the screen blood, no page errors). 12.4 and 12.5 (and all of it) tested in game by the user, 2026-11-13: all good.)*
 
 1. **Blood pools under bodies.** A dead body slowly grows a dark pool under it over about 10 seconds. A big pool tells
    others how long ago someone died. *One flat decal per body that scales up; it moves with the body when dragged.*
