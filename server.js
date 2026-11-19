@@ -909,13 +909,17 @@ function mendPieces(t) {
     broadcast({ t: 'doors', doors: states, i: +doors[0][0], open: false, p: doorCenter(MAP.doors[doors[0][0]]) });
   }
   if (!world.gone.size) return;
-  const mended = [...world.gone].filter(id => {
-    if (t - (game.pieceAt?.get(id) || 0) < 90000) return false;
+  // (every tick: no copies of the broken set, which a bomb fills with ~1,600 pieces, until something is due)
+  let alive = null, mended = null;
+  for (const id of world.gone) {
+    if (t - (game.pieceAt?.get(id) || 0) < 90000) continue;
     const pc = MAP.breakables[id];
-    return ![...players.values()].some(q => q.alive && overlapsAny([{ min: pc.min, max: pc.max }], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height));
-  });
-  if (!mended.length) return;
-  world.setGone([...world.gone].filter(id => !mended.includes(id)));
+    alive ||= [...players.values()].filter(q => q.alive);
+    if (alive.some(q => overlapsAny([{ min: pc.min, max: pc.max }], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height))) continue;
+    (mended ||= new Set()).add(id);
+  }
+  if (!mended) return;
+  world.setGone([...world.gone].filter(id => !mended.has(id)));
   for (const id of mended) { game.pieceHp.delete(id); game.burnt?.delete(id); }
   broadcast({ t: 'world', glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates });
 }
@@ -929,9 +933,11 @@ function warmupRepairs(t) {
     world.setBroken([...world.broken].filter(id => !fixed.includes(id)));
     broadcast({ t: 'world', glass: [...world.broken], brk: [...world.gone], lights: game.lights, doors: world.doorStates });
   }
-  const fresh = isHostageMap() ? createHostages(MAP) : [];
-  game.hostages = game.hostages.map(h =>
-    (h.state === 'dead' || h.state === 'rescued') && t - (h.doneAt || 0) > 8000 ? fresh[h.id] : h);
+  const due = h => (h.state === 'dead' || h.state === 'rescued') && t - (h.doneAt || 0) > 8000;
+  if (game.hostages.some(due)) { // (built only when one is due: not every warmup tick)
+    const fresh = isHostageMap() ? createHostages(MAP) : [];
+    game.hostages = game.hostages.map(h => (due(h) ? fresh[h.id] : h));
+  }
   world.cars = world.cars.map(c => (c.wrecked && t - c.wreckAt > 20000 ? freshCar(MAP.vehicles[c.id], c.id) : c));
   for (const c of world.cars) {
     const home = MAP.vehicles?.[c.id];

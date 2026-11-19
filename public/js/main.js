@@ -407,7 +407,7 @@ function applySpread(d, s) {
   return o.map(v => v / l);
 }
 
-const _v = new THREE.Vector3();
+const _v = new THREE.Vector3(), _earP = new THREE.Vector3(), _earF = new THREE.Vector3();
 function viewMuzzleWorld() {
   if (!vm || me.scope) {
     const e = eyePos();
@@ -2070,6 +2070,7 @@ const selfHistory = [];
 function recordSelf() {
   if (!me.alive) return;
   const t = serverNow();
+  if (t - (selfHistory[selfHistory.length - 1]?.t ?? -1e9) < 30) return; // (30 a second is plenty for the killcam)
   selfHistory.push({ t, p: me.p.slice(), yaw: me.yaw, pitch: me.pitch, c: me.crouch ? 1 : 0, w: current(), alive: 1 });
   while (selfHistory.length && selfHistory[0].t < t - 9000) selfHistory.shift();
 }
@@ -3590,7 +3591,7 @@ function updateCamera(dt, now) {
   camera.updateMatrixWorld();
   camera.getWorldDirection(_v);
   const ear = gadgets.ear(); // (at the CCTV desk we hear from our own head, not the camera)
-  if (ear) audio.listener(new THREE.Vector3(...ear.p), new THREE.Vector3(...ear.fwd));
+  if (ear) audio.listener(_earP.fromArray(ear.p), _earF.fromArray(ear.fwd));
   else audio.listener(camera.position, _v);
 
   // Flashlight follows the view
@@ -3689,6 +3690,7 @@ function updateViewModel(dt, now) {
 
 const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
+let radarAt = 0, radarMates = [];
 function updateHud(now) {
   hud.overlays(now, me.alive && me.nvgOn && !gadgets.watching());
   // (watching a security camera: its black and white picture instead)
@@ -3813,16 +3815,20 @@ function updateHud(now) {
   }
   hud.targetName(target?.name, target?.team);
 
-  const showAll = me.team === 'SPEC';
-  const mates = [...remotes.values()].filter(r => r.alive && (showAll || isMate(r)))
-    .map(r => ({ p: r.p, team: r.team, carrier: r.id === game.carrier, radio: r.radioUntil > now }));
-  let bomb = null;
-  if ((me.team === 'T' || showAll) && game.bomb.p && (game.bomb.s === 'dropped' || game.bomb.s === 'planted')) {
-    bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
+  // the radar: 30 times a second (a full canvas redraw, and the dot lists built new each time)
+  if (now - radarAt >= 33) {
+    radarAt = now;
+    const showAll = me.team === 'SPEC';
+    radarMates = [...remotes.values()].filter(r => r.alive && (showAll || isMate(r)))
+      .map(r => ({ p: r.p, team: r.team, carrier: r.id === game.carrier, radio: r.radioUntil > now }));
+    let bomb = null;
+    if ((me.team === 'T' || showAll) && game.bomb.p && (game.bomb.s === 'dropped' || game.bomb.s === 'planted')) {
+      bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
+    }
+    const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
+    hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, radarMates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
   }
-  const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
-  hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, mates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
-  drawMortarMap(performance.now(), mates);
+  drawMortarMap(performance.now(), radarMates);
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
 
@@ -4079,7 +4085,11 @@ function updateTeamBar() {
     $('top').classList.toggle('hidden', on);
     document.body.classList.toggle('teambar', on);
   }
-  if (on) teamBar.update(game.roster || [], game.bar, game.avatars || {}, game.score || { T: 0, CT: 0 }, me.id, me.team);
+  // (10 times a second: its rows only change 4 times a second, and every update builds a map, sorts and compares keys)
+  const now = performance.now();
+  if (!on || now - (updateTeamBar.at || 0) < 100) return;
+  updateTeamBar.at = now;
+  teamBar.update(game.roster || [], game.bar, game.avatars || {}, game.score || { T: 0, CT: 0 }, me.id, me.team);
 }
 
 function updatePerf(now) {

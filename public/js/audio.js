@@ -964,6 +964,10 @@ export const audio = {
       this.engines.set(id, e);
     }
     const t = ctx.currentTime, rpm = Math.min(1, Math.abs(speed) / 17);
+    // every write crosses to the audio thread (see listener): 30 times a second at most, and a parked car's silent
+    // engine not at all once it's faded out
+    if ((!running && e.off) || t - (e.at || 0) < 0.033) return;
+    e.at = t; e.off = !running;
     if (pos && e.out.positionX) { e.out.positionX.value = pos[0]; e.out.positionY.value = pos[1]; e.out.positionZ.value = pos[2]; }
     e.o1.frequency.setTargetAtTime(38 + rpm * 85, t, 0.08);
     e.o2.frequency.setTargetAtTime(19 + rpm * 42, t, 0.08);
@@ -998,7 +1002,7 @@ export const audio = {
       b = { out, g, o1, o2, lfo, diving: false };
       this.buzzes.set(id, b);
     }
-    if (b.out.positionX) { b.out.positionX.value = pos[0]; b.out.positionY.value = pos[1]; b.out.positionZ.value = pos[2]; }
+    if (b.out.positionX && ctx.currentTime - (b.at || 0) >= 0.033) { b.at = ctx.currentTime; b.out.positionX.value = pos[0]; b.out.positionY.value = pos[1]; b.out.positionZ.value = pos[2]; } // (30 Hz, as engine)
     if (b.diving !== diving) {
       b.diving = diving;
       const t = ctx.currentTime;
@@ -1066,7 +1070,7 @@ export const audio = {
       l = { out, g, o1, o2, src, kind, level: -1 };
       this.loops.set(id, l);
     }
-    if (l.out.positionX) { l.out.positionX.value = pos[0]; l.out.positionY.value = pos[1]; l.out.positionZ.value = pos[2]; }
+    if (l.out.positionX && ctx.currentTime - (l.at || 0) >= 0.033) { l.at = ctx.currentTime; l.out.positionX.value = pos[0]; l.out.positionY.value = pos[1]; l.out.positionZ.value = pos[2]; } // (30 Hz, as engine)
     if (Math.abs(l.level - level) > 0.05) {
       l.level = level;
       const t = ctx.currentTime;

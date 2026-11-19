@@ -163,6 +163,7 @@ export class Effects {
     this._m = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
     this._s = new THREE.Vector3(1, 1, 1);
+    this._p = new THREE.Vector3(); // (scratch: the casings' update runs every frame)
     for (let i = 0; i < MAX_CASINGS; i++) this.casings.setMatrixAt(i, this._m.makeTranslation(0, -1000, 0));
     scene.add(this.casings);
 
@@ -1000,7 +1001,7 @@ export class Effects {
       dirty = true;
       if (!c.rest) {
         c.v.y -= 15 * dt;
-        const next = c.p.clone().addScaledVector(c.v, dt);
+        const next = this._p.copy(c.p).addScaledVector(c.v, dt);
         if (c.v.y < 0) {
           const hit = world.raycast([c.p.x, c.p.y, c.p.z], [0, -1, 0], -c.v.y * dt + 0.02, 'solid');
           if (hit) {
@@ -1015,7 +1016,7 @@ export class Effects {
       }
       const y = c.life <= 0 ? -1000 : c.p.y;
       this._q.setFromEuler(c.r);
-      this._m.compose(new THREE.Vector3(c.p.x, y, c.p.z), this._q, this._s);
+      this._m.compose(this._p.set(c.p.x, y, c.p.z), this._q, this._s);
       this.casings.setMatrixAt(i, this._m);
     });
     if (dirty) this.casings.instanceMatrix.needsUpdate = true;
