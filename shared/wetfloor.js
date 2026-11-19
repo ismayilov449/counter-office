@@ -5,6 +5,7 @@
 //
 // A patch: { p: [x, y, z] (its middle, y the floor's top), r (radius), clip: [axis, at, sign] or null (it lies on the
 // side of the plane pos[axis] = at that `sign` points to), live (it was shocked a moment ago) }.
+import { r2 } from './util.js';
 export const WETFLOOR = {
   start: 0.3, // a new patch's radius (m)
   flow: 0.32, // m² of floor a jet soaks per second at full flow
@@ -36,6 +37,5 @@ export function sparkReaches(pt, s) {
 export const grown = (r, area) => Math.min(WETFLOOR.max, Math.sqrt(r * r + Math.max(0, area) / Math.PI));
 
 // The snapshot's form of a patch: [x, y, z, r, clip axis (-1: none), clip at, clip sign, live 1/0], and back.
-const r2 = v => Math.round(v * 100) / 100;
 export const packPatch = pt => [r2(pt.p[0]), r2(pt.p[1]), r2(pt.p[2]), r2(pt.r), pt.clip ? pt.clip[0] : -1, pt.clip ? r2(pt.clip[1]) : 0, pt.clip ? pt.clip[2] : 0, pt.live ? 1 : 0];
 export const unpackPatch = a => ({ p: [a[0], a[1], a[2]], r: a[3], clip: a[4] >= 0 ? [a[4], a[5], a[6]] : null, live: !!a[7] });

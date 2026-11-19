@@ -49,6 +49,7 @@ import { createStealth } from './lib/stealth.js'; // stealth: the chimney, hidin
 import { createUnderground } from './lib/underground.js'; // underground: no radar underground, the echo, the air vents
 import { createCloseCombat } from './lib/closecombat.js'; // closecombat: suppressors, disarming from behind, door fights
 import { createExplosives } from './lib/explosives.js'; // explosives: throw a grenade back, booby-trapped bodies, the dead man's switch, cut the wire
+import { dist3, r2, remember } from './shared/util.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -332,8 +333,6 @@ const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const vec3 = a => (Array.isArray(a) && a.length === 3 && a.every(isNum) ? a : null);
 const norm = d => { const l = Math.hypot(d[0], d[1], d[2]); return l > 1e-6 ? d.map(v => v / l) : null; };
 const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
-const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-const r2 = v => Math.round(v * 100) / 100;
 const eyeOf = p => [p.p[0], p.p[1] + (p.c ? PLAYER.crouchEye : PLAYER.eye), p.p[2]];
 const inTeam = p => p.team === 'T' || p.team === 'CT';
 const teamName = t => (t === 'T' ? 'Terrorists' : 'Counter-Terrorists');
@@ -3841,9 +3840,9 @@ function handle(p, m) {
       // Hide and Seek: seekers stay where they are until the hiders have had their time.
       if (isHNS() && p.team === 'CT' && game.phase === 'live' && t < (game.hideUntil || 0)) { p.yaw = m.yaw; p.pitch = m.pitch; break; }
       // On the zip line the server says where you are (hanging from the cable); after a fall off it, the landing hurts.
-      if (p.zip) { p.p = zipFeet(MAP.zip, zipNow(p, t).s); p.yaw = m.yaw; p.pitch = m.pitch; p.c = 0; p.history.push({ t, p: p.p, c: 0 }); while (p.history[0].t < t - 1000) p.history.shift(); break; }
+      if (p.zip) { p.p = zipFeet(MAP.zip, zipNow(p, t).s); p.yaw = m.yaw; p.pitch = m.pitch; p.c = 0; remember(p, t, p.p, 0); break; }
       // At the CCTV desk you sit on the chair facing the monitors.
-      if (p.cctv) { p.p = MAP.cctv.seat.slice(); p.yaw = MAP.cctv.yaw; p.pitch = -0.3; p.c = 1; p.history.push({ t, p: p.p, c: 1 }); while (p.history[0].t < t - 1000) p.history.shift(); break; }
+      if (p.cctv) { p.p = MAP.cctv.seat.slice(); p.yaw = MAP.cctv.yaw; p.pitch = -0.3; p.c = 1; remember(p, t, p.p, 1); break; }
       if (stealth.pinned(p, m, t)) break; // stealth: in a car's trunk the server says where you are
       if (p.zipFall) zipLanding(p, pos, t);
       if (!p.alive) break;
@@ -3859,8 +3858,7 @@ function handle(p, m) {
         p.w = m.w;
       }
       if (p.piloting != null) { p.c = 1; p.w = 'drone'; } // (a drone's pilot crouches with the remote)
-      p.history.push({ t, p: pos, c: p.c });
-      while (p.history.length && p.history[0].t < t - 1000) p.history.shift();
+      remember(p, t, pos, p.c);
       break;
     }
     case 'shoot':
