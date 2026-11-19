@@ -25,7 +25,7 @@ const st = {
   reveal: new Map(), // enemy id -> until (performance.now): interrogated away (a ring round his radar dot)
   spots: new Map(), // id -> [x, z]: the snapshot's radar spots (where to draw the ring)
   sentAt: -1e9, stillAt: 0, ending: false, sq: null,
-  sway: [0, 0], walk: 0, blur: '', camDy: 0,
+  sway: [0, 0], walk: 0, blur: 0, camDy: 0,
   posed: new Set(), // remotes posed here (to put back)
 };
 const MOVE = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
@@ -232,11 +232,9 @@ function effects(dt, now, camera) {
     const per = adLeft(now) > 0 ? 3 : 6;
     px = fx.blur * Math.max(0, Math.sin((t * 2 * Math.PI) / per)) ** 2;
   }
-  const css = px >= 0.25 ? `blur(${(Math.round(px * 4) / 4).toFixed(2)}px)` : '';
-  // (on the canvas's container: main.js owns the canvas's own filter — nightvision, the CCTV picture — and sets it
-  // every frame; a filter on the parent adds to it)
-  const el = A.canvas?.parentElement || A.canvas;
-  if (el && el.style.filter !== css) { st.blur = css; el.style.filter = css; }
+  // shown as a haze over the view (#haze), not a CSS blur: that redrew the whole screen at every step (slow on a laptop)
+  const o = px >= 0.25 ? Math.round(Math.min(1, px / WOUNDS.adren.blur) * 20) / 20 : 0;
+  if (o !== st.blur) { st.blur = o; document.getElementById('haze').style.opacity = o; }
 }
 
 // ---------------------------------------------------------------- remote players
