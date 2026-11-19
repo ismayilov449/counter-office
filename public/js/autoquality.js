@@ -16,8 +16,9 @@ export const LEVELS = [
 
 const LOW_FPS = 48; // below this for a while: a step down
 const GOOD_FPS = 57; // at or above this for a long while: try a step up
-const DOWN_AFTER = 1500, UP_AFTER = 12000, SETTLE = 3000; // ms
-const BOUNCE = 6000, HOLD = 90000; // dropped again within BOUNCE of a step up: stay down for HOLD
+// every step reallocates the canvas (and 2<->3 the shadow map): a short hitch, so steps up are rare
+const DOWN_AFTER = 1500, UP_AFTER = 45000, SETTLE = 3000; // ms
+const BOUNCE = 20000, HOLD = 300000; // dropped again within BOUNCE of a step up: stay down for HOLD
 
 export class AutoQuality {
   constructor(apply) {
