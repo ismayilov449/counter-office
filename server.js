@@ -619,15 +619,28 @@ function breakPieces(ids, from = null, fall = false) {
   // windows in a broken wall fall out
   const pcs = ids.map(id => MAP.breakables[id]);
   breakGlass(world.intactGlass.filter(g => pcs.some(pc => [0, 1, 2].every(k => g.min[k] < pc.max[k] + 0.1 && g.max[k] > pc.min[k] - 0.1))).map(g => g.id));
-  if (MAP.realism && !fall) collapse();
+  if (MAP.realism && !fall) collapse(ids);
 }
 
 // What no longer holds on to anything falls (see linkUp in shared/maps/breakables.js) and hurts whoever is under it.
-function collapse() {
-  const P = MAP.breakables, held = new Uint8Array(P.length), queue = [];
-  for (const pc of P) if (pc.anchor && !world.gone.has(pc.id)) { held[pc.id] = 1; queue.push(pc.id); }
-  while (queue.length) for (const n of P[queue.pop()].links) if (!held[n] && !world.gone.has(n)) { held[n] = 1; queue.push(n); }
-  const fallen = P.filter(pc => !held[pc.id] && !world.gone.has(pc.id));
+// Only what touched a broken piece can have lost its hold: from each such neighbour, walk its group until an anchor
+// turns up (usually a few steps; walking the whole house from the anchors took ~4 ms at every chip).
+function collapse(broken) {
+  const P = MAP.breakables, held = new Set(), loose = new Set();
+  for (const id of broken) {
+    for (const n of P[id].links) {
+      if (world.gone.has(n) || held.has(n) || loose.has(n)) continue;
+      const group = [n], seen = new Set(group);
+      let anchored = false;
+      for (let i = 0; i < group.length && !anchored; i++) {
+        const pc = P[group[i]];
+        if (pc.anchor || held.has(pc.id)) { anchored = true; break; }
+        for (const m of pc.links) if (!seen.has(m) && !world.gone.has(m)) { seen.add(m); group.push(m); }
+      }
+      for (const m of seen) (anchored ? held : loose).add(m);
+    }
+  }
+  const fallen = [...loose].map(id => P[id]);
   if (!fallen.length) return;
   breakPieces(fallen.map(pc => pc.id), null, true);
   const hurt = new Map();
@@ -722,23 +735,30 @@ function blastMap(at, weapon) {
   setTimeout(() => {
     if (game.round !== round) return;
     const tb = performance.now();
-    const [R, D] = B, out = [];
-    for (const pc of piecesNear(at.map(v => v - R), at.map(v => v + R))) {
-      if (world.gone.has(pc.id)) continue;
-      const c = [0, 1, 2].map(k => Math.max(pc.min[k], Math.min(at[k], pc.max[k])));
-      const d = dist3(at, c);
-      if (d > R) continue;
-      let k = 1;
-      if (d > 0.05) {
-        const h = world.raycast(at, c.map((v, i) => (v - at[i]) / d), d - 0.03, 'solid');
-        if (h && h.box.brk == null) continue;
-        if (h && h.box.brk !== pc.id) k = 0.5;
+    const [R, D] = B, out = [], near = piecesNear(at.map(v => v - R), at.map(v => v + R));
+    let next = 0;
+    // 300 pieces at a time, the ticks running in between (a bomb in the house reaches ~1,600: ~15 ms of rays)
+    (function chunk() {
+      if (game.round !== round) return;
+      for (const end = Math.min(near.length, next + 300); next < end; next++) {
+        const pc = near[next];
+        if (world.gone.has(pc.id)) continue;
+        const c = [0, 1, 2].map(k => Math.max(pc.min[k], Math.min(at[k], pc.max[k])));
+        const d = dist3(at, c);
+        if (d > R) continue;
+        let k = 1;
+        if (d > 0.05) {
+          const h = world.raycast(at, c.map((v, i) => (v - at[i]) / d), d - 0.03, 'solid');
+          if (h && h.box.brk == null) continue;
+          if (h && h.box.brk !== pc.id) k = 0.5;
+        }
+        hurtPiece(pc, D * (1 - d / R) * k * (0.75 + Math.random() * 0.5), out);
       }
-      hurtPiece(pc, D * (1 - d / R) * k * (0.75 + Math.random() * 0.5), out);
-    }
-    breakPieces(out, at);
-    if (MAP.realism) blastShove(at, weapon);
-    if (env.DEBUG_TICK) console.log(`  [blast] ${weapon}: ${out.length} pieces broken in ${(performance.now() - tb).toFixed(1)} ms`);
+      if (next < near.length) return setImmediate(chunk);
+      breakPieces(out, at);
+      if (MAP.realism) blastShove(at, weapon);
+      if (env.DEBUG_TICK) console.log(`  [blast] ${weapon}: ${out.length} pieces broken, ${(performance.now() - tb).toFixed(1)} ms from start to end`);
+    })();
   }, 0);
 }
 
