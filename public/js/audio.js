@@ -101,6 +101,11 @@ function gunshot(out, t, s, dist) {
     tone(bus, t + 0.025, { freq: 2900, dur: 0.012, type: 'square', gain: 0.05 });
     return;
   }
+  if (dist > 40) { // far away only the body and the boom carry (and a third of the audio nodes)
+    burst(bus, t, { dur: s.dur * 1.8, freq: s.body * 1.4, freqEnd: 220, gain: g * 0.9 });
+    tone(bus, t, { freq: s.boom, freqEnd: 32, dur: s.dur * 1.5, gain: g * 0.95 });
+    return;
+  }
   burst(bus, t, { dur: 0.018, type: 'highpass', freq: s.crack, gain: g * 1.8 });
   const sh = drive();
   sh.connect(bus);
@@ -221,6 +226,19 @@ function throat(dest, t0, { f0, f1, dur, gain, form = [650, 1100], wob = 0 }) {
   burst(dest, t0, { dur: dur * 0.9, type: 'bandpass', freq: 1300, q: 1.2, gain: gain * 0.35 });
 }
 
+// A cap on sounds at once: a shot is about 20 audio nodes, a blast about 60 for seconds, and a firefight with a few
+// grenades piled up hundreds (crackling, and the page stalls). Past it, other players' sounds are dropped; yours
+// always play. [at once, seconds one lasts]
+const CAP = { shot: [24, 0.5], blast: [3, 4] };
+const KIND = { shot: 'shot', sshot: 'shot', heboom: 'blast', mortarboom: 'blast', rpgboom: 'blast', c4boom: 'blast' };
+const playing = { shot: [], blast: [] }; // end times, oldest first
+function full(kind, t) {
+  const a = playing[kind];
+  while (a.length && a[0] <= t) a.shift();
+  if (a.length >= CAP[kind][0]) return true;
+  a.push(t + CAP[kind][1]);
+  return false;
+}
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
 const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], medic: [5, 0.8], crumble: [8, 0.8], sshot: [1, 3] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
@@ -373,7 +391,7 @@ function shellBlast(out, t, s = 1) {
     rumble(bus, t + dt, { dur: 2.2 * s, freq: fr + up * 3, freqEnd: 40, gain: g * (0.4 + 0.6 * s), attack: 0.12 });
   }
   // debris raining down
-  for (let i = 0; i < 40 * s; i++) {
+  for (let i = 0; i < 14 * s; i++) {
     const at = t + 0.35 + Math.pow(Math.random(), 1.6) * 3.2 * s;
     burst(bus, at, { dur: 0.025 + Math.random() * 0.06, type: 'bandpass', freq: 900 + Math.random() * 3200, q: 1.5, gain: 0.06 + Math.random() * 0.12 });
   }
@@ -509,6 +527,7 @@ export const audio = {
   play(name, pos = null, arg = null) {
     if (!ctx || ctx.state !== 'running') return;
     const t = ctx.currentTime;
+    if (KIND[name] && full(KIND[name], t) && pos) return;
     if (pos && this.vent) pos = this.vent(pos) || pos; // underground: heard through an air vent, it comes out of the grille (public/js/underground.js)
     const out = this.out(pos, FAR[name], this.muffled);
     switch (name) {
