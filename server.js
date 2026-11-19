@@ -175,10 +175,12 @@ function staticFile(file, done) {
       const f = {
         mtime: st.mtimeMs, size: st.size, data, type: MIME[ext] || 'application/octet-stream',
         etag: `"${crypto.createHash('sha1').update(data).digest('base64url').slice(0, 16)}"`,
-        gz: COMPRESS.has(ext) && data.length > 1024 ? zlib.gzipSync(data, { level: 9 }) : null,
+        gz: null,
       };
-      fileCache.set(file, f);
-      done(null, f);
+      const keep = () => { fileCache.set(file, f); done(null, f); };
+      // compressed off the game's thread (a 1.5 MB map file took ~100 ms in one go, the ticks waiting)
+      if (COMPRESS.has(ext) && data.length > 1024) zlib.gzip(data, { level: 9 }, (e, gz) => { f.gz = e ? null : gz; keep(); });
+      else keep();
     });
   });
 }
@@ -3942,13 +3944,15 @@ function handle(p, m) {
       // the player's picture for the team bar: a small JPEG made in their browser
       if (typeof m.img === 'string' && m.img.startsWith('data:image/jpeg;base64,') && m.img.length < 24000) {
         p.avatar = m.img;
-        broadcast({ t: 'avatar', id: p.id, img: m.img });
+        // shortcut: at most one every 5 s goes out (24 KB to everyone); a change within that reaches the others when they next join
+        if (t - (p.avatarAt || 0) >= 5000) { p.avatarAt = t; broadcast({ t: 'avatar', id: p.id, img: m.img }); }
       }
       break;
     case 'sprayimg':
       if (typeof m.data === 'string' && m.data.startsWith('data:image/png;base64,') && m.data.length < 90000) {
         p.sprayImg = m.data;
-        broadcast({ t: 'sprayimg', id: p.id, data: m.data });
+        // shortcut: at most one every 5 s goes out (90 KB to everyone); a change within that reaches the others when they next join
+        if (t - (p.sprayImgAt || 0) >= 5000) { p.sprayImgAt = t; broadcast({ t: 'sprayimg', id: p.id, data: m.data }); }
       }
       break;
     case 'startmoney': {
