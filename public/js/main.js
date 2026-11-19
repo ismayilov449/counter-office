@@ -232,6 +232,9 @@ function prewarm() {
   renderer.render(scene, warmCam);
   renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, warmCam);
+  // the renders above only compile what warmCam sees; this compiles every material in the scene, hidden or far
+  // (walls across the map, the blood pools, footprints, the flood and gas meshes), so none compiles mid-fight
+  renderer.compile(scene, camera);
   scene.remove(extra);
   fx.reset();
   world.update(0, camera.position);
