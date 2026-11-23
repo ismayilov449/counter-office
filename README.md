@@ -41,7 +41,8 @@ the Esc menu. The password is printed in the server window when it starts. It is
 in `data/admin.json`, where you can change it (or set `ADMIN_PASSWORD`). From the panel you can:
 
 - switch the **game mode** (Classic, Gun Game, Zombie mode, Deathmatch or Hide and Seek; the match restarts),
-- set the **bots**: how many players each team is filled up to (off, 1 vs 1 … 10 vs 10) and their level (easy, normal, hard),
+- set the **bots**: how many players each team is filled up to (off, 1 vs 1 … 10 vs 10) and their level (easy, normal, hard), or
+  play **people vs bots**: all the people on one side (the first to pick a team chooses which) against that many bots,
 - turn on **party modes** (low gravity, headshots only, big heads, one weapon for everyone),
 - change the start money, rounds to win, round/freeze/buy time, C4 timer, friendly fire, auto team balance, halftime
   and map rotation (saved in `data/settings.json`; round times apply from the next round, start money from the next match),
@@ -81,6 +82,7 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
 | `GAME_MODE`     | classic    | `gungame` Gun Game, `zombie` Zombie mode, `deathmatch` Deathmatch, `hns` Hide and Seek |
 | `BOTS`          | 8          | Fill each team up to this many players with bots (8 = 8 vs 8); `0` turns bots off |
 | `BOT_LEVEL`     | hard       | Bot level: `easy`, `normal` or `hard` |
+| `BOTS_VS`       | off        | `1`: people vs bots: all the people on one side, `BOTS` bots on the other |
 | `DM_FRAGS`      | 30         | Deathmatch: kills to win |
 | `DM_MINUTES`    | 10         | Deathmatch: time limit in minutes |
 | `AUTO_BALANCE`  | on         | `0` turns off auto team balance               |

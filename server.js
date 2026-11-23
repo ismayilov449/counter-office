@@ -77,8 +77,9 @@ const CFG = {
   medicCalls: env.MEDIC_CALLS === '1',
   noKillConfirm: env.NO_KILL_CONFIRM === '1',
   gameMode: ['gungame', 'zombie', 'deathmatch', 'hns'].includes(env.GAME_MODE) ? env.GAME_MODE : 'classic',
-  // Bots fill both teams up to perTeam players each (8 = 8 vs 8); 0 turns them off.
-  bots: { perTeam: num(env.BOTS, 8), difficulty: BOT_LEVELS[env.BOT_LEVEL] ? env.BOT_LEVEL : 'hard' },
+  // Bots fill both teams up to perTeam players each (8 = 8 vs 8); 0 turns them off. vs (people vs bots): all the people
+  // play on one side (whichever the first one picks) and perTeam bots play the other.
+  bots: { perTeam: num(env.BOTS, 8), difficulty: BOT_LEVELS[env.BOT_LEVEL] ? env.BOT_LEVEL : 'hard', vs: env.BOTS_VS === '1' },
   dmFrags: num(env.DM_FRAGS, 30), // Deathmatch: kills to win
   dmMinutes: num(env.DM_MINUTES, 10), // Deathmatch: time limit
   hnsHide: 30, // Hide and Seek: seconds the hiders get before the seekers are let out
@@ -142,7 +143,7 @@ const int = (lo, hi) => v => Number.isInteger(v) && v >= lo && v <= hi;
 const bool = v => typeof v === 'boolean';
 const SETTINGS = {
   gameMode: v => ['classic', 'gungame', 'zombie', 'deathmatch', 'hns'].includes(v),
-  bots: v => !!v && typeof v === 'object' && Number.isInteger(v.perTeam) && v.perTeam >= 0 && v.perTeam <= 10 && !!BOT_LEVELS[v.difficulty],
+  bots: v => !!v && typeof v === 'object' && Number.isInteger(v.perTeam) && v.perTeam >= 0 && v.perTeam <= 10 && !!BOT_LEVELS[v.difficulty] && (v.vs === undefined || bool(v.vs)),
   dmFrags: int(5, 150),
   dmMinutes: int(2, 60),
   party: v => !!v && typeof v === 'object' && bool(v.lowGravity) && bool(v.headshotsOnly) && bool(v.bigHeads) && PARTY_WEAPONS.includes(v.weapon),
@@ -387,7 +388,7 @@ function spawnPlayer(p) {
 
 // With auto team balance on, a team can't get two players ahead of the other.
 function teamFull(p, team) {
-  if (!CFG.autoBalance || !inTeam({ team }) || isZM() || p.bot) return false;
+  if (!CFG.autoBalance || isVs() || !inTeam({ team }) || isZM() || p.bot) return false;
   const count = t => [...players.values()].filter(q => q !== p && q.team === t && !q.bot).length;
   return count(team) + 1 - count(other(team)) >= 2;
 }
@@ -417,6 +418,13 @@ function setTeam(p, team) {
 }
 
 const humanCount = team => [...players.values()].filter(p => !p.bot && p.team === team).length;
+
+// People vs bots: the side the people play (where most of them are), or null while nobody has picked one.
+const isVs = () => !!CFG.bots.vs && !isZM();
+function peopleSide(except) {
+  const n = t => [...players.values()].filter(p => p !== except && !p.bot && p.team === t).length;
+  return n('T') || n('CT') ? (n('T') >= n('CT') ? 'T' : 'CT') : null;
+}
 
 function teamCount(team, aliveOnly = false) {
   let n = 0;
@@ -1220,6 +1228,11 @@ function startMatch() {
 
 // ---- auto team balance: between rounds, move players from the bigger team until they are within one
 function balanceTeams() {
+  if (isVs()) { // (vs turned on with people on both sides)
+    const side = peopleSide();
+    for (const p of [...players.values()]) if (side && !p.bot && p.team === other(side)) { movePlayer(p, side); notify(`${p.name} was moved to the ${teamName(side)}: people vs bots`); }
+    return;
+  }
   if (!CFG.autoBalance || isZM()) return;
   for (;;) {
     const nT = humanCount('T'), nCT = humanCount('CT');
@@ -1604,8 +1617,9 @@ function syncBots(force = false) {
     for (let n = all.length; n < want; n++) addBot('CT');
     return;
   }
+  const side = isVs() ? peopleSide() : null;
   for (const team of ['T', 'CT']) {
-    const want = Math.max(0, per - people.filter(p => p.team === team).length);
+    const want = side ? (team === side ? 0 : per) : Math.max(0, per - people.filter(p => p.team === team).length);
     const mine = all.filter(p => p.team === team);
     trim(mine, want);
     for (let n = mine.length; n < want; n++) addBot(team);
@@ -3713,6 +3727,11 @@ function handle(p, m) {
         team = other(team);
         send(p, { t: 'msg', text: `Too many players on the other side — you joined the ${teamName(team)} (auto team balance).`, big: true });
       }
+      const vsSide = isVs() && team !== 'SPEC' ? peopleSide(p) : null;
+      if (vsSide && team !== vsSide) {
+        team = vsSide;
+        send(p, { t: 'msg', text: `People vs bots: you joined your friends on the ${teamName(team)}.`, big: true });
+      }
       if (team === 'SPEC') sendMe(p);
       else setTeam(p, team);
       sendRoster();
@@ -3722,6 +3741,7 @@ function handle(p, m) {
     case 'team':
       if (!p.joined || !['T', 'CT', 'SPEC'].includes(m.team)) break;
       if (teamFull(p, m.team)) { send(p, { t: 'msg', text: 'That team has too many players (auto team balance). Join the other side.' }); break; }
+      if (isVs() && m.team !== 'SPEC' && peopleSide(p) && m.team !== peopleSide(p)) { send(p, { t: 'msg', text: `People vs bots: everyone plays on the ${teamName(peopleSide(p))}. That side is the bots'.` }); break; }
       setTeam(p, m.team);
       break;
     case 'state': {
@@ -3936,7 +3956,7 @@ function tick() {
     for (const p of players.values()) {
       if (!inTeam(p) || p.alive || t - p.deathAt < CFG.ggRespawn * 1000) continue;
       // Auto team balance in Gun Game: someone on a team two players ahead respawns on the other side.
-      if (CFG.autoBalance && !p.bot && humanCount(p.team) - humanCount(other(p.team)) >= 2) {
+      if (CFG.autoBalance && !isVs() && !p.bot && humanCount(p.team) - humanCount(other(p.team)) >= 2) {
         const to = other(p.team);
         movePlayer(p, to);
         notify(`${p.name} was moved to the ${teamName(to)} to balance the teams`);

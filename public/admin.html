@@ -117,8 +117,11 @@
         <label class="field">Bot level
           <select id="b-difficulty"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
         </label>
+        <label class="field">Bots play
+          <select id="b-vs"><option value="0">on both teams</option><option value="1">against the people</option></select>
+        </label>
       </div>
-      <p class="muted small">Bots fill the places nobody is playing (8 vs 8 with 6 people = 10 bots) and leave as people join. When every person is dead, the round ends right away — nobody has to watch the bots play.</p>
+      <p class="muted small">Bots fill the places nobody is playing (8 vs 8 with 6 people = 10 bots) and leave as people join. <b>Against the people</b>: all the people play on one side (the first one to pick a team chooses it) and the bots on the other; the number is how many bots (8 vs 8 = 8 bots), and auto team balance is off. When every person is dead, the round ends right away — nobody has to watch the bots play.</p>
       <h2 style="margin-top:16px">Party modes</h2>
       <div class="grid">
         <label class="check"><input id="p-lowGravity" type="checkbox"> Low gravity (jump way higher)</label>
@@ -215,6 +218,7 @@ function fillForm(set) {
   $('p-weapon').value = set.party?.weapon || '';
   $('b-perTeam').value = String(set.bots?.perTeam ?? 8);
   $('b-difficulty').value = set.bots?.difficulty || 'hard';
+  $('b-vs').value = set.bots?.vs ? '1' : '0';
   formDirty = false;
 }
 
@@ -224,7 +228,7 @@ function readForm() {
   for (const k of BOOLS) out[k] = $('s-' + k).checked;
   out.party = { weapon: $('p-weapon').value };
   for (const k of PARTY) out.party[k] = $('p-' + k).checked;
-  out.bots = { perTeam: +$('b-perTeam').value, difficulty: $('b-difficulty').value };
+  out.bots = { perTeam: +$('b-perTeam').value, difficulty: $('b-difficulty').value, vs: $('b-vs').value === '1' };
   return out;
 }
 
