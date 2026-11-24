@@ -179,10 +179,10 @@ export class Hud {
     const L = v.last;
     if (L?.c) {
       const fade = Math.max(0.35, 1 - L.age / 30); // older scans fade (but stay: it's the last one)
-      for (const [x, z, r, floor] of L.c) {
+      for (const [x, z, r, floor, white] of [...L.c, ...(L.h || []).map(h => [...h.slice(0, 4), 1])]) { // (white: a hostage's phone)
         const [cx, cz] = toR(x, z);
         g.globalAlpha = fade;
-        g.fillStyle = 'rgba(255, 70, 50, 0.22)'; g.strokeStyle = '#ff5a40'; g.lineWidth = 2;
+        g.fillStyle = white ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 70, 50, 0.22)'; g.strokeStyle = white ? '#f4f4f4' : '#ff5a40'; g.lineWidth = 2;
         g.beginPath(); g.arc(cx, cz, Math.max(4, r * s), 0, Math.PI * 2); g.fill(); g.stroke();
         if (floor) { g.fillStyle = '#ffd0c0'; g.font = 'bold 10px Consolas, monospace'; g.textAlign = 'center'; g.fillText(floor, cx, cz + 3); g.textAlign = 'start'; }
       }
@@ -644,7 +644,7 @@ export class Hud {
       } else if (mk.kind === 'trk') {
         // phone tracker: a scan's circle round a phone, fading out over its last seconds
         g.globalAlpha = Math.min(1, Math.max(0, (6 - mk.age) / 2));
-        g.fillStyle = 'rgba(255, 70, 50, 0.18)'; g.strokeStyle = '#ff5a40';
+        g.fillStyle = mk.white ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 70, 50, 0.18)'; g.strokeStyle = mk.white ? '#f4f4f4' : '#ff5a40'; // (white: a hostage's phone)
         g.beginPath(); g.arc(x, z, Math.max(3, mk.r * s), 0, Math.PI * 2); g.fill(); g.stroke();
         g.globalAlpha = 1;
       } else if (mk.kind === 'target') {

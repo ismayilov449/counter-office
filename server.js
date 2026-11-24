@@ -1546,14 +1546,15 @@ function swapHns() {
 
 // Hostages try to escape (lib/hostage-escape.js): paths from the bots' nav grid, doors opened as they bump into them.
 const escape = createEscape({ game, players, on: () => CFG.hostageEscape, map: () => MAP, world: () => world, now, send, broadcast, near: p => world.move(null, p, 2),
-  reach: (p, h) => hostageInReach(p, h), route: (a, b, cb) => bots.route(a, b, cb), lead: (p, h) => leadHostage(p, h),
+  reach: (p, h) => hostageInReach(p, h), route: (a, b, cb) => bots.route(a, b, cb), lead: (p, h) => leadHostage(p, h), tied: (p, h) => tracker.tied(p, h), // (phone tracker: the T takes its phone)
   openDoorNear: pos => { const d = nearestDoor({ p: pos }); if (!d || d.dist > 1.6 || world.doorStates[d.i] !== 0) return false; useDoor({ p: pos, ws: {} }, d.i); return world.doorStates[d.i] !== 0 || !!game.doorOpening?.[d.i]; } }); // (false: something was in the door's way)
 // Carrying wounded hostages (lib/hostage-carry.js)
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
 // Phone tracker (lib/phonetracker.js)
-const tracker = createPhoneTracker({ game, players, cfg: CFG, map: () => MAP, world: () => world, now, send, sendMe: p => sendMe(p),
-  jammedAt: pos => jammedAt(pos), jammers: () => game.jammers, eyeOf: p => eyeOf(p),
+const tracker = createPhoneTracker({ game, players, cfg: CFG, map: () => MAP, world: () => world, now, send, sendMe: p => sendMe(p), broadcast,
+  jammedAt: pos => jammedAt(pos), jammers: () => game.jammers, eyeOf: p => eyeOf(p), los: (a, b) => lineOfSight(a, b),
+  drone: p => game.drones.find(d => d.owner === p.id && (d.state === 'fly' || d.state === 'dive')) || null,
   dropAt: p => game.drops.push({ id: game.nextDropId++, w: 'tracker', p: [p.p[0], groundY(p.p[0], p.p[1] + 0.5, p.p[2]), p.p[2]], owner: p.id, until: now() + 1200 }) });
 // closecombat: ROADMAP group 8 (lib/closecombat.js)
 const cc = createCloseCombat({ game, players, send, broadcast, sendMe: p => sendMe(p), now, mates: (a, b) => mates(a, b), eyeOf: p => eyeOf(p), lineOfSight: (a, b) => lineOfSight(a, b), spawnDrop: (...a) => spawnDrop(...a), noDisarm: () => isGG() || isZM(),
@@ -2132,6 +2133,7 @@ function updateActions(t) {
   for (const p of players.values()) {
     const a = p.act;
     if (!a) continue;
+    if (a.type === 'twr') { tracker.act(p, a, t); continue; } // phone tracker: repairing a cell tower
     if (a.type === 'flood') { flood.updateAct(p, a, t); continue; } // Floodgate: turning the valve
     if (a.type === 'fireplace') { stealth.updateAct(p, a, t); continue; } // stealth: lighting the fireplace
     if (a.type === 'tie' || a.type === 'untie') { escape.act(p, a, t); continue; } // escape: zip-tying a hostage, cutting the ties
@@ -2240,6 +2242,7 @@ function onUse(p, m, t) {
   if (cc.disarm(p, t)) return; // closecombat: an enemy's back within reach: snatch the gun in his hands
   if (p.shield == null && MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at; a hostage held lets go first)
   if (carry.use(p, t)) return; // carry: a CT picks up a badly hurt hostage or puts his down
+  if (tracker.use(p, t)) return; // phone tracker: a CT repairs a cell tower that is down
   if (escape.use(p, t)) return; // escape: a crouched Terrorist zip-ties a hostage, a CT cuts the ties (before the shield and the lead)
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   const plantHere = game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p);
@@ -2446,6 +2449,7 @@ function onShoot(p, m) {
     else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
     if (!def.melee) for (const s of game.satchels) if (!shotSatchels.includes(s) && raySatchel(o, d, s, endT + 0.1)) shotSatchels.push(s);
+    if (!def.melee) tracker.shoot(o, d, endT); // phone tracker: a cell tower's cabinet in the way
     if (MAP.cctv && !def.melee) MAP.cctv.cams.forEach((c, i) => { if (!game.camsDown.has(i) && !shotCams.includes(i) && rayAABB(o, d, c.p.map(v => v - CCTV.hit), c.p.map(v => v + CCTV.hit), endT + 0.1)) shotCams.push(i); });
     for (const dr of game.drones) {
       if (shotDrones.includes(dr) || (!CFG.friendlyFire && mates(p, dr) && dr.owner !== p.id)) continue;
@@ -2885,6 +2889,7 @@ function destroyJammer(j, by) {
 
 function blastJammers(at, r) {
   if (MAP.cctv) blastCams(at, Math.max(CCTV.blast, r * 0.5)); // (every blast passes here: the cameras too)
+  tracker.blast(at, r); // phone tracker: and the cell towers
   for (const j of [...game.jammers]) if (dist3(j.p, at) < r && lineOfSight(at, [j.p[0], j.p[1] + 0.3, j.p[2]])) destroyJammer(j, null);
 }
 
@@ -3906,7 +3911,7 @@ function handle(p, m) {
       sendRoster();
       checkVotes();
       break;
-    case 'scan': tracker.scan(p, t); break; // phone tracker: Mouse1 with it out
+    case 'scan': tracker.scan(p, t, !!m.drone); break; // phone tracker: Mouse1 with it out (R flying a drone: from the drone)
     case 'radio': {
       const menu = RADIO[m.menu];
       const text = menu?.items[m.n];
@@ -4101,6 +4106,7 @@ function tick() {
     ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
     ...wounds.snap(), // wounds: wd: { d: [[dragger, dragged, x, y, z]], k: [[id, 0..1]] ending it, i: [[asker, victim, 0..1]], a: [interrogated] }
     ...stealth.snap(), // stealth: st: { f: the fireplace burns, s: sooty players, k: who hides in which trunk }, only while there's any
+    ...tracker.snap(), // phone tracker: tw: [1 per cell tower that is down] while any is
     ...walls.snap(), // walls: wa: [wet patches, sprays, cut cables' ends] while there are any (see lib/walls.js)
   }).slice(0, -1);
   // The parts that rarely change go out only when they do (and all of them to someone who has just joined); the

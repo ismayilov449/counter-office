@@ -19,7 +19,7 @@ settings like the RPG-7.
 
 **New (2026-11-24): group 14, Phone tracker** (stop the Terrorists camping: every Terrorist carries a phone that is
 always on, the CTs hunt the phones with a tracker), designed with the user. Version 1 is 14.1-14.4,
-version 2 is 14.5-14.7. **Version 1 built 2026-11-24, on `main`** (server-tested; not yet checked in a browser).
+version 2 is 14.5-14.7. **Versions 1 and 2 built 2026-11-24, on `main`** (server-tested; not yet checked in a browser).
 
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)
@@ -345,7 +345,12 @@ On any other map, or with the switch off, the game works as it does today.
 lib/phonetracker.js (server), public/js/phonetracker.js + hud.trackerScreen (browser), the admin switch `phoneTracker`
 (`PHONE_TRACKER=1`); the tracker is weapon `tracker` (slot 6, drawn as the detonator's phone for now). Test:
 dev/test-scripts/phonetracker/t1-server.mjs (server, all pass). Not yet checked in a browser: waiting for the user.
-Version 2 (14.5-14.7) not started.)*
+**Version 2 (14.5-14.7) built 2026-11-24, on `main`:** towers in shared/maps/mansion_phonetracker.js (map.towers,
+solids via remodel), knocked out by bullets/blasts, repaired with E ('twr' action), the snapshot's `tw`; drone scans
+(`scan` with `drone: 1`, R in the browser); hostage phones (msg.h, taken on zip-tying via escape's `tied` hook). Choices
+made while building: the roof tower's cabinet is inside the lift's machine room (reachable by the roof ladder); the
+hostage's phone is taken as part of zip-tying (crouch + hold E, 2 s) because standing E is the hostage shield.
+Test: dev/test-scripts/phonetracker/t2-v2.mjs (server, all pass). Not yet checked in a browser.)*
 
 *(Designed with the user on 2026-11-24, after hostage escaping (6.1) got its admin switch, because the
 group didn't like hostages walking off; this replaces it as the answer to Terrorists camping.)*

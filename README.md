@@ -824,6 +824,15 @@ still gets found, a phone that moves stays fuzzy.**
 - **Underground** (the cellar, the tunnels) the signal is weak: twice as big a circle, but never nothing.
 - **The signal jammer** hides every phone within its 15 m, but it cuts the Terrorists' own phones there too (no radar,
   no radio), and a scan within 30 m of it shows which way it is.
+- **Cell towers.** The tracker measures from three towers: an antenna on the lift's machine room on the roof (its
+  cabinet inside the room), one on the driveway by the garage, and one on the CT street. **Shoot a tower's cabinet**
+  (10 bullets) **or blow it up** and it goes down: everyone is told, and every scan's circles get 50% bigger per tower
+  down. A CT repairs one by **holding E at its cabinet for 5 seconds**. A standing tower's light blinks red on top;
+  a dead one's cabinet is black with a red light.
+- **The drone's antenna.** A CT flying an FPV drone presses **R** to scan from it (it uses the team's scans). Phones
+  outdoors get **circles half the size**: the air is the best place to scan from.
+- **The hostages have phones too:** white circles on the radar. A Terrorist who **zip-ties** a hostage takes its phone,
+  and the tracker can't see it any more.
 
 ## Bots
 

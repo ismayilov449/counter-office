@@ -275,7 +275,7 @@ const gas = createGasClient({ scene, camera, fx, audio, me, brk: () => game.brk,
 
 const remotes = new Map();
 const drops = new Map();
-const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels });
+const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels, scene });
 let dropList = [];
 let plantedBomb = null;
 let nextBeep = 0;
@@ -2406,7 +2406,7 @@ document.addEventListener('keydown', e => {
         break;
       }
       if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
-    case 'KeyR': startReload(); break;
+    case 'KeyR': if (me.drone && me.team === 'CT' && trk.on()) trk.scan(true); else startReload(); break; // (phone tracker: flying a drone, R scans from it)
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
     case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
@@ -2980,6 +2980,7 @@ const net = new Net({
     gas.snapshot(m.gs); // gas: the pipes and the gas in each room (none: clean air)
     flood.onSnapshot(m.fl); // Floodgate: the water level and the valve
     stealth.onSnapshot(m.st); // stealth: the fireplace's fire, who is sooty, who hides in a trunk
+    trk.snapshot(m.tw); // phone tracker: which cell towers are down
     walls.onSnapshot(m.wa); // walls: wet patches, burst pipes' sprays, cut cables
   },
   catMeow(m) {
@@ -3810,6 +3811,7 @@ function updateHud(now) {
   if (me.act?.a === 'tie' || me.act?.a === 'untie') hud.progress(me.act.a === 'tie' ? 'Zip-tying the hostage...' : 'Cutting the zip ties...', me.act.pr); // escape
   if (me.act?.a === 'flood') hud.progress(flood.actLabel(), me.act.pr); // Floodgate
   if (me.act && circuits.progress(me.act.a)) hud.progress(circuits.progress(me.act.a), me.act.pr); // power
+  if (me.act && trk.progress(me.act.a)) hud.progress(trk.progress(me.act.a), me.act.pr); // phone tracker: repairing a cell tower
   if (me.act && stealth.progressLabel(me.act.a)) hud.progress(stealth.progressLabel(me.act.a), me.act.pr); // stealth: lighting the fireplace
   if (me.act && cc.progress(me.act.a)) hud.progress(cc.progress(me.act.a), me.act.pr); // closecombat: holding a door shut, pushing it
 

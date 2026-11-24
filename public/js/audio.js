@@ -772,6 +772,13 @@ export const audio = {
       case 'trkbeep':
         tone(out, t, { freq: 2600, dur: 0.04, type: 'square', gain: 0.04 });
         break;
+      case 'twrdown': // a cell tower's cabinet knocked out: a crackle of sparks and a dying hum
+        burst(out, t, { dur: 0.5, type: 'highpass', freq: 3000, gain: 0.5 });
+        tone(out, t, { freq: 120, freqEnd: 40, dur: 0.8, type: 'sawtooth', gain: 0.12 });
+        break;
+      case 'twrup': // repaired: the hum comes back
+        tone(out, t, { freq: 60, freqEnd: 120, dur: 0.6, type: 'sawtooth', gain: 0.08 });
+        break;
       case 'trkdone':
         tone(out, t, { freq: 1400, dur: 0.07, gain: 0.08 });
         tone(out, t + 0.09, { freq: 2100, dur: 0.09, gain: 0.08 });
