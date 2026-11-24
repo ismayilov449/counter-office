@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Van Extraction Demo</title>
+  <!-- A scripted 2-minute look at the proposed "van extraction" round on cs_mansion (the real map, models and the
+       bots' routes; nothing is simulated). Served by the game server: /dev/van-demo.html -->
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: #eee; font: 14px Verdana, sans-serif; }
+    #view { position: fixed; inset: 0; }
+    .hud { position: fixed; pointer-events: none; text-shadow: 0 1px 3px #000; }
+    #top { top: 10px; left: 50%; transform: translateX(-50%); text-align: center; }
+    #clock { font: bold 30px monospace; }
+    #phase { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #ffd060; }
+    #score { font-size: 13px; margin-top: 4px; }
+    #van { margin-top: 6px; font: bold 16px monospace; color: #ff6a50; }
+    #feed { top: 10px; right: 12px; text-align: right; font-size: 13px; }
+    #feed div { background: rgba(0, 0, 0, 0.55); padding: 3px 8px; margin-bottom: 3px; border-radius: 3px; }
+    .t { color: #e8b04a; } .ct { color: #7fb0ff; } .h { color: #ddd; }
+    #banner { top: 34%; left: 50%; transform: translateX(-50%); text-align: center; font: bold 34px Verdana, sans-serif; opacity: 0; transition: opacity .3s; }
+    #banner small { display: block; font-size: 16px; font-weight: normal; margin-top: 6px; }
+    #caption { bottom: 70px; left: 50%; transform: translateX(-50%); width: min(820px, calc(100% - 32px)); text-align: center;
+      background: rgba(0, 0, 0, 0.6); padding: 10px 14px; border-radius: 4px; font-size: 15px; line-height: 1.4; }
+    #caption b { color: #ffd060; }
+    #radar { top: 10px; left: 12px; width: 190px; height: 190px; background: rgba(10, 20, 10, 0.75); border: 1px solid #4a6; border-radius: 4px; }
+    #radarLabel { top: 204px; left: 12px; font-size: 11px; color: #9c9; width: 190px; text-align: center; }
+    #bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; align-items: center; padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.7); }
+    #bar button, #bar select { background: #333; color: #eee; border: 1px solid #555; border-radius: 3px; padding: 5px 10px; font: inherit; cursor: pointer; }
+    #seek { flex: 1; }
+    #time { font: 13px monospace; min-width: 90px; text-align: right; }
+    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; background: #111; }
+  </style>
+</head>
+<body>
+  <div id="view"></div>
+  <canvas id="radar" class="hud" width="190" height="190"></canvas>
+  <div id="radarLabel" class="hud">CT RADAR</div>
+  <div id="top" class="hud"><div id="phase"></div><div id="clock"></div><div id="score"></div><div id="van"></div></div>
+  <div id="feed" class="hud"></div>
+  <div id="banner" class="hud"></div>
+  <div id="caption" class="hud"></div>
+  <div id="bar">
+    <button id="play" type="button">Pause</button>
+    <button id="restart" type="button">Restart</button>
+    <select id="speed" aria-label="Speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
+    <input id="seek" type="range" min="0" max="120" step="0.1" value="0" aria-label="Timeline">
+    <span id="time"></span>
+  </div>
+  <div id="loading">Loading the mansion…</div>
+  <script type="module" src="./van-demo.js"></script>
+</body>
+</html>
