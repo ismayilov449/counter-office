@@ -17,6 +17,10 @@ executions), added at the user's request; **done 2026-11-13, on `main`** (the us
 **built 2026-11-13, on `main`**. Both only on cs_mansion and cs_mansion_night, each switched on and off in the admin
 settings like the RPG-7.
 
+**New (2026-11-24): group 14, Phone tracker** (stop the Terrorists camping: every Terrorist carries a phone that is
+always on, the CTs hunt the phones with a tracker), designed with the user; **not started**. Version 1 is 14.1-14.4,
+version 2 is 14.5-14.7.
+
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)
 
@@ -37,6 +41,7 @@ settings like the RPG-7.
 | 11 | Realism (new 2026-11-13) | 11.1 Hearing loss · 11.2 Hostages panic · 11.3 Hostages talk — **done 2026-11-13** |
 | 12 | Blood & horror (new 2026-11-13) | 12.1 Blood pools under bodies · 12.2 Splatter on walls · 12.3 Blood on your screen · 12.4 Dying sounds · 12.5 The heartbeat when alone · 12.6 Executions — **done 2026-11-13** |
 | 13 | War (new 2026-11-13, both Mansion maps, admin switches) | 13.1 The wounded call for help · 13.2 No kill confirmation — **built 2026-11-13** |
+| 14 | Phone tracker (new 2026-11-24, both Mansion maps, admin switch) | 14.1 The Terrorists' phones · 14.2 The CT tracker and its scans · 14.3 Underground and the jammer · 14.4 Counting phones, phones that notice a scan · 14.5 Cell towers · 14.6 The drone's antenna · 14.7 The hostages' phones |
 
 Each feature's full description is in its group's section below.
 
@@ -60,6 +65,7 @@ wave 1 group(s) it builds on.
 | 11 | Realism | `feature/realism` | 3 | — (all it needs is in `main`) | — |
 | 12 | Blood & horror | `feature/blood-horror` | 3 | — (all it needs is in `main`) | — |
 | 13 | War | `feature/war` | 3 | — (all it needs is in `main`) | — |
+| 14 | Phone tracker | `feature/phone-tracker` | 4 | — (all it needs is in `main`) | — |
 
 **Rolling start, not strict waves:** start wave 1 (groups 1–5). Whenever a wave 1 group is tested and merged, start the
 groups that were waiting on it:
@@ -330,6 +336,72 @@ On any other map, or with the switch off, the game works as it does today.
    messages as today; the browser holds them back while the switch is on (hud.js `killfeed` and the hit marker in
    main.js). **The dead don't see it either** (the user's choice, 2026-11-13); nor does the team bar or the scoreboard
    show who is dead on the other team, and the kill money waits for the round's end.*
+
+---
+
+## 14. Phone tracker (`feature/phone-tracker`, added 2026-11-24)
+
+*(Not started. Designed with the user on 2026-11-24, after hostage escaping (6.1) got its admin switch, because the
+group didn't like hostages walking off; this replaces it as the answer to Terrorists camping.)*
+
+**The rule behind it: a phone that sits still gets found, a phone that moves stays fuzzy.** So the only way to stay
+hard to find is to keep moving, and camping gets you pinpointed. **No loopholes** (the user's rule): nothing makes a
+Terrorist invisible to the tracker, things can only make him harder to find for a while. There is **no way to switch a
+phone off, drop it or throw it away** (the user rejected an off switch as a "terrible gap").
+
+Both Mansion maps (hostage rounds), with an **admin switch "Phone tracker"** made like the War switches (13): a `CFG`
+flag with an env var (`PHONE_TRACKER=1`), the settings validator, the change log's name, a checkbox on admin.html.
+On any other map, or with the switch off, the game works as it does today. All numbers below are first guesses, in
+`shared/phonetracker.js`.
+
+**Version 1 (14.1-14.4):**
+
+1. **The Terrorists' phones.** Every living Terrorist carries a phone, always on, nothing to buy or hold. When a scan
+   reaches it, its screen flickers "No service" and it **vibrates**: the Terrorist feels it (a buzz on screen and a
+   sound) and **anyone within 3 m hears it**, through a door or a closet. **A dead Terrorist's phone keeps pinging for
+   20 s** (CTs may chase a body; with 13.2 they can't tell a corpse's circle from a living one).
+2. **The CT tracker and its scans.** A cell-site simulator (a fake tower in a briefcase), **one per CT team**, given to
+   a random CT at the round start, dropped when its holder dies and picked up like a weapon.
+   - Held in **both hands**: walking slower, about 1 s to get a gun back out, and its **screen glows** (Terrorists can
+     see who holds it in the dark). Its screen is the estate map, drawn like the mortar's phone map.
+   - **8 scans a round.** A scan takes **3 s** and shows **where the phones were when it started** (a moving Terrorist
+     is already elsewhere).
+   - Each scan draws **a circle per Terrorist phone**:
+     - bigger the farther away the phone is;
+     - bigger for each wall and floor between the tracker and the phone;
+     - big while the phone moves;
+     - shrinking scan after scan while the phone stays still, towards an exact spot.
+   - The floor ("UPSTAIRS", "GROUND", "CELLAR") is only shown within 10 m.
+   - **Within 20 m it is a direction finder:** an arrow, signal bars and a beep that speeds up as you close in.
+   - The circles go onto **every CT's radar for a few seconds**, so the whole team hunts together.
+3. **Underground and the jammer.**
+   - **Underground** (the cellar, the tunnels) the signal is weak: circles twice as big, never nothing. (Group 5's
+     "no radar underground" stays as it is for the radar; the tracker is its own screen.)
+   - **The signal jammer** (already in the game): no scans within its 15 m; it **also cuts the Terrorists' own phones
+     there** (their radar and radio, like the CTs' today); and within 30 m the tracker points towards it (a jammer is
+     loud on the airwaves), so it protects for a while but shows the CTs where to look.
+4. **Counting phones, phones that notice a scan.**
+   - **The first scan of a round only counts the phones:** "3 phones found" (the living Terrorists plus the dead still
+     pinging), no positions. Spend a scan on it early, or wait?
+   - **The phones notice the fake tower:** on every scan, each Terrorist phone shows roughly **which way the scan came
+     from** ("fake tower to the east"). Counter-intel for the Terrorists, so it's fair both ways.
+
+**Version 2 (14.5-14.7):**
+
+5. **Cell towers.** Tracking measures from real towers: **2-3 on the map** (the roof, a street pole, by the garage),
+   new geometry in `shared/maps/mansion_phonetracker.js`. A Terrorist can **sabotage** one (shoot its box, or blow it
+   up): scans get worse, with bigger circles, until a CT **repairs it (hold E 5 s)**. A reason for the Terrorists to
+   leave their spot, and for the CTs to guard something.
+6. **The drone's antenna.** Scanning from the CT drone (already in the game) gives **sharper circles outdoors**, like
+   trackers on police aircraft. The drone becomes a hunting tool, and the Terrorists get a reason to shoot it down.
+7. **The hostages' phones.** Every hostage has a hidden phone: a **white circle** on the tracker, so the CTs can find
+   the hostages too. A Terrorist can **take a hostage's phone (hold E 2 s)**, which keeps him next to the hostage for
+   that long.
+
+**Left out (offered, not chosen):** electrical interference near the generator, a shielding pouch Terrorists could buy,
+a trail for fast-moving phones.
+
+*Bots: they don't use the tracker or react to it in version 1.*
 
 ---
 
