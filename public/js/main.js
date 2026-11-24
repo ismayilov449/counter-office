@@ -41,6 +41,8 @@ import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, sh
 import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
 import { initWounds, wounds } from './wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
+import { createTrackerClient } from './phonetracker.js'; // phone tracker (ROADMAP 14): the CTs' scans, the holder's screen
+import { TRACKER } from '/shared/phonetracker.js';
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
 import { createElevator } from './elevator.js'; // elevator
@@ -273,6 +275,7 @@ const gas = createGasClient({ scene, camera, fx, audio, me, brk: () => game.brk,
 
 const remotes = new Map();
 const drops = new Map();
+const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels });
 let dropList = [];
 let plantedBomb = null;
 let nextBeep = 0;
@@ -303,14 +306,14 @@ function weaponOf(slot) {
     case 'satchel': return me.inv.satchel > 0 ? 'satchel' : null;
     case 'phone': return phoneLive() ? 'phone' : null;
     case 'drone': return me.inv.drone > 0 || me.drone ? 'drone' : null;
-    default: return (GRENADES.includes(slot) || MINES.includes(slot) || slot === 'jammer') && me.inv[slot] > 0 ? slot : null;
+    default: return (GRENADES.includes(slot) || MINES.includes(slot) || slot === 'jammer' || slot === 'tracker') && me.inv[slot] > 0 ? slot : null;
   }
 }
 // The pickup's gunner always uses the mounted machine gun.
 const current = () => (me.riding?.gunner ? 'pkt' : weaponOf(me.slot) || 'knife');
 const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me.inv[me.slot] : null);
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
-const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'c4'];
+const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker', 'c4'];
 
 // The gun in your hands: one model per weapon and look, made once and kept (building a new one at every switch was a
 // small hitch each time, and the old ones were never freed). prewarm fills it while the map loads.
@@ -349,7 +352,7 @@ function switchSlot(slot, silent = false) {
   me.scope = 0;
   me.resumeScope = 0;
   me.shotsFired = 0;
-  me.drawUntil = performance.now() + (slot === 'knife' ? 300 : 600);
+  me.drawUntil = performance.now() + (me.lastSlot === 'tracker' && slot !== 'tracker' ? TRACKER.draw : slot === 'knife' ? 300 : 600); // (phone tracker: two hands to free first)
   if (me.usingMouse) stopUse('mouse');
   refreshViewModel();
   if (!silent) audio.play('draw');
@@ -555,6 +558,7 @@ function tryFire(now) {
   me.triggerFresh = false;
   if (def.mortar) { mortarFire(now); return; }
   if (id === 'drone') { launchDrone(now); return; }
+  if (id === 'tracker') { trk.scan(); return; } // phone tracker: a scan
   if (def.device) { placeJammer(now); return; }
   if (def.mine) { layMine(id, now); return; }
   if (def.satchel) { throwSatchel(now); return; }
@@ -692,7 +696,7 @@ function updateJammers(now) {
   }
 }
 function jammedHere() {
-  if (me.team !== 'CT' || !me.alive) return false;
+  if (!me.alive || (me.team !== 'CT' && !(me.team === 'T' && trk.on()))) return false; // (phone tracker: a jammer cuts the Ts' phones too)
   for (const e of jammerModels.values()) if (Math.hypot(me.p[0] - e.p[0], me.p[1] - e.p[1], me.p[2] - e.p[2]) < JAMMER.radius) return true;
   return false;
 }
@@ -2393,7 +2397,7 @@ document.addEventListener('keydown', e => {
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
-    case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone']); break;
+    case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ':
       if (me.alive && (me.car?.type === 'pickup' || me.riding?.gunner)) {
@@ -2404,7 +2408,7 @@ document.addEventListener('keydown', e => {
       if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': startReload(); break;
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
-    case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone'].includes(current())) net.send({ t: 'drop', w: current() }); break;
+    case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
     case 'KeyO': openBuy(5); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;
@@ -3234,6 +3238,7 @@ const net = new Net({
     fx.fireOut(m.id);
   },
   round(m) {
+    trk.reset(); // phone tracker
     mortarInfo.target = mortarInfo.impact = null;
     spotted.clear();
     lostSpots.clear();
@@ -3343,6 +3348,7 @@ const gadgets = createGadgets({
   scene, me, net, audio, hud, fx, remotes, serverNow, stopEmote: () => stopEmote(),
   power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
+Object.assign(net.handlers, trk.handlers); // phone tracker: trk, trkScan, trkInfo, trkHit
 Object.assign(net.handlers, gas.handlers); // gas: gasLeak, gasBoom, gasCough
 // elevator: the lift in the Mansion (see elevator.js)
 const elevator = createElevator({ scene, me, net, audio, serverNow, coll: () => coll, mines: mineModels, satchels: satchelModels });
@@ -3754,6 +3760,7 @@ function updateHud(now) {
     else if (canPlantHere()) hint = 'Hold E to plant the bomb';
     else if ((gh = gadgets.hint())) hint = gh;
     else if ((gh = elevator.hint())) hint = gh; // elevator
+    else if ((gh = trk.hint())) hint = gh; // phone tracker
     else if (current() === 'jammer') hint = 'Click to put the signal jammer down — no enemy radar, pings or drones within 15 m';
     else if (jammedHere()) hint = JAM_HINT;
     else if (mineToDefuse()) hint = `Hold E to defuse the mine (${me.kit ? MINE.kitDefuse : MINE.defuse} s)`;
@@ -3766,7 +3773,7 @@ function updateHud(now) {
     else if (!canDefuseHere() && car && game.phase !== 'freeze') hint = !car.driver ? 'Press E to drive the car' : car.type === 'pickup' ? 'Press E to man the machine gun' : 'Press E to get in as a passenger';
     else if (ladderAt(map.ladders, me.p, PLAYER.height) && !me.onGround) hint = 'Ladder: look up/down + W to climb, Space to jump off';
     else if (canDefuseHere()) hint = me.kit ? 'Hold E to defuse (kit: 5 s)' : 'Hold E to defuse (10 s, buy a kit to halve it)';
-    else if (drop && drop !== 'c4') hint = me.inv[slotKey(drop)] ? `Press E to swap for the ${WEAPONS[drop].name}` : `Press E to pick up the ${WEAPONS[drop].name}`;
+    else if (drop && drop !== 'c4' && !(drop === 'tracker' && me.team !== 'CT')) hint = me.inv[slotKey(drop)] ? `Press E to swap for the ${WEAPONS[drop].name}` : `Press E to pick up the ${WEAPONS[drop].name}`;
     else if (game.phase === 'freeze' && !menu.isOpen && !isHNS()) hint = 'Press B to buy';
     else if (isDM() && !me.inv.primary && !menu.isOpen) hint = 'Press B for a free gun';
   } else if (!me.alive && me.team !== 'SPEC' && game.phase !== 'warmup') {
@@ -3830,9 +3837,10 @@ function updateHud(now) {
       bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
     }
     const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
-    hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, radarMates, bomb, hostageDots, mortarRadarMarks(performance.now()), radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
+    hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, radarMates, bomb, hostageDots, [...mortarRadarMarks(performance.now()), ...trk.radarMarks(performance.now())], radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
   }
   drawMortarMap(performance.now(), radarMates);
+  trk.frame(performance.now()); // phone tracker: the holder's screen, the direction finder's beep
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
 

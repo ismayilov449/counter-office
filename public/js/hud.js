@@ -21,7 +21,7 @@ export class Hud {
     for (const id of ['hud', 'hp', 'armor', 'money', 'ammo', 'weapon-name', 'timer', 'phase', 'scoreT', 'scoreCT', 'killfeed',
       'center-msg', 'small-msg', 'hint', 'progress', 'progress-label', 'progress-fill', 'crosshair', 'hitmarker', 'scope',
       'damage', 'flash', 'flashbang', 'nvg', 'bomb-icon', 'kit-icon', 'nvg-icon', 'slots', 'spec', 'chat', 'chat-log', 'chat-line',
-      'chat-mode', 'chat-input', 'scoreboard', 'radar', 'target-name', 'map-name', 'mortar-panel', 'mortar-map', 'mortar-map-canvas']) this.el[id] = $(id);
+      'chat-mode', 'chat-input', 'scoreboard', 'radar', 'target-name', 'map-name', 'mortar-panel', 'mortar-map', 'mortar-map-canvas', 'tracker']) this.el[id] = $(id);
     this.radarCtx = this.el.radar.getContext('2d');
     this.radarBg = null;
     this.map = null;
@@ -47,6 +47,7 @@ export class Hud {
     this.map = map;
     this.radarBg = this.drawRadarBackground();
     this.mortarBg = null; // the big mortar map's, drawn when first opened
+    this.trackerBg = null; // phone tracker: its screen's
     this.set('map-name', esc(map.title));
   }
 
@@ -160,6 +161,63 @@ export class Hud {
     g.lineWidth = 4; g.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     g.strokeText(label, lx, cz - 14); g.fillStyle = col; g.fillText(label, lx, cz - 14);
     g.textAlign = 'start'; g.textBaseline = 'alphabetic'; g.lineWidth = 1;
+  }
+
+  // Phone tracker (ROADMAP 14): the holder's screen, or null to hide it. v: me (p, yaw), left / scans, scan (0..1 while
+  // one runs), last (the last result: c circles [x, z, r, floor], count, jam directions, from, age s), finder (d, turn,
+  // bars: the direction finder within its range), jammed.
+  trackerScreen(v) {
+    const c = this.el.tracker;
+    c.classList.toggle('hidden', !v);
+    if (!v) return;
+    const N = c.width, g = c.getContext('2d');
+    if (!this.trackerBg) this.trackerBg = this.drawRadarBackground(N);
+    const { toR, s } = this.radarXform(N);
+    g.clearRect(0, 0, N, c.height);
+    g.drawImage(this.trackerBg, 0, 0);
+    g.fillStyle = 'rgba(0, 40, 20, 0.35)'; g.fillRect(0, 0, N, N); // the screen's green
+    const L = v.last;
+    if (L?.c) {
+      const fade = Math.max(0.35, 1 - L.age / 30); // older scans fade (but stay: it's the last one)
+      for (const [x, z, r, floor] of L.c) {
+        const [cx, cz] = toR(x, z);
+        g.globalAlpha = fade;
+        g.fillStyle = 'rgba(255, 70, 50, 0.22)'; g.strokeStyle = '#ff5a40'; g.lineWidth = 2;
+        g.beginPath(); g.arc(cx, cz, Math.max(4, r * s), 0, Math.PI * 2); g.fill(); g.stroke();
+        if (floor) { g.fillStyle = '#ffd0c0'; g.font = 'bold 10px Consolas, monospace'; g.textAlign = 'center'; g.fillText(floor, cx, cz + 3); g.textAlign = 'start'; }
+      }
+      g.globalAlpha = 1;
+      if (L.jam?.length && L.from) {
+        const [fx, fz] = toR(L.from[0], L.from[1]);
+        g.strokeStyle = '#ffd030'; g.lineWidth = 2; g.setLineDash([4, 3]);
+        for (const a of L.jam) { g.beginPath(); g.moveTo(fx, fz); g.lineTo(fx - Math.sin(a) * 30 * s, fz - Math.cos(a) * 30 * s); g.stroke(); }
+        g.setLineDash([]);
+      }
+    }
+    // yourself: an arrow
+    const [mx, mz] = toR(v.me.p[0], v.me.p[2]);
+    g.save(); g.translate(mx, mz); g.rotate(Math.atan2(-Math.cos(v.me.yaw), -Math.sin(v.me.yaw)));
+    g.fillStyle = '#9fffb0'; g.beginPath(); g.moveTo(8, 0); g.lineTo(-5, 5); g.lineTo(-2, 0); g.lineTo(-5, -5); g.closePath(); g.fill(); g.restore();
+    // the status strip under the map
+    g.fillStyle = '#081a10'; g.fillRect(0, N, N, c.height - N);
+    g.font = 'bold 13px Consolas, monospace'; g.fillStyle = '#9fffb0';
+    g.fillText(`SCANS ${v.left}/${v.scans}`, 8, N + 18);
+    let line = v.jammed ? 'NO SIGNAL — JAMMER' : L?.count != null && L.age < 20 ? `${L.count} PHONE${L.count === 1 ? '' : 'S'} FOUND` : L?.c ? `LAST SCAN ${Math.round(L.age)} s AGO` : 'CLICK TO SCAN';
+    if (v.scan != null) {
+      line = 'SCANNING';
+      g.strokeStyle = '#9fffb0'; g.strokeRect(N - 108, N + 8, 100, 12);
+      g.fillRect(N - 108, N + 8, 100 * v.scan, 12);
+    }
+    g.fillStyle = v.jammed ? '#ffd030' : '#9fffb0';
+    g.fillText(line, 8, N + 38);
+    // the direction finder: an arrow at the top, turning to the phone, and signal bars
+    if (v.finder) {
+      const f = v.finder, ax = N / 2, az = 34;
+      g.fillStyle = 'rgba(0, 0, 0, 0.55)'; g.beginPath(); g.arc(ax, az, 26, 0, Math.PI * 2); g.fill();
+      g.save(); g.translate(ax, az); g.rotate(-f.turn);
+      g.fillStyle = '#ffe040'; g.beginPath(); g.moveTo(0, -20); g.lineTo(11, 8); g.lineTo(0, 2); g.lineTo(-11, 8); g.closePath(); g.fill(); g.restore();
+      for (let i = 0; i < 5; i++) { g.fillStyle = i < f.bars ? '#ffe040' : 'rgba(255, 224, 64, 0.2)'; g.fillRect(N - 40 + i * 7, N + 34 - i * 4, 5, 6 + i * 4); }
+    }
   }
 
   // The mortar gunner's panel (html from main.js), or null to hide it.
@@ -528,7 +586,7 @@ export class Hud {
   radar(self, mates, bomb, hostages = [], marks = [], enemies = [], jammed = false) {
     if (!this.radarBg) return;
     const g = this.radarCtx;
-    const { toR } = this.radarXform();
+    const { toR, s } = this.radarXform();
     g.clearRect(0, 0, 200, 200);
     g.drawImage(this.radarBg, 0, 0);
     if (jammed) {
@@ -582,6 +640,12 @@ export class Hud {
         g.fillText('!', x, z + 1);
         g.textAlign = 'start';
         g.textBaseline = 'alphabetic';
+        g.globalAlpha = 1;
+      } else if (mk.kind === 'trk') {
+        // phone tracker: a scan's circle round a phone, fading out over its last seconds
+        g.globalAlpha = Math.min(1, Math.max(0, (6 - mk.age) / 2));
+        g.fillStyle = 'rgba(255, 70, 50, 0.18)'; g.strokeStyle = '#ff5a40';
+        g.beginPath(); g.arc(x, z, Math.max(3, mk.r * s), 0, Math.PI * 2); g.fill(); g.stroke();
         g.globalAlpha = 1;
       } else if (mk.kind === 'target') {
         g.strokeStyle = '#ffe040';

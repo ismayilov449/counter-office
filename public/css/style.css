@@ -170,6 +170,8 @@ body.teambar #center-msg { top: max(24%, 196px); } /* (and the big centre messag
 /* the mortar gunner's sight panel */
 #mortar-panel { position: absolute; left: 14px; top: 250px; width: 400px; padding: 10px 14px; background: rgba(12, 14, 10, 0.78); border: 1px solid var(--hud-dim); color: var(--text); font-size: 13px; line-height: 1.55; font-family: Consolas, monospace; }
 #mortar-panel b { color: var(--hud); }
+/* phone tracker: the holder's screen (ROADMAP 14) */
+#tracker { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 260px; border: 2px solid #2a5a3a; border-radius: 6px; box-shadow: 0 0 18px rgba(80, 255, 140, 0.25); }
 #mortar-panel .mp-head { color: var(--hud); font-weight: bold; letter-spacing: 1px; display: flex; justify-content: space-between; margin-bottom: 2px; }
 #mortar-panel .mp-head span { color: var(--text); font-weight: normal; }
 #mortar-panel .mp-row { font-size: 15px; }

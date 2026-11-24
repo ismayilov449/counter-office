@@ -241,7 +241,7 @@ function full(kind, t) {
 }
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], medic: [5, 0.8], crumble: [8, 0.8], sshot: [1, 3] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
+const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], medic: [5, 0.8], crumble: [8, 0.8], sshot: [1, 3], buzz: [0.6, 3] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -760,6 +760,21 @@ export const audio = {
         break;
       case 'nvg':
         tone(out, t, { freq: 400, freqEnd: 4000, dur: 0.35, gain: 0.08 });
+        break;
+      // phone tracker (ROADMAP 14): a phone vibrating (three buzzes), the tracker's scan whine, its direction-finder
+      // beep and the scan's result
+      case 'buzz':
+        for (let i = 0; i < 3; i++) tone(out, t + i * 0.22, { freq: 160, dur: 0.15, type: 'square', gain: 0.07 });
+        break;
+      case 'trkscan':
+        tone(out, t, { freq: 600, freqEnd: 2400, dur: 2.9, type: 'sine', gain: 0.03 });
+        break;
+      case 'trkbeep':
+        tone(out, t, { freq: 2600, dur: 0.04, type: 'square', gain: 0.04 });
+        break;
+      case 'trkdone':
+        tone(out, t, { freq: 1400, dur: 0.07, gain: 0.08 });
+        tone(out, t + 0.09, { freq: 2100, dur: 0.09, gain: 0.08 });
         break;
       case 'deny':
         tone(out, t, { freq: 220, dur: 0.12, type: 'square', gain: 0.08 });

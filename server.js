@@ -38,6 +38,7 @@ import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createWounds } from './lib/wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
 import { createEscape } from './lib/hostage-escape.js';
 import { warOn } from './shared/war.js'; // war: ROADMAP group 13
+import { createPhoneTracker } from './lib/phonetracker.js'; // phone tracker (ROADMAP group 14)
 import { createCarry } from './lib/hostage-carry.js'; // carrying wounded hostages (ROADMAP 6.2) // hostages try to escape (ROADMAP 6.1), zip ties
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
@@ -76,6 +77,7 @@ const CFG = {
   // feed or kill money until the round ends
   medicCalls: env.MEDIC_CALLS === '1',
   noKillConfirm: env.NO_KILL_CONFIRM === '1',
+  phoneTracker: env.PHONE_TRACKER === '1', // phone tracker (group 14, both Mansion maps): the CTs hunt the Terrorists' phones
   hostageEscape: env.HOSTAGE_ESCAPE !== '0', // unwatched hostages sneak (or, scared, run) off to the CT base on their own
   gameMode: ['gungame', 'zombie', 'deathmatch', 'hns'].includes(env.GAME_MODE) ? env.GAME_MODE : 'classic',
   // Bots fill both teams up to perTeam players each (8 = 8 vs 8); 0 turns them off. vs (people vs bots): all the people
@@ -162,6 +164,7 @@ const SETTINGS = {
   medicCalls: bool,
   noKillConfirm: bool,
   hostageEscape: bool,
+  phoneTracker: bool,
 };
 const savedSettings = {};
 try {
@@ -1317,6 +1320,7 @@ function startRound() {
     p.inv.c4 = false;
     spawnPlayer(p);
   }
+  tracker.roundStart(); // phone tracker: one CT gets it
   // aim_map: weapons lying in the field every round.
   if (MAP.roundDrops && CFG.gameMode === 'classic' && !partyWeapon()) {
     for (const d of MAP.roundDrops) {
@@ -1547,6 +1551,10 @@ const escape = createEscape({ game, players, on: () => CFG.hostageEscape, map: (
 // Carrying wounded hostages (lib/hostage-carry.js)
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
+// Phone tracker (lib/phonetracker.js)
+const tracker = createPhoneTracker({ game, players, cfg: CFG, map: () => MAP, world: () => world, now, send, sendMe: p => sendMe(p),
+  jammedAt: pos => jammedAt(pos), jammers: () => game.jammers, eyeOf: p => eyeOf(p),
+  dropAt: p => game.drops.push({ id: game.nextDropId++, w: 'tracker', p: [p.p[0], groundY(p.p[0], p.p[1] + 0.5, p.p[2]), p.p[2]], owner: p.id, until: now() + 1200 }) });
 // closecombat: ROADMAP group 8 (lib/closecombat.js)
 const cc = createCloseCombat({ game, players, send, broadcast, sendMe: p => sendMe(p), now, mates: (a, b) => mates(a, b), eyeOf: p => eyeOf(p), lineOfSight: (a, b) => lineOfSight(a, b), spawnDrop: (...a) => spawnDrop(...a), noDisarm: () => isGG() || isZM(),
   blocked: q => busy(q) || q.driving != null || q.riding != null || q.piloting != null || q.shield != null || body.lying(q) || game.hostages.some(h => h.carriedBy === q.id),
@@ -1921,6 +1929,7 @@ function killPlayer(v, killer, weapon, hs, silent = false, how = null) {
   if (v.inv.primary) { spawnDrop(v, v.inv.primary, offsetPos(v.p, yaw, 0.35)); v.inv.primary = null; }
   if (v.inv.secondary) { spawnDrop(v, v.inv.secondary, offsetPos(v.p, yaw + Math.PI / 2, 0.45)); v.inv.secondary = null; }
   if (v.inv.c4) dropBomb(v, offsetPos(v.p, yaw - Math.PI / 2, 0.45));
+  tracker.drop(v); // phone tracker: it lies where its holder fell
 
   let streak = 0, first = false, ace = false;
   if (killer && killer !== v) {
@@ -2045,7 +2054,9 @@ function dropBomb(p, at, thrown = false) {
 
 function takeDrop(p, d) {
   if (p.zombie) return false;
-  if (d.w === 'c4') {
+  if (d.w === 'tracker') {
+    if (!tracker.take(p)) return false;
+  } else if (d.w === 'c4') {
     if (p.team !== 'T') return false;
     p.inv.c4 = true;
     game.bomb = { state: 'carried', carrier: p.id, p: null, explodeAt: 0 };
@@ -2080,7 +2091,7 @@ function updatePickups() {
     if (p.zombie) continue;
     if (p.playingDead) continue; // body: a "corpse" lies on its own weapons
     for (const d of nearbyDrops(p, 1.0)) {
-      if (d.w === 'c4' ? p.team === 'T' : !p.inv[slotKey(d.w)]) takeDrop(p, d);
+      if (d.w === 'c4' ? p.team === 'T' : d.w === 'tracker' ? p.team === 'CT' : !p.inv[slotKey(d.w)]) takeDrop(p, d);
     }
   }
 }
@@ -3608,7 +3619,7 @@ function passwordOk(given) {
 const SETTING_LABELS = {
   gameMode: 'Game mode', startMoney: 'Start money', roundsToWin: 'Rounds to win', roundTime: 'Round time', freezeTime: 'Freeze time',
   buyTime: 'Buy time', bombTime: 'C4 timer', friendlyFire: 'Friendly fire', autoBalance: 'Auto team balance', halftime: 'Halftime side switch',
-  rotateMaps: 'Map rotation', rpg7: 'RPG-7', medicCalls: 'Calls for help', noKillConfirm: 'No kill confirmation', hostageEscape: 'Hostages escape', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
+  rotateMaps: 'Map rotation', rpg7: 'RPG-7', medicCalls: 'Calls for help', noKillConfirm: 'No kill confirmation', hostageEscape: 'Hostages escape', phoneTracker: 'Phone tracker', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
 };
 
 function adminState() {
@@ -3895,12 +3906,14 @@ function handle(p, m) {
       sendRoster();
       checkVotes();
       break;
+    case 'scan': tracker.scan(p, t); break; // phone tracker: Mouse1 with it out
     case 'radio': {
       const menu = RADIO[m.menu];
       const text = menu?.items[m.n];
       if (!text || !p.alive || !inTeam(p) || t - (p.lastRadio || 0) < 700) break;
+      if (tracker.noSignal(p)) { send(p, { t: 'msg', text: 'No signal: a jammer is near (no radio here).' }); break; } // phone tracker: a jammer cuts the Ts' phones too
       p.lastRadio = t;
-      broadcast({ t: 'radio', id: p.id, name: p.name, team: p.team, text, p: p.p }, q => q.team === p.team);
+      broadcast({ t: 'radio', id: p.id, name: p.name, team: p.team, text, p: p.p }, q => q.team === p.team && !tracker.noSignal(q));
       break;
     }
     case 'chat': {
@@ -3924,6 +3937,7 @@ function leave(p) {
   game.sprays.delete(p.id);
   if (!p.joined) return;
   if (p.inv.c4 && p.alive) dropBomb(p, p.p);
+  if (p.alive) tracker.drop(p);
   if (game.bomb.carrier === p.id) game.bomb.carrier = null;
   if (!p.bot) notify(`${p.name} left the game`);
   broadcast({ t: 'left', id: p.id });
@@ -4048,6 +4062,7 @@ function tick() {
     }
     carry.tick(); // carry: badly hurt hostages stop walking, carried ones go with their carriers
     escape.tick(t, dt); // escape: unwatched hostages sneak off, ties work loose
+    tracker.tick(t); // phone tracker: scans finishing
     for (const h of game.hostages) if ((h.state === 'follow' || h.state === 'escape') && inRescueZone(MAP, h.p)) rescueHostage(h);
   }
   shield.update(t); // shield: held hostages go with their holders; holds end on death, a new round...

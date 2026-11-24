@@ -18,8 +18,8 @@ executions), added at the user's request; **done 2026-11-13, on `main`** (the us
 settings like the RPG-7.
 
 **New (2026-11-24): group 14, Phone tracker** (stop the Terrorists camping: every Terrorist carries a phone that is
-always on, the CTs hunt the phones with a tracker), designed with the user; **not started**. Version 1 is 14.1-14.4,
-version 2 is 14.5-14.7.
+always on, the CTs hunt the phones with a tracker), designed with the user. Version 1 is 14.1-14.4,
+version 2 is 14.5-14.7. **Version 1 built 2026-11-24, on `main`** (server-tested; not yet checked in a browser).
 
 (Before wave 1: every group built on the 9 features of 2026-10-31 and the hostage fix, merged into `main` on
 2026-11-02.)
@@ -341,7 +341,13 @@ On any other map, or with the switch off, the game works as it does today.
 
 ## 14. Phone tracker (`feature/phone-tracker`, added 2026-11-24)
 
-*(Not started. Designed with the user on 2026-11-24, after hostage escaping (6.1) got its admin switch, because the
+*(**Version 1 (14.1-14.4) built 2026-11-24, on `main`:** shared/phonetracker.js (TRACKER, circleRadius, compass),
+lib/phonetracker.js (server), public/js/phonetracker.js + hud.trackerScreen (browser), the admin switch `phoneTracker`
+(`PHONE_TRACKER=1`); the tracker is weapon `tracker` (slot 6, drawn as the detonator's phone for now). Test:
+dev/test-scripts/phonetracker/t1-server.mjs (server, all pass). Not yet checked in a browser: waiting for the user.
+Version 2 (14.5-14.7) not started.)*
+
+*(Designed with the user on 2026-11-24, after hostage escaping (6.1) got its admin switch, because the
 group didn't like hostages walking off; this replaces it as the answer to Terrorists camping.)*
 
 **The rule behind it: a phone that sits still gets found, a phone that moves stays fuzzy.** So the only way to stay

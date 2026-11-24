@@ -53,6 +53,9 @@ in `data/admin.json`, where you can change it (or set `ADMIN_PASSWORD`). From th
     announcements. On the team bar and the scoreboard, every enemy looks alive and nobody's kill count moves, even for
     the dead. You only know he's dead if you go and look. The round's kill feed shows when it ends, and the kill money
     is paid then too.
+- switch on the **Phone tracker** for the two Mansion maps (off by default): every Terrorist's phone is always on,
+  and one CT gets a tracker to hunt the phones with (see Gameplay → Phone tracker),
+- switch off **Hostages escape** (on by default): then hostages only leave when a CT leads them out,
 - **restart the match**, **change the map** now, send a message to everyone,
 - see everyone's team, kills, deaths and ping, **move** a player to T / CT / spectators, or **kick** them.
 
@@ -79,6 +82,7 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
 | `FRIENDLY_FIRE` | off        | `1` to enable                                 |
 | `MEDIC_CALLS`   | off        | `1`: War, the downed call for help (Mansion maps) |
 | `NO_KILL_CONFIRM` | off      | `1`: War, no kill confirmation until the round ends (Mansion maps) |
+| `PHONE_TRACKER` | off       | `1`: the phone tracker on the Mansion maps (the CTs hunt the Terrorists' phones) |
 | `HOSTAGE_ESCAPE` | on       | `0`: hostages never leave on their own (only a CT leads them out) |
 | `GAME_MODE`     | classic    | `gungame` Gun Game, `zombie` Zombie mode, `deathmatch` Deathmatch, `hns` Hide and Seek |
 | `BOTS`          | 8          | Fill each team up to this many players with bots (8 = 8 vs 8); `0` turns bots off |
@@ -798,6 +802,28 @@ Zombie or Hide and Seek. Esc → Team bar turns it off (back to the plain score 
 - **Halftime:** after round *rounds to win − 1* (round 9 with the default 10), the teams switch sides like in a
   real match: everyone starts again with the start money, and the score stays with the players.
 - **Footsteps** sound like the floor: sand, grass, wood, metal (also car roofs), tiles, carpet, stone; water splashes.
+
+## Phone tracker
+
+With **Phone tracker** on (admin page, Mansion maps), hiding in one spot all round stops working: **a phone that sits
+still gets found, a phone that moves stays fuzzy.**
+
+- **Every Terrorist carries a phone, always on.** There's no way to switch it off or drop it. When a scan reaches it,
+  it shows "No service", vibrates, and tells you which way the scan came from ("the fake tower is to the east").
+  **Anyone within 3 m hears it buzz**, through a door too. A dead Terrorist's phone keeps answering for 20 seconds.
+- **The CTs have one tracker** (a fake cell tower), given to one CT at the round start. **6** takes it out (you walk
+  slower, and getting a gun back out takes a second); **click** to scan. A scan takes **3 seconds**, and you can't
+  shoot while it runs, so cover each other. **8 scans a round.** If its holder dies it lies there, and any CT picks it up.
+  - **The first scan** only counts the phones: "3 phones found".
+  - **Every scan after that** puts a red circle round each phone on **every CT's radar** for 6 seconds, and on the
+    holder's screen. The circle is bigger the farther away the phone is and the more walls and floors are in between,
+    stays big while the Terrorist moves, and **shrinks scan after scan while he stays put**. Within 10 m it names the
+    floor (upstairs, ground, underground).
+  - **Within 20 m** the tracker turns into a direction finder: an arrow, signal bars and a beep that gets faster as you
+    close in.
+- **Underground** (the cellar, the tunnels) the signal is weak: twice as big a circle, but never nothing.
+- **The signal jammer** hides every phone within its 15 m, but it cuts the Terrorists' own phones there too (no radar,
+  no radio), and a scan within 30 m of it shows which way it is.
 
 ## Bots
 

@@ -727,6 +727,7 @@ const BUILD = {
   pmn: (g, P) => pmnMine(g, P),
   satchel: (g, P) => satchel(g, P),
   phone: (g, P) => phone(g, P),
+  tracker: (g, P) => phone(g, P), // phone tracker (ROADMAP 14): drawn as a phone for now
   mon50: (g, P) => mon50Mine(g, P),
   jammer: (g, P) => jammerHeld(g, P),
   drone: (g, P) => droneRemote(g, P),

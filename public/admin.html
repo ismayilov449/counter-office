@@ -104,6 +104,7 @@
         <label class="check"><input id="s-rpg7" type="checkbox"> RPG-7 in the buy menu (both teams)</label>
         <label class="check"><input id="s-medicCalls" type="checkbox"> Calls for help: the downed scream for a medic (Mansion maps)</label>
         <label class="check"><input id="s-noKillConfirm" type="checkbox"> No kill confirmation until the round ends (Mansion maps)</label>
+        <label class="check"><input id="s-phoneTracker" type="checkbox"> Phone tracker: the Ts' phones are always on, the CTs hunt them with a tracker (Mansion maps)</label>
         <label class="check"><input id="s-hostageEscape" type="checkbox"> Hostages escape: unwatched (or scared) hostages go to the CT base on their own</label>
       </div>
       <h2 style="margin-top:16px">Bots</h2>
@@ -147,7 +148,7 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const NUMS = ['roundsToWin', 'roundTime', 'freezeTime', 'buyTime', 'bombTime', 'dmFrags', 'dmMinutes'];
-const BOOLS = ['autoBalance', 'halftime', 'friendlyFire', 'rotateMaps', 'rpg7', 'medicCalls', 'noKillConfirm', 'hostageEscape'];
+const BOOLS = ['autoBalance', 'halftime', 'friendlyFire', 'rotateMaps', 'rpg7', 'medicCalls', 'noKillConfirm', 'hostageEscape', 'phoneTracker'];
 const PARTY = ['lowGravity', 'headshotsOnly', 'bigHeads'];
 const MODES = { classic: 'Classic', gungame: 'Gun Game', zombie: 'Zombie mode', deathmatch: 'Deathmatch', hns: 'Hide and Seek' };
 let password = '';

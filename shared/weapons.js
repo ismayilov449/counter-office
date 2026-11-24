@@ -69,6 +69,8 @@ export const WEAPONS = {
   // you hold the detonator, an old phone, and Mouse1 sets it off from anywhere (see SATCHEL).
   satchel: { name: 'Satchel charge', slot: 6, cls: 'satchel', satchel: true, price: 1200, max: 1, speed: 6.3 },
   phone: { name: 'Detonator', slot: 6, cls: 'phone', speed: 6.3 },
+  // Phone tracker (ROADMAP 14, CTs, never bought: one CT gets it at the round start): 6 takes it out, Mouse1 scans; see TRACKER.
+  tracker: { name: 'Phone tracker', slot: 6, cls: 'phone', team: 'CT', speed: 5.2 },
   // FPV drone (both teams): 6 takes out its remote (with the mines), Mouse1 launches it, and
   // you fly it through its camera while you crouch with the remote; see DRONE.
   drone: { name: 'FPV drone', slot: 6, cls: 'drone', device: true, price: 5500, max: 1, speed: 6.3 },
