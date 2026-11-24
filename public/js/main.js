@@ -59,7 +59,7 @@ const angleDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 // ---------------------------------------------------------------- settings
 
 const SETTINGS_KEY = 'counter-office-settings';
-const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50', chDynamic: true, autoQuality: true, showPerf: false, teamBar: true, avatar: null };
+const settings = { name: '', sens: 1, volume: 0.6, quality: 'medium', fullscreen: true, rawInput: true, radioVoice: true, killcam: true, announcer: true, chGap: 3, chLen: 7, chThick: 2, chColor: '#50ff50', chDynamic: true, autoQuality: true, showPerf: false, teamBar: true, doubleScope: true, avatar: null };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch { /* storage unavailable */ }
 if (!QUALITY[settings.quality]) settings.quality = 'medium';
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ } };
@@ -1314,7 +1314,8 @@ function secondary() {
   if (!me.alive) return;
   const id = current(), def = WEAPONS[id];
   if (def.zoom && !me.reload && performance.now() >= me.drawUntil) {
-    me.scope = (me.scope + 1) % (def.zoom.length + 1);
+    const steps = def.sniper && settings.doubleScope === false ? 1 : def.zoom.length; // (off: snipers only zoom once)
+    me.scope = (me.scope + 1) % (steps + 1);
     me.resumeScope = 0;
     audio.play('click');
   } else if (id === 'knife' || id === 'claws') {
@@ -2491,6 +2492,9 @@ killcamBox.addEventListener('change', () => { settings.killcam = killcamBox.chec
 const teamBarBox = $('team-bar-setting');
 teamBarBox.checked = settings.teamBar;
 teamBarBox.addEventListener('change', () => { settings.teamBar = teamBarBox.checked; saveSettings(); });
+const doubleScopeBox = $('double-scope-setting');
+doubleScopeBox.checked = settings.doubleScope !== false;
+doubleScopeBox.addEventListener('change', () => { settings.doubleScope = doubleScopeBox.checked; if (!settings.doubleScope && me.scope > 1) me.scope = 1; saveSettings(); });
 // Your picture on the team bar: chosen on the join screen, kept in this browser, sent when you connect.
 function showAvatar() {
   if (settings.avatar) $('avatar-preview').src = settings.avatar;

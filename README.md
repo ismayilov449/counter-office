@@ -896,7 +896,7 @@ The HUD shows the active party modes under the timer.
 |---|---|---|---|
 | W A S D | move | Space | jump (lets go of the zip line) |
 | Ctrl | duck | Shift | walk (silent) |
-| Mouse 1 / 2 | fire / zoom, knife stab | R | reload |
+| Mouse 1 / 2 | fire / zoom (snipers: twice, or once with Esc → Sniper rifles: second, closer zoom off), knife stab | R | reload |
 | Mouse 1 (grenade) | hold to pull the pin, release to throw | Mouse 2 (grenade) | hold, release for a short lob |
 | E | use: plant, defuse (bomb or mine), pick up, door, light switch, enter/exit car, car trunk, zip line on/off, CCTV desk, lift, valves, chimney (top); hold: revive a teammate (+ walk: drag him; walk over a dead body: drag it), interrogate a downed enemy, a uniform (crouched), light the fireplace, a breaker / the generator / the lift's winch (looking at it); hostage shield (T); behind an enemy: disarm him; running at a door: kick it open; crouched, hold at a door: hold it shut | G | drop weapon |
 | 1 2 3 5 | primary, pistol, knife, C4 | 4 / 6 | grenades / mines (press again to cycle) |
