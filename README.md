@@ -79,6 +79,7 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
 | `FRIENDLY_FIRE` | off        | `1` to enable                                 |
 | `MEDIC_CALLS`   | off        | `1`: War, the downed call for help (Mansion maps) |
 | `NO_KILL_CONFIRM` | off      | `1`: War, no kill confirmation until the round ends (Mansion maps) |
+| `HOSTAGE_ESCAPE` | on       | `0`: hostages never leave on their own (only a CT leads them out) |
 | `GAME_MODE`     | classic    | `gungame` Gun Game, `zombie` Zombie mode, `deathmatch` Deathmatch, `hns` Hide and Seek |
 | `BOTS`          | 8          | Fill each team up to this many players with bots (8 = 8 vs 8); `0` turns bots off |
 | `BOT_LEVEL`     | hard       | Bot level: `easy`, `normal` or `hard` |

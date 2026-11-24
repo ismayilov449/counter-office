@@ -76,6 +76,7 @@ const CFG = {
   // feed or kill money until the round ends
   medicCalls: env.MEDIC_CALLS === '1',
   noKillConfirm: env.NO_KILL_CONFIRM === '1',
+  hostageEscape: env.HOSTAGE_ESCAPE !== '0', // unwatched hostages sneak (or, scared, run) off to the CT base on their own
   gameMode: ['gungame', 'zombie', 'deathmatch', 'hns'].includes(env.GAME_MODE) ? env.GAME_MODE : 'classic',
   // Bots fill both teams up to perTeam players each (8 = 8 vs 8); 0 turns them off. vs (people vs bots): all the people
   // play on one side (whichever the first one picks) and perTeam bots play the other.
@@ -160,6 +161,7 @@ const SETTINGS = {
   rpg7: bool,
   medicCalls: bool,
   noKillConfirm: bool,
+  hostageEscape: bool,
 };
 const savedSettings = {};
 try {
@@ -1539,7 +1541,7 @@ function swapHns() {
 // ---------------------------------------------------------------- bots
 
 // Hostages try to escape (lib/hostage-escape.js): paths from the bots' nav grid, doors opened as they bump into them.
-const escape = createEscape({ game, players, map: () => MAP, world: () => world, now, send, broadcast, near: p => world.move(null, p, 2),
+const escape = createEscape({ game, players, on: () => CFG.hostageEscape, map: () => MAP, world: () => world, now, send, broadcast, near: p => world.move(null, p, 2),
   reach: (p, h) => hostageInReach(p, h), route: (a, b, cb) => bots.route(a, b, cb), lead: (p, h) => leadHostage(p, h),
   openDoorNear: pos => { const d = nearestDoor({ p: pos }); if (!d || d.dist > 1.6 || world.doorStates[d.i] !== 0) return false; useDoor({ p: pos, ws: {} }, d.i); return world.doorStates[d.i] !== 0 || !!game.doorOpening?.[d.i]; } }); // (false: something was in the door's way)
 // Carrying wounded hostages (lib/hostage-carry.js)
@@ -3606,7 +3608,7 @@ function passwordOk(given) {
 const SETTING_LABELS = {
   gameMode: 'Game mode', startMoney: 'Start money', roundsToWin: 'Rounds to win', roundTime: 'Round time', freezeTime: 'Freeze time',
   buyTime: 'Buy time', bombTime: 'C4 timer', friendlyFire: 'Friendly fire', autoBalance: 'Auto team balance', halftime: 'Halftime side switch',
-  rotateMaps: 'Map rotation', rpg7: 'RPG-7', medicCalls: 'Calls for help', noKillConfirm: 'No kill confirmation', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
+  rotateMaps: 'Map rotation', rpg7: 'RPG-7', medicCalls: 'Calls for help', noKillConfirm: 'No kill confirmation', hostageEscape: 'Hostages escape', party: 'Party modes', bots: 'Bots', dmFrags: 'Deathmatch kill limit', dmMinutes: 'Deathmatch time limit',
 };
 
 function adminState() {
