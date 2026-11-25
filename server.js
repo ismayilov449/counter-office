@@ -38,7 +38,8 @@ import * as body from './lib/body.js'; // body: "Downed, not dead" + "Play dead"
 import { createWounds } from './lib/wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
 import { createEscape } from './lib/hostage-escape.js';
 import { warOn } from './shared/war.js'; // war: ROADMAP group 13
-import { createPhoneTracker } from './lib/phonetracker.js'; // phone tracker (ROADMAP group 14)
+import { createPhoneTracker } from './lib/phonetracker.js';
+import { createStorm } from './lib/storm.js'; // Hotel Meridian's storm // phone tracker (ROADMAP group 14)
 import { createCarry } from './lib/hostage-carry.js'; // carrying wounded hostages (ROADMAP 6.2) // hostages try to escape (ROADMAP 6.1), zip ties
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
 import { createFlood } from './lib/flood.js'; // Floodgate
@@ -1332,6 +1333,7 @@ function startRound() {
     spawnPlayer(p);
   }
   tracker.roundStart(); // phone tracker: one CT gets it
+  storm.roundStart(now()); // storm: the power on, the first strike soon
   // aim_map: weapons lying in the field every round.
   if (MAP.roundDrops && CFG.gameMode === 'classic' && !partyWeapon()) {
     for (const d of MAP.roundDrops) {
@@ -1562,6 +1564,8 @@ const escape = createEscape({ game, players, on: () => CFG.hostageEscape, map: (
 // Carrying wounded hostages (lib/hostage-carry.js)
 const carry = createCarry({ game, players, send, broadcast, world: () => world, map: () => MAP, reach: (p, h) => hostageInReach(p, h),
   rewind: (q, rt) => rewind(q, rt), inRescueZone: pos => inRescueZone(MAP, pos), rescue: h => rescueHostage(h) });
+// The storm (lib/storm.js): lightning, thunder, power cuts on a map with `storm`
+const storm = createStorm({ game, map: () => MAP, now, broadcast });
 // Phone tracker (lib/phonetracker.js)
 const tracker = createPhoneTracker({ game, players, cfg: CFG, map: () => MAP, world: () => world, now, send, sendMe: p => sendMe(p), broadcast,
   jammedAt: pos => jammedAt(pos), jammers: () => game.jammers, eyeOf: p => eyeOf(p), los: (a, b) => lineOfSight(a, b),
@@ -3978,6 +3982,7 @@ function tick() {
   if (MAP.mansion2) mansionTick(t);
   else if (MAP.elevator) elevator.tick(t); // (Hotel Meridian's lift: the Mansion's runs inside mansionTick)
   if (MAP.chute) chuteTick(); // Hotel Meridian: the laundry chute
+  storm.tick(t); // Hotel Meridian: lightning, power cuts
   if (game.phase === 'warmup') {
     warmupRepairs(t);
     for (const p of players.values()) if (inTeam(p) && !p.alive && t - p.deathAt > 3000) { resetLoadout(p); spawnPlayer(p); }

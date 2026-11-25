@@ -31,7 +31,24 @@ user plays between: 1. the layout, 2. looks + the lift + the laundry chute, 3. t
     694/694; t-elev.mjs has one failure ("once he's out of the way it goes down") that fails the same before these
     changes.
 
+- **Stage 3 (2026-11-25): built, server-tested, not yet seen in a browser.**
+  - The storm: lib/storm.js (the server picks the strikes: 'storm' { near }; a close one may cut the power: every
+    room's group off with a 'lights' message marked storm, back on by itself after 10-18 s; a new round's 'world'
+    brings the lights back), public/js/storm.js (rain streaks round the camera while it's outdoors, the flash as a
+    tone-mapping exposure spike, the thunder; audio.hush mutes others' footsteps while it rumbles). The hotel's point
+    lights got groups so the cuts put them out.
+  - The guest-room hostage: map.hostages[3].anyOf (16 spots), picked by createHostages each round.
+  - The War options and the phone tracker on the hotel (shared/war.js WAR_MAPS), three cell towers (map.towers).
+  - Lighting fix: the browsers light 24 rooms at most and the hotel had 27, so the suite was never lit; now 23 (the
+    stairwell and linen room are one, the closets stay dark).
+  - Tests: t3-storm.mjs (offline: 20 simulated minutes of storm, the random room, all 16 spots reachable), t4-live.mjs
+    (live: the tracker on the hotel, strikes reach everyone). Fixed on the way: a strike in the warmup crashed the server
+    (no game.lights yet).
+
 ## Next
+- The user plays it: the layout, the looks, the lift, the chute, the storm's timing and brightness.
+
+## Old next (done)
 - Stage 3: the storm (rain, lightning flashes, thunder covering footsteps, power cuts), the guest-room hostage in a
   different room every round, switching on the Mansion-only features here (power, phone tracker towers, War options).
 

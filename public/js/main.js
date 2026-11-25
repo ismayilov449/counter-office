@@ -41,7 +41,8 @@ import { initShield, shieldSnap, shieldHeldBy, shieldSlotOk, shieldLimitKeys, sh
 import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
 import { initWounds, wounds } from './wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
-import { createTrackerClient } from './phonetracker.js'; // phone tracker (ROADMAP 14): the CTs' scans, the holder's screen
+import { createTrackerClient } from './phonetracker.js';
+import { createStorm } from './storm.js'; // Hotel Meridian's storm: rain, lightning, thunder // phone tracker (ROADMAP 14): the CTs' scans, the holder's screen
 import { TRACKER } from '/shared/phonetracker.js';
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
 import * as flood from './flood.js'; // Floodgate: the storm drain's valve floods the underground (Mansion)
@@ -275,6 +276,7 @@ const gas = createGasClient({ scene, camera, fx, audio, me, brk: () => game.brk,
 
 const remotes = new Map();
 const drops = new Map();
+const storm = createStorm({ scene, renderer, audio, camera, map: () => map });
 const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels, scene });
 let dropList = [];
 let plantedBomb = null;
@@ -2896,6 +2898,7 @@ const net = new Net({
     world?.setBrokenGlass(game.broken);
   },
   lights(m) {
+    if (m.storm) { applyLights(m.lights); return; } // (the storm's power cut and its return: no switch's click)
     // (the same fuse box state again — power's circuits repeat the flood's blown fuse with the lamps worked out —
     // only the lamps: no second power-down sound; integration 2026-11-08)
     if (m.power && (m.power === 'off') === (game.lights?.power === false)) { applyLights(m.lights); return; }
@@ -3350,6 +3353,7 @@ const gadgets = createGadgets({
   power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
 Object.assign(net.handlers, trk.handlers); // phone tracker: trk, trkScan, trkInfo, trkHit
+Object.assign(net.handlers, storm.handlers); // storm: a lightning strike
 Object.assign(net.handlers, gas.handlers); // gas: gasLeak, gasBoom, gasCough
 // elevator: the lift in the Mansion (see elevator.js)
 const elevator = createElevator({ scene, me, net, audio, serverNow, coll: () => coll, mines: mineModels, satchels: satchelModels });
@@ -3843,6 +3847,7 @@ function updateHud(now) {
   }
   drawMortarMap(performance.now(), radarMates);
   trk.frame(performance.now()); // phone tracker: the holder's screen, the direction finder's beep
+  storm.frame(performance.now()); // storm: rain, the flash, the thunder
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();
 }
 

@@ -5,7 +5,7 @@
 // 13.2 no kill confirmation: while the round is on, no hit marker, kill feed, kill announcements or kill money, and on
 //      the team bar and the scoreboard the enemies all look alive and nobody's kills move, even for the dead. The
 //      round's kill feed shows when it ends, and the kill money is paid then (server.js; the browser: main.js).
-export const WAR_MAPS = ['cs_mansion', 'cs_mansion_night'];
+export const WAR_MAPS = ['cs_mansion', 'cs_mansion_night', 'cs_meridian']; // (and Hotel Meridian, 2026-11-25: the War options and the phone tracker)
 export const MEDIC = { every: 5, heard: 30 };
 // flag: the admin's switch; map: the map now
 export const warOn = (flag, map) => !!flag && WAR_MAPS.includes(map?.id);

@@ -159,7 +159,7 @@ for (const y of [FL[1], FL[2]]) {
     }
   });
   // lights down the corridor
-  for (const x of [-15, -3, 9]) { m.add({ type: 'ceilinglamp', p: [x, y + H, 0] }); m.add({ type: 'light', p: [x, y + H - 0.3, 0], color: '#ffd6a0', intensity: 10, distance: 9 }); }
+  for (const x of [-15, -3, 9]) { m.add({ type: 'ceilinglamp', p: [x, y + H, 0] }); m.add({ type: 'light', p: [x, y + H - 0.3, 0], color: '#ffd6a0', intensity: 10, distance: 9, group: `corridor${y === FL[1] ? 2 : 3}` }); } // (group: the storm's power cuts put it out)
 }
 
 // ---- the penthouse: the suite (living room, bedroom with two hostages, bathroom), a glass door out to the terrace;
@@ -175,8 +175,8 @@ wall('z', 13, Z1, -5, P, 'tanbrick', [], 0.2, 3.4);
 wall('x', Z1, 13, X2, P, 'tanbrick', [], 0.3, 3.4); wall('z', X2, Z1, -5, P, 'tanbrick', [], 0.3, 3.4); // (its outer sides, over the parapet)
 box(8, 0, 18.6, 0.4, 0.5, 'pooltile', P); box(8, 7, 18.6, 7.4, 0.5, 'pooltile', P); box(8, 0.4, 8.4, 7, 0.5, 'pooltile', P); box(18.2, 0.4, 18.6, 7, 0.5, 'pooltile', P);
 m.add({ type: 'water', min: [8.4, 0.4], max: [18.2, 7], y: P + 0.35, color: '#1f6e9a' });
-m.add({ type: 'light', p: [-14, P + 3.2, 0], color: '#ffcf96', intensity: 18, distance: 12 });
-m.add({ type: 'light', p: [-1, P + 3.2, 0], color: '#ffcf96', intensity: 14, distance: 10 });
+m.add({ type: 'light', p: [-14, P + 3.2, 0], color: '#ffcf96', intensity: 18, distance: 12, group: 'suite' });
+m.add({ type: 'light', p: [-1, P + 3.2, 0], color: '#ffcf96', intensity: 14, distance: 10, group: 'suite' });
 m.add({ type: 'chandelier', p: [-2, P + 3.4, 0] });
 
 // ---- the fire escape: balconies on the west wall, a ladder from the side street to the roof
@@ -188,7 +188,7 @@ for (let k = 1; k < 4; k++) {
 m.ladder(X1 - 0.15, 0.9, [-1, 0], 0, FL[3] + 1.2, 0.9);
 
 // ---- lights: the lobby, the kitchen, the street lamps
-for (const [x, z] of [[-4, 2], [6, -6], [16, 6], [-16, -5]]) m.add({ type: 'light', p: [x, L + 3.2, z], color: '#ffd8a8', intensity: 18, distance: 13 });
+for (const [x, z] of [[-4, 2], [6, -6], [16, 6], [-16, -5]]) m.add({ type: 'light', p: [x, L + 3.2, z], color: '#ffd8a8', intensity: 18, distance: 13, group: 'lobby' });
 for (const x of [-20, 0, 20]) { m.add({ type: 'streetlight', p: [x, 0, 13.4], rot: Math.PI, h: 4.5 }); m.add({ type: 'light', p: [x, 4.3, 14.6], color: '#ffc07a', intensity: 30, distance: 16 }); }
 m.add({ type: 'streetlight', p: [-5, 0, -11], wall: true, rot: Math.PI }); m.add({ type: 'light', p: [-5, 3, -11.6], color: '#ffc07a', intensity: 14, distance: 10 });
 
@@ -251,13 +251,25 @@ for (const z of [-3.5, -1.5]) box(19, z, 21, z + 0.9, 0.35, 'wood', P);
 m.add({ type: 'umbrella', p: [19.5, P, 1], color: '#c8a050' });
 m.add({ type: 'painting', p: [-14, P + 1.8, -9.82], w: 2, h: 1.1, seed: 99, rot: 0 });
 
+// ---- the phone tracker's cell towers (as Mansion's, shared/maps/mansion_phonetracker.js): a mast and its cabinet
+// (box: shot, blown up, repaired) on the roof terrace, on the street (CT side) and in the alley behind the kitchen
+const TOWERS = [
+  { name: 'roof', box: { min: [20.9, P, -4.4], max: [21.6, P + 1.3, -3.8] }, mast: [21.25, P, -3.35, 5] },
+  { name: 'street', box: { min: [25.6, 0, 14.7], max: [26.4, 1.3, 15.3] }, mast: [26, 0, 15.75, 8] },
+  { name: 'alley', box: { min: [2, 0, -15.6], max: [2.8, 1.3, -15] }, mast: [2.4, 0, -16.05, 8] },
+];
+for (const { box: b, mast: [x, y, z, h] } of TOWERS) {
+  m.solid(b.min[0], b.min[2], b.max[0], b.max[2], b.max[1] - b.min[1], b.min[1]);
+  m.solid(x - 0.12, z - 0.12, x + 0.12, z + 0.12, h, y);
+}
+
 // ---- rooms (indoors, for the lighting and the phone tracker's "outdoors")
 const room = (group, x1, y, z1, x2, z2, h = H) => ({ group, min: [x1, y - 0.05, z1], max: [x2, y + h, z2] });
 const ROOMS = [room('lobby', X1, 0, Z1, X2, Z2, H + 0.1)];
 for (const [k, y] of [[2, FL[1]], [3, FL[2]]]) {
   ROOMS.push(room(`corridor${k}`, X1, y, -CZ, X2, CZ));
   RX.slice(0, 4).forEach((x, i) => { ROOMS.push(room(`room${k}${i + 1}n`, x, y, Z1, RX[i + 1], -CZ)); ROOMS.push(room(`room${k}${i + 1}s`, x, y, CZ, RX[i + 1], Z2)); });
-  ROOMS.push(room(`stairs${k}`, 13, y, Z1, X2, -CZ), room(`linen${k}`, 13, y, CZ, X2, Z2), room(`closet${k}`, X1, y, Z1, RX[0], -CZ));
+  ROOMS.push(room(`east${k}`, 13, y, Z1, X2, Z2)); // the stairwell and the linen room (the browsers light 24 rooms at most; the closets stay dark)
 }
 ROOMS.push(room('suite', X1, P, Z1, 4, Z2, 4), room('stairhut', 13, P, Z1, X2, -5, 3.4));
 
@@ -266,11 +278,14 @@ export default {
   title: 'Hotel Meridian',
   mode: 'hostage',
   night: true,
+  storm: true, // lightning, thunder, rain, power cuts (lib/storm.js, public/js/storm.js)
+  towers: TOWERS, // the phone tracker's cell towers (ROADMAP 14.5)
   hostages: [
     { p: [-13, P, -8], yaw: Math.PI / 2 }, // the suite's bedroom (off its rug)
     { p: [-14, P, -6.5], yaw: 0 },
     { p: [-20, L, -8.3], yaw: Math.PI / 2 }, // the kitchen's freezer
-    { p: [2, FL[2], -3.5], yaw: Math.PI }, // a guest room on the 3rd floor (stage 3: a different room every round)
+    // a guest room, a different one every round (any of the 16: by the bathroom, off the rug)
+    { p: [2, FL[2], -3.2], yaw: Math.PI, anyOf: [FL[1], FL[2]].flatMap(y => RX.slice(0, 4).flatMap(x => [-1, 1].map(s => [x + 5.5, y, s * 3.2]))) },
   ],
   boxes: m.boxes,
   decor: [...m.decor, { type: 'skyline', seed: 33, night: true }],

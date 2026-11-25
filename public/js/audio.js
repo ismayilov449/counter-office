@@ -436,6 +436,9 @@ function footstep(out, t, surface, heavy) {
 export const audio = {
   volume: 0.6,
 
+  // For s seconds nobody else's footsteps are heard (the storm's thunder).
+  hush(s) { if (ctx) this.hushUntil = ctx.currentTime + s; },
+
   init() {
     if (ctx) { ctx.resume(); return; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -528,6 +531,7 @@ export const audio = {
     if (!ctx || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     if (KIND[name] && full(KIND[name], t) && pos) return;
+    if (name === 'step' && pos && t < (this.hushUntil || 0)) return; // (the storm: thunder drowns out footsteps)
     if (pos && this.vent) pos = this.vent(pos) || pos; // underground: heard through an air vent, it comes out of the grille (public/js/underground.js)
     const out = this.out(pos, FAR[name], this.muffled);
     switch (name) {
@@ -771,6 +775,11 @@ export const audio = {
         break;
       case 'trkbeep':
         tone(out, t, { freq: 2600, dur: 0.04, type: 'square', gain: 0.04 });
+        break;
+      case 'thunder': // the storm (arg: 0..1 how loud): a crack, then a long low rumble
+        burst(out, t, { dur: 0.35, type: 'lowpass', freq: 2400, freqEnd: 400, gain: 0.9 * (arg ?? 1) });
+        burst(out, t + 0.1, { dur: 2.6, type: 'lowpass', freq: 260, freqEnd: 60, gain: 1.4 * (arg ?? 1) });
+        tone(out, t + 0.1, { freq: 48, freqEnd: 30, dur: 2.4, type: 'sawtooth', gain: 0.12 * (arg ?? 1) });
         break;
       case 'chute': // the laundry chute: a body rattling down the steel tube
         for (let i = 0; i < 6; i++) burst(out, t + i * 0.13, { dur: 0.12, type: 'bandpass', freq: 500 + Math.random() * 400, q: 3, gain: 0.5 });
