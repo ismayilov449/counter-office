@@ -15,7 +15,7 @@ export const TRACKER = {
   // a circle's radius (m): base, + perM per metre away, + perWall per wall or floor in between (at most walls), x under
   // underground; x still for every scan in a row the phone hasn't moved more than `moved` m (not below min); a phone
   // walking (more than `walking` m in the half second before the scan) gets x moving and starts over
-  circle: { base: 2, perM: 0.12, perWall: 1.5, walls: 6, under: 2, still: 0.6, min: 1.5, moved: 1.5, walking: 1, moving: 1.3 },
+  circle: { base: 1, perM: 0.06, perWall: 0.75, walls: 6, under: 2, still: 0.6, min: 0.8, moved: 1.5, walking: 1, moving: 1.3 }, // (halved 2026-11-25: the user found them too big)
   // cell towers (14.5): bullets that knock one out, a blast within `blast` m does at once; s a CT holds E to repair one
   // from within `reach` m; every tower down makes the circles x(1 + worse) bigger
   tower: { hits: 10, blast: 4, repair: 5, reach: 1.6, worse: 0.5 },
