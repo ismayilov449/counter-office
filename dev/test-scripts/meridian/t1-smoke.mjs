@@ -21,5 +21,11 @@ ct.at([-19.4, 0.12, -7.6], Math.PI / 2); await sleep(300);
 ct.send({ t: 'use', on: true }); await sleep(150); ct.send({ t: 'use', on: false });
 ok('the freezer hostage follows Alice', await until(() => hs.find(h => Math.abs(h[1] + 20) < 1.5 && Math.abs(h[3] + 8.3) < 2)?.[5] === 1, 3000));
 ok(`4 hostages (${hs.length})`, hs.length === 4);
+// stage 2: Bob drops down the laundry chute from the 3rd floor: Alice hears it rattle, then the thud at the bottom
+const sounds = [];
+ct.on.sfx = m => sounds.push(m.s);
+for (const y of [8.6, 6, 3.5, 1.5, 0.82]) { t.at([20.9, y, 8.9], 0); await sleep(120); }
+ok(`the chute rattles (${sounds.join(', ')})`, await until(() => sounds.includes('chute'), 1500));
+ok('and thuds on the laundry', await until(() => sounds.includes('chuteland'), 1500));
 console.log(ok.fails() ? ok.fails() + ' FAILED' : 'ALL OK');
 process.exit(ok.fails() ? 1 : 0);

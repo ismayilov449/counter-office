@@ -19,6 +19,14 @@ const X1 = -22, X2 = 22, Z1 = -10, Z2 = 10; // the building
 const RX = [-19, -11, -3, 5, 13]; // guest rooms between these x (four a side)
 const CZ = 1.2; // the corridor: z -1.2 .. 1.2
 const STAIR = { x1: 14.5, x2: 20.5, a: [-10, -8.5], b: [-8.5, -7] }; // the flights' run and their two lanes (z)
+// the lift's shaft in the north-west corner (map.elevator; the cabin and its doors are shared/elevator.js), its doors
+// facing south: onto the guest floors' corridors, the lobby and the suite's bedroom. Its west wall is the building's.
+const LIFT = { out: { x1: -21.85, x2: -19.6, z1: -3.8, z2: -1.1 }, in: { x1: -21.85, x2: -19.75, z1: -3.65, z2: -1.25 }, door: { x1: -21.2, x2: -20.3, h: 2.05 } };
+const STOPS = [0.12, 4, 8, 12], LIFT_TOP = 15.7;
+// the laundry chute (outside its walls): a steel tube in the linen rooms' corner, from the terrace down to the lobby's
+// laundry, a hatch at waist height on each floor
+const CHUTE = { x1: 20.1, x2: 21.7, z1: 8.1, z2: 9.7 };
+const liftHole = [LIFT.out.x1, LIFT.out.z1, LIFT.out.x2, LIFT.in.z2], chuteHole = [CHUTE.x1, CHUTE.z1, CHUTE.x2, CHUTE.z2];
 
 // ---- doors: { id, hinge, axis, dir, len, h } (shared/doors.js); every doorway in a wall gets one
 const doors = [];
@@ -70,10 +78,10 @@ for (const [x, z] of [[-26, -15], [-24.6, -15.4], [20, -16], [26, 24]]) { m.soli
 box(10, -17.5, 16, -16, 1.6, 'metal'); // a skip in the alley
 
 // ---- the floors
-slab(X1, Z1, X2, Z2, FL[0] + 0.12, 'marble');
+slab(X1, Z1, X2, Z2, FL[0] + 0.12, 'marble', [liftHole]);
 for (let k = 1; k < 4; k++) {
   const hole = k === 2 ? [STAIR.x1, STAIR.b[0], STAIR.x2, STAIR.b[1]] : [STAIR.x1, STAIR.a[0], STAIR.x2, STAIR.a[1]]; // over the flight coming up
-  slab(X1, Z1, X2, Z2, FL[k], k === 3 ? 'parquet' : 'carpet', [hole]);
+  slab(X1, Z1, X2, Z2, FL[k], k === 3 ? 'parquet' : 'carpet', [hole, liftHole, chuteHole]);
 }
 slab(X1, Z1, 4, Z2, FL[3] + 4, 'roof'); // the suite's roof
 slab(13, -10, 22, -5, FL[3] + 3.4, 'roof'); // the stair hut's roof
@@ -113,7 +121,7 @@ wall('x', Z1, X1, 4, FL[3], 'tanbrick', [win(-18, -12), win(-8, -2)], 0.3);
 // ---- the lobby: reception, lounge, the bar, the kitchen (with the freezer) behind a wall on the west
 const L = FL[0] + 0.12;
 wall('z', -11, Z1, -1, L, 'mwall', [doorway(-4.5, 1.2)]); door(-11, L, -4.5, 'z', 1, 1.2);
-wall('x', -1, X1, -11, L, 'mwall');
+wall('x', -1, LIFT.out.x2, -11, L, 'mwall'); // (the lift's shaft stands in the kitchen's corner, its doors onto the lobby)
 wall('z', -18, Z1, -6.5, L, 'metal'); wall('x', -6.5, X1, -18, L, 'metal', [doorway(-19.6)]); door(-19.6, L, -6.5, 'x', 1); // the walk-in freezer
 box(-17, -9.6, -12, -8.8, 0.95, 'metal', L); box(-17, -4, -13, -2.6, 0.95, 'metal', L); // kitchen counters
 box(2, -5.2, 9, -4.2, 1.1, 'wood', L); box(2, -8, 9, -7.6, 2.4, 'shelf', L); // reception desk, the key board behind it
@@ -127,9 +135,9 @@ for (const y of [FL[1], FL[2]]) {
   // the corridor's walls: a door into every room, the housekeeping closet at the west end, the linen room at the east
   const north = [], south = [];
   RX.slice(0, 4).forEach(x => { north.push(doorway(x + 3.2)); south.push(doorway(x + 3.2)); door(x + 3.2, y, -CZ, 'x', 1); door(x + 3.2, y, CZ, 'x', 1); });
-  north.push(doorway(-21)); door(-21, y, -CZ, 'x', 1);
-  south.push(doorway(14)); door(14, y, CZ, 'x', 1);
-  wall('x', -CZ, X1, 13, y, 'mwall', north);
+  south.push(doorway(-21)); door(-21, y, CZ, 'x', 1); // the housekeeping closet
+  south.push(doorway(14)); door(14, y, CZ, 'x', 1); // the linen room (the laundry chute)
+  wall('x', -CZ, LIFT.out.x2, 13, y, 'mwall', north); // (west of it: the lift's doors)
   wall('x', CZ, X1, X2, y, 'mwall', south);
   // between the rooms: a connecting door near the window side; the ends close the closet and the stairwell off
   for (const x of RX.slice(1, 4)) {
@@ -138,8 +146,8 @@ for (const y of [FL[1], FL[2]]) {
   }
   wall('z', RX[0], Z1, -CZ, y, 'plaster'); wall('z', RX[0], CZ, Z2, y, 'plaster');
   wall('z', RX[4], CZ, Z2, y, 'plaster'); wall('z', RX[4], Z1, -CZ, y, 'plaster');
-  box(X1, 1.2, -19.6, 3.8, H, 'block', y); // (the lift's shaft: stage 2)
-  box(X1, 3.8, RX[0], Z2, H, 'block', y);  // (and a service duct beside it)
+  box(X1, Z1, RX[0], LIFT.out.z1, H, 'block', y); // (the service duct behind the lift)
+  box(X1 + 0.3, 7.5, X1 + 1.2, 9.6, 2, 'shelf', y); // the closet's shelves
   // each room: a bed by the window, a bathroom in the corner by its door (its walls make one more corner to clear)
   RX.slice(0, 4).forEach(x => {
     for (const s of [-1, 1]) {
@@ -184,6 +192,65 @@ for (const [x, z] of [[-4, 2], [6, -6], [16, 6], [-16, -5]]) m.add({ type: 'ligh
 for (const x of [-20, 0, 20]) { m.add({ type: 'streetlight', p: [x, 0, 13.4], rot: Math.PI, h: 4.5 }); m.add({ type: 'light', p: [x, 4.3, 14.6], color: '#ffc07a', intensity: 30, distance: 16 }); }
 m.add({ type: 'streetlight', p: [-5, 0, -11], wall: true, rot: Math.PI }); m.add({ type: 'light', p: [-5, 3, -11.6], color: '#ffc07a', intensity: 14, distance: 10 });
 
+// ---- the lift's shaft: its east and north walls the whole way up, the front wall round the doorway on every floor
+const LO = LIFT.out, LI = LIFT.in;
+box(LI.x2, LO.z1, LO.x2, LI.z2, LIFT_TOP, 'plaster');
+box(LO.x1, LO.z1, LI.x2, LI.z1, LIFT_TOP, 'plaster');
+for (const y of STOPS) wall('x', (LI.z2 + LO.z2) / 2, LO.x1, LO.x2, y, 'plaster', [{ from: LIFT.door.x1, to: LIFT.door.x2, height: LIFT.door.h }], LO.z2 - LI.z2, 4 - (y - Math.floor(y))); // (up through the slab above)
+
+// ---- the laundry chute: the tube's four walls, a hatch on its west side on each floor (crouch-jump in), open at the
+// bottom over a cart of laundry in the lobby's laundry room (a soft landing; everyone near hears you come down)
+const C = CHUTE, T = 0.1;
+const tube = (y0, h, hatch) => {
+  wall('z', C.x1 + T / 2, C.z1, C.z2, y0, 'metal', hatch ? [{ from: 8.4, to: 9.4, bottom: 0.5, height: 1.6 }] : [], T, h);
+  wall('z', C.x2 - T / 2, C.z1, C.z2, y0, 'metal', [], T, h);
+  wall('x', C.z1 + T / 2, C.x1, C.x2, y0, 'metal', [], T, h);
+  wall('x', C.z2 - T / 2, C.x1, C.x2, y0, 'metal', [], T, h);
+};
+tube(2.6, 1.4, false); tube(FL[1], 4, true); tube(FL[2], 4, true); tube(FL[3], 1.2, true);
+box(C.x1, C.z1, C.x2, C.z2, 0.08, 'metal', FL[3] + 1.2); // its lid on the terrace
+wall('z', 19, 7, Z2, L, 'plaster', [doorway(7.5)]); door(19, L, 7.5, 'z', 1); // the laundry room
+wall('x', 7, 19, X2, L, 'plaster');
+box(20.3, 8.3, 21.5, 9.5, 0.7, 'fabric', L); // the laundry cart under the chute
+box(19.3, 9.2, 19.9, 9.8, 1.3, 'metal', L); box(21.2, 7.2, 21.8, 7.9, 1.0, 'metal', L); // a washer, a dryer
+
+// ---- furniture and dressing (stage 2)
+// guest rooms: a wardrobe, a TV on the desk, a bedside table, a painting over the bed, a rug
+for (const y of [FL[1], FL[2]]) RX.slice(0, 4).forEach((x, i) => {
+  for (const s of [-1, 1]) {
+    const zo = s * 10, zw = s < 0 ? zo + 0.25 : zo - 0.25;
+    box(x + 0.25, s < 0 ? -9.6 : 7.6, x + 1.0, s < 0 ? -7.6 : 9.6, 2.1, 'cabinet', y); // wardrobe by the window wall
+    box(x + 6.9, s < 0 ? -2.0 : 1.6, x + 7.5, s < 0 ? -1.94 : 1.66, 0.4, 'black', y + 0.8); // TV
+    box(x + 7.0, s < 0 ? zo + 0.3 : zo - 0.8, x + 7.5, s < 0 ? zo + 0.8 : zo - 0.3, 0.5, 'wood', y); // bedside table
+    box(x + 3.2, s < 0 ? -8.6 : 4.4, x + 7.2, s < 0 ? -4.4 : 8.6, 0.06, 'fabric', y); // rug
+    m.add({ type: 'painting', p: [x + 5.8, y + 1.7, s < 0 ? zo + 0.17 : zo - 0.17], w: 1.4, h: 0.9, seed: i * 7 + (s < 0 ? 1 : 2) + y, rot: s < 0 ? 0 : Math.PI });
+    m.add({ type: 'ceilinglamp', p: [x + 5, y + H, s * 5.5] });
+  }
+});
+// (rugs are 6 cm thick: the bots' grid takes a floor less than 5 cm over another for the same one, and loses both)
+// guest corridors: a red runner, paintings between the doors, a plant at each end
+for (const y of [FL[1], FL[2]]) {
+  box(-19.4, -0.7, 12.6, 0.7, 0.06, 'fabric', y);
+  for (const x of [-12.8, -4.8, 3.2, 11.2]) { m.add({ type: 'painting', p: [x, y + 1.6, -CZ + 0.12], w: 0.9, h: 0.7, seed: x + y, rot: 0 }); m.add({ type: 'painting', p: [x - 1.5, y + 1.6, CZ - 0.12], w: 0.9, h: 0.7, seed: x - y, rot: Math.PI }); }
+  m.tree(12.3, 0.6, 'palm', 0.35);
+}
+// the lobby: a big rug, plants, luggage, stools at the bar, shelves of bottles, the kitchen's stoves and fridge
+box(-10, -0.4, 10, 8.6, 0.06, 'fabric', L);
+for (const [x, z] of [[-9.5, -0.5], [9.5, 8.5], [-1.5, 9], [12.5, -1]]) m.tree(x, z, 'palm', 0.45);
+box(10.5, -9.2, 11.3, -8.4, 0.7, 'cardboard', L); box(11.4, -9.3, 12.1, -8.6, 0.55, 'cardboard', L); // suitcases by the desk
+for (const x of [16.8, 18.2, 19.6]) box(x - 0.2, 2.3, x + 0.2, 2.7, 0.75, 'metal', L); // bar stools
+box(16.4, 6.2, 18.6, 6.6, 2.4, 'winerack', L); // bottles behind the bar
+box(-17, -9.9, -13, -9.6, 2.2, 'shelf', L); box(-12.8, -9.6, -11.4, -8.6, 1.9, 'metal', L); // shelves, the fridge
+box(-17, -2.6, -13, -2.2, 0.08, 'metal', L + 0.95); // (the stove's hob)
+box(-21.8, -9.8, -18.3, -9.3, 1.9, 'shelf', L); box(-21.8, -9.2, -21.3, -7.2, 1.9, 'shelf', L); // the freezer's racks (clear of its door)
+m.add({ type: 'awning', p: [0, 3.1, 11.2], w: 6, d: 2.2, rot: 0, color: '#7a1c22' }); // over the entrance
+// the penthouse: a headboard, a rug, a TV wall, a bar; loungers and an umbrella on the terrace
+box(-20.2, -9.5, -15.8, -9.3, 1.3, 'wood', P); box(-19, -6.5, -12, 0.5, 0.06, 'fabric', P);
+box(-7.6, -6, -7.4, -2.8, 1.6, 'black', P + 0.5); box(-1, -9.2, 3.2, -8.7, 1.05, 'wood', P);
+for (const z of [-3.5, -1.5]) box(19, z, 21, z + 0.9, 0.35, 'wood', P);
+m.add({ type: 'umbrella', p: [19.5, P, 1], color: '#c8a050' });
+m.add({ type: 'painting', p: [-14, P + 1.8, -9.82], w: 2, h: 1.1, seed: 99, rot: 0 });
+
 // ---- rooms (indoors, for the lighting and the phone tracker's "outdoors")
 const room = (group, x1, y, z1, x2, z2, h = H) => ({ group, min: [x1, y - 0.05, z1], max: [x2, y + h, z2] });
 const ROOMS = [room('lobby', X1, 0, Z1, X2, Z2, H + 0.1)];
@@ -200,10 +267,10 @@ export default {
   mode: 'hostage',
   night: true,
   hostages: [
-    { p: [-16, P, -4], yaw: Math.PI / 2 }, // the suite's bedroom
+    { p: [-13, P, -8], yaw: Math.PI / 2 }, // the suite's bedroom (off its rug)
     { p: [-14, P, -6.5], yaw: 0 },
     { p: [-20, L, -8.3], yaw: Math.PI / 2 }, // the kitchen's freezer
-    { p: [0.5, FL[2], -6], yaw: Math.PI }, // a guest room on the 3rd floor (stage 3: a different room every round)
+    { p: [2, FL[2], -3.5], yaw: Math.PI }, // a guest room on the 3rd floor (stage 3: a different room every round)
   ],
   boxes: m.boxes,
   decor: [...m.decor, { type: 'skyline', seed: 33, night: true }],
@@ -216,13 +283,26 @@ export default {
   },
   spawns: {
     CT: [-8, -4, 0, 4, 8].flatMap(x => [{ p: [x, 0, 22], yaw: 0 }, { p: [x + 2, 0, 24.5], yaw: 0 }]),
-    T: [[-14, 0], [-10, 2], [-4, -4], [-2, 2], [-16, 6], [-12, -8], [0, -2], [-6, 7]].map(([x, z]) => ({ p: [x, P, z], yaw: Math.PI / 2 })),
+    T: [[-14, 1.5], [-10, 2], [-4, -4], [-2, 2], [-16, 6], [-12, -8], [0, -2], [-6, 7]].map(([x, z]) => ({ p: [x, P, z], yaw: Math.PI / 2 })),
   },
   labels: {},
   ladders: m.ladders,
   water: [],
   doors,
   rooms: ROOMS,
+  // the lift (shared/elevator.js reads it as it does the Mansion's): stops at the four floors, the cabin waits in the lobby
+  elevator: {
+    shaft: { ...LIFT.in }, out: { ...LIFT.out }, pit: 0, top: LIFT_TOP, stops: STOPS.slice(), home: 0,
+    names: ['the lobby', 'the 2nd floor', 'the 3rd floor', 'the penthouse'],
+    door: { ...LIFT.door },
+    cabin: { x1: -21.68, x2: -19.8, z1: -3.6, z2: -1.27, wall: 0.05, ceil: 2.2, roof: 0.08, floor: 0.1 },
+    hatch: { x1: -21.1, x2: -20.35, z1: -3.3, z2: -2.55 },
+    panel: { x: -19.845, z: -1.7, ys: [1.0, 1.12, 1.24, 1.36] },
+    call: STOPS.map(s => [-19.81, s + 1.1, LIFT.out.z2 + 0.005]),
+    ladder: { x: LIFT.in.x1, z1: -3.4, z2: -2.8, top: LIFT_TOP - 0.1 },
+  },
+  // the laundry chute: drop in from any floor's hatch (or the terrace), land on the cart in the lobby's laundry
+  chute: { min: [CHUTE.x1 + 0.1, CHUTE.z1 + 0.1], max: [CHUTE.x2 - 0.1, CHUTE.z2 - 0.1], bottom: L + 0.7 },
   theme: {
     skyTop: '#05070f', skyHorizon: '#141a2a', fog: ['#0c1220', 50, 260],
     sun: { color: '#9aaad4', intensity: 0.8, dir: [-30, 62, 45] }, // the moon behind the clouds

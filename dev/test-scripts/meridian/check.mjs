@@ -3,7 +3,7 @@
 // standing route a hostage can follow out to the rescue zone. node dev/test-scripts/meridian/check.mjs
 import { MAPS } from '../../../shared/maps/index.js';
 import { CollisionWorld } from '../../../shared/collision.js';
-import { overlapsAny, PLAYER } from '../../../shared/physics.js';
+import { overlapsAny, movePlayer, PLAYER } from '../../../shared/physics.js';
 import { buildNav, smoothPath } from '../../../lib/nav.js';
 const M = MAPS.cs_meridian, w = new CollisionWorld(M);
 let fails = 0;
@@ -29,5 +29,15 @@ const tr = route(ct, tsp, false);
 ok(`CT spawn -> T spawn in the penthouse (${tr ? tr.length + ' points' : 'none'})`, !!tr && Math.abs(tr.at(-1).p[1] - tsp[1]) < 0.6);
 const ladderUsed = route([-26, 0, 0], [-20, 8, 0], false);
 ok(`the fire escape: side street -> 3rd-floor corridor (${ladderUsed ? ladderUsed.some(p => p.ladder) ? 'by the ladder' : 'another way' : 'none'})`, !!ladderUsed);
+// stage 2: the laundry chute. A body dropped in at the 3rd floor's hatch falls the tube's length and lands on the cart;
+// every floor's hatch is open (a level look from the linen room reaches the tube's far wall).
+const C = M.chute, cx = (C.min[0] + C.max[0]) / 2, cz = (C.min[1] + C.max[1]) / 2;
+const body = { p: [cx, 8.6, cz], v: [0, 0, 0], onGround: false, crouch: true };
+for (let i = 0; i < 400 && !body.onGround; i++) movePlayer(body, 1 / 60, w.move(null, body.p, 3));
+ok(`the chute: dropped in at the 3rd floor, lands on the cart (y ${body.p[1].toFixed(2)} vs ${C.bottom})`, body.onGround && Math.abs(body.p[1] - C.bottom) < 0.1 && Math.hypot(body.p[0] - cx, body.p[2] - cz) < 0.3);
+for (const y of [4, 8, 12]) {
+  const h = w.raycast([18.5, y + 1.1, cz], [1, 0, 0], 4, 'move');
+  ok(`its hatch at y ${y} is open (${h ? h.t.toFixed(2) + ' m to the far wall' : 'nothing'})`, !!h && 18.5 + h.t > C.max[0] - 0.05);
+}
 console.log(fails ? fails + ' FAILED' : 'ALL OK');
 process.exit(fails ? 1 : 0);

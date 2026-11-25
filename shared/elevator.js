@@ -55,6 +55,7 @@ export function tripTime(y0, y1) {
 export const doorAt = (d, t) => Math.max(0, Math.min(1, d[0] + (d[1] * (t - d[2])) / (d[3] * 1000)));
 
 export const ceilAt = (E, y) => y + E.cabin.ceil;
+export const homeStop = E => E.home ?? 1; // where the cabin waits at the round start (the Mansion: the ground floor, stop 1)
 export const roofAt = (E, y) => y + E.cabin.ceil + E.cabin.roof;
 // The stop the cabin is nearest, and how far from it: { s, d }.
 export function nearestStop(E, y) {
@@ -80,9 +81,10 @@ export const onRoof = (E, y, p, tol = 0.12) => inShaft(E, p) && Math.abs(p[1] - 
 const box = extra => ({ min: [0, 0, 0], max: [0, 0, 0], mat: 'none', elev: true, ...extra });
 const put = (b, x1, y1, z1, x2, y2, z2) => { b.min[0] = x1; b.min[1] = y1; b.min[2] = z1; b.max[0] = x2; b.max[1] = y2; b.max[2] = z2; };
 const away = b => put(b, b.min[0], -1000, b.min[2], b.min[0], -1000, b.min[2]);
-export function makeBoxes() {
+// (stops: how many floors the lift serves — a door set for the cabin and one for each landing)
+export function makeBoxes(stops = 3) {
   const cabin = Array.from({ length: 12 }, () => box());
-  const doors = [0, 1, 2, 3].map(k => Array.from({ length: 4 }, (_, i) => box({ elevDoor: k, panel: i })));
+  const doors = Array.from({ length: stops + 1 }, (_, k) => k).map(k => Array.from({ length: 4 }, (_, i) => box({ elevDoor: k, panel: i })));
   return { cabin, doors, all: [...cabin, ...doors.flat()] };
 }
 // The cabin's boxes for its floor at y (hatch: open or shut).

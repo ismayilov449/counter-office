@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLAYER } from '/shared/physics.js';
-import { ELEV, motionAt, doorAt, inCabin, onRoof, inShaft, roofAt, nearestStop, makeBoxes, placeCabin, placeDoor, makeLadders, placeLadders, aimAt, touches } from '/shared/elevator.js';
+import { ELEV, motionAt, doorAt, inCabin, onRoof, inShaft, roofAt, nearestStop, makeBoxes, homeStop, placeCabin, placeDoor, makeLadders, placeLadders, aimAt, touches } from '/shared/elevator.js';
 
 const aimDir = (yaw, pitch) => [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
@@ -43,7 +43,7 @@ export function createElevator(ctx) {
     rest.slice(6, 10).forEach(b => parts.push(boxGeo(b, 0x707478)));
     parts.push(boxGeo(bx(c.x1 + c.wall, 0.88, c.z1 + c.wall, c.x2 - c.wall, 0.93, c.z1 + c.wall + 0.05), 0x5f6366));
     parts.push(boxGeo(bx(c.x1 + c.wall, 0.005, c.z1 + c.wall, c.x2 - c.wall, 0.01, c.z2 - c.wall), 0x2a2b2e)); // (the floor's top: a darker mat)
-    parts.push(boxGeo(bx(P.x - 0.012, P.ys[0] - 0.1, P.z - 0.075, P.x + 0.005, P.ys[2] + 0.12, P.z + 0.075), 0x2b2d30));
+    parts.push(boxGeo(bx(P.x - 0.012, P.ys[0] - 0.1, P.z - 0.075, P.x + 0.005, P.ys.at(-1) + 0.12, P.z + 0.075), 0x2b2d30));
     P.ys.forEach(h => parts.push(boxGeo(bx(P.x - 0.022, h - 0.025, P.z - 0.025, P.x - 0.012, h + 0.025, P.z + 0.025), 0xcfd2d4)));
     parts.push(boxGeo(bx(c.x1 + 0.2, c.ceil - 0.004, c.z2 - 0.75, c.x1 + 0.6, c.ceil - 0.001, c.z2 - 0.25), 0xdedede)); // (the light's frame)
     // the hatch's steel frame round its opening on the ceiling (seen from inside: where to look up)
@@ -67,12 +67,12 @@ export function createElevator(ctx) {
     // the door panels (4 per door set: the cabin's and the three landings'), brushed steel
     const steel = new THREE.MeshLambertMaterial({ color: 0xb4b9be });
     mats.push(steel);
-    panels = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), steel, 16);
+    panels = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), steel, B.doors.length * 4);
     panels.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     // lit things: the cabin's ceiling light, its three buttons, the three call buttons (unlit: scaled away)
     const glow = new THREE.MeshBasicMaterial({ color: 0xffffff });
     mats.push(glow);
-    lit = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), glow, 7);
+    lit = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), glow, 1 + E.panel.ys.length + E.call.length); // (the cabin light, its buttons, the call buttons)
     lit.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < 7; i++) lit.setColorAt(i, _c.set(i === 0 ? 0xfff6e0 : 0xffb347));
     // (both span the shaft: one fixed bounding sphere round it, never recomputed)
@@ -105,8 +105,9 @@ export function createElevator(ctx) {
   const atStop = () => { const n = nearestStop(E, y); return n.d < 0.002 ? n.s : -1; };
   function fresh() {
     const t = serverNow();
-    st = { m: [E.stops[1], E.stops[1], t, 0], d: [0, 1, 2, 3].map(() => [0, 0, t, ELEV.door]), h: 0, q: [], p: 1, rm: [], rs: [] };
-    y = yPrev = E.stops[1];
+    const home = E.stops[homeStop(E)];
+    st = { m: [home, home, t, 0], d: E.stops.map(() => [0, 0, t, ELEV.door]).concat([[0, 0, t, ELEV.door]]), h: 0, q: [], p: 1, rm: [], rs: [] };
+    y = yPrev = home;
   }
   // Once per frame (local() or update(), whichever comes first; `frame` is the frame's clock): the cabin's height now, its
   // boxes and ladders, and the mines and satchels on it moved along.
@@ -124,7 +125,7 @@ export function createElevator(ctx) {
       for (const id of st.rs) { const e = ctx.satchels.get(id); if (e && e.obj.parent === scene) e.obj.position.y += dy; }
     }
     placeCabin(E, B, y, !!st.h);
-    for (let k = 0; k < 4; k++) placeDoor(E, B, k, y, doorAt(st.d[k], t));
+    for (let k = 0; k < B.doors.length; k++) placeDoor(E, B, k, y, doorAt(st.d[k], t));
     placeLadders(E, lads, y);
     const coll = ctx.coll();
     if (coll.elev !== B.all) { coll.elev = B.all; coll.elevBound = bound; }
@@ -230,7 +231,7 @@ export function createElevator(ctx) {
       map = m;
       E = m.elevator || null;
       if (!E) { B = null; return; }
-      B = makeBoxes();
+      B = makeBoxes(E.stops.length);
       lads = E._ladders ||= makeLadders(E); // (the night map shares the day map's ladders list)
       if (!map.ladders.includes(lads[0])) map.ladders.push(...lads);
       bound = { min: [E.out.x1, E.pit - 0.2, E.out.z1], max: [E.out.x2, E.top + 0.1, E.out.z2] };
@@ -305,7 +306,7 @@ export function createElevator(ctx) {
       lid.position.set(H.x1, E.cabin.ceil, (H.z1 + H.z2) / 2);
       // the door panels (placed again: local() may have let one that was closing on us through, for the movement only)
       let i = 0;
-      for (let k = 0; k < 4; k++) placeDoor(E, B, k, y, doorAt(st.d[k], t));
+      for (let k = 0; k < B.doors.length; k++) placeDoor(E, B, k, y, doorAt(st.d[k], t));
       for (const b of B.all) {
         if (b.elevDoor == null) continue;
         _p.set((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
@@ -318,7 +319,7 @@ export function createElevator(ctx) {
       const put = (k, x, yy, z, sx, sy, sz, show) => lit.setMatrixAt(k, _m.compose(_p.set(x, yy, z), _q.identity(), _s.set(show ? sx : 1e-4, show ? sy : 1e-4, show ? sz : 1e-4)));
       put(0, c.x1 + 0.4, y + c.ceil - 0.006, c.z2 - 0.5, 0.36, 0.004, 0.46, on);
       P.ys.forEach((h, s) => put(1 + s, P.x - 0.023, y + h, P.z, 0.004, 0.036, 0.036, on && st.q.includes(s)));
-      E.call.forEach(([x, h, z], s) => put(4 + s, x, h, z + 0.019, 0.036, 0.036, 0.004, on && st.q.includes(s)));
+      E.call.forEach(([x, h, z], s) => put(1 + P.ys.length + s, x, h, z + 0.019, 0.036, 0.036, 0.004, on && st.q.includes(s)));
       lit.instanceMatrix.needsUpdate = true;
       for (const m of mats) if (m.emissive) m.emissive.setHex(on ? 0x1a1a1a : 0);
       // the motor's hum while it moves (from the machine room over the shaft and the cabin itself)

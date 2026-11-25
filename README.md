@@ -452,13 +452,17 @@ Settings saved from the admin panel (or the Esc menu) win over these environment
   the CTs start in the parking lot and bring the hostages back there. Ladders lead up to the roof and the vents, the
   shop windows and the skylights are glass you can shoot out, and the office door by the parking lot opens with **E**.
   (The original's textures aren't inside its .bsp, so this one is painted like Dust II and the mansion.)
-- **cs_meridian** — **Hotel Meridian** at night (new, stage 1 of 3: the layout, without the storm yet). Hostage rescue in
+- **cs_meridian** — **Hotel Meridian** at night (new, stage 2 of 3: everything but the storm). Hostage rescue in
   a four-storey hotel: the CTs start on the street in front, the Terrorists in the penthouse at the top with two
   hostages; one more is in a guest room on the 3rd floor and one in the kitchen's walk-in freezer. The two guest floors
   are one long corridor each with a door on both sides every few metres; every room has a bathroom, and a
   **connecting door** to the next room, so you can cross a floor without stepping into the corridor. Two ways up: the
   **main stairs** in the east stairwell and the **fire escape** on the west wall (a ladder from the side street past a
-  balcony on each floor, all the way to the penthouse). Coming next: the lift, the laundry chute and the storm.
+  balcony on each floor, all the way to the penthouse). The **lift** in the north-west corner serves all four floors
+  (call it with **E** at its button, pick a floor inside; it opens onto the corridors, the lobby and the penthouse's
+  bedroom). The **laundry chute** in the linen rooms' corner drops you from any floor (crouch-jump into its hatch) or
+  the terrace down to the laundry behind the bar, onto a cart of laundry, fast but loud: everyone near hears the tube
+  rattle. Coming next: the storm.
 - **aim_map** — a small mirrored arena for quick fights, like the CS 1.6 classic. No bomb or hostages: a round ends
   when one team is wiped out (at the time limit, the side with more players alive wins, then the one with more
   health). Everyone gets free Kevlar + helmet each round, and an AWP (in the middle), AK-47, M4A1 and two Desert

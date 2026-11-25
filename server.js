@@ -1094,6 +1094,17 @@ function cctvTick(t) {
   sendGadgets();
 }
 
+// ---- the laundry chute (map.chute, Hotel Meridian): someone dropping down it rattles the steel tube (heard all round),
+// and lands with a thud on the laundry cart at the bottom.
+function chuteTick() {
+  const c = MAP.chute;
+  for (const p of players.values()) {
+    const inside = p.alive && p.p[0] > c.min[0] && p.p[0] < c.max[0] && p.p[2] > c.min[1] && p.p[2] < c.max[1];
+    if (inside && !p.chuting && p.p[1] > c.bottom + 1.5) { p.chuting = true; broadcast({ t: 'sfx', s: 'chute', p: p.p.map(r2) }); }
+    else if (p.chuting && (!inside || p.p[1] < c.bottom + 0.3)) { p.chuting = false; if (inside) broadcast({ t: 'sfx', s: 'chuteland', p: p.p.map(r2) }); }
+  }
+}
+
 // elevator: the lift in the Mansion (lib/elevator.js). motorStart: the motor sparks each time it starts (gas).
 const elevator = createElevator({
   map: () => MAP, world: () => world, now, players, game, send, broadcast, sendMines, sendSatchels,
@@ -3965,6 +3976,8 @@ function tick() {
 
   if (game.phase === 'live' && (isDM() || isGG())) mendPieces(t);
   if (MAP.mansion2) mansionTick(t);
+  else if (MAP.elevator) elevator.tick(t); // (Hotel Meridian's lift: the Mansion's runs inside mansionTick)
+  if (MAP.chute) chuteTick(); // Hotel Meridian: the laundry chute
   if (game.phase === 'warmup') {
     warmupRepairs(t);
     for (const p of players.values()) if (inTeam(p) && !p.alive && t - p.deathAt > 3000) { resetLoadout(p); spawnPlayer(p); }
