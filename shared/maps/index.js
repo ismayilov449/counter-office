@@ -5,8 +5,9 @@ import aim from './aim.js';
 import inferno from './inferno.js';
 import assault from './assault.js';
 import mansionNight from './mansion_night.js';
+import meridian from './hotel.js';
 
-export const MAPS = { [mansion.id]: mansion, [dusty.id]: dusty, [dust2.id]: dust2, [aim.id]: aim, [inferno.id]: inferno, [assault.id]: assault, [mansionNight.id]: mansionNight };
+export const MAPS = { [mansion.id]: mansion, [dusty.id]: dusty, [dust2.id]: dust2, [aim.id]: aim, [inferno.id]: inferno, [assault.id]: assault, [mansionNight.id]: mansionNight, [meridian.id]: meridian };
 export const MAP_IDS = Object.keys(MAPS);
 export const DEFAULT_MAP = mansion.id;
 
