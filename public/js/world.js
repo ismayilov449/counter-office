@@ -911,34 +911,79 @@ function cypress(s) {
   return g;
 }
 
-export function createCarModel(color) {
-  const g = new THREE.Group();
-  const body = lam(new THREE.Color(color).getHex());
-  g.add(mesh(new THREE.BoxGeometry(1.8, 0.7, 4.3), body, 0, 0.6, 0));
-  g.add(mesh(new THREE.BoxGeometry(1.6, 0.6, 2.2), new THREE.MeshLambertMaterial({ color: 0x1a2430 }), 0, 1.2, 0.2));
-  g.add(mesh(new THREE.BoxGeometry(1.62, 0.08, 2.0), body, 0, 1.52, 0.2));
-  const wheel = new THREE.CylinderGeometry(0.34, 0.34, 0.22, 12);
-  wheel.rotateZ(Math.PI / 2);
-  const wmat = lam(0x161616);
+// The fixed meshes straight under g that share a material become one (fewer draw calls on the Intel laptops); groups
+// (the wheels) and meshes in keep stay as they are.
+export function mergeByMaterial(g, keep = []) {
+  const byMat = new Map();
+  for (const o of [...g.children]) {
+    if (!o.isMesh || keep.includes(o)) continue;
+    o.updateMatrix();
+    if (!byMat.has(o.material)) byMat.set(o.material, []);
+    byMat.get(o.material).push(o);
+  }
+  for (const [mat, list] of byMat) {
+    if (list.length < 2) continue;
+    const geos = list.map(o => { const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); for (const k of Object.keys(geo.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') geo.deleteAttribute(k); if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2)); return geo.applyMatrix4(o.matrix); });
+    const m = new THREE.Mesh(mergeGeometries(geos), mat);
+    m.castShadow = list.some(o => o.castShadow);
+    m.receiveShadow = list.some(o => o.receiveShadow);
+    for (const o of list) { g.remove(o); o.geometry.dispose(); }
+    g.add(m);
+  }
+  return g;
+}
+
+// A car's side profile ([z, y] points, front -z) pushed out to `width` across, with its edges rounded a little.
+function sideProfile(points, width, mat, bevel = 0.04) {
+  const shape = new THREE.Shape(points.map(([z, y]) => new THREE.Vector2(z, y)));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: width - bevel * 2, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 4 });
+  geo.rotateY(-Math.PI / 2); // (the profile's x becomes the car's z, the push goes across)
+  geo.translate(width / 2 - bevel, 0, 0);
+  return mesh(geo, mat);
+}
+// Four wheels (a tyre, a silver rim, its hub) on steering mounts at the front: { spins, steers }.
+function carWheels(g, spots, r, w) {
+  const tyre = new THREE.CylinderGeometry(r, r, w, 18).rotateZ(Math.PI / 2), rim = new THREE.CylinderGeometry(r * 0.62, r * 0.62, w + 0.02, 14).rotateZ(Math.PI / 2);
+  const hub = new THREE.BoxGeometry(w + 0.04, r * 0.25, r * 1.1);
+  const tmat = lam(0x141414), rmat = lam(0xa8adb2), hmat = lam(0x55585c);
   const spins = [], steers = [];
-  for (const [x, z] of [[-0.85, -1.4], [0.85, -1.4], [-0.85, 1.4], [0.85, 1.4]]) {
+  for (const [x, z] of spots) {
     const steer = new THREE.Group();
-    steer.position.set(x, 0.34, z);
-    const spin = mesh(wheel, wmat);
-    spin.add(mesh(new THREE.BoxGeometry(0.23, 0.08, 0.5), lam(0x5a5a5a), 0, 0, 0, false));
+    steer.position.set(x, r, z);
+    const spin = mesh(tyre, tmat);
+    spin.add(mesh(rim, rmat, 0, 0, 0, false), mesh(hub, hmat, 0, 0, 0, false));
     steer.add(spin);
     g.add(steer);
     spins.push(spin);
     if (z < 0) steers.push(steer);
   }
-  const lightMat = new THREE.MeshBasicMaterial({ color: 0xfff4d0 });
-  for (const x of [-0.6, 0.6]) {
-    g.add(mesh(new THREE.BoxGeometry(0.35, 0.15, 0.05), lightMat, x, 0.7, -2.16, false));
-    g.add(mesh(new THREE.BoxGeometry(0.35, 0.12, 0.05), new THREE.MeshBasicMaterial({ color: 0xa01818 }), x, 0.72, 2.16, false));
+  return { spins, steers };
+}
+const carGlass = () => new THREE.MeshLambertMaterial({ color: 0x1c2a36, transparent: true, opacity: 0.82 });
+// Lights, bumpers and plates at the front (z0) and back (z1) of a car whose body is `w` wide.
+function carDetails(g, w, z0, z1, y) {
+  const head = new THREE.MeshBasicMaterial({ color: 0xfff4d0 }), tail = new THREE.MeshBasicMaterial({ color: 0xb01818 }), trim = lam(0x202224), plate = lam(0xe8e8e0);
+  for (const s of [-1, 1]) {
+    g.add(mesh(new THREE.BoxGeometry(0.34, 0.13, 0.06), head, s * (w / 2 - 0.3), y + 0.12, z0 - 0.01, false));
+    g.add(mesh(new THREE.BoxGeometry(0.3, 0.12, 0.06), tail, s * (w / 2 - 0.28), y + 0.14, z1 + 0.01, false));
   }
-  g.add(mesh(new THREE.BoxGeometry(0.4, 0.05, 0.05), lam(0x111111), -0.42, 1.0, -0.55, false));
-  g.userData = { spins, steers, roll: 0 };
-  return g;
+  g.add(mesh(new THREE.BoxGeometry(w * 0.42, 0.14, 0.05), trim, 0, y + 0.1, z0 - 0.02, false)); // (the grille)
+  for (const z of [z0 + 0.03, z1 - 0.03]) g.add(mesh(new THREE.BoxGeometry(w + 0.04, 0.16, 0.14), trim, 0, y - 0.12, z)); // (the bumpers)
+  for (const z of [z0 - 0.05, z1 + 0.05]) g.add(mesh(new THREE.BoxGeometry(0.42, 0.11, 0.02), plate, 0, y - 0.12, z, false));
+}
+
+export function createCarModel(color) {
+  const g = new THREE.Group();
+  const body = lam(new THREE.Color(color).getHex());
+  // the body: the bonnet, the doors and the boot in one profile; over it the glass cabin and its roof
+  g.add(sideProfile([[-2.15, 0.3], [-2.15, 0.72], [-1.95, 0.84], [-0.78, 0.95], [1.25, 0.95], [2.05, 0.9], [2.15, 0.74], [2.15, 0.3], [2.0, 0.2], [-2.0, 0.2]], 1.8, body));
+  g.add(sideProfile([[-0.78, 0.93], [-0.18, 1.42], [0.88, 1.42], [1.27, 0.93]], 1.58, carGlass(), 0.02));
+  g.add(sideProfile([[-0.16, 1.4], [0.86, 1.4], [0.84, 1.5], [-0.12, 1.5]], 1.62, body, 0.02));
+  for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.62, 0.06), body, s * 0.78, 1.18, 0.36, false)); // (the middle pillars)
+  for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.16, 0.1, 0.08), body, s * 0.95, 1.0, -0.72, false)); // (the mirrors)
+  carDetails(g, 1.8, -2.17, 2.17, 0.6);
+  g.userData = { ...carWheels(g, [[-0.85, -1.4], [0.85, -1.4], [-0.85, 1.4], [0.85, 1.4]], 0.34, 0.22), roll: 0 };
+  return mergeByMaterial(g);
 }
 
 // Pickup truck: cab in front, open bed behind with a PKT machine gun on a post.
@@ -946,37 +991,21 @@ export function createPickupModel(color) {
   const g = new THREE.Group();
   const body = lam(new THREE.Color(color).getHex());
   const dark = lam(0x1a1c1e);
-  g.add(mesh(new THREE.BoxGeometry(1.86, 0.62, 4.7), body, 0, 0.62, 0));                  // chassis
-  g.add(mesh(new THREE.BoxGeometry(1.72, 0.62, 1.55), new THREE.MeshLambertMaterial({ color: 0x1a2430 }), 0, 1.24, -0.75)); // cab windows
-  g.add(mesh(new THREE.BoxGeometry(1.76, 0.08, 1.5), body, 0, 1.58, -0.75));                // cab roof
-  g.add(mesh(new THREE.BoxGeometry(1.86, 0.3, 0.6), body, 0, 0.95, -1.95));                 // bonnet
-  for (const x of [-0.9, 0.9]) g.add(mesh(new THREE.BoxGeometry(0.08, 0.38, 2.1), body, x, 1.12, 1.25)); // bed sides
-  g.add(mesh(new THREE.BoxGeometry(1.86, 0.38, 0.08), body, 0, 1.12, 2.3));                 // tailgate
-  g.add(mesh(new THREE.BoxGeometry(1.7, 0.04, 2.1), dark, 0, 0.94, 1.25));                  // bed floor
+  // the bonnet and the cab's lower half, the cab's glass and roof, the load bed behind
+  g.add(sideProfile([[-2.35, 0.32], [-2.35, 0.84], [-2.1, 0.98], [-1.35, 1.04], [0.05, 1.04], [0.05, 0.32]], 1.86, body));
+  g.add(sideProfile([[-1.35, 1.02], [-0.95, 1.55], [-0.02, 1.55], [0.03, 1.02]], 1.7, carGlass(), 0.02));
+  g.add(sideProfile([[-0.93, 1.53], [-0.03, 1.53], [-0.05, 1.62], [-0.88, 1.62]], 1.74, body, 0.02));
+  g.add(mesh(new THREE.BoxGeometry(1.86, 0.55, 2.3), body, 0, 0.6, 1.2)); // (the bed's underside)
+  for (const x of [-0.9, 0.9]) g.add(mesh(new THREE.BoxGeometry(0.08, 0.4, 2.3), body, x, 1.08, 1.2)); // bed sides
+  g.add(mesh(new THREE.BoxGeometry(1.86, 0.4, 0.08), body, 0, 1.08, 2.33)); // tailgate
+  g.add(mesh(new THREE.BoxGeometry(1.7, 0.04, 2.2), dark, 0, 0.9, 1.2)); // bed floor
+  for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.16, 0.1, 0.08), body, s * 1.0, 1.1, -1.25, false)); // (the mirrors)
   // gun post and the PKT on top (the gunner holds it)
   g.add(mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.0, 8), dark, 0, 1.45, 0.45));
   g.add(mesh(new THREE.BoxGeometry(0.5, 0.06, 0.2), dark, 0, 1.95, 0.45));
-  const wheel = new THREE.CylinderGeometry(0.38, 0.38, 0.26, 12);
-  wheel.rotateZ(Math.PI / 2);
-  const wmat = lam(0x161616);
-  const spins = [], steers = [];
-  for (const [x, z] of [[-0.88, -1.55], [0.88, -1.55], [-0.88, 1.5], [0.88, 1.5]]) {
-    const steer = new THREE.Group();
-    steer.position.set(x, 0.38, z);
-    const spin = mesh(wheel, wmat);
-    spin.add(mesh(new THREE.BoxGeometry(0.27, 0.08, 0.55), lam(0x5a5a5a), 0, 0, 0, false));
-    steer.add(spin);
-    g.add(steer);
-    spins.push(spin);
-    if (z < 0) steers.push(steer);
-  }
-  const lightMat = new THREE.MeshBasicMaterial({ color: 0xfff4d0 });
-  for (const x of [-0.62, 0.62]) {
-    g.add(mesh(new THREE.BoxGeometry(0.35, 0.15, 0.05), lightMat, x, 0.82, -2.36, false));
-    g.add(mesh(new THREE.BoxGeometry(0.3, 0.12, 0.05), new THREE.MeshBasicMaterial({ color: 0xa01818 }), x, 0.9, 2.36, false));
-  }
-  g.userData = { spins, steers, roll: 0 };
-  return g;
+  carDetails(g, 1.86, -2.37, 2.37, 0.68);
+  g.userData = { ...carWheels(g, [[-0.88, -1.55], [0.88, -1.55], [-0.88, 1.5], [0.88, 1.5]], 0.38, 0.26), roll: 0 };
+  return mergeByMaterial(g);
 }
 
 // Spin wheels by distance driven and turn the front ones.

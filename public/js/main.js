@@ -2464,7 +2464,8 @@ document.addEventListener('keydown', e => {
     case 'KeyT': spray(); break;
     case 'KeyJ': if (me.alive && me.team !== 'SPEC') toggleMenu(emoteMenu); break;
     case 'KeyV':
-      if (me.driving != null) me.carCam = me.carCam === 'chase' ? 'seat' : 'chase';
+      if (heliC.piloting()) heliC.toggleView(); // heli: the cockpit or the chase camera
+      else if (me.driving != null) me.carCam = me.carCam === 'chase' ? 'seat' : 'chase';
       else if (me.alive && inTeamName(me.team)) { if (jammedHere()) hud.small(JAM_HINT, 2); else spotTarget(); }
       break;
     case 'KeyF':

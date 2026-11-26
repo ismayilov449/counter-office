@@ -3,17 +3,20 @@
 // pilot's controls and chase camera, a passenger's seat, the rotor's sound, the hints.
 import * as THREE from 'three';
 import { HELI, S, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround, nosePos } from '/shared/heli.js';
+import { mergeByMaterial } from './world.js';
 
-const ROTOR_Y = 3.7; // (over the street's 3.5 m walls when it stands on its pad)
+const ROTOR_Y = 2.95; // (the rotor's hub, full size: just over the engine)
+const EYE = [0.45, 1.6, -0.8]; // (the pilot's eyes in the cockpit, full size: right, up, back along +z)
 
 // Stage 2: the door gunners' PKTs (on the model, turned the way their gunners look), the fast rope (whoever slides down
 // it: the rope from the door to him; our own slide follows the server's path).
 // ctx: { me, game, scene, audio, hud, send(m), map(), coll(), keys(), remotes }
 export function createHeli(ctx) {
   const { me } = ctx;
-  let model = null, pad = null, rotor = null, tailRotor = null, view = null; // view: { p, yaw, tilt, roll, st, hp, fuel, seats }
+  let model = null, pad = null, rotor = null, tailRotor = null, paint = null, beacon = null, view = null; // view: { p, yaw, tilt, roll, st, hp, fuel, seats }
   let own = null; // the pilot's own flying: { p, yaw, v, tilt, roll, landed, engine, sent }
-  let cam = { yaw: 0, pitch: 0.25 }, spinA = 0, spinV = 0, last = 0, guns = [];
+  // the pilot's view: from the cockpit (look: the eyes' pitch) or chasing it from behind (pitch: the camera's height)
+  let cam = { yaw: 0, pitch: 0.25, look: -0.12, chase: false }, spinA = 0, spinV = 0, last = 0, guns = [];
   const ropes = new Map(); // stage 2: id -> { line, until } for whoever slides down the rope
   // the pilot's flares: bright sparks falling away from it for a few seconds
   const sparks = [];
@@ -66,14 +69,33 @@ export function createHeli(ctx) {
     if (model) { ctx.scene.remove(model, pad); model = pad = null; }
     const H = ctx.map().heli;
     if (!H) return;
-    const navy = new THREE.MeshLambertMaterial({ color: 0x1d2a44 }), dark = new THREE.MeshLambertMaterial({ color: 0x15181c });
-    const glass = new THREE.MeshLambertMaterial({ color: 0x8fb4d0, transparent: true, opacity: 0.35, depthWrite: false });
+    // (built at full size, front -z, drawn at shared/heli.js's S; its boxes in shared/heli.js stay a 2.0 x 4.4 body)
+    paint = new THREE.MeshLambertMaterial({ color: 0x1d2a44 });
+    const dark = new THREE.MeshLambertMaterial({ color: 0x15181c }), steel = new THREE.MeshLambertMaterial({ color: 0x7c8288 });
+    const white = new THREE.MeshLambertMaterial({ color: 0xd8dade }), seat = new THREE.MeshLambertMaterial({ color: 0x2b2d30 });
+    const glass = new THREE.MeshLambertMaterial({ color: 0x9fc4dc, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
     model = new THREE.Group();
-    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); model.add(m); return m; };
-    add(new THREE.BoxGeometry(2.0, 0.9, 4.4), navy, 0, 0.9, 0); // the body below the windows
-    add(new THREE.BoxGeometry(1.96, 1.0, 2.6), glass, 0, 1.85, -0.7); // the cockpit's glass (front: -z)
-    add(new THREE.BoxGeometry(2.0, 0.1, 1.8), navy, 0, 2.3, 1.3); // the cabin's back: its roof and back wall, the doors open each side
-    add(new THREE.BoxGeometry(2.0, 1.0, 0.1), navy, 0, 1.85, 2.15);
+    const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); model.add(m); return m; };
+    // the nose: a glass bubble over a painted chin (one sphere, its top and bottom halves), the windscreen's frame
+    add(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.98, 1.0, 1.15), glass, 0, 1.3, -1.0);
+    add(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.98, 0.75, 1.15), paint, 0, 1.3, -1.0);
+    add(new THREE.TorusGeometry(0.98, 0.035, 6, 24, Math.PI).scale(1, 1.0, 1), dark, 0, 1.3, -1.0, 0, 0, 0); // (the frame across its top)
+    add(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark, 0, 1.8, -1.95, -0.5); // (the centre post)
+    // the cabin: its floor and belly, the roof, the back wall, the posts each side of the open doors
+    add(new THREE.BoxGeometry(1.96, 0.75, 2.4), paint, 0, 0.92, 0.6);
+    add(new THREE.BoxGeometry(1.9, 0.1, 2.5), paint, 0, 2.3, 0.4);
+    add(new THREE.BoxGeometry(1.96, 1.4, 0.1), paint, 0, 1.6, 1.8);
+    for (const x of [-0.95, 0.95]) for (const z of [-0.35, 1.75]) add(new THREE.BoxGeometry(0.08, 1.4, 0.1), paint, x, 1.6, z);
+    add(new THREE.BoxGeometry(2.0, 0.12, 4.0), white, 0, 1.22, 0.1); // (a white stripe round it)
+    // the engine and its exhaust on the roof
+    add(new THREE.BoxGeometry(1.0, 0.45, 1.9), paint, 0, 2.58, 0.9);
+    add(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 10), dark, 0.25, 2.65, 1.95, Math.PI / 2);
+    // inside: the instrument panel (its screens glow), two seats in front and a bench behind, the pilot's stick
+    add(new THREE.BoxGeometry(1.5, 0.3, 0.35), dark, 0, 1.25, -1.45, -0.4);
+    for (const x of [-0.35, 0.35]) add(new THREE.PlaneGeometry(0.3, 0.18), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.34, -1.27, -0.4 - Math.PI / 2 + Math.PI / 2);
+    for (const x of [-0.45, 0.45]) { add(new THREE.BoxGeometry(0.55, 0.12, 0.55), seat, x, 0.95, -0.85); add(new THREE.BoxGeometry(0.55, 0.65, 0.1), seat, x, 1.3, -0.55, 0.15); }
+    add(new THREE.BoxGeometry(1.6, 0.12, 0.6), seat, 0, 0.95, 1.4); add(new THREE.BoxGeometry(1.6, 0.6, 0.1), seat, 0, 1.3, 1.7);
+    add(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), dark, 0.45, 1.15, -1.15, -0.3);
     guns = GUNNERS.map(i => { // the door guns: a receiver and a barrel on a pivot in each door
       const g = new THREE.Group(), side = SEATS[i][0] >= 0 ? 1 : -1;
       g.position.set(side * 1.02, 1.5, -SEATS[i][2]);
@@ -84,17 +106,35 @@ export function createHeli(ctx) {
       model.add(g);
       return g;
     });
-    add(new THREE.BoxGeometry(0.5, 0.6, 3.8), navy, 0, 1.65, 4.1); // the tail boom
-    add(new THREE.BoxGeometry(0.12, 1.2, 0.8), navy, 0, 2.3, 5.8); // the fin
-    for (const x of [-0.85, 0.85]) add(new THREE.BoxGeometry(0.1, 0.08, 4.2), dark, x, 0.04, 0); // the skids
-    add(new THREE.CylinderGeometry(0.09, 0.09, ROTOR_Y - 2.35, 8), dark, 0, (ROTOR_Y + 2.35) / 2, 0); // the mast
+    // the tail: a boom thinning towards its end, the stabiliser across it, the fin raked back, "SWAT" on each side
+    add(new THREE.CylinderGeometry(0.16, 0.34, 4.0, 12), paint, 0, 1.75, 3.75, Math.PI / 2);
+    add(new THREE.BoxGeometry(1.5, 0.06, 0.4), paint, 0, 1.75, 4.9);
+    add(new THREE.BoxGeometry(0.08, 1.1, 0.6), paint, 0, 2.25, 5.65, 0.35);
+    const label = document.createElement('canvas');
+    label.width = 128; label.height = 32;
+    const lg = label.getContext('2d');
+    lg.fillStyle = '#e8e8e8'; lg.font = 'bold 26px sans-serif'; lg.textAlign = 'center'; lg.textBaseline = 'middle'; lg.fillText('SWAT', 64, 17);
+    const word = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(label), transparent: true, depthWrite: false });
+    for (const s of [-1, 1]) add(new THREE.PlaneGeometry(1.3, 0.32), word, s * 0.29, 1.76, 3.1, 0, s * Math.PI / 2);
+    beacon = add(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2010 }), 0, 2.8, 5.85);
+    // the skids: two tubes turned up at the front, two struts each side up to the belly
+    for (const x of [-0.85, 0.85]) {
+      add(new THREE.CylinderGeometry(0.05, 0.05, 3.6, 8), steel, x, 0.05, 0.2, Math.PI / 2);
+      add(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8), steel, x, 0.2, -1.75, Math.PI / 2 - 0.6);
+      for (const z of [-0.9, 1.2]) add(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), steel, x * 0.85, 0.35, z, 0, 0, x > 0 ? 0.3 : -0.3);
+    }
+    // the mast and hub over the engine, two long thin blades
+    add(new THREE.CylinderGeometry(0.08, 0.1, ROTOR_Y - 2.8, 8), dark, 0, (ROTOR_Y + 2.8) / 2, 0);
     rotor = new THREE.Group();
     rotor.position.set(0, ROTOR_Y, 0);
-    for (const a of [0, Math.PI / 2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(HELI.rotor * 2, 0.04, 0.28), dark); b.rotation.y = a; rotor.add(b); }
+    rotor.add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 10), dark));
+    for (const a of [0, Math.PI]) { const b = new THREE.Mesh(new THREE.BoxGeometry(HELI.rotor, 0.03, 0.22), dark); b.position.x = Math.cos(a) * HELI.rotor / 2; b.position.z = -Math.sin(a) * HELI.rotor / 2; rotor.add(b); }
     model.add(rotor);
-    tailRotor = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.3, 0.16), dark);
-    tailRotor.position.set(0.12, 2.3, 5.9);
+    tailRotor = new THREE.Group();
+    tailRotor.position.set(0.12, 2.3, 5.75);
+    for (const a of [0, Math.PI / 2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 1.1, 0.1), dark); b.rotation.x = a; tailRotor.add(b); }
     model.add(tailRotor);
+    mergeByMaterial(model, [beacon]); // (one mesh per material for the fixed parts: the rotors, the door guns and the light move)
     model.scale.setScalar(S); // (built at full size, drawn at shared/heli.js's S)
     ctx.scene.add(model);
     // the pad: a white H in a circle on the street
@@ -118,7 +158,7 @@ export function createHeli(ctx) {
         me.heli = { seat: m.seat };
         own = null;
         if (m.seat === 0) own = { p: m.h.p.slice(), yaw: m.h.yaw, v: m.h.v.slice(), tilt: 0, roll: 0, landed: true, engine: !m.h.out, sent: 0 };
-        cam = { yaw: 0, pitch: 0.25 };
+        cam = { yaw: 0, pitch: 0.25, look: -0.12, chase: cam.chase };
       },
       heliOut(m) { me.heli = null; own = null; me.p = m.p.slice(); me.v = [0, 0, 0]; me.onGround = false; me.viewY = me.p[1]; },
       slide(m) {
@@ -188,7 +228,8 @@ export function createHeli(ctx) {
     mouse(dx, dy, k) {
       if (!pilotNow()) return false;
       own.yaw -= dx * k;
-      cam.pitch = Math.max(-0.3, Math.min(1.2, cam.pitch + dy * k));
+      if (cam.chase) cam.pitch = Math.max(-0.3, Math.min(1.2, cam.pitch + dy * k));
+      else cam.look = Math.max(-1.2, Math.min(0.6, cam.look - dy * k));
       return true;
     },
     // Our own movement in it (true: handled): the pilot flies; a passenger sits.
@@ -219,9 +260,17 @@ export function createHeli(ctx) {
       me.v = [0, 0, 0]; me.crouch = true; me.eyeH = 1.0; me.onGround = true; me.jumpQueued = false; me.viewY = me.p[1];
       return true;
     },
-    // The pilot's chase camera (true when it set it).
+    // V flying: the cockpit or the chase camera.
+    toggleView() { cam.chase = !cam.chase; ctx.hud.small(cam.chase ? 'Chase camera (V: the cockpit)' : 'Cockpit (V: the chase camera)', 1.5); },
+    // The pilot's camera (true when it set it): from his seat, looking out through the glass; or from behind.
     camera(camera) {
       if (!pilotNow()) return false;
+      if (!cam.chase) {
+        const c = Math.cos(own.yaw), s = Math.sin(own.yaw), [ex, ey, ez] = EYE.map(v => v * S);
+        camera.position.set(own.p[0] + ex * c + ez * s, own.p[1] + ey, own.p[2] - ex * s + ez * c);
+        camera.rotation.set(cam.look + (own.tilt || 0), own.yaw, -(own.roll || 0), 'YXZ');
+        return true;
+      }
       const t = [own.p[0], own.p[1] + 1.3, own.p[2]], yaw = own.yaw + cam.yaw, p = cam.pitch;
       const dir = [Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)];
       const hit = ctx.coll().raycast(t, dir, 8, 'solid'), d = hit ? Math.max(1.5, hit.t - 0.3) : 8;
@@ -234,7 +283,7 @@ export function createHeli(ctx) {
       if (me.alive && me.heli) {
         const fuel = Math.ceil(view.fuel), hull = view.hp, gun = GUNNERS.includes(me.heli.seat), q = view.st === 1 ? '' : gun ? ' · Q: leave the gun' : ' · Q: a door gun';
         return me.heli.seat === 0
-          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · Mouse1 rocket (${view.rockets}) · G flares (${view.flares}) · W/S A/D fly · Space up · Ctrl down · E: get out${q}`
+          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · Mouse1 rocket (${view.rockets}) · G flares (${view.flares}) · W/S A/D fly · Space up · Ctrl down · V: view · E: get out${q}`
           : `${gun ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}${q}`;
       }
       if (!me.alive || (me.team !== 'CT' && me.team !== 'T') || view.st >= 2) return null;
@@ -269,7 +318,8 @@ export function createHeli(ctx) {
       rotor.rotation.y = spinA;
       tailRotor.rotation.x = spinA * 1.7;
       model.visible = true;
-      model.children[0].material.color.setHex(view.st === 3 ? 0x1a1a1a : 0x1d2a44);
+      paint.color.setHex(view.st === 3 ? 0x1a1a1a : 0x1d2a44);
+      beacon.visible = view.st !== 3 && Math.floor(now / 600) % 2 === 0; // (the tail's red light blinks)
       // the door guns turn the way their gunners look; an empty one points out of its door
       for (const g of guns) {
         const id = view.seats?.[g.userData.seat], r = id && (id === me.id ? me : ctx.remotes.get(id));
