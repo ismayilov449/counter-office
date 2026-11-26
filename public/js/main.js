@@ -290,7 +290,7 @@ const haunt = createHaunt({ me, game, hud, audio, send: m => net.send(m), map: (
   liftY: () => elevator.cabinY(), showLights: L => { world?.setLights(L); setRooms(map.rooms, L); } });
 const safeC = createSafe({ me, game, scene, map: () => map }); // safe: ROADMAP 16.1
 const rope = createRope({ me, game, scene, map: () => map, remotes }); // rope: ROADMAP 16.2
-const heliC = createHeli({ me, game, scene, audio, hud, send: m => net.send(m), map: () => map, coll: () => coll, keys: () => keys, remotes }); // heli: ROADMAP 18
+const heliC = createHeli({ me, game, scene, audio, hud, send: m => net.send(m), map: () => map, coll: () => coll, keys: () => keys, remotes, camera }); // heli: ROADMAP 18
 const locks = createLocks({ me, game, send: m => net.send(m), map: () => map }); // locks: locked doors (Mansion maps)
 const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels, scene });
 let dropList = [];

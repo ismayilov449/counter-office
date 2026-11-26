@@ -19,6 +19,48 @@ export function createHeli(ctx) {
   const sparks = [];
   let sparkTex = null, rocketAt = 0;
   const _dir = new THREE.Vector3();
+  // Where a rocket would go now: toward what the middle of the screen is on, or locked onto an enemy near it (within
+  // LOCK radians of the middle, in sight of the nose); { o, d, at (where it hits), locked }.
+  const LOCK = 0.09;
+  function aimAt(camera) {
+    camera.getWorldDirection(_dir);
+    const c = [camera.position.x, camera.position.y, camera.position.z], d = [_dir.x, _dir.y, _dir.z], coll = ctx.coll();
+    const o = nosePos(own);
+    let target = null, best = LOCK;
+    for (const r of ctx.remotes.values()) {
+      if (!r.alive || r.team === me.team || !r.buf?.length) continue;
+      const q = [r.p[0], r.p[1] + 1.0, r.p[2]], v = [q[0] - c[0], q[1] - c[1], q[2] - c[2]], l = Math.hypot(...v);
+      const ang = Math.acos(Math.min(1, (v[0] * d[0] + v[1] * d[1] + v[2] * d[2]) / l));
+      if (ang >= best || l > 200) continue;
+      const w = [q[0] - o[0], q[1] - o[1], q[2] - o[2]], lw = Math.hypot(...w), h = coll.raycast(o, w.map(x => x / lw), lw, 'bullet', 'heli');
+      if (h && h.t < lw - 0.5) continue; // (a wall between the nose and him)
+      best = ang; target = q;
+    }
+    if (!target) { const h = coll.raycast(c, d, 250, 'bullet', 'heli'), t = h ? h.t : 250; target = [c[0] + d[0] * t, c[1] + d[1] * t, c[2] + d[2] * t]; }
+    const w = [target[0] - o[0], target[1] - o[1], target[2] - o[2]], lw = Math.hypot(...w) || 1, dir = w.map(x => x / lw);
+    const h = coll.raycast(o, dir, lw + 1, 'bullet', 'heli'), t = h ? Math.min(h.t, lw) : lw; // (what the rocket would really hit first)
+    return { o, d: dir, at: [o[0] + dir[0] * t, o[1] + dir[1] * t, o[2] + dir[2] * t], locked: best < LOCK };
+  }
+  // the pilot's target marker: drawn over everything where the rocket would hit; red when locked onto someone
+  let marker = null;
+  function markerAt(a) {
+    if (!marker) {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d');
+      g.strokeStyle = '#fff'; g.lineWidth = 4;
+      g.beginPath(); g.arc(32, 32, 22, 0, Math.PI * 2); g.stroke();
+      for (const [x1, y1, x2, y2] of [[32, 2, 32, 16], [32, 48, 32, 62], [2, 32, 16, 32], [48, 32, 62, 32]]) { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+      marker = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }));
+      marker.scale.setScalar(0.05);
+      marker.renderOrder = 10;
+      ctx.scene.add(marker);
+    }
+    marker.visible = !!a;
+    if (!a) return;
+    marker.position.set(a.at[0], a.at[1], a.at[2]);
+    marker.material.color.setHex(a.locked ? 0xff3020 : view.rockets > 0 ? 0xffffff : 0x777777);
+    marker.scale.setScalar(a.locked ? 0.065 : 0.05);
+  }
 
   function build() {
     if (model) { ctx.scene.remove(model, pad); model = pad = null; }
@@ -126,11 +168,8 @@ export function createHeli(ctx) {
       if (now < rocketAt) return;
       if (!(view.rockets > 0)) { ctx.hud.small('No rockets left', 1.5); return; }
       rocketAt = now + HELI.rocketGap * 1000;
-      camera.getWorldDirection(_dir);
-      const c = [camera.position.x, camera.position.y, camera.position.z], d = [_dir.x, _dir.y, _dir.z];
-      const hit = ctx.coll().raycast(c, d, 250, 'bullet', 'heli'), t = hit ? hit.t : 250;
-      const o = nosePos(own), aim = [c[0] + d[0] * t - o[0], c[1] + d[1] * t - o[1], c[2] + d[2] * t - o[2]], l = Math.hypot(...aim) || 1;
-      ctx.send({ t: 'heliRocket', d: aim.map(v => Math.round((v / l) * 1000) / 1000) });
+      const a = aimAt(camera);
+      ctx.send({ t: 'heliRocket', d: a.d.map(v => Math.round(v * 1000) / 1000) });
       ctx.audio.play('shot', null, 'rpg26');
     },
     // G flying: flares.
@@ -247,6 +286,7 @@ export function createHeli(ctx) {
         pos.setXYZ(1, who.p[0], who.p[1] + 1.6, who.p[2]);
         pos.needsUpdate = true;
       }
+      markerAt(pilotNow() && view.st < 2 && ctx.camera ? aimAt(ctx.camera) : null); // (the pilot: where a rocket would go)
       for (let i = sparks.length - 1; i >= 0; i--) {
         const k = sparks[i], age = (now - k.t0) / 1000;
         if (age > 2.5) { ctx.scene.remove(k.s); k.s.material.dispose(); sparks.splice(i, 1); continue; }
