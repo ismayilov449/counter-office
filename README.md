@@ -884,8 +884,8 @@ still gets found, a phone that moves stays fuzzy.**
 - **Getting in:** a CT presses **E** by it while it stands or hovers low. The first one in flies it, and up to 4 more
   ride along. **E** gets you out. From up high you fall, and the landing hurts. **Q** on the ground moves you to a free
   door gun and back, like the pickup's gun.
-- **Flying:** **W/S** forward and back, **A/D** sideways, **Space** up, **Ctrl** down, the mouse turns it. You see it
-  from behind, and the pilot can't shoot. It lands on anything flat: the street, the garden, the east balcony, the roof.
+- **Flying:** **W/S** forward and back, **A/D** sideways, **Space** up, **Ctrl** down, the mouse turns it. You fly it
+  from the cockpit, looking out through the glass (**V** switches to a camera behind it). The pilot has no gun. It lands on anything flat: the street, the garden, the east balcony, the roof.
   Its tail is long, and it won't turn into a wall.
 - **Fuel:** 90 s in the air (it doesn't burn on the ground). When it runs out, the engine stops and it drops.
 - **Damage:**
