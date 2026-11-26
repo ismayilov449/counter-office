@@ -18,7 +18,7 @@ export const HELI = {
 };
 // Seats: [right, up, forward] from its base (the skids' bottom, in the middle): the pilot (front right), a passenger,
 // the two door gunners (in the open doors, each on a mounted PKT: GUNNERS), a passenger.
-export const SEATS = [[0.45, 0.45, 1.0], [-0.45, 0.45, 1.0], [0.75, 0.45, -0.5], [-0.75, 0.45, -0.5], [0, 0.45, -1.3]].map(s => s.map(v => v * S));
+export const SEATS = [[0.45, 0.45, 0.75], [-0.45, 0.45, 0.75], [0.75, 0.45, -0.5], [-0.75, 0.45, -0.5], [0, 0.45, -1.3]].map(s => s.map(v => v * S));
 export const GUNNERS = [2, 3];
 export const ROCKET = { damage: 300, blast: 5, rocketSpeed: 45 }; // (on top of the RPG-26's: its blast tables, its kill icon)
 // Where its rockets leave: under the nose.

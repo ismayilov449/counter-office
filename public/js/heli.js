@@ -6,7 +6,7 @@ import { HELI, S, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround, nose
 import { mergeByMaterial } from './world.js';
 
 const ROTOR_Y = 2.95; // (the rotor's hub, full size: just over the engine)
-const EYE = [0.45, 1.6, -0.8]; // (the pilot's eyes in the cockpit, full size: right, up, back along +z)
+const EYE = [0.45, 1.6, -0.55]; // (the pilot's eyes in the cockpit, full size: right, up, back along +z)
 
 // Stage 2: the door gunners' PKTs (on the model, turned the way their gunners look), the fast rope (whoever slides down
 // it: the rope from the door to him; our own slide follows the server's path).
@@ -163,30 +163,31 @@ export function createHeli(ctx) {
     add(new THREE.BoxGeometry(1.0, 0.45, 1.9), paint, 0, 2.58, 0.9);
     add(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 10), dark, 0.25, 2.65, 1.95, Math.PI / 2);
     // inside: the instrument panel (its screens glow), two seats in front and a bench behind, the pilot's stick
-    add(new THREE.BoxGeometry(1.5, 0.3, 0.35), dark, 0, 1.25, -1.45, -0.4);
-    for (const x of [-0.52, 0.52]) add(new THREE.PlaneGeometry(0.28, 0.18), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.34, -1.27, -0.4);
+    // (small and low, well under the pilot's eyes: the glass ahead of him stays clear)
+    add(new THREE.BoxGeometry(1.1, 0.16, 0.3), dark, 0, 1.12, -1.5, -0.4);
+    for (const x of [-0.42, 0.42]) add(new THREE.PlaneGeometry(0.18, 0.11), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.18, -1.36, -0.4);
     // the moving map in front of the pilot: the radar's own picture (the HUD's canvas, copied a few times a second)
     // the flight display in front of the pilot (drawn by mfd(): a moving map turning with it, the compass, the readouts)
     if (ctx.hud.el) {
       mfdCanvas = document.createElement('canvas');
       mfdCanvas.width = mfdCanvas.height = 256;
       mapTex = new THREE.CanvasTexture(mfdCanvas);
-      add(new THREE.PlaneGeometry(0.42, 0.42), new THREE.MeshBasicMaterial({ map: mapTex, transparent: true, opacity: 0.72, depthWrite: false }), 0, 1.38, -1.25, -0.4); // (in the middle of the panel, a little see-through)
+      add(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshBasicMaterial({ map: mapTex, transparent: true, opacity: 0.72, depthWrite: false }), 0, 1.22, -1.33, -0.4); // (in the middle of the panel, a little see-through)
     }
     // the pilot's own legs (only we see them, from his seat: everyone else sees his body sitting there)
     legs = new THREE.Group();
     const trousers = new THREE.MeshLambertMaterial({ color: 0x2a3038 }), boots = new THREE.MeshLambertMaterial({ color: 0x141414 });
     for (const dx of [-0.12, 0.12]) {
-      const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.14, 0.48), trousers); thigh.position.set(0.45 + dx, 1.08, -1.05);
-      const shin = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.46, 0.13), trousers); shin.position.set(0.45 + dx, 0.85, -1.33); shin.rotation.x = -0.35;
-      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.26), boots); boot.position.set(0.45 + dx, 0.62, -1.46);
+      const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.14, 0.48), trousers); thigh.position.set(0.45 + dx, 1.08, -0.8);
+      const shin = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.46, 0.13), trousers); shin.position.set(0.45 + dx, 0.85, -1.08); shin.rotation.x = -0.35;
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.26), boots); boot.position.set(0.45 + dx, 0.62, -1.21);
       legs.add(thigh, shin, boot);
     }
-    for (const dx of [-0.12, 0.12]) add(new THREE.BoxGeometry(0.12, 0.03, 0.16), dark, 0.45 + dx, 0.55, -1.5); // (the pedals)
+    for (const dx of [-0.12, 0.12]) add(new THREE.BoxGeometry(0.12, 0.03, 0.16), dark, 0.45 + dx, 0.55, -1.25); // (the pedals)
     model.add(legs);
-    for (const x of [-0.45, 0.45]) { add(new THREE.BoxGeometry(0.55, 0.12, 0.55), seat, x, 0.95, -0.85); add(new THREE.BoxGeometry(0.55, 0.65, 0.1), seat, x, 1.3, -0.55, 0.15); }
+    for (const x of [-0.45, 0.45]) { add(new THREE.BoxGeometry(0.55, 0.12, 0.55), seat, x, 0.95, -0.6); add(new THREE.BoxGeometry(0.55, 0.65, 0.1), seat, x, 1.3, -0.3, 0.15); } // (25 cm further back than they were: more glass ahead)
     add(new THREE.BoxGeometry(1.6, 0.12, 0.6), seat, 0, 0.95, 1.4); add(new THREE.BoxGeometry(1.6, 0.6, 0.1), seat, 0, 1.3, 1.7);
-    add(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), dark, 0.45, 1.15, -1.15, -0.3);
+    add(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), dark, 0.45, 1.15, -0.9, -0.3);
     guns = GUNNERS.map(i => { // the door guns: a receiver and a barrel on a pivot in each door
       const g = new THREE.Group(), side = SEATS[i][0] >= 0 ? 1 : -1;
       g.position.set(side * 1.02, 1.5, -SEATS[i][2]);
