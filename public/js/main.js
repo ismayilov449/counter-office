@@ -327,7 +327,7 @@ function weaponOf(slot) {
   }
 }
 // The pickup's gunner always uses the mounted machine gun.
-const current = () => (me.riding?.gunner || heliC.gunner() ? 'pkt' : weaponOf(me.slot) || 'knife'); // (heli: its door gunners too)
+const current = () => (me.riding?.gunner || heliC.gunner() || heliC.piloting() ? 'pkt' : weaponOf(me.slot) || 'knife'); // (heli: its door gunners and its pilot's nose gun too)
 const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me.inv[me.slot] : null);
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
 const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker', 'c4'];
@@ -481,13 +481,14 @@ function fireRocket(id, def, now) {
 
 function fireBullet(id, def, now) {
   if (def.rocket) { fireRocket(id, def, now); return; }
-  const o = eyePos();
-  const base = aimDir(me.yaw + me.punchY, me.pitch + me.punchP);
+  const nose = heliC.aim(camera); // heli: the pilot's nose gun, from under the nose to the marker
+  const o = nose ? nose.o : eyePos();
+  const base = nose ? nose.d : aimDir(me.yaw + me.punchY, me.pitch + me.punchP);
   const spread = computeSpread(def);
   const dirs = def.pellets
     ? Array.from({ length: def.pellets }, () => applySpread(base, def.pelletSpread + spread))
     : [applySpread(base, spread)];
-  const muzzle = viewMuzzleWorld();
+  const muzzle = nose ? nose.o : viewMuzzleWorld();
   for (const d of dirs) {
     const tr = localTrace(o, d, 250);
     walls.localShot(o, d, id, tr.hitR ? tr.t : 250); // walls: holes in the walls it goes through (not past someone it hit)
@@ -2302,7 +2303,7 @@ function takeScreenshot() {
 }
 
 document.addEventListener('mousemove', e => {
-  if (!locked || !me.alive) return;
+  if (!locked || (!me.alive && !haunt.floating())) return; // (haunt: a ghost looks round with the mouse too)
   const k = 0.0022 * settings.sens * (camera.fov / BASE_FOV);
   if (gadgets.mouseMove(e.movementX, e.movementY, k)) return; // (watching a camera: it turns)
   if (heliC.mouse(e.movementX, e.movementY, k)) return; // heli: flying, the mouse turns it
@@ -2333,7 +2334,7 @@ document.addEventListener('mousedown', e => {
     return;
   }
   if (gadgets.busy() && me.alive && e.button !== 1) { gadgets.mouseDown(e.button); return; }
-  if (heliC.piloting() && e.button !== 1) { if (e.button === 0) heliC.rocket(camera); return; } // heli: the pilot fires a nose rocket (no guns) // (on a gadget: no shooting or throwing; at the CCTV desk the buttons switch cameras)
+  if (heliC.piloting() && e.button === 2) return; // heli: the pilot's Mouse1 fires the nose gun (below, as any gun) // (on a gadget: no shooting or throwing; at the CCTV desk the buttons switch cameras)
   if (me.drone && me.alive) {
     if (e.button === 0) droneBomb();
     else if (e.button === 2) droneDive();
@@ -3434,7 +3435,7 @@ function updateLocal(dt, now) {
   elevator.local(dt, now); // elevator: in the lift we ride up and down with it (before we move)
   if (gadgets.local(dt, now)) return;
   if (rope.local()) return; // rope: swinging in, along the server's path
-  if (heliC.local(dt)) { if (!heliC.piloting()) seatedFire(dt, now); return; } // heli: the pilot flies it; a passenger sits, a door gunner fires the PKT (as in a car)
+  if (heliC.local(dt)) { seatedFire(dt, now); return; } // heli: the pilot flies it and fires the nose PKT; a passenger sits, a door gunner fires the PKT (as in a car)
   if (stealth.local(dt, now)) return; // stealth: in a car's trunk you go where it goes (no walking, no shooting)
   if (me.drone) { updateDroneFlight(dt, now); return; }
   if (me.driving != null && me.car) { updateDriving(dt, now); return; }

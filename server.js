@@ -18,7 +18,7 @@ const ZOMBIE = { hp: 1000, motherHp: 2000, countdown: 12, respawn: 4 };
 // Party modes the admin can switch on (see CFG.party).
 const PARTY_WEAPONS = ['', 'awp', 'deagle', 'scout', 'ak47', 'knife', 'rpg'];
 import { CAR, carBoxes, seatPos, exitSpots } from './shared/vehicles.js';
-import { HELI, ROCKET } from './shared/heli.js';
+import { HELI } from './shared/heli.js';
 import { CollisionWorld } from './shared/collision.js';
 import { skyOf } from './shared/maps/sky.js';
 import { doorBox, doorCenter, doorReach, openingSide, GONE } from './shared/doors.js';
@@ -1621,8 +1621,7 @@ const rope = createRope({ game, players, map: () => MAP, world: () => world, now
 // heli: the SWAT helicopter (ROADMAP 18; Mansion maps; lib/heli.js)
 const heli = createHeli({ game, players, map: () => MAP, world: () => world, now, send, broadcast, notify: (...a) => notify(...a),
   killPlayer: (q, by, w) => killPlayer(q, by, w, false), applyDamage: (...a) => applyDamage(...a), lineOfSight: (a, b) => lineOfSight(a, b),
-  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w),
-  launch: (p, o, d) => launchRocket(p, o, d, { ...WEAPONS.rpg26, ...ROCKET }, 'rpg26') }); // (the pilot's nose rockets)
+  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w) });
 // locks: locked doors (Mansion maps; lib/locks.js)
 const locks = createLocks({ game, players, map: () => MAP, world: () => world, now, send, broadcast, nearestDoor: (p, max) => nearestDoor(p, max),
   speed: (p, t) => cc.speed(p, t), kickOpen: (i, side, by) => cc.slam(i, side, by) });
@@ -2443,7 +2442,7 @@ function onShoot(p, m) {
   if (def.mounted) {
     // the truck's machine gun: only its gunner, and it never runs out
     const truck = carOf(p);
-    if (heli.gunner(p)) { /* heli: a door gunner's PKT */ } else if (!truck || truck.type !== 'pickup' || truck.riders[0] !== p.id || truck.wrecked) return;
+    if (heli.gunner(p)) { if (!heli.aimOk(p, dirs[0])) return; /* heli: a door gunner's or the pilot's PKT, not into its own cabin */ } else if (!truck || truck.type !== 'pickup' || truck.riders[0] !== p.id || truck.wrecked) return;
   } else if (!def.melee) {
     item = ownItem(p, w);
     if (!item || item.mag <= 0) return;
@@ -3934,7 +3933,6 @@ function handle(p, m) {
       break;
     case 'heli': heli.pilot(p, m, t); break; // heli: the pilot's browser, where it is
     case 'heliHit': heli.hit(p, m); break; // heli: it hit something
-    case 'heliRocket': heli.rocket(p, m, t); break; // heli: the pilot's nose rocket
     case 'heliFlare': heli.flare(p, t); break; // heli: the pilot's flares
     case 'heliSeat': heli.swap(p); break; // heli: Q on the ground, to a door gun and back
     case 'zip':

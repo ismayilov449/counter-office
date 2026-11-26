@@ -476,7 +476,9 @@ to win the round; the helicopter is for flying and shooting, never for winning.
 ## 20. The pilot's weapons (both Mansion maps, added 2026-11-26) — **built 2026-11-26**
 
 1. **Nose rockets.** Mouse 1 flying: a rocket from under the nose toward the middle of the screen (4 a round, 1.2 s
-   apart; 300 damage, a 5 m blast).
+   apart; 300 damage, a 5 m blast). **Replaced on 2026-11-26 at the user's request** by a nose PKT (Mouse 1 held, the
+   marker shows where it hits, fires within 1 rad of ahead); the door guns were limited to 1.1 rad either side of their
+   doors (they could shoot their own pilot).
 2. **Flares.** G flying (2 a round): for 3 s rockets fired at it fly past, and their blasts don't hurt it.
 
 **Left out (offered, not chosen):** a searchlight, a tracker scan and spotting from the air, a supply drop, the winch

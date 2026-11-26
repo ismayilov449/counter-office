@@ -2,7 +2,7 @@
 // lib/heli.js): its model and pad, where it is (the snapshot's hl, smoothed; the pilot's own flying is ours), the
 // pilot's controls and chase camera, a passenger's seat, the rotor's sound, the hints.
 import * as THREE from 'three';
-import { HELI, S, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround, nosePos } from '/shared/heli.js';
+import { HELI, S, SEATS, GUNNERS, GUN_ARC, gunYaw, seatPos, heliBoxes, stepHeli, heliGround, nosePos } from '/shared/heli.js';
 import { mergeByMaterial } from './world.js';
 
 const ROTOR_Y = 2.95; // (the rotor's hub, full size: just over the engine)
@@ -21,33 +21,22 @@ export function createHeli(ctx) {
   const ropes = new Map(); // stage 2: id -> { line, until } for whoever slides down the rope
   // the pilot's flares: bright sparks falling away from it for a few seconds
   const sparks = [];
-  let sparkTex = null, rocketAt = 0;
+  let sparkTex = null;
   const _dir = new THREE.Vector3();
-  // Where a rocket would go now: toward what the middle of the screen is on, or locked onto an enemy near it (within
-  // LOCK radians of the middle, in sight of the nose); { o, d, at (where it hits), locked }.
-  const LOCK = 0.09;
+  // Where the nose gun's bullets go now: from under the nose toward what the middle of the screen is on; { o, d, at
+  // (where they hit) }.
   function aimAt(camera) {
     camera.getWorldDirection(_dir);
     const c = [camera.position.x, camera.position.y, camera.position.z], d = [_dir.x, _dir.y, _dir.z], coll = ctx.coll();
     const o = nosePos(own);
-    let target = null, best = LOCK;
-    for (const r of ctx.remotes.values()) {
-      if (!r.alive || r.team === me.team || !r.buf?.length) continue;
-      const q = [r.p[0], r.p[1] + 1.0, r.p[2]], v = [q[0] - c[0], q[1] - c[1], q[2] - c[2]], l = Math.hypot(...v);
-      const ang = Math.acos(Math.min(1, (v[0] * d[0] + v[1] * d[1] + v[2] * d[2]) / l));
-      if (ang >= best || l > 200) continue;
-      const w = [q[0] - o[0], q[1] - o[1], q[2] - o[2]], lw = Math.hypot(...w), h = coll.raycast(o, w.map(x => x / lw), lw, 'bullet', 'heli');
-      if (h && h.t < lw - 0.5) continue; // (a wall between the nose and him)
-      best = ang; target = q;
-    }
-    if (!target) { const h = coll.raycast(c, d, 250, 'bullet', 'heli'), t = h ? h.t : 250; target = [c[0] + d[0] * t, c[1] + d[1] * t, c[2] + d[2] * t]; }
+    const hc = coll.raycast(c, d, 250, 'bullet', 'heli'), tc = hc ? hc.t : 250, target = [c[0] + d[0] * tc, c[1] + d[1] * tc, c[2] + d[2] * tc];
     const w = [target[0] - o[0], target[1] - o[1], target[2] - o[2]], lw = Math.hypot(...w) || 1, dir = w.map(x => x / lw);
-    const h = coll.raycast(o, dir, lw + 1, 'bullet', 'heli'), t = h ? Math.min(h.t, lw) : lw; // (what the rocket would really hit first)
-    return { o, d: dir, at: [o[0] + dir[0] * t, o[1] + dir[1] * t, o[2] + dir[2] * t], locked: best < LOCK };
+    const h = coll.raycast(o, dir, lw + 1, 'bullet', 'heli'), t = h ? Math.min(h.t, lw) : lw; // (what the bullets would really hit first)
+    return { o, d: dir, at: [o[0] + dir[0] * t, o[1] + dir[1] * t, o[2] + dir[2] * t] };
   }
   // The flight display (256 px): a map round it, 40 m each way, heading up and turning with it (the HUD radar's picture
   // of the map and its dots), the compass ring, the heading on top; height over the ground and speed each side; fuel
-  // and hull bars and what's left of the rockets and flares at the bottom.
+  // and hull bars and the flares left at the bottom.
   function mfd() {
     const g = mfdCanvas.getContext('2d'), h = own, hud = ctx.hud, W = 256, cx = 128, cy = 132, R = 92;
     g.fillStyle = '#05080a'; g.fillRect(0, 0, W, W);
@@ -84,7 +73,7 @@ export function createHeli(ctx) {
     bar(W - 34, 'FUEL', view.fuel / HELI.fuel, view.fuel < 20 ? '#ff5030' : '#ffd040');
     bar(W - 18, 'HULL', view.hp / 100, view.hp < 35 ? '#ff5030' : '#60d080');
     g.textAlign = 'right'; g.fillStyle = '#ffffff'; g.font = 'bold 13px Consolas, monospace';
-    g.fillText('R' + (view.rockets ?? 0) + '  F' + (view.flares ?? 0), W - 10, W - 22);
+    g.fillText('F' + (view.flares ?? 0), W - 10, W - 22);
   }
   // In it (the pilot and the door gunners): a red diamond over every enemy it has a clear line to, so the ones down
   // below between the hedges and on the roofs stand out. (Their lines are checked 8 times a second.)
@@ -116,7 +105,7 @@ export function createHeli(ctx) {
       s.visible = l < 150 && !(h && h.t < l - 0.6);
     }
   }
-  // the pilot's target marker: drawn over everything where the rocket would hit; red when locked onto someone
+  // the pilot's target marker: drawn over everything where the nose gun's bullets would hit
   let marker = null;
   function markerAt(a) {
     if (!marker) {
@@ -133,8 +122,6 @@ export function createHeli(ctx) {
     marker.visible = !!a;
     if (!a) return;
     marker.position.set(a.at[0], a.at[1], a.at[2]);
-    marker.material.color.setHex(a.locked ? 0xff3020 : view.rockets > 0 ? 0xffffff : 0x777777);
-    marker.scale.setScalar(a.locked ? 0.065 : 0.05);
   }
 
   function build() {
@@ -286,8 +273,8 @@ export function createHeli(ctx) {
     },
     snapshot(hl) {
       if (!hl || !view) return;
-      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0, rockets = 0, flares = 0] = hl;
-      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side], rockets, flares });
+      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0, flares = 0] = hl;
+      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side], flares });
       if (st >= 2 && own) own.engine = false; // (falling or wrecked: the server has it now)
       if (st >= 2 && me.heli?.seat === 0) own = null;
     },
@@ -296,17 +283,8 @@ export function createHeli(ctx) {
     // main.js, before the HUD radar: its dots (teammates, enemies seen, hostages) for the cockpit's display.
     radar(mates, enemies, hostages) { radarData = { mates, enemies, hostages }; },
     // Q in it: on the ground, to a door gun and back (like the pickup's gun).
-    // Mouse1 flying: a nose rocket toward what the middle of the screen is on.
-    rocket(camera) {
-      if (!pilotNow() || view.st >= 2) return;
-      const now = performance.now();
-      if (now < rocketAt) return;
-      if (!(view.rockets > 0)) { ctx.hud.small('No rockets left', 1.5); return; }
-      rocketAt = now + HELI.rocketGap * 1000;
-      const a = aimAt(camera);
-      ctx.send({ t: 'heliRocket', d: a.d.map(v => Math.round(v * 1000) / 1000) });
-      ctx.audio.play('shot', null, 'rpg26');
-    },
+    // main.js fireBullet, flying: where the nose PKT fires from and to (null: not the pilot).
+    aim: camera => (pilotNow() && view.st < 2 ? aimAt(camera) : null),
     // G flying: flares.
     flare() {
       if (!pilotNow() || view.st >= 2) return;
@@ -352,6 +330,7 @@ export function createHeli(ctx) {
       }
       const h = shown();
       if (h) me.p = seatPos(h, me.heli.seat);
+      if (h && GUNNERS.includes(me.heli.seat)) { const a = gunYaw(h.yaw, me.heli.seat), r = Math.atan2(Math.sin(me.yaw - a), Math.cos(me.yaw - a)); if (Math.abs(r) > GUN_ARC) me.yaw = a + Math.sign(r) * GUN_ARC; } // (a door gun turns only so far: never into the cabin)
       me.v = [0, 0, 0]; me.crouch = true; me.eyeH = 1.0; me.onGround = true; me.jumpQueued = false; me.viewY = me.p[1];
       return true;
     },
@@ -378,7 +357,7 @@ export function createHeli(ctx) {
       if (me.alive && me.heli) {
         const fuel = Math.ceil(view.fuel), hull = view.hp, gun = GUNNERS.includes(me.heli.seat), q = view.st === 1 ? '' : gun ? ' · Q: leave the gun' : ' · Q: a door gun';
         return me.heli.seat === 0
-          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · Mouse1 rocket (${view.rockets}) · G flares (${view.flares}) · W/S A/D fly · Space up · Ctrl down · V: view · E: get out${q}`
+          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · Mouse1 nose gun · G flares (${view.flares}) · W/S A/D fly · Space up · Ctrl down · V: view · E: get out${q}`
           : `${gun ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}${q}`;
       }
       if (!me.alive || (me.team !== 'CT' && me.team !== 'T') || view.st >= 2) return null;
@@ -431,7 +410,7 @@ export function createHeli(ctx) {
         pos.setXYZ(1, who.p[0], who.p[1] + 1.6, who.p[2]);
         pos.needsUpdate = true;
       }
-      markerAt(pilotNow() && view.st < 2 && ctx.camera ? aimAt(ctx.camera) : null); // (the pilot: where a rocket would go)
+      markerAt(pilotNow() && view.st < 2 && ctx.camera ? aimAt(ctx.camera) : null); // (the pilot: where the nose gun's bullets go)
       if (mapTex && me.heli?.seat === 0 && now - mapAt > 100) { mapAt = now; mfd(); mapTex.needsUpdate = true; } // (the cockpit's display, while we fly)
       legs.visible = me.alive && me.heli?.seat === 0;
       targets(now);

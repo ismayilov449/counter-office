@@ -853,7 +853,7 @@ still gets found, a phone that moves stays fuzzy.**
 ## Ghosts and rigged doors (Mansion maps)
 
 - **Ghosts.** Killed this round? Press **G** to float free as a ghost: **WASD** flies, **Space** goes up and **Ctrl**
-  goes down, straight through walls. **G** again goes back to watching your teammates. **Once a round**, near a living
+  goes down, straight through walls, the way you look with the mouse. **G** again goes back to watching your teammates. **Once a round**, near a living
   enemy (within 10 m), you can haunt them:
   - **1:** three hard knocks on the wall you're looking at;
   - **2:** the lights of the room you're in flicker;
@@ -895,14 +895,14 @@ still gets found, a phone that moves stays fuzzy.**
 - **Shot down:** it spins down and explodes, killing whoever is still inside. If the pilot jumps out in the air,
   nobody is flying it, and it falls the same way.
 - **Door gunners.** The two seats in its open side doors each have a mounted **PKT** machine gun: aim with the mouse,
-  hold Mouse 1, no reloads. The helicopter's own body doesn't block their shots, so they can fire straight down.
+  hold Mouse 1, no reloads. The helicopter's own body doesn't block their shots, so they can fire straight down. Each
+  gun turns only about 65° either way from straight out of its door, so a gunner can't shoot into the cabin or the pilot.
 - **The fast rope.** A passenger (not the pilot) pressing **E** while it hovers up high and slowly (under 4 m/s)
   slides down a rope from the door to whatever is below (the street, the garden, the roof) at 6 m/s, unhurt. Everyone
   sees the rope. Going faster, or low over the ground, E is a plain jump.
-- **The pilot's weapons.** **Mouse 1** fires a rocket from under the nose: 4 a round, 1.2 s apart, a bit lighter than
-  an RPG's. A **target marker** shows where it will hit (the middle of your screen). With an enemy near the middle and
-  in sight, it **locks on**: the marker jumps onto them and turns red, and the rocket goes to them. **G** fires flares (2 a round): for 3 s, rockets fired at it fly past and
-  their blasts don't hurt it. The bottom line shows how many of each are left.
+- **The pilot's weapons.** Hold **Mouse 1** to fire the **PKT** under the nose (no reloads; it fires ahead, not out to
+  the sides). A **target marker** shows where its bullets will hit (the middle of your screen). **G** fires flares (2 a
+  round): for 3 s, rockets fired at it fly past and their blasts don't hurt it.
 - **Steal it.** It belongs to the CTs, but its pad is behind the house, and Terrorists can get in too: whichever side
   gets in first has it (everyone is told when it's stolen), to fly it and shoot from it. It never wins or loses a
   round. While the Terrorists have it, the CTs' bullets and rockets hurt it, and the Terrorists' don't.

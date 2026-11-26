@@ -44,8 +44,8 @@ const n0 = got(carol, 'heliIn').length;
 carol.send({ t: 'heliSeat' });
 await sleep(400);
 ok('in the air, Q changes nothing', got(carol, 'heliIn').length === n0);
-// Dave fires the door gun at Bob below
-bob.at([H.p[0], 0, H.p[2] + 6], 0, 0);
+// Dave fires the door gun at Bob below, out of his door (its right, +x: the gun turns only so far)
+bob.at([H.p[0] + 4, 0, H.p[2] + 3], 0, 0);
 await sleep(300);
 const drow = carol.snap.pl.find(r => r[0] === daveId);
 const eye = [drow[1], drow[2] + 1.0, drow[3]];
