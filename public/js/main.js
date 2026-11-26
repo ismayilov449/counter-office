@@ -3400,7 +3400,8 @@ const gadgets = createGadgets({
   power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
 Object.assign(net.handlers, locks.handlers); // locks
-Object.assign(net.handlers, safeC.handlers, rope.handlers, heliC.handlers); // (heli: heliIn, heliOut, heliFuel, slide, slideEnd) // safe: safe; rope: rope, ropeEnd
+Object.assign(net.handlers, safeC.handlers, rope.handlers, heliC.handlers); // (heli: heliIn, heliOut, heliFuel, slide, slideEnd)
+for (const k of ['heliIn', 'heliOut', 'slide']) { const f = net.handlers[k]; net.handlers[k] = m => { f(m); refreshViewModel(); }; } // (heli: a seat changed: the gun in our hands, the door gunner's PKT) // safe: safe; rope: rope, ropeEnd
 Object.assign(net.handlers, haunt.handlers); // haunt: haunt, hauntUsed, rigs
 Object.assign(net.handlers, trk.handlers); // phone tracker: trk, trkScan, trkInfo, trkHit
 Object.assign(net.handlers, storm.handlers); // storm: a lightning strike
@@ -3414,26 +3415,31 @@ Object.assign(net.handlers, betUI.handlers); // bet feature: betOk, betNo, betNe
 
 // ---------------------------------------------------------------- per-frame updates
 
+// Sitting in a car or the helicopter: shooting out of it (the pickup's and the helicopter's gunners on their PKT).
+function seatedFire(dt, now) {
+  const canFire = game.phase !== 'freeze' && !ui.chat && locked && !me.act;
+  if (mouse1 && canFire) tryFire(now);
+  if (me.reload && now >= me.reload.until) finishReload();
+  if (now - me.lastFire > (WEAPONS[current()].rate || 0.1) * 1000 + 150) {
+    if (!mouse1) me.shotsFired = 0;
+    const k = Math.min(1, dt * 7);
+    me.punchP -= me.punchP * k;
+    me.punchY -= me.punchY * k;
+  }
+}
+
 function updateLocal(dt, now) {
   if (!me.alive) return;
   elevator.local(dt, now); // elevator: in the lift we ride up and down with it (before we move)
   if (gadgets.local(dt, now)) return;
   if (rope.local()) return; // rope: swinging in, along the server's path
-  if (heliC.local(dt)) return; // heli: the pilot flies it, a passenger sits
+  if (heliC.local(dt)) { if (!heliC.piloting()) seatedFire(dt, now); return; } // heli: the pilot flies it; a passenger sits, a door gunner fires the PKT (as in a car)
   if (stealth.local(dt, now)) return; // stealth: in a car's trunk you go where it goes (no walking, no shooting)
   if (me.drone) { updateDroneFlight(dt, now); return; }
   if (me.driving != null && me.car) { updateDriving(dt, now); return; }
   if (me.riding) {
     updateRiding();
-    const canFire = game.phase !== 'freeze' && !ui.chat && locked && !me.act;
-    if (mouse1 && canFire) tryFire(now);
-    if (me.reload && now >= me.reload.until) finishReload();
-    if (now - me.lastFire > (WEAPONS[current()].rate || 0.1) * 1000 + 150) {
-      if (!mouse1) me.shotsFired = 0;
-      const k = Math.min(1, dt * 7);
-      me.punchP -= me.punchP * k;
-      me.punchY -= me.punchY * k;
-    }
+    seatedFire(dt, now);
     return;
   }
   const moveBoxes = coll.move(null, me.p, 2);
