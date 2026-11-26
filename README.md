@@ -877,7 +877,7 @@ still gets found, a phone that moves stays fuzzy.**
   smashing the glass, and land on the floor inside. Everyone sees the rope, and you can be shot while you swing. (Get
   onto the roof by the ladders: from the ground to the east balcony, then up to the roof.)
 
-## The SWAT helicopter (Mansion maps, CTs)
+## The SWAT helicopter (Mansion maps)
 
 - **Where:** every round it waits on its pad (a white H) on the back garden's lawn, behind the house. It's a small
   helicopter, about 4 m long with its tail.
@@ -899,6 +899,11 @@ still gets found, a phone that moves stays fuzzy.**
 - **The fast rope.** A passenger (not the pilot) pressing **E** while it hovers up high and slowly (under 4 m/s)
   slides down a rope from the door to whatever is below (the street, the garden, the roof) at 6 m/s, unhurt. Everyone
   sees the rope. Going faster, or low over the ground, E is a plain jump.
+- **Steal it (the Terrorists' way out).** It belongs to the CTs, but its pad is behind the house, and Terrorists can
+  get in too: whichever side gets in first has it (everyone is told when it's being stolen). A Terrorist pilot who
+  gets it **11 m up or higher and keeps it there for 8 s** gets away: **the Terrorists win the round**. Everyone sees
+  the countdown, and dropping below 11 m stops it. While the Terrorists have it, the CTs' bullets and rockets hurt it,
+  and the Terrorists' don't.
 
 ## Locked doors, the estate gate and scope glint
 

@@ -1621,7 +1621,7 @@ const rope = createRope({ game, players, map: () => MAP, world: () => world, now
 // heli: the SWAT helicopter (ROADMAP 18; Mansion maps; lib/heli.js)
 const heli = createHeli({ game, players, map: () => MAP, world: () => world, now, send, broadcast, notify: (...a) => notify(...a),
   killPlayer: (q, by, w) => killPlayer(q, by, w, false), applyDamage: (...a) => applyDamage(...a), lineOfSight: (a, b) => lineOfSight(a, b),
-  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w) });
+  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w), win: (team, why) => endRound(team, why) });
 // locks: locked doors (Mansion maps; lib/locks.js)
 const locks = createLocks({ game, players, map: () => MAP, world: () => world, now, send, broadcast, nearestDoor: (p, max) => nearestDoor(p, max),
   speed: (p, t) => cc.speed(p, t), kickOpen: (i, side, by) => cc.slam(i, side, by) });
@@ -2516,7 +2516,7 @@ function onShoot(p, m) {
     traces.push([r3(d[0]), r3(d[1]), r3(d[2]), r2(best ? best.t : wallT), best ? 1 : 0, !best && wall ? 1 : 0]);
     if (best) hits.push({ ...best, d });
     else if (wall && wall.box.car != null && !def.melee) damageCar(world.cars[wall.box.car], def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p);
-    else if (wall && wall.box.heli && !def.melee && p.team !== 'CT') heli.damage(def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p); // heli: a bullet on its metal (CTs' own don't hurt it)
+    else if (wall && wall.box.heli && !def.melee && p.team !== (heli.side() || 'CT')) heli.damage(def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p); // heli: a bullet on its metal (its own side's don't hurt it; empty, it's the CTs')
     else if (wall && wall.box.door != null && MAP.doors[wall.box.door]?.weak) shootDoor(wall.box.door, def.melee ? def.damage * 2 : def.damage);
     else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
