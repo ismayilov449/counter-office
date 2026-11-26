@@ -5,9 +5,9 @@ import { WEAPONS, ITEMS, BUY_COLUMNS, GRENADES, FIRE, GUNGAME, availableTo, item
 import { SurfaceGrid } from './surfaces.js';
 import { RADIO } from '/shared/radio.js';
 import { PLAYER, movePlayer, overlapsAny, overlapsBox, raycastMap, rayPlayer, ladderAt, ladderPull, ladderExit, inWater } from '/shared/physics.js';
-import { CAR, seatPos, stepCar } from '/shared/vehicles.js';
+import { CAR, seatPos, stepCar, carForward } from '/shared/vehicles.js';
 import { CollisionWorld } from '/shared/collision.js';
-import { doorCenter } from '/shared/doors.js';
+import { doorCenter, doorBox, GONE } from '/shared/doors.js';
 import { buildWorld, QUALITY, createCarModel, createPickupModel, animateCar } from './world.js';
 import { setRooms, setGlow, ambientAt, glowAt, maskLamps, setNvg } from './roomlight.js';
 import { ESCAPE } from '/shared/hostage-escape.js'; // escape: hostages try to escape, zip ties
@@ -43,6 +43,8 @@ import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play 
 import { initWounds, wounds } from './wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
 import { createTrackerClient } from './phonetracker.js';
 import { createHaunt } from './haunt.js';
+import { createLocks } from './locks.js';
+import { glint, dropGlint } from './glint.js';
 import { createStorm } from './storm.js'; // Hotel Meridian's storm: rain, lightning, thunder // phone tracker (ROADMAP 14): the CTs' scans, the holder's screen
 import { TRACKER } from '/shared/phonetracker.js';
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
@@ -281,6 +283,7 @@ const storm = createStorm({ scene, renderer, audio, camera, map: () => map });
 // haunt: ghosts, grenades tied to doors and the lift (Mansion maps)
 const haunt = createHaunt({ me, game, hud, audio, send: m => net.send(m), map: () => map, keys: () => keys, coll: () => coll, scene,
   liftY: () => elevator.cabinY(), showLights: L => { world?.setLights(L); setRooms(map.rooms, L); } });
+const locks = createLocks({ me, game, send: m => net.send(m), map: () => map }); // locks: locked doors (Mansion maps)
 const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels, scene });
 let dropList = [];
 let plantedBomb = null;
@@ -1572,6 +1575,7 @@ function addRemote(id, team) {
 
 function removeRemote(r) {
   scene.remove(r.model);
+  dropGlint(scene, r); // scope glint
   disposeOwn(r.model);
   if (r.mortarSet) scene.remove(r.mortarSet);
   remotes.delete(r.id);
@@ -1645,7 +1649,8 @@ function updateRemotes(dt) {
       r.deadT += dt;
       r.model.rotation.x = Math.min(Math.PI / 2, r.deadT * 5);
     }
-    r.model.userData.light.visible = alive && !!r.fl;
+    r.model.userData.light.visible = alive && !!(r.fl & 1);
+    glint(scene, r, alive && !!(r.fl & 2) && !!WEAPONS[s.w]?.sniper && !killcam, camera.position); // scope glint: scoped in with a sniper rifle (snapshot flags: 2)
     setFaded(r.model, alive && r.hidden && !isMate(r));
     // far away, a body's shadow isn't worth drawing
     const near = camera.position.distanceToSquared(r.model.position) < 900;
@@ -1870,6 +1875,7 @@ function updateDriving(dt, now) {
     steer: frozen ? 0 : (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
     handbrake: keys.has('Space'),
   };
+  ramDoors(c);
   const crash = stepCar(c, input, dt, coll.move(c.id, c.p, 8));
   if (crash > 5) {
     audio.play('crash', [c.p[0], c.p[1] + 0.5, c.p[2]]);
@@ -1888,6 +1894,23 @@ function updateDriving(dt, now) {
     const r3 = v => Math.round(v * 1000) / 1000;
     net.send({ t: 'car', id: c.id, p: c.p.map(r3), yaw: r3(c.yaw), speed: r3(c.speed), steer: r3(c.steer) });
   }
+}
+
+// A closed door marked ram just ahead of the car's nose at speed: it's smashed (here at once, so we drive on through;
+// the server checks and tells everyone).
+function ramDoors(c) {
+  if (Math.abs(c.speed) < CAR.ram) return;
+  const f = carForward(c.yaw).map(v => v * Math.sign(c.speed)), reach = CAR.offsets[2] + CAR.radius + 0.35;
+  const nose = [c.p[0] + f[0] * reach, c.p[2] + f[2] * reach];
+  (map.doors || []).forEach((d, i) => {
+    if (!d.ram || game.doors?.[i] !== 0) return;
+    const b = doorBox(d, 0), dx = Math.max(b.min[0] - nose[0], 0, nose[0] - b.max[0]), dz = Math.max(b.min[2] - nose[1], 0, nose[1] - b.max[2]);
+    if (Math.hypot(dx, dz) > 0.45 || c.p[1] + 0.5 < b.min[1] || c.p[1] > b.max[1]) return;
+    net.send({ t: 'ram', car: c.id, door: i, speed: Math.round(c.speed * 100) / 100 });
+    const s = game.doors.slice();
+    s[i] = GONE;
+    applyDoors(s);
+  });
 }
 
 // Passenger: sit in the car, look around freely and shoot out of the window.
@@ -2434,6 +2457,7 @@ document.addEventListener('keydown', e => {
       if (me.alive) { me.flashlight = !me.flashlight; audio.play('click'); }
       break;
     case 'KeyH': if (me.alive) toggleCamo(); break;
+    case 'KeyL': locks.key(); break; // locks: a Terrorist locks / unlocks the door he's at
     case 'KeyP': bleed.bandage(); break; // blood trails: bandage
     case 'KeyK': body.key(); break; // body: play dead
     case 'KeyN':
@@ -3358,6 +3382,7 @@ const gadgets = createGadgets({
   scene, me, net, audio, hud, fx, remotes, serverNow, stopEmote: () => stopEmote(),
   power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
+Object.assign(net.handlers, locks.handlers); // locks
 Object.assign(net.handlers, haunt.handlers); // haunt: haunt, hauntUsed, rigs
 Object.assign(net.handlers, trk.handlers); // phone tracker: trk, trkScan, trkInfo, trkHit
 Object.assign(net.handlers, storm.handlers); // storm: a lightning strike
@@ -3809,6 +3834,7 @@ function updateHud(now) {
     hint = shieldHint(hint); // shield: grab / let go / held
     hint = tieHint(hint); // escape: a crouched Terrorist zip-ties (before the shield, as on the server)
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
+    hint = locks.hint(hint); // locks: a locked door from outside, L for Terrorists
     hint = haunt.useHint(hint, current()); // haunt: a grenade tied to a door or the lift (before the doors, as on the server)
     hint = cc.hint(hint); // closecombat: an enemy's back within reach (over the lift, as on the server); a door: kick it running, crouch + hold E to hold it shut
   }
@@ -3818,6 +3844,7 @@ function updateHud(now) {
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
   else if (me.act && elevator.progress(me.act.a)) hud.progress(elevator.progress(me.act.a), me.act.pr); // elevator
+  else if (me.act && locks.progress(me.act.a)) hud.progress(locks.progress(me.act.a), me.act.pr); // locks: picking
   else if (me.act && haunt.progress(me.act.a)) hud.progress(haunt.progress(me.act.a), me.act.pr); // haunt: tying a grenade, taking one off
   else if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
@@ -3875,7 +3902,7 @@ function sendState(now) {
   const yaw = me.car ? me.car.yaw + me.camYaw : me.yaw;
   if (me.riding) me.crouch = !me.riding.gunner;
   if (me.drone) me.crouch = true;
-  net.send({ t: 'state', sq: me.spawnSeq, p: me.p.map(r3), yaw: r3(yaw), pitch: r3(me.car ? 0 : me.pitch), c: me.crouch ? 1 : 0, w: current(), fl: me.flashlight ? 1 : 0, mo: me.mortar ? Math.round(me.mortar.elev) : 0 });
+  net.send({ t: 'state', sq: me.spawnSeq, p: me.p.map(r3), yaw: r3(yaw), pitch: r3(me.car ? 0 : me.pitch), c: me.crouch ? 1 : 0, w: current(), fl: (me.flashlight ? 1 : 0) | (me.scope && WEAPONS[current()].sniper ? 2 : 0), mo: me.mortar ? Math.round(me.mortar.elev) : 0 });
 }
 
 function saveScreenshot() {

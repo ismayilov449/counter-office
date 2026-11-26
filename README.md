@@ -867,6 +867,21 @@ still gets found, a phone that moves stays fuzzy.**
 - **The rigged lift.** The same, inside the lift's cabin while it stands at a floor. It goes off when the lift's doors
   next open at **another** floor, and goes off 1 s later.
 
+## Locked doors, the estate gate and scope glint
+
+- **Locked doors (Mansion maps).** Every round, 2 of the house's 4 outer doors (front, south, back, the kitchen's door
+  from the garage) start locked. The Terrorists have the keys: they open them as usual, and **L** locks or unlocks the
+  closed door they're at. From the inside anyone can open a locked door. From the outside, CTs can:
+  - **pick the lock:** crouch and hold **E** for 6 s, and the Terrorists inside hear it clicking;
+  - **kick it in:** run into it with **E**, 3 loud kicks;
+  - **blow it:** any explosion within 3 m breaks the lock.
+- **The estate gate.** Two steel leaves now close the gateway from the CT street. It starts shut but unlocked (E opens
+  it), and the Terrorists can lock it with L.
+- **Ram it.** The CTs have a car on their street. Drive it into the gate or the garage's roller door at speed and it
+  smashes open (the car takes a knock).
+- **Scope glint (every map).** A player scoped in with a sniper rifle flashes a bright glint toward whoever they aim
+  at. It's brighter the closer the aim, and you can see it from any distance.
+
 ## Bots
 
 Bots fill the teams up to **8 vs 8** (change it in the admin panel or with `BOTS`): with 6 people playing there are 10

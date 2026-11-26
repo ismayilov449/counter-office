@@ -317,7 +317,7 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
     brush(x2, dh, d1, x2 + T, top, d2, { '+x': ext, '-x': int, bottom: int }, ['top', '-z', '+z']);
     brush(x1 - T, top, z1, x2 + T, roof, z2, { top: 'x_gravel', bottom: int, side: 'x_trim' }, ['-z', '+z']);
     // the roller door, and its drum under the ceiling
-    doors.push({ roller: { min: [x2 + 0.07, d1], max: [x2 + 0.18, d2], y: 0, h: dh }, tex: 'roller', slow: 2.0 });
+    doors.push({ roller: { min: [x2 + 0.07, d1], max: [x2 + 0.18, d2], y: 0, h: dh }, tex: 'roller', slow: 2.0, ram: true }); // (ram: a car driven into it at speed smashes it, server.js onRam)
     brush(x2 - 0.35, dh + 0.05, d1, x2, top - 0.05, d2, 'x_metal', ['+x'], false);
     // the side door from the kitchen (between the filing cabinet and the window) and three concrete steps down
     const k1 = -22.05, k2 = -21.05, ktop = 3.0, wall = [-14.43, -14.02];
@@ -601,6 +601,10 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   addPower({ carve, brush, ladders, keep, solid: (...b) => solids.push(...b) }); // power: the machine room on the roof, the roof ladder, the generator's solid (mansion_power.js)
   addTowers({ keep, solid: (...b) => solids.push(...b) }); // phone tracker: the cell towers' masts and cabinets (mansion_phonetracker.js)
   addStealth({ carve, unface, face, brush, decor, keep }); // stealth: the fireplace and chimney (shared/maps/mansion_stealth.js)
+  // The estate gate (ROADMAP 17): two steel leaves in the gateway of the east wall (x 23.27..24.08, z -3.25..1.63),
+  // shut at the round start, opened with E like any door. The Terrorists can lock it (shared/locks.js: from the street
+  // a key is needed); a car driven into it at speed smashes it open (ram).
+  for (const [z, dir] of [[-3.25, 1], [1.63, -1]]) doors.push({ axis: 'z', dir, len: 2.44, h: 2.4, hinge: [23.67, 0, z], tex: 'metal', lock: 1, lockOpen: true, ram: true });
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
   return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv, elevator }; // (elevator: + elevator)
 }

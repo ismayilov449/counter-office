@@ -5,6 +5,7 @@ import { raycastMap } from './physics.js';
 export const CAR = {
   maxSpeed: 17, maxReverse: 6, accel: 9, brake: 18, drag: 3, handbrake: 22,
   wheelBase: 2.6, maxSteer: 0.6, step: 0.62, radius: 0.95, height: 1.45,
+  ram: 6, ramDamage: 120, // (a door marked ram, driven into at ram m/s or more, smashes: server.js onRam)
   offsets: [-1.3, 0, 1.3], enterRange: 3.2,
   // Seat 0 is the driver; 1 and 2 are passengers. Bullets and grenades wear the car down until it explodes.
   seats: 3, hp: 400, blastRadius: 7,

@@ -133,6 +133,9 @@ const DOORS = BSP.DOORS.map((d, id) => {
   const len = axis === 'x' ? x2 - x1 : z2 - z1;
   return { id, axis, dir: 1, len, h: y2 - y1 - 0.02, hinge: [d.origin[0], y1, d.origin[2]], tex: 'door1' };
 }).concat(RM.doors.map((d, i) => ({ id: BSP.DOORS.length + i, ...d })));
+// Locked doors (ROADMAP 17, shared/locks.js): the house's outer doors, each with the side its key is needed from (the
+// front door, the south door, the back door, the kitchen's door from the garage).
+for (const [i, out] of [[0, 1], [1, 1], [2, -1], [7, -1]]) DOORS[i].lock = out;
 
 // ---- lights: one lamp per original light (the two lampa10 bulbs share one), switched by the wall buttons
 const seen = new Set();
@@ -220,6 +223,7 @@ export default {
   vehicles: [
     { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },
     { p: [-19.75, -17.9], y: 1, yaw: -Math.PI / 2, color: '#7a1e1a' },
+    { p: [26.4, -11], yaw: Math.PI, color: '#1d2a44' }, // (the CTs' car on the street, facing the gate: ROADMAP 17, ram it)
   ],
   labels: {},
   // The zip line from the neighbour's roof to the roof terrace (see mansion2.js and shared/gadgets.js).
