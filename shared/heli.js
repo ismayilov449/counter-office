@@ -8,7 +8,7 @@
 // Its size: everything below is in the full-size model's metres times S (the user found it too big to fly, 2026-11-26).
 export const S = 0.7;
 export const HELI = {
-  speed: 13, side: 7, climb: 4.5, accel: 7, fall: 9.8, ceiling: 12.6, // (the map's sky is at 15.65: the rotor's top stays under it)
+  speed: 13, side: 7, climb: 4.5, accel: 7, fall: 9.8, ceiling: 14, // (the map's sky slab over the house is at 15.65, and bullets stop there: the gunners' eyes stay under it)
   fuel: 90, hp: 1500, rpg: 800, crash: 9, hard: 6, hurt: 90, // (an impact over `hard` m/s costs `hurt` hp per m/s over it)
   reach: 3.0, low: 2.5, blast: 9, spin: 2.6, rotor: 4.3, // (rotor: the full-size model's)
   slide: 6, ropeMax: 4, // (stage 2: down the rope at `slide` m/s, while it moves slower than `ropeMax` m/s)
@@ -76,9 +76,29 @@ export function heliGround(boxes, p, yaw) {
   return g;
 }
 
+// What it bumps into in the air (the user kept touching things up there, 2026-11-26): the BSP map seals its sky with
+// invisible boxes (over the house, and above the estate walls up to 20 m); each box reaching that high is cut down to
+// the top of what's drawn inside it (nothing drawn: gone). map.heli.area keeps it over the estate instead (stepHeli).
+const SEAL = 15.5, cut = new WeakMap(), drawn = new WeakMap();
+function trim(map, b) {
+  if (!b.hidden || b.max[1] < SEAL || !map.faces) return b;
+  if (cut.has(b)) return cut.get(b);
+  if (!drawn.has(map)) drawn.set(map, [...Object.values(map.faces), ...Object.values(map.staticFaces || {})].flat());
+  let top = -Infinity;
+  for (const f of drawn.get(map)) for (let i = 0; i < f.length; i += 5) {
+    const x = f[i], y = f[i + 1], z = f[i + 2];
+    if (x >= b.min[0] - 0.05 && x <= b.max[0] + 0.05 && z >= b.min[2] - 0.05 && z <= b.max[2] + 0.05 && y >= b.min[1] - 0.05 && y <= b.max[1] + 0.05) top = Math.max(top, y);
+  }
+  const t = top > b.min[1] + 0.05 ? { ...b, max: [b.max[0], top, b.max[2]] } : null;
+  cut.set(b, t);
+  return t;
+}
+export const airBoxes = (map, boxes) => boxes.map(b => trim(map, b)).filter(Boolean);
+
 // One step of the pilot's flying. input: { fwd, side, up } (-1..1); engine: false when it's out of fuel (it drops).
 // Returns the speed of a crash into something or onto the ground (0: none). h: { p, yaw, v, tilt, roll, landed }.
-export function stepHeli(h, input, dt, boxes, engine = true) {
+// area: [[x0, z0], [x1, z1]] it stays inside (map.heli.area; a soft edge, no crash).
+export function stepHeli(h, input, dt, boxes, engine = true, area = null) {
   // (the mouse turned it: not into a wall, its tail swinging round; already caught in one, it may move out of it)
   // (swept in small steps: a quick turn would swing the tail's end through a thin wall)
   if (h.okYaw != null && h.yaw !== h.okYaw && !hits(boxes, h.p, h.okYaw)) {
@@ -100,6 +120,7 @@ export function stepHeli(h, input, dt, boxes, engine = true) {
   let crash = 0;
   const next = [h.p[0] + v[0] * dt, Math.min(HELI.ceiling, h.p[1] + v[1] * dt), h.p[2] + v[2] * dt];
   if (next[1] >= HELI.ceiling) v[1] = Math.min(0, v[1]);
+  if (area) for (const [k, i] of [[0, 0], [2, 1]]) { const c = Math.max(area[0][i], Math.min(area[1][i], next[k])); if (c !== next[k]) { next[k] = c; v[k] = 0; } }
   if (!stuck && hits(boxes, next, h.yaw)) {
     crash = Math.hypot(v[0], v[2]);
     v[0] *= -0.2; v[2] *= -0.2;

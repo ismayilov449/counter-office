@@ -2,7 +2,7 @@
 // lib/heli.js): its model and pad, where it is (the snapshot's hl, smoothed; the pilot's own flying is ours), the
 // pilot's controls and chase camera, a passenger's seat, the rotor's sound, the hints.
 import * as THREE from 'three';
-import { HELI, S, SEATS, GUNNERS, GUN_ARC, gunYaw, seatPos, heliBoxes, stepHeli, heliGround, nosePos } from '/shared/heli.js';
+import { HELI, S, SEATS, GUNNERS, GUN_ARC, gunYaw, seatPos, heliBoxes, stepHeli, heliGround, nosePos, airBoxes } from '/shared/heli.js';
 import { mergeByMaterial } from './world.js';
 
 const ROTOR_Y = 2.95; // (the rotor's hub, full size: just over the engine)
@@ -64,7 +64,7 @@ export function createHeli(ctx) {
     g.font = 'bold 13px Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (const [l, deg] of [['N', 0], ['E', 90], ['S', 180], ['W', 270]]) { const a = ((deg - hdg) * Math.PI) / 180; g.fillStyle = l === 'N' ? '#ff7060' : '#9fe0b8'; g.fillText(l, cx + Math.sin(a) * (R - 10), cy - Math.cos(a) * (R - 10)); }
     // the readouts
-    const alt = Math.max(0, h.p[1] - heliGround(ctx.coll().move('heli', h.p, 9), h.p, h.yaw)), spd = Math.hypot(h.v[0], h.v[2]) * 3.6;
+    const alt = Math.max(0, h.p[1] - heliGround(air(h.p), h.p, h.yaw)), spd = Math.hypot(h.v[0], h.v[2]) * 3.6;
     g.fillStyle = '#9fe0b8'; g.font = 'bold 15px Consolas, monospace';
     g.fillText('HDG ' + String(Math.round(hdg) % 360).padStart(3, '0'), cx, 16);
     g.textAlign = 'left'; g.fillText('ALT', 10, 40); g.fillText(alt.toFixed(1) + 'm', 10, 58);
@@ -229,6 +229,7 @@ export function createHeli(ctx) {
   }
   const shown = () => (own && me.heli?.seat === 0 ? own : view);
   const pilotNow = () => me.alive && me.heli?.seat === 0 && own;
+  const air = p => airBoxes(ctx.map(), ctx.coll().move('heli', p, 9)); // (the sky's invisible seals cut away: shared/heli.js)
 
   return {
     load() { build(); own = null; me.heli = null; },
@@ -317,14 +318,14 @@ export function createHeli(ctx) {
       const keys = ctx.keys();
       if (pilotNow()) {
         const input = { fwd: (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0), side: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), up: (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') ? 1 : 0) };
-        const crash = stepHeli(own, input, dt, ctx.coll().move('heli', own.p, 9), own.engine);
+        const crash = stepHeli(own, input, dt, air(own.p), own.engine, ctx.map().heli?.area);
         if (crash > HELI.hard) ctx.send({ t: 'heliHit', s: Math.round(crash * 10) / 10 });
         ctx.coll().heli = heliBoxes(own);
         const now = performance.now();
         if (now - own.sent > 50) {
           own.sent = now;
           const r3 = v => Math.round(v * 1000) / 1000;
-          const g = heliGround(ctx.coll().move('heli', own.p, 9), own.p, own.yaw);
+          const g = heliGround(air(own.p), own.p, own.yaw);
           ctx.send({ t: 'heli', p: own.p.map(r3), yaw: r3(own.yaw), v: own.v.map(r3), tilt: r3(own.tilt), roll: r3(own.roll), air: own.p[1] - g > 0.15 ? 1 : 0 });
         }
       }

@@ -892,6 +892,8 @@ still gets found, a phone that moves stays fuzzy.**
   - Bullets on its metal wear it down. The cockpit's glass lets them through to whoever sits behind it.
   - An RPG takes more than half its hull, so 2 hits bring it down.
   - Flying into something hard hurts it too.
+- **Room in the air.** Up high it flies anywhere over the estate, up to 14 m, over the house and along the estate
+  walls, without touching anything; at the estate's edge it just stops (no crash).
 - **Shot down:** it spins down and explodes, killing whoever is still inside. If the pilot jumps out in the air,
   nobody is flying it, and it falls the same way.
 - **Door gunners.** The two seats in its open side doors each have a mounted **PKT** machine gun: aim with the mouse,
