@@ -28,6 +28,7 @@ export class CollisionWorld {
     this.elev = []; // elevator: the lift's cabin and sliding doors (moving boxes, kept up to date by lib/elevator.js and public/js/elevator.js)
     this.cells = new Map();
     for (const b of this.solids) {
+      if (b.hidden && b.min[1] >= 15.5) b.sky = true; // (a BSP map's sky ceiling, nothing drawn on it: bullets fly through it, for the helicopter up high)
       for (let cx = Math.floor(b.min[0] / CELL); cx <= Math.floor(b.max[0] / CELL); cx++) {
         for (let cz = Math.floor(b.min[2] / CELL); cz <= Math.floor(b.max[2] / CELL); cz++) {
           const k = cellKey(cx, cz);
@@ -126,7 +127,7 @@ export class CollisionWorld {
     let tz = sz ? (sz > 0 ? (cz + 1) * CELL - o[2] : o[2] - cz * CELL) / Math.abs(d[2]) : Infinity;
     for (let guard = 0; guard < 4096; guard++) {
       const list = this.cells.get(cellKey(cx, cz));
-      if (list) for (const b of list) if (b._seen !== s && (b.brk == null || !this.gone.has(b.brk))) { b._seen = s; test(b); }
+      if (list) for (const b of list) if (b._seen !== s && (b.brk == null || !this.gone.has(b.brk)) && !(b.sky && what === 'bullet')) { b._seen = s; test(b); }
       const next = Math.min(tx, tz);
       if (next > maxT || (best && best.t <= next)) break;
       if (tx < tz) { cx += sx; tx += tdx; } else { cz += sz; tz += tdz; }

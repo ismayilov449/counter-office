@@ -8,7 +8,7 @@
 // Its size: everything below is in the full-size model's metres times S (the user found it too big to fly, 2026-11-26).
 export const S = 0.7;
 export const HELI = {
-  speed: 13, side: 7, climb: 4.5, accel: 7, fall: 9.8, ceiling: 14, // (the map's sky slab over the house is at 15.65, and bullets stop there: the gunners' eyes stay under it)
+  speed: 13, side: 7, climb: 4.5, accel: 7, fall: 9.8, ceiling: 22, // (over the map's sky ceiling at 15.65: bullets fly through it, shared/collision.js b.sky)
   fuel: 90, hp: 1500, rpg: 800, crash: 9, hard: 6, hurt: 90, // (an impact over `hard` m/s costs `hurt` hp per m/s over it)
   reach: 3.0, low: 2.5, blast: 9, spin: 2.6, rotor: 4.3, // (rotor: the full-size model's)
   slide: 6, ropeMax: 4, // (stage 2: down the rope at `slide` m/s, while it moves slower than `ropeMax` m/s)
