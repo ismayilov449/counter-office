@@ -865,7 +865,7 @@ still gets found, a phone that moves stays fuzzy.**
   - A crouched CT holds **E** at it for 3 s to take it off, and keeps the grenade. A crouched Terrorist takes it back
     in 1 s.
 - **The rigged lift.** The same, inside the lift's cabin while it stands at a floor. It goes off when the lift's doors
-  next open at **another** floor.
+  next open at **another** floor, and goes off 1 s later.
 
 ## Bots
 

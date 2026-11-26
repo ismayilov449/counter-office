@@ -106,5 +106,5 @@ bob.send({ t: 'elevAim', a: 'b2' });
 await sleep(50);
 await use(bob, 100);
 ok('the lift goes up, the doors open upstairs: the pin', await until(() => got(bob, 'sfx', m => m.s === 'pin').length > 0, 15000));
-ok('it goes off', await until(() => got(bob, 'boom').length > 0, 2500));
+ok('it goes off within about 1 s', await until(() => got(bob, 'boom').length > 0, 1400));
 process.exit();
