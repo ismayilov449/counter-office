@@ -18,6 +18,7 @@ const ZOMBIE = { hp: 1000, motherHp: 2000, countdown: 12, respawn: 4 };
 // Party modes the admin can switch on (see CFG.party).
 const PARTY_WEAPONS = ['', 'awp', 'deagle', 'scout', 'ak47', 'knife', 'rpg'];
 import { CAR, carBoxes, seatPos, exitSpots } from './shared/vehicles.js';
+import { HELI } from './shared/heli.js';
 import { CollisionWorld } from './shared/collision.js';
 import { skyOf } from './shared/maps/sky.js';
 import { doorBox, doorCenter, doorReach, openingSide, GONE } from './shared/doors.js';
@@ -43,6 +44,7 @@ import { createHaunt } from './lib/haunt.js';
 import { createLocks } from './lib/locks.js';
 import { createSafe } from './lib/safe.js';
 import { createRope } from './lib/rope.js';
+import { createHeli } from './lib/heli.js';
 import { createStorm } from './lib/storm.js'; // Hotel Meridian's storm // phone tracker (ROADMAP group 14)
 import { createCarry } from './lib/hostage-carry.js'; // carrying wounded hostages (ROADMAP 6.2) // hostages try to escape (ROADMAP 6.1), zip ties
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
@@ -1353,6 +1355,7 @@ function startRound() {
   locks.roundStart(); // locks: two of the house's outer doors locked
   safe.roundStart(); // safe: shut, nothing cracked
   rope.roundStart(); // rope: nobody swinging
+  heli.reset(); // heli: back on its pad, full, empty
   storm.roundStart(now()); // storm: the power on, the first strike soon
   // aim_map: weapons lying in the field every round.
   if (MAP.roundDrops && CFG.gameMode === 'classic' && !partyWeapon()) {
@@ -1615,6 +1618,10 @@ const haunt = createHaunt({ game, players, map: () => MAP, world: () => world, n
 // safe, rope: ROADMAP 16 (Mansion maps; lib/safe.js, lib/rope.js)
 const safe = createSafe({ game, players, map: () => MAP, now, send, sendMe: p => sendMe(p), broadcast, notify: (...a) => notify(...a), addMoney: (p, n) => addMoney(p, n) });
 const rope = createRope({ game, players, map: () => MAP, world: () => world, now, send, broadcast, breakGlass: ids => breakGlass(ids) });
+// heli: the SWAT helicopter (ROADMAP 18; Mansion maps; lib/heli.js)
+const heli = createHeli({ game, players, map: () => MAP, world: () => world, now, send, broadcast, notify: (...a) => notify(...a),
+  killPlayer: (q, by, w) => killPlayer(q, by, w, false), applyDamage: (...a) => applyDamage(...a), lineOfSight: (a, b) => lineOfSight(a, b),
+  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w) });
 // locks: locked doors (Mansion maps; lib/locks.js)
 const locks = createLocks({ game, players, map: () => MAP, world: () => world, now, send, broadcast, nearestDoor: (p, max) => nearestDoor(p, max),
   speed: (p, t) => cc.speed(p, t), kickOpen: (i, side, by) => cc.slam(i, side, by) });
@@ -2293,6 +2300,7 @@ function onUse(p, m, t) {
     if (p.cctv) { cctvOff(p, 'left'); return; }
     if (p.driving != null || p.riding != null) { exitCar(p); return; }
     if (stealth.leave(p)) return; // stealth: out of a car's trunk
+    if (heli.use(p, t)) return; // heli: out of the helicopter, or into it
   }
   if (explosives.grab(p, t)) return; // explosives: grab an HE grenade at your feet (before a revive: it's about to go off)
   if (body.use(p, t)) return; // body: revive a downed teammate (nothing to use from the floor)
@@ -2508,6 +2516,7 @@ function onShoot(p, m) {
     traces.push([r3(d[0]), r3(d[1]), r3(d[2]), r2(best ? best.t : wallT), best ? 1 : 0, !best && wall ? 1 : 0]);
     if (best) hits.push({ ...best, d });
     else if (wall && wall.box.car != null && !def.melee) damageCar(world.cars[wall.box.car], def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p);
+    else if (wall && wall.box.heli && !def.melee && p.team !== 'CT') heli.damage(def.damage * Math.pow(def.rangeMod, wall.t / 12.7), p); // heli: a bullet on its metal (CTs' own don't hurt it)
     else if (wall && wall.box.door != null && MAP.doors[wall.box.door]?.weak) shootDoor(wall.box.door, def.melee ? def.damage * 2 : def.damage);
     else if (wall && wall.box.brk != null && BREAK.chip[w]) hurtPiece(MAP.breakables[wall.box.brk], def.damage * BREAK.chip[w], chipped);
     const endT = best ? best.t : wallT;
@@ -2619,6 +2628,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
     const d = dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
     if (d < R) damageCar(c, 900 * (1 - d / R), owner);
   }
+  heli.blast(at, R, weapon === 'rpg' || weapon === 'rpg26' ? HELI.rpg : 500, owner); // heli: an RPG's hit costs it more than half its hull
   chainMines(at, MINE.chain);
 }
 
@@ -2895,6 +2905,7 @@ function explodeSatchel(s) {
     const d = s.car === c.id ? 0 : dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
     if (d < R * 0.6) damageCar(c, SATCHEL.car * (1 - d / (R * 0.6)), owner);
   }
+  heli.blast(at, R * 0.6, SATCHEL.car, owner); // heli
   chainMines(at, MINE.chain);
   if (MAP.cctv) blastCams(at, CCTV.blast);
 }
@@ -3083,6 +3094,7 @@ function explodeDrone(d, at) {
     const dd = dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
     if (dd < R * 0.7) damageCar(c, DRONE.car * (1 - dd / (R * 0.7)), owner);
   }
+  heli.blast(at, R * 0.7, DRONE.car, owner); // heli
   chainMines(at, MINE.chain);
   blastJammers(at, JAMMER.blast);
   blastDrones(at, DRONE.blast * 1.5);
@@ -3304,6 +3316,7 @@ function explodeNade(n) {
       const d = dist3(o, [c.p[0], c.p[1] + 0.7, c.p[2]]);
       if (d < 8) damageCar(c, 260 * (1 - d / 8), owner);
     }
+    heli.blast(o, 8, 260, owner); // heli
     for (const h of game.hostages) {
       if (h.state === 'dead' || h.state === 'rescued') continue;
       const chest = [h.p[0], h.p[1] + 1.1, h.p[2]];
@@ -3834,6 +3847,7 @@ function handle(p, m) {
       // On the zip line the server says where you are (hanging from the cable); after a fall off it, the landing hurts.
       if (p.zip) { p.p = zipFeet(MAP.zip, zipNow(p, t).s); p.yaw = m.yaw; p.pitch = m.pitch; p.c = 0; remember(p, t, p.p, 0); break; }
       // At the CCTV desk you sit on the chair facing the monitors.
+      if (heli.pinned(p, m)) { remember(p, t, p.p, 1); break; } // heli: in a seat, you're where the seat is
       if (rope.pinned(p, m, t)) { remember(p, t, p.p, 0); break; } // rope: swinging in, the server says where you are
       if (p.cctv) { p.p = MAP.cctv.seat.slice(); p.yaw = MAP.cctv.yaw; p.pitch = -0.3; p.c = 1; remember(p, t, p.p, 1); break; }
       if (stealth.pinned(p, m, t)) break; // stealth: in a car's trunk the server says where you are
@@ -3916,6 +3930,8 @@ function handle(p, m) {
     case 'ram':
       onRam(p, m);
       break;
+    case 'heli': heli.pilot(p, m, t); break; // heli: the pilot's browser, where it is
+    case 'heliHit': heli.hit(p, m); break; // heli: it hit something
     case 'zip':
       if (m.off && p.zip) zipOff(p, t, 'letgo');
       break;
@@ -4130,6 +4146,7 @@ function tick() {
   const dt = Math.min(0.1, Math.max(0.001, (t - (tick.prev ?? t - 1000 / CFG.tickRate)) / 1000));
   tick.prev = t;
   flood.tick(t, dt); // Floodgate: the water level, drowning, electrocution
+  heli.tick(t, dt); // heli: its seats, fuel, fall
   stealth.tick(t); // stealth: soot, the fireplace's fire, the hiders kept in their cars
   walls.tick(t, dt); // walls: burst pipes soak the floor, cut cables spark (gas, wet floors)
   bots.update(dt);
@@ -4180,6 +4197,7 @@ function tick() {
     ...flood.snap(), // Floodgate: fl: [water level, valve open, being turned], only while there's water (or the valve is in use)
     ...wounds.snap(), // wounds: wd: { d: [[dragger, dragged, x, y, z]], k: [[id, 0..1]] ending it, i: [[asker, victim, 0..1]], a: [interrogated] }
     ...stealth.snap(), // stealth: st: { f: the fireplace burns, s: sooty players, k: who hides in which trunk }, only while there's any
+    ...heli.snap(), // heli: hl
     ...tracker.snap(), // phone tracker: tw: [1 per cell tower that is down] while any is
     ...walls.snap(), // walls: wa: [wet patches, sprays, cut cables' ends] while there are any (see lib/walls.js)
   }).slice(0, -1);

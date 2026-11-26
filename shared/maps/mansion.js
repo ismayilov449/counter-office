@@ -233,6 +233,8 @@ export default {
   // ROADMAP 16: the safe upstairs and the roof rope's spots (see mansion2.js and shared/safe.js).
   safe: RM.safe,
   ropes: RM.ropes,
+  // ROADMAP 18: the SWAT helicopter's pad at the north end of the CT street, its nose to the south (shared/heli.js).
+  heli: { p: [26.4, 0, 15.5], yaw: 0 },
   elevator: RM.elevator, // elevator: the lift (see mansion_elevator.js and shared/elevator.js)
   towers: TOWERS, // phone tracker: the cell towers (see mansion_phonetracker.js and shared/phonetracker.js)
   power: POWER, // power: the breaker panel, the generator, the machine room (see mansion_power.js and shared/power.js)

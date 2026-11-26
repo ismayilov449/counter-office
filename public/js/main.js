@@ -47,6 +47,7 @@ import { createLocks } from './locks.js';
 import { glint, dropGlint } from './glint.js';
 import { createSafe } from './safe.js';
 import { createRope } from './rope.js';
+import { createHeli } from './heli.js';
 import { createStorm } from './storm.js'; // Hotel Meridian's storm: rain, lightning, thunder // phone tracker (ROADMAP 14): the CTs' scans, the holder's screen
 import { TRACKER } from '/shared/phonetracker.js';
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
@@ -156,6 +157,7 @@ function loadMap(id) {
   gadgets.load(map);
   elevator.load(map); // elevator
   safeC.load(); // safe: its door
+  heliC.load(); // heli: its model and pad
   circuits.load(map); // power
   world.setLampFilter?.(circuits.lampFilter); // power: in the house, only the camera's storey's lamps shine (no light through the floors)
   fx.reset();
@@ -288,6 +290,7 @@ const haunt = createHaunt({ me, game, hud, audio, send: m => net.send(m), map: (
   liftY: () => elevator.cabinY(), showLights: L => { world?.setLights(L); setRooms(map.rooms, L); } });
 const safeC = createSafe({ me, game, scene, map: () => map }); // safe: ROADMAP 16.1
 const rope = createRope({ me, game, scene, map: () => map, remotes }); // rope: ROADMAP 16.2
+const heliC = createHeli({ me, game, scene, audio, hud, send: m => net.send(m), map: () => map, coll: () => coll, keys: () => keys }); // heli: ROADMAP 18
 const locks = createLocks({ me, game, send: m => net.send(m), map: () => map }); // locks: locked doors (Mansion maps)
 const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels, scene });
 let dropList = [];
@@ -1378,6 +1381,7 @@ function die() {
   if (me.drone) endDrone(null);
   gadgets.died();
   rope.died(); // rope
+  heliC.died(); // heli
   if (me.emote) stopEmote();
   if (me.driving != null || me.riding) leaveCar(null);
   me.alive = false;
@@ -2300,6 +2304,7 @@ document.addEventListener('mousemove', e => {
   if (!locked || !me.alive) return;
   const k = 0.0022 * settings.sens * (camera.fov / BASE_FOV);
   if (gadgets.mouseMove(e.movementX, e.movementY, k)) return; // (watching a camera: it turns)
+  if (heliC.mouse(e.movementX, e.movementY, k)) return; // heli: flying, the mouse turns it
   if (me.drone) {
     me.drone.yaw = Math.atan2(Math.sin(me.drone.yaw - e.movementX * k), Math.cos(me.drone.yaw - e.movementX * k));
     me.drone.pitch = clamp(me.drone.pitch - e.movementY * k, -1.45, 0.6);
@@ -2326,7 +2331,8 @@ document.addEventListener('mousedown', e => {
     else if (e.button === 2) openMortarMap(false);
     return;
   }
-  if (gadgets.busy() && me.alive && e.button !== 1) { gadgets.mouseDown(e.button); return; } // (on a gadget: no shooting or throwing; at the CCTV desk the buttons switch cameras)
+  if (gadgets.busy() && me.alive && e.button !== 1) { gadgets.mouseDown(e.button); return; }
+  if (heliC.piloting() && e.button !== 1) return; // heli: the pilot's hands are full // (on a gadget: no shooting or throwing; at the CCTV desk the buttons switch cameras)
   if (me.drone && me.alive) {
     if (e.button === 0) droneBomb();
     else if (e.button === 2) droneDive();
@@ -2968,6 +2974,7 @@ const net = new Net({
     if (me.driving != null || me.riding) leaveCar(null);
     gadgets.died();
     rope.died(); // rope
+    heliC.died(); // heli
     if (isGG()) setTimeout(() => { const w = GUNGAME[me.ggLevel || 0]; if (me.alive && w === 'he') switchSlot('he', true); }, 150);
     Object.assign(me, {
       p: m.p.slice(), v: [0, 0, 0], yaw: m.yaw, pitch: 0, alive: true, spawnSeq: m.sq, reload: null, scope: 0,
@@ -3020,6 +3027,7 @@ const net = new Net({
     flood.onSnapshot(m.fl); // Floodgate: the water level and the valve
     stealth.onSnapshot(m.st); // stealth: the fireplace's fire, who is sooty, who hides in a trunk
     trk.snapshot(m.tw); // phone tracker: which cell towers are down
+    heliC.snapshot(m.hl); // heli: where it is
     walls.onSnapshot(m.wa); // walls: wet patches, burst pipes' sprays, cut cables
   },
   catMeow(m) {
@@ -3390,7 +3398,7 @@ const gadgets = createGadgets({
   power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
 Object.assign(net.handlers, locks.handlers); // locks
-Object.assign(net.handlers, safeC.handlers, rope.handlers); // safe: safe; rope: rope, ropeEnd
+Object.assign(net.handlers, safeC.handlers, rope.handlers, heliC.handlers); // (heli: heliIn, heliOut, heliFuel) // safe: safe; rope: rope, ropeEnd
 Object.assign(net.handlers, haunt.handlers); // haunt: haunt, hauntUsed, rigs
 Object.assign(net.handlers, trk.handlers); // phone tracker: trk, trkScan, trkInfo, trkHit
 Object.assign(net.handlers, storm.handlers); // storm: a lightning strike
@@ -3409,6 +3417,7 @@ function updateLocal(dt, now) {
   elevator.local(dt, now); // elevator: in the lift we ride up and down with it (before we move)
   if (gadgets.local(dt, now)) return;
   if (rope.local()) return; // rope: swinging in, along the server's path
+  if (heliC.local(dt)) return; // heli: the pilot flies it, a passenger sits
   if (stealth.local(dt, now)) return; // stealth: in a car's trunk you go where it goes (no walking, no shooting)
   if (me.drone) { updateDroneFlight(dt, now); return; }
   if (me.driving != null && me.car) { updateDriving(dt, now); return; }
@@ -3600,6 +3609,8 @@ function updateCamera(dt, now) {
   } else if (me.alive && me.driving != null && me.car) {
     carCamera();
     hud.spectating(null);
+  } else if (me.alive && heliC.camera(camera)) {
+    hud.spectating(null); // heli: the pilot's chase camera
   } else if (me.alive && me.emote) {
     emoteCamera(now);
     hud.spectating(null);
@@ -3674,7 +3685,7 @@ function updateEyes(dt) {
 
 function updateViewModel(dt, now) {
   if (!vm) return;
-  vm.visible = me.alive && me.driving == null && !me.drone && !gadgets.hidesWeapon() && !(me.scope && WEAPONS[current()].sniper);
+  vm.visible = me.alive && me.driving == null && !me.drone && !gadgets.hidesWeapon() && !heliC.piloting() && !(me.scope && WEAPONS[current()].sniper);
   // (dimmer on a night map outdoors, map.theme.viewmodel; lit by a room's glow indoors)
   const amb = ambientAt(camera.position), k = map.theme.viewmodel ?? 1, glow = glowAt(camera.position);
   vmHemi.intensity = 2.2 * Math.max(0.12, amb) * Math.max(k, Math.min(1, glow * 0.7));
@@ -3849,6 +3860,7 @@ function updateHud(now) {
     hint = cc.hint(hint); // closecombat: an enemy's back within reach (over the lift, as on the server); a door: kick it running, crouch + hold E to hold it shut
   }
   if (!hint && (gh = ug.hint())) hint = gh; // underground: by an air vent (no E use: only when nothing else is said)
+  if ((gh = heliC.hint())) hint = gh; // heli: in it (fuel, hull, keys), or by it
   if ((gh = haunt.hint())) hint = gh; // haunt: dead this round, G floats as a ghost
   if ((gh = stealth.inside())) hint = gh; // stealth: in a trunk, E jumps out (before anything else, as on the server)
   hud.hint(hint);
@@ -3896,7 +3908,7 @@ function updateHud(now) {
     hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, radarMates, bomb, hostageDots, [...mortarRadarMarks(performance.now()), ...trk.radarMarks(performance.now())], radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
   }
   drawMortarMap(performance.now(), radarMates);
-  safeC.frame(1 / 60); rope.frame(); // safe: its door and dial; rope: the ropes
+  safeC.frame(1 / 60); rope.frame(); heliC.frame(performance.now()); // (heli: its model, rotor, sound) // safe: its door and dial; rope: the ropes
   haunt.frame(performance.now()); // haunt: a ghost's flicker, the rigged grenades
   trk.frame(performance.now()); // phone tracker: the holder's screen, the direction finder's beep
   storm.frame(performance.now()); // storm: rain, the flash, the thunder

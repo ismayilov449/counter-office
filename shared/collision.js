@@ -24,6 +24,7 @@ export class CollisionWorld {
     this.cars = [];
     this.doorDefs = map.doors || [];
     this.setDoors(this.doorDefs.map(() => 0));
+    this.heli = []; // helicopter: its boxes (shared/heli.js heliBoxes, kept up to date by lib/heli.js and public/js/heli.js)
     this.elev = []; // elevator: the lift's cabin and sliding doors (moving boxes, kept up to date by lib/elevator.js and public/js/elevator.js)
     this.cells = new Map();
     for (const b of this.solids) {
@@ -80,13 +81,13 @@ export class CollisionWorld {
   }
 
   move(exceptCar = null, p = null, r = 4) {
-    return this.near(p, r).concat(this.intactGlass, this.doorBoxes, this.carBoxes(exceptCar), elevNear(this, p, r)); // (elevator: + the lift)
+    return this.near(p, r).concat(this.intactGlass, this.doorBoxes, this.carBoxes(exceptCar), elevNear(this, p, r), exceptCar === 'heli' ? [] : this.heli); // (elevator: + the lift; helicopter: + it, but not for itself)
   }
 
   // Grenades smash through windows (the server breaks the glass they cross), so they ignore glass.
   // A point query for simulateNade.
   nade() {
-    const dyn = this.doorBoxes.concat(this.carBoxes(), this.elev); // (elevator: + this.elev)
+    const dyn = this.doorBoxes.concat(this.carBoxes(), this.elev, this.heli); // (elevator: + this.elev; helicopter: + this.heli)
     const pointHit = (p, r) => {
       const inside = b => p[0] > b.min[0] - r && p[0] < b.max[0] + r && p[1] > b.min[1] - r && p[1] < b.max[1] + r &&
         p[2] > b.min[2] - r && p[2] < b.max[2] + r;
@@ -99,7 +100,7 @@ export class CollisionWorld {
   // never blocks their shots (passengers shoot out of it).
   bullet(exceptCar = null, p = null, r = 4) {
     const body = this.carBoxes(exceptCar).map(b => ({ ...b, max: [b.max[0], b.min[1] + 1.0, b.max[2]] }));
-    return this.near(p, r).concat(this.doorBoxes, body, elevNear(this, p, r)); // (elevator: + the lift)
+    return this.near(p, r).concat(this.doorBoxes, body, elevNear(this, p, r), this.heli.filter(b => !b.hglass)); // (elevator: + the lift; helicopter: its metal, not its cockpit's glass)
   }
 
   // Nearest hit along a ray: { t, n, box } or null, walking the grid cells the ray crosses.
@@ -114,6 +115,7 @@ export class CollisionWorld {
       for (const b of this.doorBoxes) test(b);
       for (const b of this.carBoxes(exceptCar)) test(what === 'bullet' ? { ...b, max: [b.max[0], b.min[1] + 1.0, b.max[2]] } : b);
       if (what === 'move') for (const b of this.intactGlass) test(b);
+      for (const b of this.heli) if (what === 'move' || !b.hglass) test(b); // (helicopter: bullets go through its cockpit's glass)
     }
     if (this.elev.length && (!this.elevBound || rayAABB(o, d, this.elevBound.min, this.elevBound.max, best ? best.t : maxT))) for (const b of this.elev) test(b); // elevator: the lift (for every `what`: mines lie on its floor)
     const s = ++STAMP;
