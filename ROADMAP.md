@@ -447,7 +447,7 @@ the round, funny awards.
 **Left out (offered, not chosen):** the police helicopter's searchlight, looping the CCTV, the dumbwaiter, rescued
 hostages talking, the last Terrorist escaping over the garden wall.
 
-## 18. The SWAT helicopter (both Mansion maps, CTs only, added 2026-11-26) — **stage 1 built 2026-11-26** (flying, landing, fuel, damage, the crash; passengers ride along. Stage 2 not built yet: the door gunners, the rope slide)
+## 18. The SWAT helicopter (both Mansion maps, CTs only, added 2026-11-26) — **built 2026-11-26** (stage 1: flying, landing, fuel, damage, the crash; stage 2: the door gunners' PKTs, the fast rope)
 
 The user's choices: CTs only; for getting in and covering fire, not a gunship; free once a round; both Mansion maps.
 

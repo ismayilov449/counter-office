@@ -2,16 +2,19 @@
 // lib/heli.js): its model and pad, where it is (the snapshot's hl, smoothed; the pilot's own flying is ours), the
 // pilot's controls and chase camera, a passenger's seat, the rotor's sound, the hints.
 import * as THREE from 'three';
-import { HELI, SEATS, seatPos, heliBoxes, stepHeli, heliGround } from '/shared/heli.js';
+import { HELI, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround } from '/shared/heli.js';
 
 const ROTOR_Y = 3.7; // (over the street's 3.5 m walls when it stands on its pad)
 
-// ctx: { me, game, scene, audio, hud, send(m), map(), coll(), keys() }
+// Stage 2: the door gunners' PKTs (on the model, turned the way their gunners look), the fast rope (whoever slides down
+// it: the rope from the door to him; our own slide follows the server's path).
+// ctx: { me, game, scene, audio, hud, send(m), map(), coll(), keys(), remotes }
 export function createHeli(ctx) {
   const { me } = ctx;
   let model = null, pad = null, rotor = null, tailRotor = null, view = null; // view: { p, yaw, tilt, roll, st, hp, fuel, seats }
   let own = null; // the pilot's own flying: { p, yaw, v, tilt, roll, landed, engine, sent }
-  let cam = { yaw: 0, pitch: 0.25 }, spinA = 0, spinV = 0, last = 0;
+  let cam = { yaw: 0, pitch: 0.25 }, spinA = 0, spinV = 0, last = 0, guns = [];
+  const ropes = new Map(); // stage 2: id -> { line, until } for whoever slides down the rope
 
   function build() {
     if (model) { ctx.scene.remove(model, pad); model = pad = null; }
@@ -23,7 +26,18 @@ export function createHeli(ctx) {
     const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); model.add(m); return m; };
     add(new THREE.BoxGeometry(2.0, 0.9, 4.4), navy, 0, 0.9, 0); // the body below the windows
     add(new THREE.BoxGeometry(1.96, 1.0, 2.6), glass, 0, 1.85, -0.7); // the cockpit's glass (front: -z)
-    add(new THREE.BoxGeometry(2.0, 1.0, 1.8), navy, 0, 1.85, 1.3); // the cabin's back, solid
+    add(new THREE.BoxGeometry(2.0, 0.1, 1.8), navy, 0, 2.3, 1.3); // the cabin's back: its roof and back wall, the doors open each side
+    add(new THREE.BoxGeometry(2.0, 1.0, 0.1), navy, 0, 1.85, 2.15);
+    guns = GUNNERS.map(i => { // the door guns: a receiver and a barrel on a pivot in each door
+      const g = new THREE.Group(), side = SEATS[i][0] >= 0 ? 1 : -1;
+      g.position.set(side * 1.02, 1.5, -SEATS[i][2]);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.45), dark), barrel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.8), dark);
+      body.position.z = -0.1; barrel.position.z = -0.7;
+      g.add(body, barrel);
+      g.userData = { side, seat: i };
+      model.add(g);
+      return g;
+    });
     add(new THREE.BoxGeometry(0.5, 0.6, 3.8), navy, 0, 1.65, 4.1); // the tail boom
     add(new THREE.BoxGeometry(0.12, 1.2, 0.8), navy, 0, 2.3, 5.8); // the fin
     for (const x of [-0.85, 0.85]) add(new THREE.BoxGeometry(0.1, 0.08, 4.2), dark, x, 0.04, 0); // the skids
@@ -59,7 +73,18 @@ export function createHeli(ctx) {
         cam = { yaw: 0, pitch: 0.25 };
       },
       heliOut(m) { me.heli = null; own = null; me.p = m.p.slice(); me.v = [0, 0, 0]; me.onGround = false; me.viewY = me.p[1]; },
-      heliFuel(m) { if (own) own.engine = false; ctx.hud.small(m.dead ? 'HIT! The helicopter is going down — jump (E)!' : 'OUT OF FUEL! The engine stopped — get out (E)!', 4); },
+      slide(m) {
+      const now = performance.now();
+      if (m.id === me.id) { me.heli = null; own = null; me.slide = { ...m, t0: now }; }
+      const old = ropes.get(m.id);
+      if (old) ctx.scene.remove(old.line);
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x2a2a2a }));
+      line.frustumCulled = false;
+      ctx.scene.add(line);
+      ropes.set(m.id, { line, m, until: now + ((m.y0 - m.g) / m.v) * 1000 + 400 });
+    },
+    slideEnd(m) { me.slide = null; me.p = m.p.slice(); me.v = [0, 0, 0]; me.onGround = true; me.viewY = me.p[1]; },
+    heliFuel(m) { if (own) own.engine = false; ctx.hud.small(m.dead ? 'HIT! The helicopter is going down — jump (E)!' : 'OUT OF FUEL! The engine stopped — get out (E)!', 4); },
     },
     snapshot(hl) {
       if (!hl || !view) return;
@@ -70,6 +95,7 @@ export function createHeli(ctx) {
     },
     piloting: () => !!pilotNow(),
     seated: () => me.alive && !!me.heli,
+    gunner: () => me.alive && GUNNERS.includes(me.heli?.seat),
     // The mouse while flying: it turns, the camera's pitch.
     mouse(dx, dy, k) {
       if (!pilotNow()) return false;
@@ -79,6 +105,12 @@ export function createHeli(ctx) {
     },
     // Our own movement in it (true: handled): the pilot flies; a passenger sits.
     local(dt) {
+      if (me.alive && me.slide) { // (down the rope: where the server has us)
+        const s = me.slide;
+        me.p = [s.x, Math.max(s.g, s.y0 - (s.v * (performance.now() - s.t0)) / 1000), s.z];
+        me.v = [0, 0, 0]; me.crouch = false; me.jumpQueued = false; me.viewY = me.p[1];
+        return true;
+      }
       if (!me.alive || !me.heli) return false;
       const keys = ctx.keys();
       if (pilotNow()) {
@@ -115,7 +147,7 @@ export function createHeli(ctx) {
         const fuel = Math.ceil(view.fuel), hull = view.hp;
         return me.heli.seat === 0
           ? `HELICOPTER · fuel ${fuel} s · hull ${hull}% · W/S A/D fly · Space up · Ctrl down · mouse turns · E: get out`
-          : `In the helicopter · hull ${hull}% · E: jump out${view.st === 1 ? ' (from up here it hurts)' : ''}`;
+          : `${GUNNERS.includes(me.heli.seat) ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}`;
       }
       if (!me.alive || me.team !== 'CT' || view.st >= 2) return null;
       const h = shown();
@@ -148,8 +180,24 @@ export function createHeli(ctx) {
       tailRotor.rotation.x = spinA * 1.7;
       model.visible = true;
       model.children[0].material.color.setHex(view.st === 3 ? 0x1a1a1a : 0x1d2a44);
+      // the door guns turn the way their gunners look; an empty one points out of its door
+      for (const g of guns) {
+        const id = view.seats?.[g.userData.seat], r = id && (id === me.id ? me : ctx.remotes.get(id));
+        const yaw = r ? (r === me ? me.yaw : r.yaw) - h.yaw : -g.userData.side * Math.PI / 2, pitch = r ? (r === me ? me.pitch : r.pitch) : -0.2;
+        g.rotation.set(pitch, yaw, 0, 'YXZ');
+        g.visible = !(r === me); // (our own: the view model)
+      }
+      // the fast ropes: from the door over its slider to him
+      for (const [id, l] of ropes) {
+        const who = id === me.id ? me : ctx.remotes.get(id);
+        if (now > l.until || !who) { ctx.scene.remove(l.line); l.line.geometry.dispose(); ropes.delete(id); continue; }
+        const pos = l.line.geometry.attributes.position;
+        pos.setXYZ(0, l.m.x, Math.max(h.p[1] + 2.2, l.m.y0 + 2), l.m.z);
+        pos.setXYZ(1, who.p[0], who.p[1] + 1.6, who.p[2]);
+        pos.needsUpdate = true;
+      }
       ctx.audio.engine('heli', [h.p[0], h.p[1] + 2, h.p[2]], 17 * spinV, spinV > 0.05);
     },
-    died() { me.heli = null; own = null; },
+    died() { me.heli = null; own = null; me.slide = null; },
   };
 }

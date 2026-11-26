@@ -9,10 +9,12 @@ export const HELI = {
   speed: 13, side: 7, climb: 4.5, accel: 7, fall: 9.8, ceiling: 12.6, // (the map's sky is at 15.65: the rotor's top stays under it)
   fuel: 90, hp: 1500, rpg: 800, crash: 9, hard: 6, hurt: 90, // (an impact over `hard` m/s costs `hurt` hp per m/s over it)
   reach: 3.6, low: 2.5, blast: 9, spin: 2.6, rotor: 4.3,
+  slide: 6, ropeMax: 4, // (stage 2: down the rope at `slide` m/s, while it moves slower than `ropeMax` m/s)
 };
-// Seats: [right, up, forward] from its base (the skids' bottom, in the middle): the pilot (front right), then the
-// passengers.
-export const SEATS = [[0.45, 0.45, 1.0], [-0.45, 0.45, 1.0], [0.5, 0.45, -0.5], [-0.5, 0.45, -0.5], [0, 0.45, -1.3]];
+// Seats: [right, up, forward] from its base (the skids' bottom, in the middle): the pilot (front right), a passenger,
+// the two door gunners (in the open doors, each on a mounted PKT: GUNNERS), a passenger.
+export const SEATS = [[0.45, 0.45, 1.0], [-0.45, 0.45, 1.0], [0.75, 0.45, -0.5], [-0.75, 0.45, -0.5], [0, 0.45, -1.3]];
+export const GUNNERS = [2, 3];
 
 export const heliForward = yaw => [-Math.sin(yaw), 0, -Math.cos(yaw)];
 export const heliRight = yaw => [Math.cos(yaw), 0, -Math.sin(yaw)];

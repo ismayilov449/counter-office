@@ -2442,7 +2442,7 @@ function onShoot(p, m) {
   if (def.mounted) {
     // the truck's machine gun: only its gunner, and it never runs out
     const truck = carOf(p);
-    if (!truck || truck.type !== 'pickup' || truck.riders[0] !== p.id || truck.wrecked) return;
+    if (heli.gunner(p)) { /* heli: a door gunner's PKT */ } else if (!truck || truck.type !== 'pickup' || truck.riders[0] !== p.id || truck.wrecked) return;
   } else if (!def.melee) {
     item = ownItem(p, w);
     if (!item || item.mag <= 0) return;
@@ -2468,7 +2468,7 @@ function onShoot(p, m) {
   const range = def.melee ? def.range : 250;
   const traces = [];
   const hits = [];
-  const ownCar = carOf(p)?.id ?? null;
+  const ownCar = p.heli ? 'heli' : carOf(p)?.id ?? null; // (heli: from inside it, it's not in the way)
   const shattered = [], chipped = [], jamHits = [], shotSatchels = [], shotDrones = [], shotCams = [];
   for (const d of dirs) {
     const pen = walls.trace(o, d, range, w, ownCar); // walls: through wood and plaster (Mansion; elsewhere a plain raycast)
@@ -2573,7 +2573,7 @@ function onShoot(p, m) {
 // ---- RPG: the rocket flies to the first wall, car or person in its path and explodes there. The blast
 // only hurts people who can see the explosion: a wall in between protects them.
 function launchRocket(p, o, d, def, weapon = 'rpg') {
-  const ownCar = carOf(p)?.id ?? null;
+  const ownCar = p.heli ? 'heli' : carOf(p)?.id ?? null;
   const wall = world.raycast(o, d, 300, 'bullet', ownCar);
   let dist = wall ? wall.t : 300;
   for (const q of players.values()) {
@@ -2833,7 +2833,7 @@ function onSatchel(p, m) {
   disguise.reveal(p, 'nade'); // Disguise: so does throwing a satchel charge
   sendMe(p);
   // Fly it (gravity, no bounce) until it hits a wall, a door, the floor or a car body; windows it crosses break.
-  const ownCar = carOf(p)?.id ?? null, dt = NADE.dt, pos = o.slice(), vel = v.slice();
+  const ownCar = p.heli ? 'heli' : carOf(p)?.id ?? null, dt = NADE.dt, pos = o.slice(), vel = v.slice();
   let hit = null, steps = 0;
   for (; steps < 240 && !hit; steps++) {
     vel[1] -= NADE.gravity * dt;

@@ -290,7 +290,7 @@ const haunt = createHaunt({ me, game, hud, audio, send: m => net.send(m), map: (
   liftY: () => elevator.cabinY(), showLights: L => { world?.setLights(L); setRooms(map.rooms, L); } });
 const safeC = createSafe({ me, game, scene, map: () => map }); // safe: ROADMAP 16.1
 const rope = createRope({ me, game, scene, map: () => map, remotes }); // rope: ROADMAP 16.2
-const heliC = createHeli({ me, game, scene, audio, hud, send: m => net.send(m), map: () => map, coll: () => coll, keys: () => keys }); // heli: ROADMAP 18
+const heliC = createHeli({ me, game, scene, audio, hud, send: m => net.send(m), map: () => map, coll: () => coll, keys: () => keys, remotes }); // heli: ROADMAP 18
 const locks = createLocks({ me, game, send: m => net.send(m), map: () => map }); // locks: locked doors (Mansion maps)
 const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels, scene });
 let dropList = [];
@@ -327,7 +327,7 @@ function weaponOf(slot) {
   }
 }
 // The pickup's gunner always uses the mounted machine gun.
-const current = () => (me.riding?.gunner ? 'pkt' : weaponOf(me.slot) || 'knife');
+const current = () => (me.riding?.gunner || heliC.gunner() ? 'pkt' : weaponOf(me.slot) || 'knife'); // (heli: its door gunners too)
 const currentItem = () => (me.slot === 'primary' || me.slot === 'secondary' ? me.inv[me.slot] : null);
 const bestSlot = () => (me.inv.primary ? 'primary' : me.inv.secondary ? 'secondary' : 'knife');
 const SLOT_ORDER = ['primary', 'secondary', 'knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker', 'c4'];
@@ -442,7 +442,7 @@ function viewMuzzleWorld() {
 
 // Trace against the map and enemy players for instant local feedback.
 function localTrace(o, d, range) {
-  const wall = coll.raycast(o, d, range, 'bullet', me.driving ?? me.riding?.id ?? null);
+  const wall = coll.raycast(o, d, range, 'bullet', heliC.seated() ? 'heli' : me.driving ?? me.riding?.id ?? null); // (heli: from inside it, it's not in the way)
   let t = wall ? wall.t : range, hitR = null;
   for (const r of remotes.values()) {
     if (!r.alive || (!game.cfg.friendlyFire && isMate(r))) continue;
@@ -3398,7 +3398,7 @@ const gadgets = createGadgets({
   power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
 Object.assign(net.handlers, locks.handlers); // locks
-Object.assign(net.handlers, safeC.handlers, rope.handlers, heliC.handlers); // (heli: heliIn, heliOut, heliFuel) // safe: safe; rope: rope, ropeEnd
+Object.assign(net.handlers, safeC.handlers, rope.handlers, heliC.handlers); // (heli: heliIn, heliOut, heliFuel, slide, slideEnd) // safe: safe; rope: rope, ropeEnd
 Object.assign(net.handlers, haunt.handlers); // haunt: haunt, hauntUsed, rigs
 Object.assign(net.handlers, trk.handlers); // phone tracker: trk, trkScan, trkInfo, trkHit
 Object.assign(net.handlers, storm.handlers); // storm: a lightning strike

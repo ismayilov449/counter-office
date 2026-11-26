@@ -100,7 +100,7 @@ export class CollisionWorld {
   // never blocks their shots (passengers shoot out of it).
   bullet(exceptCar = null, p = null, r = 4) {
     const body = this.carBoxes(exceptCar).map(b => ({ ...b, max: [b.max[0], b.min[1] + 1.0, b.max[2]] }));
-    return this.near(p, r).concat(this.doorBoxes, body, elevNear(this, p, r), this.heli.filter(b => !b.hglass)); // (elevator: + the lift; helicopter: its metal, not its cockpit's glass)
+    return this.near(p, r).concat(this.doorBoxes, body, elevNear(this, p, r), exceptCar === 'heli' ? [] : this.heli.filter(b => !b.hglass)); // (elevator: + the lift; helicopter: its metal, not its cockpit's glass)
   }
 
   // Nearest hit along a ray: { t, n, box } or null, walking the grid cells the ray crosses.
@@ -115,7 +115,7 @@ export class CollisionWorld {
       for (const b of this.doorBoxes) test(b);
       for (const b of this.carBoxes(exceptCar)) test(what === 'bullet' ? { ...b, max: [b.max[0], b.min[1] + 1.0, b.max[2]] } : b);
       if (what === 'move') for (const b of this.intactGlass) test(b);
-      for (const b of this.heli) if (what === 'move' || !b.hglass) test(b); // (helicopter: bullets go through its cockpit's glass)
+      if (exceptCar !== 'heli') for (const b of this.heli) if (what === 'move' || !b.hglass) test(b); // (helicopter: bullets go through its cockpit's glass; from inside it, it's not in the way)
     }
     if (this.elev.length && (!this.elevBound || rayAABB(o, d, this.elevBound.min, this.elevBound.max, best ? best.t : maxT))) for (const b of this.elev) test(b); // elevator: the lift (for every `what`: mines lie on its floor)
     const s = ++STAMP;

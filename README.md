@@ -877,7 +877,7 @@ still gets found, a phone that moves stays fuzzy.**
   smashing the glass, and land on the floor inside. Everyone sees the rope, and you can be shot while you swing. (Get
   onto the roof by the ladders: from the ground to the east balcony, then up to the roof.)
 
-## The SWAT helicopter (Mansion maps, CTs; stage 1)
+## The SWAT helicopter (Mansion maps, CTs)
 
 - **Where:** every round it waits on its pad (a white H) at the north end of the CT street.
 - **Getting in:** a CT presses **E** by it while it stands or hovers low. The first one in flies it, and up to 4 more
@@ -892,7 +892,11 @@ still gets found, a phone that moves stays fuzzy.**
   - Flying into something hard hurts it too.
 - **Shot down:** it spins down and explodes, killing whoever is still inside. If the pilot jumps out in the air,
   nobody is flying it, and it falls the same way.
-- *Stage 2 (not built yet): door gunners with mounted machine guns, and sliding down a rope from it.*
+- **Door gunners.** The two seats in its open side doors each have a mounted **PKT** machine gun: aim with the mouse,
+  hold Mouse 1, no reloads. The helicopter's own body doesn't block their shots, so they can fire straight down.
+- **The fast rope.** A passenger (not the pilot) pressing **E** while it hovers up high and slowly (under 4 m/s)
+  slides down a rope from the door to whatever is below (the street, the garden, the roof) at 6 m/s, unhurt. Everyone
+  sees the rope. Going faster, or low over the ground, E is a plain jump.
 
 ## Locked doors, the estate gate and scope glint
 
