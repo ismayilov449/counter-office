@@ -290,6 +290,7 @@ export function createElevator(ctx) {
         else me.p[1] = Math.min(me.p[1], b.min[1] - h - 0.001);
       }
     },
+    cabinY: () => (E ? y : null), // (haunt: a grenade tied in the cabin rides with it)
     // Another player drawn at time rt: if they were in the cabin then, they're in it now.
     remote(p, rt) {
       if (!E || !st) return;

@@ -850,6 +850,23 @@ still gets found, a phone that moves stays fuzzy.**
 - **The hostages have phones too:** white circles on the radar. A Terrorist who **zip-ties** a hostage takes its phone,
   and the tracker can't see it any more.
 
+## Ghosts and rigged doors (Mansion maps)
+
+- **Ghosts.** Killed this round? Press **G** to float free as a ghost: **WASD** flies, **Space** goes up and **Ctrl**
+  goes down, straight through walls. **G** again goes back to watching your teammates. **Once a round**, near a living
+  enemy (within 10 m), you can haunt them:
+  - **1:** three hard knocks on the wall you're looking at;
+  - **2:** the lights of the room you're in flicker;
+  - **3:** the nearest open door slams shut. If it's already shut, it shakes in its frame.
+- **Rigged doors.** A Terrorist with the **HE grenade in hand** holds **E** at a closed door for 2.5 s to tie the
+  grenade to it. Whoever opens that door, in any way, pulls the pin: a *ping*, the grenade drops, and it goes off
+  1.5 s later. You can grab it and throw it back.
+  - Terrorists see their own side's rigged doors from 15 m away. CTs see the grenade on the handle only within 2.5 m.
+  - A crouched CT holds **E** at it for 3 s to take it off, and keeps the grenade. A crouched Terrorist takes it back
+    in 1 s.
+- **The rigged lift.** The same, inside the lift's cabin while it stands at a floor. It goes off when the lift's doors
+  next open at **another** floor.
+
 ## Bots
 
 Bots fill the teams up to **8 vs 8** (change it in the admin panel or with `BOTS`): with 6 people playing there are 10

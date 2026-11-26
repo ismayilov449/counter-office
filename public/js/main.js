@@ -42,6 +42,7 @@ import { disguise } from './disguise.js'; // Disguise
 import { initBody, body } from './body.js'; // body: "Downed, not dead" + "Play dead"
 import { initWounds, wounds } from './wounds.js'; // wounds: drag a downed mate, interrogate, the downed suicide, wounds, adrenaline
 import { createTrackerClient } from './phonetracker.js';
+import { createHaunt } from './haunt.js';
 import { createStorm } from './storm.js'; // Hotel Meridian's storm: rain, lightning, thunder // phone tracker (ROADMAP 14): the CTs' scans, the holder's screen
 import { TRACKER } from '/shared/phonetracker.js';
 import { createGasClient } from './gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, its blast
@@ -277,6 +278,9 @@ const gas = createGasClient({ scene, camera, fx, audio, me, brk: () => game.brk,
 const remotes = new Map();
 const drops = new Map();
 const storm = createStorm({ scene, renderer, audio, camera, map: () => map });
+// haunt: ghosts, grenades tied to doors and the lift (Mansion maps)
+const haunt = createHaunt({ me, game, hud, audio, send: m => net.send(m), map: () => map, keys: () => keys, coll: () => coll, scene,
+  liftY: () => elevator.cabinY(), showLights: L => { world?.setLights(L); setRooms(map.rooms, L); } });
 const trk = createTrackerClient({ me, hud, audio, send: m => net.send(m), remotes, cfg: () => game.cfg, map: () => map, current: () => current(), jammers: () => jammerModels, scene });
 let dropList = [];
 let plantedBomb = null;
@@ -2396,6 +2400,7 @@ document.addEventListener('keydown', e => {
   if (e.repeat) return;
   if (me.alive && xp.key(e.code)) return; // explosives: 1 / 2 cut the red / blue wire while defusing
   if (me.alive && gadgets.key(e.code)) return; // (1-4 switch cameras at the CCTV desk)
+  if (!me.alive && haunt.key(e.code)) return; // haunt: a ghost's 1 / 2 / 3
   if (SLOT_KEYS[e.code]) { if (me.alive) switchSlot(SLOT_KEYS[e.code]); return; }
   switch (e.code) {
     case 'Digit4': if (me.alive) cycleGrenades(); break;
@@ -2410,7 +2415,7 @@ document.addEventListener('keydown', e => {
       if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': if (me.drone && me.team === 'CT' && trk.on()) trk.scan(true); else startReload(); break; // (phone tracker: flying a drone, R scans from it)
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
-    case 'KeyG': if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker'].includes(current())) net.send({ t: 'drop', w: current() }); break;
+    case 'KeyG': if (!me.alive) { haunt.toggle(); break; } if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker'].includes(current())) net.send({ t: 'drop', w: current() }); break;
     case 'KeyB': openBuy(); break;
     case 'KeyO': openBuy(5); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;
@@ -3243,6 +3248,7 @@ const net = new Net({
   },
   round(m) {
     trk.reset(); // phone tracker
+    haunt.reset(); // haunt: a fresh haunt
     mortarInfo.target = mortarInfo.impact = null;
     spotted.clear();
     lostSpots.clear();
@@ -3352,6 +3358,7 @@ const gadgets = createGadgets({
   scene, me, net, audio, hud, fx, remotes, serverNow, stopEmote: () => stopEmote(),
   power: () => circuits.powered('cctv'), jammers: () => [...jammerModels.values()].map(e => e.p), // (power: the CCTV's circuit)
 });
+Object.assign(net.handlers, haunt.handlers); // haunt: haunt, hauntUsed, rigs
 Object.assign(net.handlers, trk.handlers); // phone tracker: trk, trkScan, trkInfo, trkHit
 Object.assign(net.handlers, storm.handlers); // storm: a lightning strike
 Object.assign(net.handlers, gas.handlers); // gas: gasLeak, gasBoom, gasCough
@@ -3569,6 +3576,8 @@ function updateCamera(dt, now) {
     const z = WEAPONS[current()].zoom;
     if (me.scope && z) fov = z[me.scope - 1];
     hud.spectating(null);
+  } else if (haunt.camera(camera, dt)) {
+    hud.spectating(null); // haunt: floating as a ghost
   } else {
     const since = me.deathAt ? now - me.deathAt : Infinity;
     const canSpec = me.joined && since > 2500;
@@ -3800,13 +3809,16 @@ function updateHud(now) {
     hint = shieldHint(hint); // shield: grab / let go / held
     hint = tieHint(hint); // escape: a crouched Terrorist zip-ties (before the shield, as on the server)
     if (!shieldHolding() && elevator.aiming() && (gh = elevator.hint())) hint = gh; // elevator: aimed at the lift, E goes to it first (as on the server; holding a hostage, E lets go)
+    hint = haunt.useHint(hint, current()); // haunt: a grenade tied to a door or the lift (before the doors, as on the server)
     hint = cc.hint(hint); // closecombat: an enemy's back within reach (over the lift, as on the server); a door: kick it running, crouch + hold E to hold it shut
   }
   if (!hint && (gh = ug.hint())) hint = gh; // underground: by an air vent (no E use: only when nothing else is said)
+  if ((gh = haunt.hint())) hint = gh; // haunt: dead this round, G floats as a ghost
   if ((gh = stealth.inside())) hint = gh; // stealth: in a trunk, E jumps out (before anything else, as on the server)
   hud.hint(hint);
   if (me.act && gadgets.progress(me.act.a)) hud.progress(gadgets.progress(me.act.a), me.act.pr);
   else if (me.act && elevator.progress(me.act.a)) hud.progress(elevator.progress(me.act.a), me.act.pr); // elevator
+  else if (me.act && haunt.progress(me.act.a)) hud.progress(haunt.progress(me.act.a), me.act.pr); // haunt: tying a grenade, taking one off
   else if (me.act) hud.progress(me.act.a === 'plant' ? 'Planting the bomb...' : me.act.a === 'mine' ? 'Defusing the mine...' : me.act.a === 'satchel' ? 'Defusing the satchel charge...' : me.act.a === 'fuse' ? (game.lights.power === false ? 'Restoring the power...' : 'Cutting the power...') : 'Defusing the bomb...', me.act.pr);
   else if (me.mortar?.phase === 'setup') hud.progress('Setting up the mortar...', clamp((now - me.mortar.start) / (me.mortar.until - me.mortar.start), 0, 1));
   else hud.progress(null);
@@ -3846,6 +3858,7 @@ function updateHud(now) {
     hud.radar(me.alive ? { p: me.p, yaw: me.yaw } : null, radarMates, bomb, hostageDots, [...mortarRadarMarks(performance.now()), ...trk.radarMarks(performance.now())], radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
   }
   drawMortarMap(performance.now(), radarMates);
+  haunt.frame(performance.now()); // haunt: a ghost's flicker, the rigged grenades
   trk.frame(performance.now()); // phone tracker: the holder's screen, the direction finder's beep
   storm.frame(performance.now()); // storm: rain, the flash, the thunder
   if (menu.isOpen && Math.floor(now / 250) !== Math.floor((now - 16) / 250)) menu.render();

@@ -39,6 +39,7 @@ import { createWounds } from './lib/wounds.js'; // wounds: drag a downed mate, i
 import { createEscape } from './lib/hostage-escape.js';
 import { warOn } from './shared/war.js'; // war: ROADMAP group 13
 import { createPhoneTracker } from './lib/phonetracker.js';
+import { createHaunt } from './lib/haunt.js';
 import { createStorm } from './lib/storm.js'; // Hotel Meridian's storm // phone tracker (ROADMAP group 14)
 import { createCarry } from './lib/hostage-carry.js'; // carrying wounded hostages (ROADMAP 6.2) // hostages try to escape (ROADMAP 6.1), zip ties
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
@@ -870,8 +871,8 @@ function exitCar(p) {
   send(p, { t: 'exited', p: spot, yaw: c.yaw });
 }
 
-function nearestDoor(p) {
-  let best = null, bd = 1.9;
+function nearestDoor(p, max = 1.9) {
+  let best = null, bd = max;
   (MAP.doors || []).forEach((d, i) => {
     const c = doorCenter(d);
     const dd = dist2(p.p, c);
@@ -1578,6 +1579,20 @@ const cc = createCloseCombat({ game, players, send, broadcast, sendMe: p => send
   doorBlocked: box => game.hostages.some(h => h.state !== 'dead' && h.state !== 'rescued' && overlapsAny([box], h.p[0], h.p[1], h.p[2], PLAYER.radius, PLAYER.height)) || world.cars.some(c => carBoxes(c).some(b => [0, 1, 2].every(k => b.min[k] < box.max[k] && b.max[k] > box.min[k]))) });
 // explosives: ROADMAP group 7 (lib/explosives.js)
 const explosives = createExplosives({ game, players, send, broadcast, sendMe: p => sendMe(p), corpses: () => disguise.corpses, now, world:() => world, eyeOf: p => eyeOf(p), mates: (a, b) => mates(a, b), applyDamage: (...a) => applyDamage(...a), explodeNade: n => explodeNade(n), explodeSatchel: s => explodeSatchel(s), explodeBomb: () => explodeBomb() });
+// haunt: ghosts' one haunt a round, grenades tied to doors and the lift (Mansion maps; lib/haunt.js)
+const haunt = createHaunt({ game, players, map: () => MAP, world: () => world, now, send, sendMe: p => sendMe(p), broadcast,
+  nearestDoor: (p, max) => nearestDoor(p, max), thrown: (n, path) => explosives.thrown(n, path),
+  lift: t => (MAP.elevator ? elevator.cabin(t) : null), inLift: pos => !!MAP.elevator && elevator.inside(pos),
+  closeDoor: i => {
+    const d = MAP.doors[i], box = doorBox(d, 0);
+    if ([...players.values()].some(q => q.alive && overlapsAny([box], q.p[0], q.p[1], q.p[2], PLAYER.radius, PLAYER.height)) ||
+      game.hostages.some(h => h.state !== 'dead' && h.state !== 'rescued' && overlapsAny([box], h.p[0], h.p[1], h.p[2], PLAYER.radius, PLAYER.height))) return false;
+    const states = world.doorStates.slice();
+    states[i] = 0;
+    world.setDoors(states);
+    broadcast({ t: 'doors', doors: states, i, quiet: 1, p: doorCenter(d) });
+    return true;
+  } });
 const bots = new BotManager({
   players: () => players, game: () => game, map: () => MAP, world: () => world, cfg: () => CFG, now,
   inTeam, enemies: (a, b) => !mates(a, b) && !b.playingDead /* body: bots take a "corpse" for dead */, mode: () => CFG.gameMode, mapMode: () => mapMode(MAP), phase: () => game.phase,
@@ -2158,6 +2173,7 @@ function updateActions(t) {
     if (a.type.startsWith('pw')) { circuits.act(p, a, t); continue; } // power: a breaker, the generator, cutting the lift's cable
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'disguise') { disguise.act(p, a, t); continue; } // Disguise: changing into a dead enemy's uniform
+    if (a.type === 'rig' || a.type === 'rigOff') { haunt.act(p, a, t); continue; } // haunt: tying a grenade to a door or the lift, taking one off
     if (a.type === 'xpTrap') { explosives.act(p, a, t); continue; } // explosives: hiding a grenade under a dead mate
     if (a.type === 'fuse') {
       if (t - a.start >= a.dur) { p.act = null; setPower(!game.lights.power, p); }
@@ -2262,6 +2278,7 @@ function onUse(p, m, t) {
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   const plantHere = game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p);
   const defuseHere = game.phase === 'live' && p.team === 'CT' && game.bomb.state === 'planted' && dist3(p.p, game.bomb.p) < 1.8;
+  if (haunt.use(p, t)) return; // haunt: a crouched player takes a rigged grenade off; a Terrorist with the HE in hand ties it to a closed door or the lift
   if (explosives.useBody(p, t)) return; // explosives: a CT touching a booby-trapped body sets it off; a crouched T with an HE traps a dead mate
   if (!plantHere && !defuseHere && disguise.tryStart(p, t)) return; // Disguise: crouched over a dead enemy, hold E to put on their uniform
   if (flood.onUse(p, t)) return; // Floodgate: hold E at the valve in the storm drain
@@ -3926,6 +3943,7 @@ function handle(p, m) {
       sendRoster();
       checkVotes();
       break;
+    case 'haunt': haunt.haunt(p, m); break; // haunt: a ghost's scare (Mansion maps)
     case 'scan': tracker.scan(p, t, !!m.drone); break; // phone tracker: Mouse1 with it out (R flying a drone: from the drone)
     case 'radio': {
       const menu = RADIO[m.menu];
@@ -4093,6 +4111,7 @@ function tick() {
 
   ug.tick(t); // underground: grenades dropping out of the air vents
   explosives.tick(t); // explosives: a grenade held too long goes off in the hand
+  haunt.tick(t); // haunt: rigged doors opening, the rigged lift arriving
   for (let i = game.nades.length - 1; i >= 0; i--) {
     if (t >= game.nades[i].at) explodeNade(game.nades.splice(i, 1)[0]);
   }
@@ -4234,6 +4253,7 @@ wss.on('connection', ws => {
   sendSatchels(p);
   sendGadgets(p);
   elevator.send(p); // elevator
+  haunt.send(p); // haunt: rigged doors and the lift
   circuits.send(p); // power: the breakers, the generator, burst bulbs, the lift's cable
   sendRoster();
   ws.on('message', data => {
