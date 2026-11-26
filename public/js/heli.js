@@ -164,14 +164,14 @@ export function createHeli(ctx) {
     add(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 10), dark, 0.25, 2.65, 1.95, Math.PI / 2);
     // inside: the instrument panel (its screens glow), two seats in front and a bench behind, the pilot's stick
     add(new THREE.BoxGeometry(1.5, 0.3, 0.35), dark, 0, 1.25, -1.45, -0.4);
-    for (const x of [-0.5, -0.12]) add(new THREE.PlaneGeometry(0.28, 0.18), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.34, -1.27, -0.4);
+    for (const x of [-0.52, 0.52]) add(new THREE.PlaneGeometry(0.28, 0.18), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.34, -1.27, -0.4);
     // the moving map in front of the pilot: the radar's own picture (the HUD's canvas, copied a few times a second)
     // the flight display in front of the pilot (drawn by mfd(): a moving map turning with it, the compass, the readouts)
     if (ctx.hud.el) {
       mfdCanvas = document.createElement('canvas');
       mfdCanvas.width = mfdCanvas.height = 256;
       mapTex = new THREE.CanvasTexture(mfdCanvas);
-      add(new THREE.PlaneGeometry(0.42, 0.42), new THREE.MeshBasicMaterial({ map: mapTex }), 0.3, 1.38, -1.25, -0.4);
+      add(new THREE.PlaneGeometry(0.42, 0.42), new THREE.MeshBasicMaterial({ map: mapTex, transparent: true, opacity: 0.72, depthWrite: false }), 0, 1.38, -1.25, -0.4); // (in the middle of the panel, a little see-through)
     }
     // the pilot's own legs (only we see them, from his seat: everyone else sees his body sitting there)
     legs = new THREE.Group();
