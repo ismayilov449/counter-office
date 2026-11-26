@@ -1,7 +1,7 @@
 // Mansion scares, the server's part (shared/haunt.js). Fresh test server: GAME_PORT=3995 MAP=cs_mansion BOTS=0
 // START_MONEY=16000 FREEZE_TIME=1 (no browser). Alice (CT), Bob (T).
 // Rigged door: Bob, HE in hand, ties it to the hall door; Alice crouched takes it off (and keeps the grenade). Bob ties
-// another; Alice opens the door: the pin pings, the grenade drops and goes off 1.5 s later, Alice is hurt.
+// another; Alice opens the door: the pin pings, 0.5 s later it goes off on her side of the doorway, Alice is hurt.
 // Ghosts: Alice dead: a haunt far from any enemy is refused (not spent); a knock by Bob is heard; a second haunt is refused.
 // Next round, the lift: Bob ties his grenade in the cabin, rides it up: when its doors open upstairs, the pin.
 import { player, sleep, until, checker, spot } from '../disguise/lib.mjs';
@@ -54,7 +54,8 @@ await sleep(300);
 await use(alice, 100);
 ok('the door opens: the pin', await until(() => got(alice, 'sfx', m => m.s === 'pin').length > 0, 1000));
 ok('the grenade drops', got(alice, 'nade').length > 0);
-ok('it goes off 1.5 s later', await until(() => got(alice, 'boom').length > 0, 2500));
+ok('it goes off about 0.5 s later', await until(() => got(alice, 'boom').length > 0, 900));
+ok(`on Alice's side of the doorway (x ${got(alice, 'boom')[0]?.p[0]}, the door at ${c[0].toFixed(2)})`, got(alice, 'boom')[0]?.p[0] > c[0] + 0.5);
 await sleep(300);
 ok(`Alice is hurt (${got(alice, 'dmg')[0]?.d} damage)`, got(alice, 'dmg').length > 0);
 

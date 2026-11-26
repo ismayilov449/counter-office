@@ -859,8 +859,8 @@ still gets found, a phone that moves stays fuzzy.**
   - **2:** the lights of the room you're in flicker;
   - **3:** the nearest open door slams shut. If it's already shut, it shakes in its frame.
 - **Rigged doors.** A Terrorist with the **HE grenade in hand** holds **E** at a closed door for 2.5 s to tie the
-  grenade to it. Whoever opens that door, in any way, pulls the pin: a *ping*, the grenade drops, and it goes off
-  1.5 s later. You can grab it and throw it back.
+  grenade to it. Whoever opens that door, in any way, pulls the pin: its fuse is cut short, so a *ping*, and
+  **0.5 s later** the blast, on the opener's side of the doorway. Even someone rushing through is still in it.
   - Terrorists see their own side's rigged doors from 15 m away. CTs see the grenade on the handle only within 2.5 m.
   - A crouched CT holds **E** at it for 3 s to take it off, and keeps the grenade. A crouched Terrorist takes it back
     in 1 s.
