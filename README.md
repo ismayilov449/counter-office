@@ -905,6 +905,13 @@ still gets found, a phone that moves stays fuzzy.**
 - **The pilot's weapons.** Hold **Mouse 1** to fire the **PKT** under the nose (no reloads; it fires ahead, not out to
   the sides). A **target marker** shows where its bullets will hit (the middle of your screen). **G** fires flares (2 a
   round): for 3 s, rockets fired at it fly past and their blasts don't hurt it.
+- **Tail rotor.** Bullets on the tail boom wear its tail rotor down; after 300 damage it's shot away (everyone is
+  told) and stops turning. From then on the helicopter keeps turning by itself while it flies: fight it with the
+  mouse and land it.
+- **The roof pad.** A white H on the east balcony of the top floor. Land on it and everyone gets out in front of the
+  balcony's doorway, straight into the house.
+- **Smoke screen.** **T** while flying (2 a round) drops a smoke cloud on the ground under it, to get out or slide
+  down the rope under cover.
 - **Steal it.** It belongs to the CTs, but its pad is behind the house, and Terrorists can get in too: whichever side
   gets in first has it (everyone is told when it's stolen), to fly it and shoot from it. It never wins or loses a
   round. While the Terrorists have it, the CTs' bullets and rockets hurt it, and the Terrorists' don't.

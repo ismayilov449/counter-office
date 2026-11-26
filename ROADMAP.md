@@ -487,6 +487,17 @@ rescue, rotor wash.
 **Left out (offered, not chosen):** the house remembering damage between rounds, round events, a team commander, kill
 streak support, a story match.
 
+## 21. Fighting the helicopter, the roof pad, smoke (both Mansion maps, added 2026-11-26) — **built 2026-11-26**
+
+1. **The tail rotor.** 300 damage of bullets on the tail boom shoots it away (everyone is told): from then on it turns
+   by itself (0.9 rad/s while flying), the pilot fights it with the mouse and lands.
+2. **The roof pad.** An H on the east balcony (the top floor). Landed on it, everyone gets out in front of the
+   balcony's doorway into the house.
+3. **Smoke screen.** T flying (2 a round): a smoke grenade's cloud on the ground under it.
+
+**Left out (offered, not chosen):** a car bomb, shooting the tyres, headlights and horn, a ride in the boot, car
+alarms, the pilot shot through the glass (a passenger takes over), lifting a car.
+
 ---
 
 ## Missing from the map today

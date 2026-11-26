@@ -13,7 +13,7 @@ const EYE = [0.45, 1.6, -0.55]; // (the pilot's eyes in the cockpit, full size: 
 // ctx: { me, game, scene, audio, hud, send(m), map(), coll(), keys(), remotes }
 export function createHeli(ctx) {
   const { me } = ctx;
-  let model = null, pad = null, rotor = null, tailRotor = null, paint = null, beacon = null, mapTex = null, mfdCanvas = null, mapAt = 0, legs = null, view = null;
+  let model = null, pad = null, roofPad = null, rotor = null, tailRotor = null, paint = null, beacon = null, mapTex = null, mfdCanvas = null, mapAt = 0, legs = null, view = null;
   let radarData = null; // (the HUD radar's dots this frame: main.js heliC.radar()) // view: { p, yaw, tilt, roll, st, hp, fuel, seats }
   let own = null; // the pilot's own flying: { p, yaw, v, tilt, roll, landed, engine, sent }
   // the pilot's view: from the cockpit (look: the eyes' pitch) or chasing it from behind (pitch: the camera's height)
@@ -125,7 +125,7 @@ export function createHeli(ctx) {
   }
 
   function build() {
-    if (model) { ctx.scene.remove(model, pad); model = pad = null; }
+    if (model) { ctx.scene.remove(model, pad); if (roofPad) ctx.scene.remove(roofPad); model = pad = roofPad = null; }
     const H = ctx.map().heli;
     if (!H) return;
     // (built at full size, front -z, drawn at shared/heli.js's S; its boxes in shared/heli.js stay a 2.0 x 4.4 body)
@@ -226,6 +226,8 @@ export function createHeli(ctx) {
     pad = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
     pad.position.set(H.p[0], H.p[1] + 0.02, H.p[2]);
     ctx.scene.add(pad);
+    // and the roof pad on the balcony (map.heli.roof), smaller: the balcony is 3 m wide
+    if (H.roof) { roofPad = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 2.8).rotateX(-Math.PI / 2), pad.material); roofPad.position.set(H.roof.p[0], H.roof.p[1] + 0.02, H.roof.p[2]); ctx.scene.add(roofPad); }
     view = { p: H.p.slice(), yaw: H.yaw, tilt: 0, roll: 0, st: 0, hp: 100, fuel: HELI.fuel, seats: [] };
   }
   const shown = () => (own && me.heli?.seat === 0 ? own : view);
@@ -275,8 +277,9 @@ export function createHeli(ctx) {
     },
     snapshot(hl) {
       if (!hl || !view) return;
-      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0, flares = 0] = hl;
-      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side], flares });
+      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0, flares = 0, smokes = 0, tailOut = 0] = hl;
+      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side], flares, smokes, tailOut });
+      if (own) own.tailOut = !!tailOut; // (shared/heli.js stepHeli: it turns by itself)
       if (st >= 2 && own) own.engine = false; // (falling or wrecked: the server has it now)
       if (st >= 2 && me.heli?.seat === 0) own = null;
     },
@@ -287,6 +290,12 @@ export function createHeli(ctx) {
     // Q in it: on the ground, to a door gun and back (like the pickup's gun).
     // main.js fireBullet, flying: where the nose PKT fires from and to (null: not the pilot).
     aim: camera => (pilotNow() && view.st < 2 ? aimAt(camera) : null),
+    // T flying: a smoke screen under it.
+    smoke() {
+      if (!pilotNow() || view.st >= 2) return;
+      if (!(view.smokes > 0)) { ctx.hud.small('No smoke left', 1.5); return; }
+      ctx.send({ t: 'heliSmoke' });
+    },
     // G flying: flares.
     flare() {
       if (!pilotNow() || view.st >= 2) return;
@@ -359,7 +368,7 @@ export function createHeli(ctx) {
       if (me.alive && me.heli) {
         const fuel = Math.ceil(view.fuel), hull = view.hp, gun = GUNNERS.includes(me.heli.seat), q = view.st === 1 ? '' : gun ? ' · Q: leave the gun' : ' · Q: a door gun';
         return me.heli.seat === 0
-          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · Mouse1 nose gun · G flares (${view.flares}) · W/S A/D fly · Space up · Ctrl down · V: view · E: get out${q}`
+          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · ${view.tailOut ? 'TAIL ROTOR HIT: LAND IT · ' : ''}Mouse1 nose gun · G flares (${view.flares}) · T smoke (${view.smokes}) · W/S A/D fly · Space up · Ctrl down · V: view · E: get out${q}`
           : `${gun ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}${q}`;
       }
       if (!me.alive || (me.team !== 'CT' && me.team !== 'T') || view.st >= 2) return null;
@@ -392,7 +401,7 @@ export function createHeli(ctx) {
       spinV += ((running && view.st !== 3 ? 1 : 0) - spinV) * Math.min(1, dt * 0.8);
       spinA += spinV * dt * 28;
       rotor.rotation.y = spinA;
-      tailRotor.rotation.x = spinA * 1.7;
+      if (!view.tailOut) tailRotor.rotation.x = spinA * 1.7; // (shot away: it stands still)
       model.visible = true;
       paint.color.setHex(view.st === 3 ? 0x1a1a1a : 0x1d2a44);
       beacon.visible = view.st !== 3 && Math.floor(now / 600) % 2 === 0; // (the tail's red light blinks)

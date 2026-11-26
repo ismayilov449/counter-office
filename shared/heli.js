@@ -15,6 +15,12 @@ export const HELI = {
   // the pilot's: Mouse1 fires the nose PKT (the user swapped its rockets for it, 2026-11-26); G fires flares (`flares`
   // a round): for `flareTime` s rockets miss it (they fly past, their blasts don't hurt it)
   flares: 2, flareTime: 3,
+  // T fires a smoke screen (`smokes` a round): a smoke grenade's cloud on the ground under it, to get out or slide down
+  // the rope under cover
+  smokes: 2,
+  // the tail rotor: `tail` damage of bullets on the tail boom breaks it, and from then on it turns by itself
+  // (`tailSpin` rad/s while it flies: the pilot has to fight it with the mouse and land)
+  tail: 300, tailSpin: 0.9,
 };
 // Seats: [right, up, forward] from its base (the skids' bottom, in the middle): the pilot (front right), a passenger,
 // the two door gunners (in the open doors, each on a mounted PKT: GUNNERS), a passenger.
@@ -48,7 +54,7 @@ function rotBox(p, yaw, along, w, l, y0, y1, extra) {
 // Its boxes: the body below the windows (metal), the cabin's glass over it (bullets go through: hglass), the tail boom.
 export function heliBoxes(h) {
   if (!h) return [];
-  return [rotBox(h.p, h.yaw, 0, 2.0 * S, 4.4 * S, 0.45 * S, 1.35 * S), rotBox(h.p, h.yaw, 0, 2.0 * S, 4.4 * S, 1.35 * S, 2.35 * S, { hglass: 1 }), rotBox(h.p, h.yaw, -4.1 * S, 0.5 * S, 3.8 * S, 1.35 * S, 1.95 * S)];
+  return [rotBox(h.p, h.yaw, 0, 2.0 * S, 4.4 * S, 0.45 * S, 1.35 * S), rotBox(h.p, h.yaw, 0, 2.0 * S, 4.4 * S, 1.35 * S, 2.35 * S, { hglass: 1 }), rotBox(h.p, h.yaw, -4.1 * S, 0.5 * S, 3.8 * S, 1.35 * S, 1.95 * S, { tail: 1 })];
 }
 
 // Its hull for bumping into things: three discs along the body (r 1.0) from its belly to its roof, and the tail's end.
@@ -99,6 +105,7 @@ export const airBoxes = (map, boxes) => boxes.map(b => trim(map, b)).filter(Bool
 // Returns the speed of a crash into something or onto the ground (0: none). h: { p, yaw, v, tilt, roll, landed }.
 // area: [[x0, z0], [x1, z1]] it stays inside (map.heli.area; a soft edge, no crash).
 export function stepHeli(h, input, dt, boxes, engine = true, area = null) {
+  if (h.tailOut && engine && !h.landed) h.yaw += HELI.tailSpin * dt; // (the tail rotor shot away: it turns by itself)
   // (the mouse turned it: not into a wall, its tail swinging round; already caught in one, it may move out of it)
   // (swept in small steps: a quick turn would swing the tail's end through a thin wall)
   if (h.okYaw != null && h.yaw !== h.okYaw && !hits(boxes, h.p, h.okYaw)) {

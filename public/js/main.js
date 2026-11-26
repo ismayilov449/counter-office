@@ -2462,7 +2462,7 @@ document.addEventListener('keydown', e => {
       break;
     case 'KeyY': openChat(false); break;
     case 'KeyU': openChat(true); break;
-    case 'KeyT': spray(); break;
+    case 'KeyT': if (heliC.piloting()) heliC.smoke(); else spray(); break; // (heli: the pilot's T fires a smoke screen)
     case 'KeyJ': if (me.alive && me.team !== 'SPEC') toggleMenu(emoteMenu); break;
     case 'KeyV':
       if (heliC.piloting()) heliC.toggleView(); // heli: the cockpit or the chase camera

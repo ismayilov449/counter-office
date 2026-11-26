@@ -233,7 +233,10 @@ export default {
   safe: RM.safe,
   ropes: RM.ropes,
   // ROADMAP 18: the SWAT helicopter's pad on the back garden's lawn, its nose to the west (shared/heli.js).
-  heli: { p: [-36, 0, -3.5], yaw: Math.PI / 2, area: [[-47.2, -20.5], [27.2, 20.5]] }, // (area: inside the estate walls, x -49.45..29.2, z +-22.8)
+  heli: { p: [-36, 0, -3.5], yaw: Math.PI / 2, area: [[-47.2, -20.5], [27.2, 20.5]],
+    // the roof pad on the east balcony (the top floor, x -6.4..-3.3, z -9.5..6.5); landed on it, everyone gets out in
+    // front of the balcony's doorway into the house (z -2.5..-1), one beside the other
+    roof: { p: [-4.85, 4.27, 0.6], exits: [[-5.9, -1.75], [-5.3, -1.75], [-4.7, -1.75], [-4.1, -1.75], [-3.7, -1.75]] } }, // (area: inside the estate walls, x -49.45..29.2, z +-22.8)
   elevator: RM.elevator, // elevator: the lift (see mansion_elevator.js and shared/elevator.js)
   towers: TOWERS, // phone tracker: the cell towers (see mansion_phonetracker.js and shared/phonetracker.js)
   power: POWER, // power: the breaker panel, the generator, the machine room (see mansion_power.js and shared/power.js)
