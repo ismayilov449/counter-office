@@ -447,6 +447,26 @@ the round, funny awards.
 **Left out (offered, not chosen):** the police helicopter's searchlight, looping the CCTV, the dumbwaiter, rescued
 hostages talking, the last Terrorist escaping over the garden wall.
 
+## 18. The SWAT helicopter (both Mansion maps, CTs only, added 2026-11-26, not built yet)
+
+The user's choices: CTs only; for getting in and covering fire, not a gunship; free once a round; both Mansion maps.
+
+1. **The helipad.** Every round the helicopter waits on a helipad on the CT street. Once it's shot down it's gone
+   until the next round.
+2. **Seats.** A pilot, **two door gunners** (a mounted PKT each side, like the pickup's) and two passengers. E gets
+   in and out, as with the cars.
+3. **Flying.** Simple, like the drone but heavier: W/S forward and back, A/D sideways, Space/Ctrl up and down, the
+   mouse turns. It can land on anything flat, the Mansion's roof most of all.
+4. **The entry.** It lands on the roof or hovers low, and the CTs jump out right above the Terrorists. (Group 16's
+   roof rope fits here: slide down from the hovering helicopter.)
+5. **Limits.**
+   - Fuel for 90 s in the air, then it must land or it crashes.
+   - The rotor is heard across the whole map, and it drowns out the sound outdoors under it.
+   - The Terrorists can shoot the pilot through the glass. Bullets wear it down slowly, and 2 RPG hits bring it down.
+6. **Shot down.** It spins, falls and explodes, killing whoever is still inside. Jump out in time and you live.
+
+*Bots: they don't fly it; Terrorist bots shoot at it.*
+
 ---
 
 ## Missing from the map today
