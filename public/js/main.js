@@ -3914,6 +3914,7 @@ function updateHud(now) {
       bomb = { p: game.bomb.p, planted: game.bomb.s === 'planted' };
     }
     const hostageDots = me.team === 'T' ? [] : [...hostages.values()].filter(h => h.state < 2).map(h => ({ p: h.p, follow: h.state === 1 }));
+    if (heliC.piloting()) heliC.radar(radarMates, radarEnemies(performance.now()), hostageDots); // heli: the same dots on the cockpit's display
     hud.radar(me.alive ? { p: me.p, yaw: heliC.piloting() ? heliC.yaw() : me.yaw } : null, radarMates, bomb, hostageDots, [...mortarRadarMarks(performance.now()), ...trk.radarMarks(performance.now())], radarEnemies(performance.now()), jammedHere() || ug.noSignal()); // underground: (|| ug.noSignal())
   }
   drawMortarMap(performance.now(), radarMates);

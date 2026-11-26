@@ -12,7 +12,8 @@ export const CAR = {
   seats: 3, hp: 400, blastRadius: 7,
 };
 // [right, forward, up] offsets of each seat from the car's centre. The pickup's gunner stands in the bed.
-const SEATS = { car: [[-0.42, 0.15, 0.2], [0.42, 0.15, 0.2], [0, -0.95, 0.2]], pickup: [[-0.42, 0.7, 0.2], [0, -1.0, 0.95]] };
+// (the front seats 15 cm further back than they were: the user couldn't see the wheel from the driver's seat)
+const SEATS = { car: [[-0.42, 0.0, 0.2], [0.42, 0.0, 0.2], [0, -0.95, 0.2]], pickup: [[-0.42, 0.55, 0.2], [0, -1.0, 0.95]] };
 for (const list of Object.values(SEATS)) for (const s of list) for (let i = 0; i < 3; i++) s[i] *= K;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

@@ -961,10 +961,11 @@ function carWheels(g, spots, r, w) {
 }
 const carGlass = () => new THREE.MeshLambertMaterial({ color: 0x5a7488, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
 // The inside you see through the glass: the front seats (headrests), the back bench (none in a pickup's cab), the
-// dashboard with its dials, the steering wheel on the driver's side (left: shared/vehicles.js seat 0), the console and
-// gear stick between the seats, the door panels. front: the seats' z; dash: the dashboard's z; back: the bench's z.
+// dashboard with its dials, the steering wheel in front of the driver (left, x -0.42: shared/vehicles.js seat 0), the
+// console and gear stick between the seats, the door panels. front: the seats' z; dash: the dashboard's z; back: the
+// bench's z.
 function carInterior(g, w, front, dash, back) {
-  const cloth = lam(0x3a3631), plastic = lam(0x1e1f21), dial = new THREE.MeshBasicMaterial({ color: 0xd8f0ff }), x = w / 2 - 0.5;
+  const cloth = lam(0x3a3631), plastic = lam(0x1e1f21), dial = new THREE.MeshBasicMaterial({ color: 0xd8f0ff }), x = 0.84; // (the seats' middles at x +-0.42)
   for (const s of [-1, 1]) {
     g.add(mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), cloth, s * x * 0.5, 0.62, front, false));
     const seatBack = mesh(new THREE.BoxGeometry(0.48, 0.56, 0.1), cloth, s * x * 0.5, 0.92, front + 0.27, false);
@@ -979,11 +980,12 @@ function carInterior(g, w, front, dash, back) {
   const panel = mesh(new THREE.BoxGeometry(w - 0.16, 0.2, 0.32), plastic, 0, 0.86, dash, false);
   panel.rotation.x = -0.25;
   g.add(panel);
+  // (the wheel well up in front of the driver's eyes, about 45 cm ahead of them: in view from his seat)
   const wheelX = -x * 0.5;
-  for (const dx of [-0.07, 0.07]) g.add(mesh(new THREE.CircleGeometry(0.04, 10), dial, wheelX + dx, 0.95, dash + 0.17, false)); // (the dials behind the wheel)
-  const wheel = mesh(new THREE.TorusGeometry(0.17, 0.022, 6, 16), plastic, wheelX, 0.92, dash + 0.33, false);
+  for (const dx of [-0.07, 0.07]) g.add(mesh(new THREE.CircleGeometry(0.04, 10), dial, wheelX + dx, 0.98, dash + 0.12, false)); // (the dials behind the wheel)
+  const wheel = mesh(new THREE.TorusGeometry(0.17, 0.022, 6, 16), plastic, wheelX, 1.02, dash + 0.24, false);
   wheel.rotation.x = -0.45;
-  g.add(wheel, mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.3, 6).rotateX(Math.PI / 2 - 0.45), plastic, wheelX, 0.87, dash + 0.22, false));
+  g.add(wheel, mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.22, 6).rotateX(Math.PI / 2 - 0.45), plastic, wheelX, 0.96, dash + 0.15, false));
   g.add(mesh(new THREE.BoxGeometry(0.22, 0.16, Math.abs(front - dash) + 0.2), plastic, 0, 0.6, (front + dash) / 2 + 0.05, false)); // (the console)
   g.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 6), plastic, 0, 0.75, front - 0.2, false), mesh(new THREE.SphereGeometry(0.03, 8, 6), plastic, 0, 0.84, front - 0.2, false));
 }
@@ -1010,7 +1012,7 @@ export function createCarModel(color) {
   g.add(sideProfile([[-0.16, 1.4], [0.86, 1.4], [0.84, 1.5], [-0.12, 1.5]], 1.62, body, 0.02));
   for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.62, 0.06), body, s * 0.78, 1.18, 0.36, false)); // (the middle pillars)
   for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.16, 0.1, 0.08), body, s * 0.95, 1.0, -0.72, false)); // (the mirrors)
-  carInterior(g, 1.8, -0.1, -0.62, 0.78);
+  carInterior(g, 1.8, 0.2, -0.68, 0.95);
   carDetails(g, 1.8, -2.17, 2.17, 0.6);
   g.userData = { ...carWheels(g, [[-0.85, -1.4], [0.85, -1.4], [-0.85, 1.4], [0.85, 1.4]], 0.34, 0.22), roll: 0 };
   return mergeByMaterial(g);
@@ -1032,7 +1034,7 @@ export function createPickupModel(color) {
   g.add(mesh(new THREE.BoxGeometry(1.86, 0.4, 0.08), body, 0, 1.08, 2.33)); // tailgate
   g.add(mesh(new THREE.BoxGeometry(1.7, 0.04, 2.2), dark, 0, 0.9, 1.2)); // bed floor
   for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.16, 0.1, 0.08), body, s * 1.0, 1.1, -1.25, false)); // (the mirrors)
-  carInterior(g, 1.86, -0.55, -1.12, null);
+  carInterior(g, 1.86, -0.35, -1.2, null);
   // gun post and the PKT on top (the gunner holds it)
   g.add(mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.0, 8), dark, 0, 1.45, 0.45));
   g.add(mesh(new THREE.BoxGeometry(0.5, 0.06, 0.2), dark, 0, 1.95, 0.45));
