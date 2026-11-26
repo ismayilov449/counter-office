@@ -10,7 +10,8 @@ let fails = 0;
 const ok = (what, c) => { console.log((c ? 'OK   ' : 'FAIL ') + what); if (!c) { fails++; process.exitCode = 1; } };
 const h = { p: M.heli.p.slice(), yaw: M.heli.yaw, v: [0, 0, 0], tilt: 0, roll: 0, landed: true };
 const run = (input, secs, engine = true) => { let worst = 0; for (let t = 0; t < secs; t += 1 / 60) worst = Math.max(worst, stepHeli(h, input, 1 / 60, w.move('heli', h.p, 9), engine)); return worst; };
-ok('on its pad, it stays put', run({ fwd: 1, side: 0, up: 0 }, 1) === 0 && h.landed && Math.hypot(h.p[0] - 26.4, h.p[2] - 15.5) < 0.01);
+ok('on its pad, it stays put', run({ fwd: 1, side: 0, up: 0 }, 1) === 0 && h.landed && Math.hypot(h.p[0] - M.heli.p[0], h.p[2] - M.heli.p[2]) < 0.01);
+Object.assign(h, { p: [26.4, 0, 15.5], yaw: 0, okYaw: 0, v: [0, 0, 0], landed: true }); // (the rest from the CT street: over the estate wall, into the house)
 run({ fwd: 0, side: 0, up: 1 }, 2.5);
 ok(`it lifts off (${h.p[1].toFixed(2)} m)`, h.p[1] > 6 && !h.landed);
 run({ fwd: 0, side: 0, up: 1 }, 4);
@@ -24,6 +25,7 @@ run({ fwd: 0, side: 0, up: -1 }, 1.5); h.v = [0, 0, 0];
 const y0 = h.p[1];
 run({ fwd: 0, side: 0, up: -1 }, (y0 - 1.5) / HELI.climb + 1);
 ok(`down in the garden (y ${h.p[1].toFixed(2)})`, h.p[1] < 2.5);
+run({ fwd: 0, side: 0, up: 1 }, 0.6); // (back up off the grass: on the ground it only lifts off)
 const c2 = run({ fwd: 1, side: 0, up: 0.0 }, 5);
 ok(`it hits the house (crash ${c2.toFixed(1)} m/s at x ${h.p[0].toFixed(1)})`, c2 > 3 && h.p[0] > -7.5);
 // up over the roof terrace (the east balcony at 4.3, x -6.5..-3, z -9..6) and down onto it

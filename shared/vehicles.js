@@ -2,16 +2,18 @@
 // A car is { id, p: [x, y, z], yaw, speed, steer, vy }. Front faces -z at yaw 0, like players.
 import { raycastMap } from './physics.js';
 
+const K = 0.85; // (the cars' size: the user found them a bit big, 2026-11-26; the models are drawn at this scale too)
 export const CAR = {
-  maxSpeed: 17, maxReverse: 6, accel: 9, brake: 18, drag: 3, handbrake: 22,
-  wheelBase: 2.6, maxSteer: 0.6, step: 0.62, radius: 0.95, height: 1.45,
+  maxSpeed: 17, maxReverse: 6, accel: 9, brake: 18, drag: 3, handbrake: 22, scale: K,
+  wheelBase: 2.6 * K, maxSteer: 0.6, step: 0.62, radius: 0.95 * K, height: 1.45 * K,
   ram: 6, ramDamage: 120, // (a door marked ram, driven into at ram m/s or more, smashes: server.js onRam)
-  offsets: [-1.3, 0, 1.3], enterRange: 3.2,
+  offsets: [-1.3 * K, 0, 1.3 * K], enterRange: 3.2,
   // Seat 0 is the driver; 1 and 2 are passengers. Bullets and grenades wear the car down until it explodes.
   seats: 3, hp: 400, blastRadius: 7,
 };
 // [right, forward, up] offsets of each seat from the car's centre. The pickup's gunner stands in the bed.
 const SEATS = { car: [[-0.42, 0.15, 0.2], [0.42, 0.15, 0.2], [0, -0.95, 0.2]], pickup: [[-0.42, 0.7, 0.2], [0, -1.0, 0.95]] };
+for (const list of Object.values(SEATS)) for (const s of list) for (let i = 0; i < 3; i++) s[i] *= K;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -24,7 +26,7 @@ export function carBoxes(c) {
   const f = carForward(c.yaw);
   return CAR.offsets.map(k => {
     const x = c.p[0] + f[0] * k, z = c.p[2] + f[2] * k;
-    return { min: [x - 0.9, c.p[1], z - 0.9], max: [x + 0.9, c.p[1] + CAR.height, z + 0.9], mat: 'none', car: c.id };
+    return { min: [x - 0.9 * K, c.p[1], z - 0.9 * K], max: [x + 0.9 * K, c.p[1] + CAR.height, z + 0.9 * K], mat: 'none', car: c.id };
   });
 }
 
@@ -41,7 +43,7 @@ export function seatPos(c, seat = 0) {
 export function exitSpots(c) {
   const f = carForward(c.yaw);
   const right = [-f[2], 0, f[0]];
-  return [[-1.7, 0], [1.7, 0], [0, 3.2], [0, -3.2]].map(([r, b]) =>
+  return [[-1.7 * K, 0], [1.7 * K, 0], [0, 3.2 * K], [0, -3.2 * K]].map(([r, b]) =>
     [c.p[0] + right[0] * r - f[0] * b, c.p[1], c.p[2] + right[2] * r - f[2] * b]);
 }
 

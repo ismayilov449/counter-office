@@ -3932,6 +3932,7 @@ function handle(p, m) {
       break;
     case 'heli': heli.pilot(p, m, t); break; // heli: the pilot's browser, where it is
     case 'heliHit': heli.hit(p, m); break; // heli: it hit something
+    case 'heliSeat': heli.swap(p); break; // heli: Q on the ground, to a door gun and back
     case 'zip':
       if (m.off && p.zip) zipOff(p, t, 'letgo');
       break;

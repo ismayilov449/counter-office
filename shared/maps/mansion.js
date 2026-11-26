@@ -223,7 +223,6 @@ export default {
   vehicles: [
     { p: [-4, 17], yaw: -Math.PI / 2, color: '#5a6a48', type: 'pickup' },
     { p: [-19.75, -17.9], y: 1, yaw: -Math.PI / 2, color: '#7a1e1a' },
-    { p: [26.4, -11], yaw: Math.PI, color: '#1d2a44' }, // (the CTs' car on the street, facing the gate: ROADMAP 17, ram it)
   ],
   labels: {},
   // The zip line from the neighbour's roof to the roof terrace (see mansion2.js and shared/gadgets.js).
@@ -233,8 +232,8 @@ export default {
   // ROADMAP 16: the safe upstairs and the roof rope's spots (see mansion2.js and shared/safe.js).
   safe: RM.safe,
   ropes: RM.ropes,
-  // ROADMAP 18: the SWAT helicopter's pad at the north end of the CT street, its nose to the south (shared/heli.js).
-  heli: { p: [26.4, 0, 15.5], yaw: 0 },
+  // ROADMAP 18: the SWAT helicopter's pad on the back garden's lawn, its nose to the west (shared/heli.js).
+  heli: { p: [-36, 0, -3.5], yaw: Math.PI / 2 },
   elevator: RM.elevator, // elevator: the lift (see mansion_elevator.js and shared/elevator.js)
   towers: TOWERS, // phone tracker: the cell towers (see mansion_phonetracker.js and shared/phonetracker.js)
   power: POWER, // power: the breaker panel, the generator, the machine room (see mansion_power.js and shared/power.js)

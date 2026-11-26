@@ -77,16 +77,16 @@ await use(bob, 100); // (shut again)
 await until(() => got(alice, 'doors').at(-1)?.doors?.[G] === 0, 1500);
 
 // 4: the car into the gate
-const car = M.vehicles.findIndex(v => v.p[0] > 24);
+const car = M.vehicles.findIndex(v => v.type === 'pickup'); // (the pickup in the estate: from the inside, out through the gate)
 const cv = M.vehicles[car];
-alice.at(spot(cv.p[0] + 1.7, cv.p[1], 3), 0, 0);
+alice.at(spot(cv.p[0] - 1.6, cv.p[1] + 0.4, 3), 0, 0);
 await sleep(300);
 await use(alice, 100);
 ok('Alice gets into the CTs\' car', await until(() => got(alice, 'drive').length > 0, 1500));
 const id = got(alice, 'drive').at(-1).id;
 // drive to just short of the gate at speed (a few metres a message)
-const path = [[26.4, -9], [26.4, -6], [26, -3.5], [25.4, -1.5], [24.9, -0.9]];
-for (const [x, z] of path) { alice.send({ t: 'car', id, p: [x, 0, z], yaw: Math.PI / 2, speed: 8, steer: 0 }); await sleep(120); }
+const path = []; for (let i = 1; i <= 12; i++) path.push([cv.p[0] + ((22.4 - cv.p[0]) * i) / 12, cv.p[1] + ((-0.8 - cv.p[1]) * i) / 12]); // (a few metres a message, to just short of the gate)
+for (const [x, z] of path) { alice.send({ t: 'car', id, p: [x, 0, z], yaw: -Math.PI / 2, speed: 8, steer: 0 }); await sleep(120); }
 alice.send({ t: 'ram', car: id, door: G, speed: 8 });
 ok('the gate is smashed', await until(() => got(alice, 'doors').some(m => m.i === G && m.blown && m.doors[G] === GONE), 1500));
 ok('with a crash', got(alice, 'sfx', m => m.s === 'crash').length > 0);

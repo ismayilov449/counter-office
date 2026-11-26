@@ -879,9 +879,11 @@ still gets found, a phone that moves stays fuzzy.**
 
 ## The SWAT helicopter (Mansion maps, CTs)
 
-- **Where:** every round it waits on its pad (a white H) at the north end of the CT street.
+- **Where:** every round it waits on its pad (a white H) on the back garden's lawn, behind the house. It's a small
+  helicopter, about 4 m long with its tail.
 - **Getting in:** a CT presses **E** by it while it stands or hovers low. The first one in flies it, and up to 4 more
-  ride along. **E** gets you out. From up high you fall, and the landing hurts.
+  ride along. **E** gets you out. From up high you fall, and the landing hurts. **Q** on the ground moves you to a free
+  door gun and back, like the pickup's gun.
 - **Flying:** **W/S** forward and back, **A/D** sideways, **Space** up, **Ctrl** down, the mouse turns it. You see it
   from behind, and the pilot can't shoot. It lands on anything flat: the street, the garden, the east balcony, the roof.
   Its tail is long, and it won't turn into a wall.
@@ -908,8 +910,8 @@ still gets found, a phone that moves stays fuzzy.**
   - **blow it:** any explosion within 3 m breaks the lock.
 - **The estate gate.** Two steel leaves now close the gateway from the CT street. It starts shut but unlocked (E opens
   it), and the Terrorists can lock it with L.
-- **Ram it.** The CTs have a car on their street. Drive it into the gate or the garage's roller door at speed and it
-  smashes open (the car takes a knock).
+- **Ram it.** Drive a car (the pickup or the garage's car) into the gate or the garage's roller door at speed and it
+  smashes open (the car takes a knock). The cars are a little smaller than they were.
 - **Scope glint (every map).** A player scoped in with a sniper rifle flashes a bright glint toward whoever they aim
   at. It's brighter the closer the aim, and you can see it from any distance.
 

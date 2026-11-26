@@ -5,15 +5,17 @@
 // like a car's driver; the server keeps its fuel (`fuel` s in the air: then the engine stops and it drops), its hull
 // (`hp`: bullets on its metal wear it down, the cockpit's glass lets them through to whoever sits behind it; an RPG
 // does `rpg`), and its fall when it's shot down (it spins down and explodes, killing whoever is still inside).
+// Its size: everything below is in the full-size model's metres times S (the user found it too big to fly, 2026-11-26).
+export const S = 0.7;
 export const HELI = {
   speed: 13, side: 7, climb: 4.5, accel: 7, fall: 9.8, ceiling: 12.6, // (the map's sky is at 15.65: the rotor's top stays under it)
   fuel: 90, hp: 1500, rpg: 800, crash: 9, hard: 6, hurt: 90, // (an impact over `hard` m/s costs `hurt` hp per m/s over it)
-  reach: 3.6, low: 2.5, blast: 9, spin: 2.6, rotor: 4.3,
+  reach: 3.0, low: 2.5, blast: 9, spin: 2.6, rotor: 4.3, // (rotor: the full-size model's)
   slide: 6, ropeMax: 4, // (stage 2: down the rope at `slide` m/s, while it moves slower than `ropeMax` m/s)
 };
 // Seats: [right, up, forward] from its base (the skids' bottom, in the middle): the pilot (front right), a passenger,
 // the two door gunners (in the open doors, each on a mounted PKT: GUNNERS), a passenger.
-export const SEATS = [[0.45, 0.45, 1.0], [-0.45, 0.45, 1.0], [0.75, 0.45, -0.5], [-0.75, 0.45, -0.5], [0, 0.45, -1.3]];
+export const SEATS = [[0.45, 0.45, 1.0], [-0.45, 0.45, 1.0], [0.75, 0.45, -0.5], [-0.75, 0.45, -0.5], [0, 0.45, -1.3]].map(s => s.map(v => v * S));
 export const GUNNERS = [2, 3];
 
 export const heliForward = yaw => [-Math.sin(yaw), 0, -Math.cos(yaw)];
@@ -32,17 +34,17 @@ function rotBox(p, yaw, along, w, l, y0, y1, extra) {
 // Its boxes: the body below the windows (metal), the cabin's glass over it (bullets go through: hglass), the tail boom.
 export function heliBoxes(h) {
   if (!h) return [];
-  return [rotBox(h.p, h.yaw, 0, 2.0, 4.4, 0.45, 1.35), rotBox(h.p, h.yaw, 0, 2.0, 4.4, 1.35, 2.35, { hglass: 1 }), rotBox(h.p, h.yaw, -4.1, 0.5, 3.8, 1.35, 1.95)];
+  return [rotBox(h.p, h.yaw, 0, 2.0 * S, 4.4 * S, 0.45 * S, 1.35 * S), rotBox(h.p, h.yaw, 0, 2.0 * S, 4.4 * S, 1.35 * S, 2.35 * S, { hglass: 1 }), rotBox(h.p, h.yaw, -4.1 * S, 0.5 * S, 3.8 * S, 1.35 * S, 1.95 * S)];
 }
 
 // Its hull for bumping into things: three discs along the body (r 1.0) from its belly to its roof, and the tail's end.
-const HULL = [[1.4, 1.0], [0, 1.0], [-1.4, 1.0], [-5.6, 0.4]];
+const HULL = [[1.4, 1.0], [0, 1.0], [-1.4, 1.0], [-5.6, 0.4]].map(([k, r]) => [k * S, r * S]);
 function hits(boxes, p, yaw) {
   const f = heliForward(yaw);
   for (const [k, rad] of HULL) {
     const x = p[0] + f[0] * k, z = p[2] + f[2] * k;
     for (const b of boxes) {
-      if (b.max[1] <= p[1] + 0.5 || b.min[1] >= p[1] + 2.35) continue;
+      if (b.max[1] <= p[1] + 0.5 * S || b.min[1] >= p[1] + 2.35 * S) continue;
       const dx = Math.max(b.min[0] - x, 0, x - b.max[0]), dz = Math.max(b.min[2] - z, 0, z - b.max[2]);
       if (dx * dx + dz * dz < rad * rad) return true;
     }
@@ -53,9 +55,9 @@ function hits(boxes, p, yaw) {
 export function heliGround(boxes, p, yaw) {
   const f = heliForward(yaw);
   let g = -50;
-  for (const k of [1.4, 0, -1.4]) {
+  for (const k of [1.4 * S, 0, -1.4 * S]) {
     const x = p[0] + f[0] * k, z = p[2] + f[2] * k;
-    for (const b of boxes) if (x > b.min[0] && x < b.max[0] && z > b.min[2] && z < b.max[2] && b.max[1] <= p[1] + 0.5 && b.max[1] > g) g = b.max[1];
+    for (const b of boxes) if (x > b.min[0] && x < b.max[0] && z > b.min[2] && z < b.max[2] && b.max[1] <= p[1] + 0.5 * S && b.max[1] > g) g = b.max[1];
   }
   return g;
 }

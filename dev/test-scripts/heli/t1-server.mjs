@@ -53,10 +53,10 @@ if (!process.env.FUEL) {
   ok(`the fuel burns in the air (${hl()[8]} s left)`, hl()[8] < HELI.fuel - 2);
   // Bob shoots its belly
   bob.w = bob.me?.inv?.secondary?.id || 'glock';
-  bob.at([25, 0, 9.5], Math.PI, 0); // (in front of its nose, on the street: nobody sits there)
+  bob.at([H.p[0], 0, H.p[2] - 5.5], 0, 0); // (in front of its nose, which faces -z while Alice flies it: nobody sits there)
   await sleep(300);
   for (let i = 0; i < 8; i++) {
-    const o = bob.eye(), aim = [H.p[0], 8 + 0.9, H.p[2] - 2.1], d = aim.map((v, k) => v - o[k]), l = Math.hypot(...d);
+    const o = bob.eye(), aim = [H.p[0], 8 + 0.6, H.p[2] - 1.45], d = aim.map((v, k) => v - o[k]), l = Math.hypot(...d);
     bob.send({ t: 'shoot', o, d: d.map(v => v / l), w: bob.w, rt: 0 });
     await sleep(250);
   }
@@ -66,7 +66,7 @@ if (!process.env.FUEL) {
   alice.clear();
   await use(alice);
   const out = got(alice, 'heliOut').at(-1);
-  ok(`Alice jumps out up high, over the street (${JSON.stringify(out?.p)})`, out && out.p[1] > 6 && out.p[0] > 24.3 && out.p[0] < 28.5);
+  ok(`Alice jumps out up high, into the back garden (${JSON.stringify(out?.p)})`, out && out.p[1] > 6 && out.p[0] > -43 && out.p[0] < -29.5);
   // (her browser falls: positions down to the street)
   for (let y = out.p[1]; y > 0; y -= 0.6) { alice.at([out.p[0], Math.max(0, y), out.p[2]], 0, 0); await sleep(50); }
   for (let i = 0; i < 8; i++) { alice.at([out.p[0], 0, out.p[2]], 0, 0); await sleep(60); }

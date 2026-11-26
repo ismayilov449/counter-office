@@ -1733,6 +1733,7 @@ function buildCars() {
   me.car = null;
   (map.vehicles || []).forEach((v, id) => {
     const model = v.type === 'pickup' ? createPickupModel(v.color) : createCarModel(v.color);
+    model.scale.setScalar(CAR.scale); // (smaller cars, shared/vehicles.js)
     scene.add(model);
     cars.set(id, { id, type: v.type || 'car', model, buf: [], p: [v.p[0], 0, v.p[1]], yaw: v.yaw, speed: 0, steer: 0, driver: 0, hp: CAR.hp, riders: v.type === 'pickup' ? [0] : [0, 0], wrecked: false, smokeAt: 0 });
   });
@@ -1894,7 +1895,7 @@ function updateDriving(dt, now) {
   me.p = seatPos(c);
   me.v = [0, 0, 0];
   me.crouch = true;
-  me.eyeH = 1.0;
+  me.eyeH = CAR.scale; // (seated: under the smaller car's roof)
   me.onGround = true;
   // The chase camera drifts back behind the car when you stop moving the mouse.
   me.camIdle += dt;
@@ -1931,7 +1932,7 @@ function updateRiding() {
   me.v = [0, 0, 0];
   // the pickup's gunner stands behind the machine gun; passengers sit
   me.crouch = !me.riding.gunner;
-  me.eyeH = me.riding.gunner ? PLAYER.eye : 1.0;
+  me.eyeH = me.riding.gunner ? PLAYER.eye : CAR.scale;
   me.onGround = true;
 }
 
@@ -1939,7 +1940,7 @@ function carCamera() {
   const c = me.car;
   const yaw = c.yaw + me.camYaw;
   if (me.carCam === 'seat') {
-    camera.position.set(me.p[0], me.p[1] + 1.0, me.p[2]);
+    camera.position.set(me.p[0], me.p[1] + CAR.scale, me.p[2]);
     camera.rotation.set(me.camPitch - 0.25, yaw, 0);
     return;
   }
@@ -2442,6 +2443,7 @@ document.addEventListener('keydown', e => {
     case 'Digit6': if (me.alive) cycleGrenades([...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker']); break;
     case 'Space': if (killcam) stopKillcam(); else me.jumpQueued = true; break;
     case 'KeyQ':
+      if (me.alive && heliC.seated()) { heliC.swap(); break; } // heli: on the ground, to a door gun and back
       if (me.alive && (me.car?.type === 'pickup' || me.riding?.gunner)) {
         if (me.car && Math.abs(me.car.speed) > 2) hud.small('Stop the truck first', 1.5);
         else net.send({ t: 'seat' });

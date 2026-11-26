@@ -2,7 +2,7 @@
 // lib/heli.js): its model and pad, where it is (the snapshot's hl, smoothed; the pilot's own flying is ours), the
 // pilot's controls and chase camera, a passenger's seat, the rotor's sound, the hints.
 import * as THREE from 'three';
-import { HELI, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround } from '/shared/heli.js';
+import { HELI, S, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround } from '/shared/heli.js';
 
 const ROTOR_Y = 3.7; // (over the street's 3.5 m walls when it stands on its pad)
 
@@ -49,6 +49,7 @@ export function createHeli(ctx) {
     tailRotor = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.3, 0.16), dark);
     tailRotor.position.set(0.12, 2.3, 5.9);
     model.add(tailRotor);
+    model.scale.setScalar(S); // (built at full size, drawn at shared/heli.js's S)
     ctx.scene.add(model);
     // the pad: a white H in a circle on the street
     const c = document.createElement('canvas');
@@ -69,6 +70,7 @@ export function createHeli(ctx) {
     handlers: {
       heliIn(m) {
         me.heli = { seat: m.seat };
+        own = null;
         if (m.seat === 0) own = { p: m.h.p.slice(), yaw: m.h.yaw, v: m.h.v.slice(), tilt: 0, roll: 0, landed: true, engine: !m.h.out, sent: 0 };
         cam = { yaw: 0, pitch: 0.25 };
       },
@@ -94,6 +96,11 @@ export function createHeli(ctx) {
       if (st >= 2 && me.heli?.seat === 0) own = null;
     },
     piloting: () => !!pilotNow(),
+    // Q in it: on the ground, to a door gun and back (like the pickup's gun).
+    swap() {
+      if (view?.st === 1) { ctx.hud.small('Land first to change seats', 2); return; }
+      ctx.send({ t: 'heliSeat' });
+    },
     seated: () => me.alive && !!me.heli,
     gunner: () => me.alive && GUNNERS.includes(me.heli?.seat),
     // The mouse while flying: it turns, the camera's pitch.
@@ -134,9 +141,9 @@ export function createHeli(ctx) {
     // The pilot's chase camera (true when it set it).
     camera(camera) {
       if (!pilotNow()) return false;
-      const t = [own.p[0], own.p[1] + 1.8, own.p[2]], yaw = own.yaw + cam.yaw, p = cam.pitch;
+      const t = [own.p[0], own.p[1] + 1.3, own.p[2]], yaw = own.yaw + cam.yaw, p = cam.pitch;
       const dir = [Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)];
-      const hit = ctx.coll().raycast(t, dir, 11, 'solid'), d = hit ? Math.max(2, hit.t - 0.3) : 11;
+      const hit = ctx.coll().raycast(t, dir, 8, 'solid'), d = hit ? Math.max(1.5, hit.t - 0.3) : 8;
       camera.position.set(t[0] + dir[0] * d, t[1] + dir[1] * d, t[2] + dir[2] * d);
       camera.lookAt(t[0], t[1], t[2]);
       return true;
@@ -144,10 +151,10 @@ export function createHeli(ctx) {
     hint() {
       if (!view || !ctx.map().heli) return null;
       if (me.alive && me.heli) {
-        const fuel = Math.ceil(view.fuel), hull = view.hp;
+        const fuel = Math.ceil(view.fuel), hull = view.hp, gun = GUNNERS.includes(me.heli.seat), q = view.st === 1 ? '' : gun ? ' · Q: leave the gun' : ' · Q: a door gun';
         return me.heli.seat === 0
-          ? `HELICOPTER · fuel ${fuel} s · hull ${hull}% · W/S A/D fly · Space up · Ctrl down · mouse turns · E: get out`
-          : `${GUNNERS.includes(me.heli.seat) ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}`;
+          ? `HELICOPTER · fuel ${fuel} s · hull ${hull}% · W/S A/D fly · Space up · Ctrl down · mouse turns · E: get out${q}`
+          : `${gun ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}${q}`;
       }
       if (!me.alive || me.team !== 'CT' || view.st >= 2) return null;
       const h = shown();
@@ -192,7 +199,7 @@ export function createHeli(ctx) {
         const who = id === me.id ? me : ctx.remotes.get(id);
         if (now > l.until || !who) { ctx.scene.remove(l.line); l.line.geometry.dispose(); ropes.delete(id); continue; }
         const pos = l.line.geometry.attributes.position;
-        pos.setXYZ(0, l.m.x, Math.max(h.p[1] + 2.2, l.m.y0 + 2), l.m.z);
+        pos.setXYZ(0, l.m.x, Math.max(h.p[1] + 1.6, l.m.y0 + 1.5), l.m.z);
         pos.setXYZ(1, who.p[0], who.p[1] + 1.6, who.p[2]);
         pos.needsUpdate = true;
       }
