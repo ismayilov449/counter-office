@@ -959,7 +959,34 @@ function carWheels(g, spots, r, w) {
   }
   return { spins, steers };
 }
-const carGlass = () => new THREE.MeshLambertMaterial({ color: 0x1c2a36, transparent: true, opacity: 0.82 });
+const carGlass = () => new THREE.MeshLambertMaterial({ color: 0x5a7488, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
+// The inside you see through the glass: the front seats (headrests), the back bench (none in a pickup's cab), the
+// dashboard with its dials, the steering wheel on the driver's side (left: shared/vehicles.js seat 0), the console and
+// gear stick between the seats, the door panels. front: the seats' z; dash: the dashboard's z; back: the bench's z.
+function carInterior(g, w, front, dash, back) {
+  const cloth = lam(0x3a3631), plastic = lam(0x1e1f21), dial = new THREE.MeshBasicMaterial({ color: 0xd8f0ff }), x = w / 2 - 0.5;
+  for (const s of [-1, 1]) {
+    g.add(mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), cloth, s * x * 0.5, 0.62, front, false));
+    const seatBack = mesh(new THREE.BoxGeometry(0.48, 0.56, 0.1), cloth, s * x * 0.5, 0.92, front + 0.27, false);
+    seatBack.rotation.x = 0.15;
+    g.add(seatBack, mesh(new THREE.BoxGeometry(0.26, 0.15, 0.09), cloth, s * x * 0.5, 1.27, front + 0.32, false));
+    g.add(mesh(new THREE.BoxGeometry(0.04, 0.32, Math.abs(back ?? front + 0.8) + 0.6), plastic, s * (w / 2 - 0.08), 0.78, ((back ?? front) + dash) / 2, false)); // (the door panels)
+  }
+  if (back != null) {
+    g.add(mesh(new THREE.BoxGeometry(w - 0.3, 0.12, 0.5), cloth, 0, 0.62, back, false));
+    g.add(mesh(new THREE.BoxGeometry(w - 0.3, 0.52, 0.1), cloth, 0, 0.92, back + 0.27, false));
+  }
+  const panel = mesh(new THREE.BoxGeometry(w - 0.16, 0.2, 0.32), plastic, 0, 0.86, dash, false);
+  panel.rotation.x = -0.25;
+  g.add(panel);
+  const wheelX = -x * 0.5;
+  for (const dx of [-0.07, 0.07]) g.add(mesh(new THREE.CircleGeometry(0.04, 10), dial, wheelX + dx, 0.95, dash + 0.17, false)); // (the dials behind the wheel)
+  const wheel = mesh(new THREE.TorusGeometry(0.17, 0.022, 6, 16), plastic, wheelX, 0.92, dash + 0.33, false);
+  wheel.rotation.x = -0.45;
+  g.add(wheel, mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.3, 6).rotateX(Math.PI / 2 - 0.45), plastic, wheelX, 0.87, dash + 0.22, false));
+  g.add(mesh(new THREE.BoxGeometry(0.22, 0.16, Math.abs(front - dash) + 0.2), plastic, 0, 0.6, (front + dash) / 2 + 0.05, false)); // (the console)
+  g.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 6), plastic, 0, 0.75, front - 0.2, false), mesh(new THREE.SphereGeometry(0.03, 8, 6), plastic, 0, 0.84, front - 0.2, false));
+}
 // Lights, bumpers and plates at the front (z0) and back (z1) of a car whose body is `w` wide.
 function carDetails(g, w, z0, z1, y) {
   const head = new THREE.MeshBasicMaterial({ color: 0xfff4d0 }), tail = new THREE.MeshBasicMaterial({ color: 0xb01818 }), trim = lam(0x202224), plate = lam(0xe8e8e0);
@@ -976,11 +1003,14 @@ export function createCarModel(color) {
   const g = new THREE.Group();
   const body = lam(new THREE.Color(color).getHex());
   // the body: the bonnet, the doors and the boot in one profile; over it the glass cabin and its roof
-  g.add(sideProfile([[-2.15, 0.3], [-2.15, 0.72], [-1.95, 0.84], [-0.78, 0.95], [1.25, 0.95], [2.05, 0.9], [2.15, 0.74], [2.15, 0.3], [2.0, 0.2], [-2.0, 0.2]], 1.8, body));
+  // (the cabin cut out of it down to its floor, the doors' thin walls each side: the inside shows through the glass)
+  g.add(sideProfile([[-2.15, 0.3], [-2.15, 0.72], [-1.95, 0.84], [-0.78, 0.95], [-0.78, 0.55], [1.25, 0.55], [1.25, 0.95], [2.05, 0.9], [2.15, 0.74], [2.15, 0.3], [2.0, 0.2], [-2.0, 0.2]], 1.8, body));
+  for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.4, 2.03), body, s * 0.87, 0.75, 0.235));
   g.add(sideProfile([[-0.78, 0.93], [-0.18, 1.42], [0.88, 1.42], [1.27, 0.93]], 1.58, carGlass(), 0.02));
   g.add(sideProfile([[-0.16, 1.4], [0.86, 1.4], [0.84, 1.5], [-0.12, 1.5]], 1.62, body, 0.02));
   for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.62, 0.06), body, s * 0.78, 1.18, 0.36, false)); // (the middle pillars)
   for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.16, 0.1, 0.08), body, s * 0.95, 1.0, -0.72, false)); // (the mirrors)
+  carInterior(g, 1.8, -0.1, -0.62, 0.78);
   carDetails(g, 1.8, -2.17, 2.17, 0.6);
   g.userData = { ...carWheels(g, [[-0.85, -1.4], [0.85, -1.4], [-0.85, 1.4], [0.85, 1.4]], 0.34, 0.22), roll: 0 };
   return mergeByMaterial(g);
@@ -992,7 +1022,9 @@ export function createPickupModel(color) {
   const body = lam(new THREE.Color(color).getHex());
   const dark = lam(0x1a1c1e);
   // the bonnet and the cab's lower half, the cab's glass and roof, the load bed behind
-  g.add(sideProfile([[-2.35, 0.32], [-2.35, 0.84], [-2.1, 0.98], [-1.35, 1.04], [0.05, 1.04], [0.05, 0.32]], 1.86, body));
+  g.add(sideProfile([[-2.35, 0.32], [-2.35, 0.84], [-2.1, 0.98], [-1.35, 1.04], [-1.35, 0.55], [0.05, 0.55], [0.05, 0.32]], 1.86, body));
+  for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.49, 1.4), body, s * 0.9, 0.795, -0.65)); // (the doors)
+  g.add(mesh(new THREE.BoxGeometry(1.86, 0.49, 0.06), body, 0, 0.795, 0.02)); // (the cab's back wall)
   g.add(sideProfile([[-1.35, 1.02], [-0.95, 1.55], [-0.02, 1.55], [0.03, 1.02]], 1.7, carGlass(), 0.02));
   g.add(sideProfile([[-0.93, 1.53], [-0.03, 1.53], [-0.05, 1.62], [-0.88, 1.62]], 1.74, body, 0.02));
   g.add(mesh(new THREE.BoxGeometry(1.86, 0.55, 2.3), body, 0, 0.6, 1.2)); // (the bed's underside)
@@ -1000,6 +1032,7 @@ export function createPickupModel(color) {
   g.add(mesh(new THREE.BoxGeometry(1.86, 0.4, 0.08), body, 0, 1.08, 2.33)); // tailgate
   g.add(mesh(new THREE.BoxGeometry(1.7, 0.04, 2.2), dark, 0, 0.9, 1.2)); // bed floor
   for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.16, 0.1, 0.08), body, s * 1.0, 1.1, -1.25, false)); // (the mirrors)
+  carInterior(g, 1.86, -0.55, -1.12, null);
   // gun post and the PKT on top (the gunner holds it)
   g.add(mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.0, 8), dark, 0, 1.45, 0.45));
   g.add(mesh(new THREE.BoxGeometry(0.5, 0.06, 0.2), dark, 0, 1.95, 0.45));

@@ -20,7 +20,7 @@ const meshes = o => { const n = []; o.traverse(x => x.isMesh && n.push(x)); retu
 for (const [name, make, len] of [['car', createCarModel, 4.3], ['pickup', createPickupModel, 4.7]]) {
   const m = make('#7a1e1a'), bb = box(m), n = meshes(m).length;
   ok(`${name}: ${n} meshes, ${(bb.max.x - bb.min.x).toFixed(2)} x ${(bb.max.y - bb.min.y).toFixed(2)} x ${(bb.max.z - bb.min.z).toFixed(2)} m`,
-    fin(bb) && Math.abs(bb.max.z - bb.min.z - len) < 0.4 && bb.max.x - bb.min.x < 2.25 && bb.min.y > -0.01 && n <= 20 && m.userData.spins.length === 4 && m.userData.steers.length === 2);
+    fin(bb) && Math.abs(bb.max.z - bb.min.z - len) < 0.4 && bb.max.x - bb.min.x < 2.25 && bb.min.y > -0.01 && n <= 24 && m.userData.spins.length === 4 && m.userData.steers.length === 2);
 }
 const scene = new THREE.Scene();
 const hc = createHeli({ me: { p: [0, 0, 0], alive: false }, game: {}, scene, audio: { engine() {}, play() {} }, hud: { small() {} }, send() {}, map: () => MAPS.cs_mansion, coll: () => ({ heli: [] }), keys: () => new Set(), remotes: new Map(), camera: null });

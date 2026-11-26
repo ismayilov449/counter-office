@@ -13,7 +13,7 @@ const EYE = [0.45, 1.6, -0.8]; // (the pilot's eyes in the cockpit, full size: r
 // ctx: { me, game, scene, audio, hud, send(m), map(), coll(), keys(), remotes }
 export function createHeli(ctx) {
   const { me } = ctx;
-  let model = null, pad = null, rotor = null, tailRotor = null, paint = null, beacon = null, view = null; // view: { p, yaw, tilt, roll, st, hp, fuel, seats }
+  let model = null, pad = null, rotor = null, tailRotor = null, paint = null, beacon = null, mapTex = null, mapAt = 0, view = null; // view: { p, yaw, tilt, roll, st, hp, fuel, seats }
   let own = null; // the pilot's own flying: { p, yaw, v, tilt, roll, landed, engine, sent }
   // the pilot's view: from the cockpit (look: the eyes' pitch) or chasing it from behind (pitch: the camera's height)
   let cam = { yaw: 0, pitch: 0.25, look: -0.12, chase: false }, spinA = 0, spinV = 0, last = 0, guns = [];
@@ -43,6 +43,36 @@ export function createHeli(ctx) {
     const w = [target[0] - o[0], target[1] - o[1], target[2] - o[2]], lw = Math.hypot(...w) || 1, dir = w.map(x => x / lw);
     const h = coll.raycast(o, dir, lw + 1, 'bullet', 'heli'), t = h ? Math.min(h.t, lw) : lw; // (what the rocket would really hit first)
     return { o, d: dir, at: [o[0] + dir[0] * t, o[1] + dir[1] * t, o[2] + dir[2] * t], locked: best < LOCK };
+  }
+  // In it (the pilot and the door gunners): a red diamond over every enemy it has a clear line to, so the ones down
+  // below between the hedges and on the roofs stand out. (Their lines are checked 8 times a second.)
+  const tags = new Map(); // remote id -> sprite
+  let tagTex = null, tagAt = 0;
+  function targets(now) {
+    const on = me.alive && me.heli && (me.heli.seat === 0 || GUNNERS.includes(me.heli.seat)) && view.st < 2;
+    if (!on) { for (const s of tags.values()) s.visible = false; return; }
+    if (!tagTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const g = c.getContext('2d');
+      g.strokeStyle = '#ff3020'; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(16, 3); g.lineTo(29, 16); g.lineTo(16, 29); g.lineTo(3, 16); g.closePath(); g.stroke();
+      tagTex = new THREE.CanvasTexture(c);
+    }
+    const check = now - tagAt > 125;
+    if (check) tagAt = now;
+    const eye = seatPos(shown(), me.heli.seat), coll = ctx.coll();
+    eye[1] += 1.0 * S;
+    for (const [id, r] of ctx.remotes) {
+      let s = tags.get(id);
+      const enemy = r.alive && r.team !== me.team && r.buf?.length;
+      if (!enemy) { if (s) s.visible = false; continue; }
+      if (!s) { s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tagTex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false })); s.scale.setScalar(0.035); s.renderOrder = 9; ctx.scene.add(s); tags.set(id, s); }
+      s.position.set(r.p[0], r.p[1] + 2.1, r.p[2]);
+      if (!check) continue;
+      const q = [r.p[0], r.p[1] + 1.2, r.p[2]], d = [q[0] - eye[0], q[1] - eye[1], q[2] - eye[2]], l = Math.hypot(...d);
+      const h = l < 150 && coll.raycast(eye, d.map(v => v / l), l, 'bullet', 'heli');
+      s.visible = l < 150 && !(h && h.t < l - 0.6);
+    }
   }
   // the pilot's target marker: drawn over everything where the rocket would hit; red when locked onto someone
   let marker = null;
@@ -78,7 +108,7 @@ export function createHeli(ctx) {
     const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); model.add(m); return m; };
     // the nose: a glass bubble over a painted chin (one sphere, its top and bottom halves), the windscreen's frame
     add(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.98, 1.0, 1.15), glass, 0, 1.3, -1.0);
-    add(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.98, 0.75, 1.15), paint, 0, 1.3, -1.0);
+    add(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.98, 0.75, 1.15), glass, 0, 1.3, -1.0); // (its chin glass too: the pilot sees down past his feet)
     add(new THREE.TorusGeometry(0.98, 0.035, 6, 24, Math.PI).scale(1, 1.0, 1), dark, 0, 1.3, -1.0, 0, 0, 0); // (the frame across its top)
     add(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark, 0, 1.8, -1.95, -0.5); // (the centre post)
     // the cabin: its floor and belly, the roof, the back wall, the posts each side of the open doors
@@ -92,7 +122,10 @@ export function createHeli(ctx) {
     add(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 10), dark, 0.25, 2.65, 1.95, Math.PI / 2);
     // inside: the instrument panel (its screens glow), two seats in front and a bench behind, the pilot's stick
     add(new THREE.BoxGeometry(1.5, 0.3, 0.35), dark, 0, 1.25, -1.45, -0.4);
-    for (const x of [-0.35, 0.35]) add(new THREE.PlaneGeometry(0.3, 0.18), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.34, -1.27, -0.4 - Math.PI / 2 + Math.PI / 2);
+    for (const x of [-0.5, -0.12]) add(new THREE.PlaneGeometry(0.28, 0.18), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.34, -1.27, -0.4);
+    // the moving map in front of the pilot: the radar's own picture (the HUD's canvas, copied a few times a second)
+    const radar = ctx.hud.el?.radar;
+    if (radar) { mapTex = new THREE.CanvasTexture(radar); add(new THREE.PlaneGeometry(0.34, 0.34), new THREE.MeshBasicMaterial({ map: mapTex }), 0.32, 1.37, -1.26, -0.4); }
     for (const x of [-0.45, 0.45]) { add(new THREE.BoxGeometry(0.55, 0.12, 0.55), seat, x, 0.95, -0.85); add(new THREE.BoxGeometry(0.55, 0.65, 0.1), seat, x, 1.3, -0.55, 0.15); }
     add(new THREE.BoxGeometry(1.6, 0.12, 0.6), seat, 0, 0.95, 1.4); add(new THREE.BoxGeometry(1.6, 0.6, 0.1), seat, 0, 1.3, 1.7);
     add(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), dark, 0.45, 1.15, -1.15, -0.3);
@@ -200,6 +233,7 @@ export function createHeli(ctx) {
       if (st >= 2 && me.heli?.seat === 0) own = null;
     },
     piloting: () => !!pilotNow(),
+    yaw: () => own?.yaw ?? 0, // (the pilot's radar turns with it)
     // Q in it: on the ground, to a door gun and back (like the pickup's gun).
     // Mouse1 flying: a nose rocket toward what the middle of the screen is on.
     rocket(camera) {
@@ -229,7 +263,7 @@ export function createHeli(ctx) {
       if (!pilotNow()) return false;
       own.yaw -= dx * k;
       if (cam.chase) cam.pitch = Math.max(-0.3, Math.min(1.2, cam.pitch + dy * k));
-      else cam.look = Math.max(-1.2, Math.min(0.6, cam.look - dy * k));
+      else cam.look = Math.max(-1.5, Math.min(0.6, cam.look - dy * k)); // (down to nearly straight below, through the chin's glass)
       return true;
     },
     // Our own movement in it (true: handled): the pilot flies; a passenger sits.
@@ -337,6 +371,8 @@ export function createHeli(ctx) {
         pos.needsUpdate = true;
       }
       markerAt(pilotNow() && view.st < 2 && ctx.camera ? aimAt(ctx.camera) : null); // (the pilot: where a rocket would go)
+      if (mapTex && me.heli?.seat === 0 && now - mapAt > 150) { mapAt = now; mapTex.needsUpdate = true; } // (the cockpit's map, while we fly)
+      targets(now);
       for (let i = sparks.length - 1; i >= 0; i--) {
         const k = sparks[i], age = (now - k.t0) / 1000;
         if (age > 2.5) { ctx.scene.remove(k.s); k.s.material.dispose(); sparks.splice(i, 1); continue; }
