@@ -1621,7 +1621,7 @@ const rope = createRope({ game, players, map: () => MAP, world: () => world, now
 // heli: the SWAT helicopter (ROADMAP 18; Mansion maps; lib/heli.js)
 const heli = createHeli({ game, players, map: () => MAP, world: () => world, now, send, broadcast, notify: (...a) => notify(...a),
   killPlayer: (q, by, w) => killPlayer(q, by, w, false), applyDamage: (...a) => applyDamage(...a), lineOfSight: (a, b) => lineOfSight(a, b),
-  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w), win: (team, why) => endRound(team, why) });
+  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w) });
 // locks: locked doors (Mansion maps; lib/locks.js)
 const locks = createLocks({ game, players, map: () => MAP, world: () => world, now, send, broadcast, nearestDoor: (p, max) => nearestDoor(p, max),
   speed: (p, t) => cc.speed(p, t), kickOpen: (i, side, by) => cc.slam(i, side, by) });

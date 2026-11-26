@@ -899,11 +899,9 @@ still gets found, a phone that moves stays fuzzy.**
 - **The fast rope.** A passenger (not the pilot) pressing **E** while it hovers up high and slowly (under 4 m/s)
   slides down a rope from the door to whatever is below (the street, the garden, the roof) at 6 m/s, unhurt. Everyone
   sees the rope. Going faster, or low over the ground, E is a plain jump.
-- **Steal it (the Terrorists' way out).** It belongs to the CTs, but its pad is behind the house, and Terrorists can
-  get in too: whichever side gets in first has it (everyone is told when it's being stolen). A Terrorist pilot who
-  gets it **11 m up or higher and keeps it there for 8 s** gets away: **the Terrorists win the round**. Everyone sees
-  the countdown, and dropping below 11 m stops it. While the Terrorists have it, the CTs' bullets and rockets hurt it,
-  and the Terrorists' don't.
+- **Steal it.** It belongs to the CTs, but its pad is behind the house, and Terrorists can get in too: whichever side
+  gets in first has it (everyone is told when it's stolen), to fly it and shoot from it. It never wins or loses a
+  round. While the Terrorists have it, the CTs' bullets and rockets hurt it, and the Terrorists' don't.
 
 ## Locked doors, the estate gate and scope glint
 

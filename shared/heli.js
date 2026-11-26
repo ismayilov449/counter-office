@@ -12,7 +12,6 @@ export const HELI = {
   fuel: 90, hp: 1500, rpg: 800, crash: 9, hard: 6, hurt: 90, // (an impact over `hard` m/s costs `hurt` hp per m/s over it)
   reach: 3.0, low: 2.5, blast: 9, spin: 2.6, rotor: 4.3, // (rotor: the full-size model's)
   slide: 6, ropeMax: 4, // (stage 2: down the rope at `slide` m/s, while it moves slower than `ropeMax` m/s)
-  escape: 11, escapeTime: 8, // (stolen: Terrorists who keep it `escape` m up or higher for `escapeTime` s get away with it and win)
 };
 // Seats: [right, up, forward] from its base (the skids' bottom, in the middle): the pilot (front right), a passenger,
 // the two door gunners (in the open doors, each on a mounted PKT: GUNNERS), a passenger.

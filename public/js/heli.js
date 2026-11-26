@@ -90,8 +90,8 @@ export function createHeli(ctx) {
     },
     snapshot(hl) {
       if (!hl || !view) return;
-      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0, esc = 0] = hl;
-      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side], esc });
+      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0] = hl;
+      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side] });
       if (st >= 2 && own) own.engine = false; // (falling or wrecked: the server has it now)
       if (st >= 2 && me.heli?.seat === 0) own = null;
     },
@@ -153,7 +153,7 @@ export function createHeli(ctx) {
       if (me.alive && me.heli) {
         const fuel = Math.ceil(view.fuel), hull = view.hp, gun = GUNNERS.includes(me.heli.seat), q = view.st === 1 ? '' : gun ? ' · Q: leave the gun' : ' · Q: a door gun';
         return me.heli.seat === 0
-          ? `${me.team === 'T' ? (view.esc ? `GETTING AWAY: ${view.esc} s · ` : `STOLEN · climb to ${HELI.escape} m to get away (${Math.max(0, shown().p[1]).toFixed(1)} m) · `) : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · W/S A/D fly · Space up · Ctrl down · mouse turns · E: get out${q}`
+          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · W/S A/D fly · Space up · Ctrl down · mouse turns · E: get out${q}`
           : `${gun ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}${q}`;
       }
       if (!me.alive || (me.team !== 'CT' && me.team !== 'T') || view.st >= 2) return null;
@@ -162,7 +162,7 @@ export function createHeli(ctx) {
       const free = SEATS.findIndex((_, i) => !(view.seats?.[i]));
       if (free < 0) return 'The helicopter is full';
       if (view.side && view.side !== me.team) return null;
-      if (me.team === 'T') return free === 0 ? `Press E to STEAL the helicopter: fly it ${HELI.escape} m up and keep it there ${HELI.escapeTime} s to win the round` : 'Press E to get into the stolen helicopter';
+      if (me.team === 'T') return free === 0 ? 'Press E to steal the helicopter and fly it' : 'Press E to get into the stolen helicopter';
       return free === 0 ? `Press E to fly the helicopter (fuel ${Math.ceil(view.fuel)} s)` : 'Press E to get into the helicopter';
     },
     frame(now) {

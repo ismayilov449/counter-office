@@ -467,11 +467,11 @@ The user's choices: CTs only; for getting in and covering fire, not a gunship; f
 
 *Bots: they don't fly it; Terrorist bots shoot at it.*
 
-## 19. Steal the helicopter (both Mansion maps, added 2026-11-26) — **built 2026-11-26** (cc84e89)
+## 19. Steal the helicopter (both Mansion maps, added 2026-11-26) — **built 2026-11-26** (cc84e89; the win removed)
 
-The Terrorists' way out. The CTs' helicopter waits behind the house; Terrorists can get in too (the first side in has
-it). A Terrorist pilot who keeps it 11 m up for 8 s gets away and wins the round, with everyone watching the countdown.
-(The map's walls reach the sky, so "flying off the map" is this instead.)
+The CTs' helicopter waits behind the house; Terrorists can get in too (the first side in has it), to fly it and shoot
+from it. **Its win was removed on 2026-11-26 at the user's request:** a Terrorist pilot keeping it 11 m up for 8 s used
+to win the round; the helicopter is for flying and shooting, never for winning.
 
 **Left out (offered, not chosen):** the house remembering damage between rounds, round events, a team commander, kill
 streak support, a story match.
