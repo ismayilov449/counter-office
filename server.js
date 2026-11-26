@@ -41,6 +41,8 @@ import { warOn } from './shared/war.js'; // war: ROADMAP group 13
 import { createPhoneTracker } from './lib/phonetracker.js';
 import { createHaunt } from './lib/haunt.js';
 import { createLocks } from './lib/locks.js';
+import { createSafe } from './lib/safe.js';
+import { createRope } from './lib/rope.js';
 import { createStorm } from './lib/storm.js'; // Hotel Meridian's storm // phone tracker (ROADMAP group 14)
 import { createCarry } from './lib/hostage-carry.js'; // carrying wounded hostages (ROADMAP 6.2) // hostages try to escape (ROADMAP 6.1), zip ties
 import { createGas } from './lib/gas.js'; // gas: Mansion's gas pipes, the gas in the rooms, sparks (sparkAt)
@@ -1349,6 +1351,8 @@ function startRound() {
   }
   tracker.roundStart(); // phone tracker: one CT gets it
   locks.roundStart(); // locks: two of the house's outer doors locked
+  safe.roundStart(); // safe: shut, nothing cracked
+  rope.roundStart(); // rope: nobody swinging
   storm.roundStart(now()); // storm: the power on, the first strike soon
   // aim_map: weapons lying in the field every round.
   if (MAP.roundDrops && CFG.gameMode === 'classic' && !partyWeapon()) {
@@ -1608,6 +1612,9 @@ const haunt = createHaunt({ game, players, map: () => MAP, world: () => world, n
     broadcast({ t: 'doors', doors: states, i, quiet: 1, p: doorCenter(d) });
     return true;
   } });
+// safe, rope: ROADMAP 16 (Mansion maps; lib/safe.js, lib/rope.js)
+const safe = createSafe({ game, players, map: () => MAP, now, send, sendMe: p => sendMe(p), broadcast, notify: (...a) => notify(...a), addMoney: (p, n) => addMoney(p, n) });
+const rope = createRope({ game, players, map: () => MAP, world: () => world, now, send, broadcast, breakGlass: ids => breakGlass(ids) });
 // locks: locked doors (Mansion maps; lib/locks.js)
 const locks = createLocks({ game, players, map: () => MAP, world: () => world, now, send, broadcast, nearestDoor: (p, max) => nearestDoor(p, max),
   speed: (p, t) => cc.speed(p, t), kickOpen: (i, side, by) => cc.slam(i, side, by) });
@@ -2191,7 +2198,9 @@ function updateActions(t) {
     if (a.type.startsWith('pw')) { circuits.act(p, a, t); continue; } // power: a breaker, the generator, cutting the lift's cable
     if (!p.alive || (game.phase !== 'live' && !((a.type === 'mine' || a.type === 'fuse' || a.type === 'satchel' || a.type === 'cut') && game.phase === 'warmup')) || dist2(p.p, a.pos) > 0.6) { p.act = null; continue; }
     if (a.type === 'disguise') { disguise.act(p, a, t); continue; } // Disguise: changing into a dead enemy's uniform
-    if (a.type === 'pick') { locks.act(p, a, t); continue; } // locks: picking a lock
+    if (a.type === 'pick') { locks.act(p, a, t); continue; }
+    if (a.type === 'safe') { safe.act(p, a, t); continue; } // safe: cracking it
+    if (a.type === 'rope') { rope.act(p, a, t); continue; } // rope: hooking it // locks: picking a lock
     if (a.type === 'rig' || a.type === 'rigOff') { haunt.act(p, a, t); continue; } // haunt: tying a grenade to a door or the lift, taking one off
     if (a.type === 'xpTrap') { explosives.act(p, a, t); continue; } // explosives: hiding a grenade under a dead mate
     if (a.type === 'fuse') {
@@ -2293,6 +2302,8 @@ function onUse(p, m, t) {
   if (p.shield == null && MAP.elevator && elevator.use(p, t)) return; // elevator: a button, the hatch or the doors (only what the player aims at; a hostage held lets go first)
   if (carry.use(p, t)) return; // carry: a CT picks up a badly hurt hostage or puts his down
   if (tracker.use(p, t)) return; // phone tracker: a CT repairs a cell tower that is down
+  if (safe.use(p, t)) return; // safe: a Terrorist cracks the safe upstairs
+  if (rope.use(p, t)) return; // rope: a CT on the eaves hooks the rope
   if (escape.use(p, t)) return; // escape: a crouched Terrorist zip-ties a hostage, a CT cuts the ties (before the shield and the lead)
   if (shield.use(p, t)) return; // shield: a Terrorist grabs or lets go of a hostage; CTs can't lead a held one
   const plantHere = game.phase === 'live' && p.team === 'T' && p.inv.c4 && siteAt(MAP, p.p);
@@ -3823,6 +3834,7 @@ function handle(p, m) {
       // On the zip line the server says where you are (hanging from the cable); after a fall off it, the landing hurts.
       if (p.zip) { p.p = zipFeet(MAP.zip, zipNow(p, t).s); p.yaw = m.yaw; p.pitch = m.pitch; p.c = 0; remember(p, t, p.p, 0); break; }
       // At the CCTV desk you sit on the chair facing the monitors.
+      if (rope.pinned(p, m, t)) { remember(p, t, p.p, 0); break; } // rope: swinging in, the server says where you are
       if (p.cctv) { p.p = MAP.cctv.seat.slice(); p.yaw = MAP.cctv.yaw; p.pitch = -0.3; p.c = 1; remember(p, t, p.p, 1); break; }
       if (stealth.pinned(p, m, t)) break; // stealth: in a car's trunk the server says where you are
       if (p.zipFall) zipLanding(p, pos, t);
@@ -4136,6 +4148,7 @@ function tick() {
   ug.tick(t); // underground: grenades dropping out of the air vents
   explosives.tick(t); // explosives: a grenade held too long goes off in the hand
   haunt.tick(t); // haunt: rigged doors opening, the rigged lift arriving
+  rope.tick(t); // rope: the window smashing, in
   for (let i = game.nades.length - 1; i >= 0; i--) {
     if (t >= game.nades[i].at) explodeNade(game.nades.splice(i, 1)[0]);
   }
@@ -4279,6 +4292,7 @@ wss.on('connection', ws => {
   elevator.send(p); // elevator
   haunt.send(p); // haunt: rigged doors and the lift
   locks.send(p); // locks
+  safe.send(p); // safe
   circuits.send(p); // power: the breakers, the generator, burst bulbs, the lift's cable
   sendRoster();
   ws.on('message', data => {

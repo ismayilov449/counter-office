@@ -18,6 +18,8 @@ const carol = await player('Carol', 'CT'); // (stays alive, so the round goes on
 const told = { a: [], b: [] };
 alice.on.msg = m => told.a.push(m.text);
 bob.on.msg = m => told.b.push(m.text);
+let locked = [];
+alice.on.locks = m => { locked = m.ids; };
 await nextLive([alice, bob], st);
 await until(() => alice.snap?.ph === 'live', 8000);
 carol.at(spot(30, 30), 0, 0);
@@ -32,6 +34,7 @@ bob.w = 'he';
 bob.at(BOBP, -Math.PI / 2, 0);
 alice.at([ALIP[0] + 3, ALIP[1], ALIP[2]], Math.PI / 2, 0);
 await sleep(300);
+if (locked.includes(D)) { bob.send({ t: 'lock' }); await sleep(300); } // (locks: the door may start locked; Bob has the key)
 await use(bob, RIG.time * 1000 + 400);
 ok('Bob ties it to the door', told.b.some(t => /tied to the door/.test(t)));
 ok(`everyone gets the rig (${JSON.stringify(got(alice, 'rigs').at(-1)?.list)})`, got(alice, 'rigs').at(-1)?.list?.[0]?.[0] === D);

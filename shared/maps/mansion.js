@@ -230,6 +230,9 @@ export default {
   zip: RM.zip,
   // CCTV: four cameras and the security desk with their monitors (see mansion2.js and shared/gadgets.js).
   cctv: RM.cctv,
+  // ROADMAP 16: the safe upstairs and the roof rope's spots (see mansion2.js and shared/safe.js).
+  safe: RM.safe,
+  ropes: RM.ropes,
   elevator: RM.elevator, // elevator: the lift (see mansion_elevator.js and shared/elevator.js)
   towers: TOWERS, // phone tracker: the cell towers (see mansion_phonetracker.js and shared/phonetracker.js)
   power: POWER, // power: the breaker panel, the generator, the machine room (see mansion_power.js and shared/power.js)

@@ -422,7 +422,7 @@ a trail for fast-moving phones.
    blast 0.5 s later on the opener's side of the doorway. A crouched CT takes it off (3 s).
 3. **The rigged lift.** The same in the lift's cabin: it goes off 1 s after its doors open at another floor.
 
-## 16. The safe & the roof rope (Mansion maps, added 2026-11-26, not built yet)
+## 16. The safe & the roof rope (Mansion maps, added 2026-11-26) — **built 2026-11-26**
 
 1. **The safe.** A second objective for the Terrorists: a safe in a room on the upper floor (the room picked when it's
    built). Cracking it takes holding E for 20 s, with loud clicks heard across the floor, and pays every Terrorist
@@ -433,7 +433,7 @@ a trail for fast-moving phones.
 **Left out (offered, not chosen):** fake rigs, last breath (marking your killer), the bounty, throwable junk, play of
 the round, funny awards.
 
-## 17. Scope glint, locked doors & ramming the gate (Mansion maps, added 2026-11-26, not built yet)
+## 17. Scope glint, locked doors & ramming the gate (Mansion maps, added 2026-11-26) — **built 2026-11-26** (scope glint on every map; the locked doors are the house's 4 outer doors and the gate, the Mansion having no inner doors)
 
 1. **Scope glint.** A scoped sniper rifle (Scout, AWP and the rest) flashes a bright glint toward whoever it's aimed
    at, seen from far away. Snipers on the roof or at a window give themselves away, and the other side gets a fair

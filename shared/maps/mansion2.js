@@ -605,6 +605,14 @@ export function remodel(SOLIDS, FACES, TEXTURES) {
   // shut at the round start, opened with E like any door. The Terrorists can lock it (shared/locks.js: from the street
   // a key is needed); a car driven into it at speed smashes it open (ram).
   for (const [z, dir] of [[-3.25, 1], [1.63, -1]]) doors.push({ axis: 'z', dir, len: 2.44, h: 2.4, hinge: [23.67, 0, z], tex: 'metal', lock: 1, lockOpen: true, ram: true });
+  // ROADMAP 16.1: the safe (shared/safe.js), against the south wall of the upper floor's south-east room, its door
+  // facing north (-z; the door and its dial are drawn by public/js/safe.js).
+  const safe = { box: { min: [-10.9, 4.27, 10.27], max: [-10.1, 5.27, 10.97] }, stand: [-10.5, 4.27, 9.7] };
+  brush(-10.9, 4.27, 10.27, -10.1, 5.27, 10.97, 'x_metal', ['bottom']);
+  // ROADMAP 16.2: the roof rope's spots on the eaves (shared/safe.js): over the two upstairs windows at each end of
+  // the east and west walls (a: where you stand on the roof, n: the window's outward side, w: the window's middle).
+  const ropes = [[-7.0, 7.42, -11.98, 1, -6.61], [-7.0, 7.42, 8.95, 1, -6.61], [-23.0, 7.52, -11.37, -1, -23.47], [-23.0, 7.52, 8.95, -1, -23.47]]
+    .map(([x, y, z, n, wx]) => ({ a: [x, y, z], n, w: [wx, 5.79, z], floor: 4.27 }));
   const fusebox = { p: [-18.3, -0.95, -5.3], floor: -2.2 };
-  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv, elevator }; // (elevator: + elevator)
+  return { solids, faces, tex, doors, decor, ladders, rooms, switches, fusebox, keep, windows, water, glass, zip, cctv, elevator, safe, ropes }; // (elevator: + elevator; ROADMAP 16: + safe, ropes)
 }

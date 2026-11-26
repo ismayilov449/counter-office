@@ -867,6 +867,16 @@ still gets found, a phone that moves stays fuzzy.**
 - **The rigged lift.** The same, inside the lift's cabin while it stands at a floor. It goes off when the lift's doors
   next open at **another** floor, and goes off 1 s later.
 
+## The safe and the roof rope (Mansion maps)
+
+- **The safe.** It stands against the south wall of the upstairs south-east room. A Terrorist holds **E** at it to
+  crack it: 20 s of work in all, and if you let go, what you've done stays done this round. Its dial clicks the whole
+  time, and you can hear it across the floor. Cracked, it pays **$1500 to every Terrorist**, once a round.
+- **The roof rope.** On the roof's east and west eaves, over the four upstairs corner windows, a CT holds **E** for
+  2 s to hook a rope. The hook's clank is heard inside. Then they swing out, down and **in through the window**,
+  smashing the glass, and land on the floor inside. Everyone sees the rope, and you can be shot while you swing. (Get
+  onto the roof by the ladders: from the ground to the east balcony, then up to the roof.)
+
 ## Locked doors, the estate gate and scope glint
 
 - **Locked doors (Mansion maps).** Every round, 2 of the house's 4 outer doors (front, south, back, the kitchen's door
