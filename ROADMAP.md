@@ -433,6 +433,20 @@ a trail for fast-moving phones.
 **Left out (offered, not chosen):** fake rigs, last breath (marking your killer), the bounty, throwable junk, play of
 the round, funny awards.
 
+## 17. Scope glint, locked doors & ramming the gate (Mansion maps, added 2026-11-26, not built yet)
+
+1. **Scope glint.** A scoped sniper rifle (Scout, AWP and the rest) flashes a bright glint toward whoever it's aimed
+   at, seen from far away. Snipers on the roof or at a window give themselves away, and the other side gets a fair
+   warning.
+2. **Locked doors.** Some doors start locked (the master bedroom, the wine cellar, the study; picked when built). The
+   Terrorists spawn with the keys and can lock a door behind them. CTs pick the lock (6 s, clicks heard on the other
+   side), kick it in (3 loud kicks) or blow it.
+3. **Ram the gate.** CTs drive a car through the front gate or the garage door: it smashes open with debris and a huge
+   noise. A loud rush with the cars the map already has.
+
+**Left out (offered, not chosen):** the police helicopter's searchlight, looping the CCTV, the dumbwaiter, rescued
+hostages talking, the last Terrorist escaping over the garden wall.
+
 ---
 
 ## Missing from the map today
