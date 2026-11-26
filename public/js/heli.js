@@ -151,8 +151,9 @@ export function createHeli(ctx) {
     add(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 10), dark, 0.25, 2.65, 1.95, Math.PI / 2);
     // inside: the instrument panel (its screens glow), two seats in front and a bench behind, the pilot's stick
     // (small and low, well under the pilot's eyes: the glass ahead of him stays clear)
-    add(new THREE.BoxGeometry(1.1, 0.16, 0.3), dark, 0, 1.12, -1.5, -0.4);
-    for (const x of [-0.42, 0.42]) add(new THREE.PlaneGeometry(0.18, 0.11), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.18, -1.36, -0.4);
+    // (half as wide as it was, 55 cm, in the middle between the seats: the view ahead of the pilot clear, 2026-11-26)
+    add(new THREE.BoxGeometry(0.55, 0.16, 0.3), dark, 0, 1.12, -1.5, -0.4);
+    for (const x of [-0.22, 0.22]) add(new THREE.PlaneGeometry(0.09, 0.11), new THREE.MeshBasicMaterial({ color: 0x3aa0d8 }), x, 1.18, -1.36, -0.4);
     // the moving map in front of the pilot: the radar's own picture (the HUD's canvas, copied a few times a second)
     // the flight display in front of the pilot (drawn by mfd(): a moving map turning with it, the compass, the readouts)
     if (ctx.hud.el) {
