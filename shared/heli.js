@@ -12,11 +12,17 @@ export const HELI = {
   fuel: 90, hp: 1500, rpg: 800, crash: 9, hard: 6, hurt: 90, // (an impact over `hard` m/s costs `hurt` hp per m/s over it)
   reach: 3.0, low: 2.5, blast: 9, spin: 2.6, rotor: 4.3, // (rotor: the full-size model's)
   slide: 6, ropeMax: 4, // (stage 2: down the rope at `slide` m/s, while it moves slower than `ropeMax` m/s)
+  // the pilot's: Mouse1 fires a nose rocket (`rockets` a round, `rocketGap` s apart, lighter than an RPG's: ROCKET);
+  // G fires flares (`flares` a round): for `flareTime` s rockets miss it (they fly past, their blasts don't hurt it)
+  rockets: 4, rocketGap: 1.2, flares: 2, flareTime: 3,
 };
 // Seats: [right, up, forward] from its base (the skids' bottom, in the middle): the pilot (front right), a passenger,
 // the two door gunners (in the open doors, each on a mounted PKT: GUNNERS), a passenger.
 export const SEATS = [[0.45, 0.45, 1.0], [-0.45, 0.45, 1.0], [0.75, 0.45, -0.5], [-0.75, 0.45, -0.5], [0, 0.45, -1.3]].map(s => s.map(v => v * S));
 export const GUNNERS = [2, 3];
+export const ROCKET = { damage: 300, blast: 5, rocketSpeed: 45 }; // (on top of the RPG-26's: its blast tables, its kill icon)
+// Where its rockets leave: under the nose.
+export const nosePos = h => { const f = heliForward(h.yaw); return [h.p[0] + f[0] * 1.9 * S, h.p[1] + 0.55 * S, h.p[2] + f[2] * 1.9 * S]; };
 
 export const heliForward = yaw => [-Math.sin(yaw), 0, -Math.cos(yaw)];
 export const heliRight = yaw => [Math.cos(yaw), 0, -Math.sin(yaw)];

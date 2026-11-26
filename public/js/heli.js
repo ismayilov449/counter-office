@@ -2,7 +2,7 @@
 // lib/heli.js): its model and pad, where it is (the snapshot's hl, smoothed; the pilot's own flying is ours), the
 // pilot's controls and chase camera, a passenger's seat, the rotor's sound, the hints.
 import * as THREE from 'three';
-import { HELI, S, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround } from '/shared/heli.js';
+import { HELI, S, SEATS, GUNNERS, seatPos, heliBoxes, stepHeli, heliGround, nosePos } from '/shared/heli.js';
 
 const ROTOR_Y = 3.7; // (over the street's 3.5 m walls when it stands on its pad)
 
@@ -15,6 +15,10 @@ export function createHeli(ctx) {
   let own = null; // the pilot's own flying: { p, yaw, v, tilt, roll, landed, engine, sent }
   let cam = { yaw: 0, pitch: 0.25 }, spinA = 0, spinV = 0, last = 0, guns = [];
   const ropes = new Map(); // stage 2: id -> { line, until } for whoever slides down the rope
+  // the pilot's flares: bright sparks falling away from it for a few seconds
+  const sparks = [];
+  let sparkTex = null, rocketAt = 0;
+  const _dir = new THREE.Vector3();
 
   function build() {
     if (model) { ctx.scene.remove(model, pad); model = pad = null; }
@@ -85,18 +89,56 @@ export function createHeli(ctx) {
       ctx.scene.add(line);
       ropes.set(m.id, { line, m, until: now + ((m.y0 - m.g) / m.v) * 1000 + 400 });
     },
+    heliFlare(m) {
+      ctx.audio.play('flare', m.p);
+      if (!sparkTex) {
+        const c = document.createElement('canvas'); c.width = c.height = 32;
+        const g = c.getContext('2d'), r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+        r.addColorStop(0, 'rgba(255,250,220,1)'); r.addColorStop(0.3, 'rgba(255,170,60,0.9)'); r.addColorStop(1, 'rgba(255,120,20,0)');
+        g.fillStyle = r; g.fillRect(0, 0, 32, 32);
+        sparkTex = new THREE.CanvasTexture(c);
+      }
+      for (let i = 0; i < 10; i++) {
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        s.position.set(m.p[0], m.p[1] + 0.5, m.p[2]);
+        s.scale.setScalar(0.7);
+        ctx.scene.add(s);
+        const a = (i / 10) * Math.PI * 2;
+        sparks.push({ s, v: [Math.cos(a) * (3 + Math.random() * 3), 1 + Math.random() * 2, Math.sin(a) * (3 + Math.random() * 3)], t0: performance.now() });
+      }
+    },
     slideEnd(m) { me.slide = null; me.p = m.p.slice(); me.v = [0, 0, 0]; me.onGround = true; me.viewY = me.p[1]; },
     heliFuel(m) { if (own) own.engine = false; ctx.hud.small(m.dead ? 'HIT! The helicopter is going down — jump (E)!' : 'OUT OF FUEL! The engine stopped — get out (E)!', 4); },
     },
     snapshot(hl) {
       if (!hl || !view) return;
-      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0] = hl;
-      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side] });
+      const [x, y, z, yaw, tilt, roll, st, hp, fuel, seats, side = 0, rockets = 0, flares = 0] = hl;
+      Object.assign(view, { target: [x, y, z], tyaw: yaw, tilt, roll, st, hp, fuel, seats, side: [null, 'T', 'CT'][side], rockets, flares });
       if (st >= 2 && own) own.engine = false; // (falling or wrecked: the server has it now)
       if (st >= 2 && me.heli?.seat === 0) own = null;
     },
     piloting: () => !!pilotNow(),
     // Q in it: on the ground, to a door gun and back (like the pickup's gun).
+    // Mouse1 flying: a nose rocket toward what the middle of the screen is on.
+    rocket(camera) {
+      if (!pilotNow() || view.st >= 2) return;
+      const now = performance.now();
+      if (now < rocketAt) return;
+      if (!(view.rockets > 0)) { ctx.hud.small('No rockets left', 1.5); return; }
+      rocketAt = now + HELI.rocketGap * 1000;
+      camera.getWorldDirection(_dir);
+      const c = [camera.position.x, camera.position.y, camera.position.z], d = [_dir.x, _dir.y, _dir.z];
+      const hit = ctx.coll().raycast(c, d, 250, 'bullet', 'heli'), t = hit ? hit.t : 250;
+      const o = nosePos(own), aim = [c[0] + d[0] * t - o[0], c[1] + d[1] * t - o[1], c[2] + d[2] * t - o[2]], l = Math.hypot(...aim) || 1;
+      ctx.send({ t: 'heliRocket', d: aim.map(v => Math.round((v / l) * 1000) / 1000) });
+      ctx.audio.play('shot', null, 'rpg26');
+    },
+    // G flying: flares.
+    flare() {
+      if (!pilotNow() || view.st >= 2) return;
+      if (!(view.flares > 0)) { ctx.hud.small('No flares left', 1.5); return; }
+      ctx.send({ t: 'heliFlare' });
+    },
     swap() {
       if (view?.st === 1) { ctx.hud.small('Land first to change seats', 2); return; }
       ctx.send({ t: 'heliSeat' });
@@ -153,7 +195,7 @@ export function createHeli(ctx) {
       if (me.alive && me.heli) {
         const fuel = Math.ceil(view.fuel), hull = view.hp, gun = GUNNERS.includes(me.heli.seat), q = view.st === 1 ? '' : gun ? ' · Q: leave the gun' : ' · Q: a door gun';
         return me.heli.seat === 0
-          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · W/S A/D fly · Space up · Ctrl down · mouse turns · E: get out${q}`
+          ? `${me.team === 'T' ? 'STOLEN HELICOPTER · ' : 'HELICOPTER · '}fuel ${fuel} s · hull ${hull}% · Mouse1 rocket (${view.rockets}) · G flares (${view.flares}) · W/S A/D fly · Space up · Ctrl down · E: get out${q}`
           : `${gun ? 'DOOR GUN · Mouse1 fires (no reloads)' : 'In the helicopter'} · hull ${hull}% · E: ${view.st === 1 ? 'slide down the rope (hovering slowly) or jump' : 'get out'}${q}`;
       }
       if (!me.alive || (me.team !== 'CT' && me.team !== 'T') || view.st >= 2) return null;
@@ -204,6 +246,13 @@ export function createHeli(ctx) {
         pos.setXYZ(0, l.m.x, Math.max(h.p[1] + 1.6, l.m.y0 + 1.5), l.m.z);
         pos.setXYZ(1, who.p[0], who.p[1] + 1.6, who.p[2]);
         pos.needsUpdate = true;
+      }
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const k = sparks[i], age = (now - k.t0) / 1000;
+        if (age > 2.5) { ctx.scene.remove(k.s); k.s.material.dispose(); sparks.splice(i, 1); continue; }
+        k.v[1] -= 4 * dt;
+        k.s.position.x += k.v[0] * dt; k.s.position.y += k.v[1] * dt; k.s.position.z += k.v[2] * dt;
+        k.s.material.opacity = 1 - age / 2.5;
       }
       ctx.audio.engine('heli', [h.p[0], h.p[1] + 2, h.p[2]], 17 * spinV, spinV > 0.05);
     },

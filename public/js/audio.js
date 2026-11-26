@@ -241,7 +241,7 @@ function full(kind, t) {
 }
 // ---- the 82-BM-37's shells
 // Sounds that carry across the map: [refDistance, rolloff] for their panner instead of the usual 3 m / 1.1.
-const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], medic: [5, 0.8], crumble: [8, 0.8], sshot: [1, 3], buzz: [0.6, 3], chute: [10, 0.7], chuteland: [6, 0.9], knock: [8, 0.8], rattle: [8, 0.8], slam: [12, 0.7], rigpin: [3, 1.2], lockpick: [4, 1], lock: [5, 1], kick: [14, 0.6], safeclick: [16, 0.6], safeopen: [10, 0.8], ropehook: [14, 0.6] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
+const FAR = { creak: [9, 0.7], roller: [9, 0.7], dronedive: [10, 0.7], dronedown: [6, 0.9], dronehit: [6, 0.9], mortarfire: [15, 0.7], whistle: [25, 0.45], mortarboom: [14, 0.5], rpgboom: [14, 0.5], c4boom: [14, 0.5], heboom: [10, 0.6], medic: [5, 0.8], crumble: [8, 0.8], sshot: [1, 3], buzz: [0.6, 3], chute: [10, 0.7], chuteland: [6, 0.9], knock: [8, 0.8], rattle: [8, 0.8], slam: [12, 0.7], rigpin: [3, 1.2], lockpick: [4, 1], lock: [5, 1], kick: [14, 0.6], safeclick: [16, 0.6], safeopen: [10, 0.8], ropehook: [14, 0.6], flare: [14, 0.7] }; // closecombat: (sshot: a suppressed shot, heard only nearby)
 
 // A shell coming down, like the real thing on recordings: a reedy, breathy shriek that holds high and then drops
 // faster and faster (Doppler) as it comes in, fluttering with the air tearing round it; thin and far away at first,
@@ -799,6 +799,10 @@ export const audio = {
         break;
       // locks (Mansion): a pick working in the lock, a key turning, a boot against a locked door
       // ROADMAP 16: the safe's dial clicking round, its door's bolts going back; the rope's grappling hook on the roof
+      case 'flare': // the helicopter's flares: a pop and a hiss
+        burst(out, t, { dur: 0.08, type: 'lowpass', freq: 1200, gain: 0.9 });
+        burst(out, t + 0.05, { dur: 1.4, type: 'highpass', freq: 2500, freqEnd: 1200, gain: 0.35 });
+        break;
       case 'safeclick':
         for (let i = 0; i < 4; i++) tone(out, t + i * 0.09, { freq: 2400 - (i % 2) * 500, dur: 0.015, type: 'square', gain: 0.07 });
         break;

@@ -2333,7 +2333,7 @@ document.addEventListener('mousedown', e => {
     return;
   }
   if (gadgets.busy() && me.alive && e.button !== 1) { gadgets.mouseDown(e.button); return; }
-  if (heliC.piloting() && e.button !== 1) return; // heli: the pilot's hands are full // (on a gadget: no shooting or throwing; at the CCTV desk the buttons switch cameras)
+  if (heliC.piloting() && e.button !== 1) { if (e.button === 0) heliC.rocket(camera); return; } // heli: the pilot fires a nose rocket (no guns) // (on a gadget: no shooting or throwing; at the CCTV desk the buttons switch cameras)
   if (me.drone && me.alive) {
     if (e.button === 0) droneBomb();
     else if (e.button === 2) droneDive();
@@ -2452,7 +2452,7 @@ document.addEventListener('keydown', e => {
       if (me.alive) switchSlot(weaponOf(me.lastSlot) ? me.lastSlot : bestSlot()); break;
     case 'KeyR': if (me.drone && me.team === 'CT' && trk.on()) trk.scan(true); else startReload(); break; // (phone tracker: flying a drone, R scans from it)
     case 'KeyE': if (me.mortar) me.mortar = null; else if (me.drone) releaseDrone(); else if (me.alive) startUse('key'); break;
-    case 'KeyG': if (!me.alive) { haunt.toggle(); break; } if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker'].includes(current())) net.send({ t: 'drop', w: current() }); break;
+    case 'KeyG': if (!me.alive) { haunt.toggle(); break; } if (heliC.piloting()) { heliC.flare(); break; } if (me.alive && !me.drone && !['knife', ...GRENADES, ...MINES, 'jammer', 'drone', 'satchel', 'phone', 'tracker'].includes(current())) net.send({ t: 'drop', w: current() }); break; // (heli: the pilot's G fires flares)
     case 'KeyB': openBuy(); break;
     case 'KeyO': openBuy(5); break; // straight to the equipment
     case 'KeyM': toggleMenu(teamMenu); break;

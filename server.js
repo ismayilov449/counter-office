@@ -18,7 +18,7 @@ const ZOMBIE = { hp: 1000, motherHp: 2000, countdown: 12, respawn: 4 };
 // Party modes the admin can switch on (see CFG.party).
 const PARTY_WEAPONS = ['', 'awp', 'deagle', 'scout', 'ak47', 'knife', 'rpg'];
 import { CAR, carBoxes, seatPos, exitSpots } from './shared/vehicles.js';
-import { HELI } from './shared/heli.js';
+import { HELI, ROCKET } from './shared/heli.js';
 import { CollisionWorld } from './shared/collision.js';
 import { skyOf } from './shared/maps/sky.js';
 import { doorBox, doorCenter, doorReach, openingSide, GONE } from './shared/doors.js';
@@ -1621,7 +1621,8 @@ const rope = createRope({ game, players, map: () => MAP, world: () => world, now
 // heli: the SWAT helicopter (ROADMAP 18; Mansion maps; lib/heli.js)
 const heli = createHeli({ game, players, map: () => MAP, world: () => world, now, send, broadcast, notify: (...a) => notify(...a),
   killPlayer: (q, by, w) => killPlayer(q, by, w, false), applyDamage: (...a) => applyDamage(...a), lineOfSight: (a, b) => lineOfSight(a, b),
-  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w) });
+  mates: (a, b) => mates(a, b), ff: () => CFG.friendlyFire, blastMap: (at, w) => blastMap(at, w),
+  launch: (p, o, d) => launchRocket(p, o, d, { ...WEAPONS.rpg26, ...ROCKET }, 'rpg26') }); // (the pilot's nose rockets)
 // locks: locked doors (Mansion maps; lib/locks.js)
 const locks = createLocks({ game, players, map: () => MAP, world: () => world, now, send, broadcast, nearestDoor: (p, max) => nearestDoor(p, max),
   speed: (p, t) => cc.speed(p, t), kickOpen: (i, side, by) => cc.slam(i, side, by) });
@@ -2574,7 +2575,8 @@ function onShoot(p, m) {
 // only hurts people who can see the explosion: a wall in between protects them.
 function launchRocket(p, o, d, def, weapon = 'rpg') {
   const ownCar = p.heli ? 'heli' : carOf(p)?.id ?? null;
-  const wall = world.raycast(o, d, 300, 'bullet', ownCar);
+  let wall = world.raycast(o, d, 300, 'bullet', ownCar);
+  if (wall?.box.heli && heli.flared()) wall = world.raycast(o, d, 300, 'bullet', 'heli'); // heli: its flares, the rocket flies past it
   let dist = wall ? wall.t : 300;
   for (const q of players.values()) {
     if (q === p || !q.alive || !inTeam(q)) continue;
@@ -2628,7 +2630,7 @@ function explodeRocket(at, owner, def, weapon = 'rpg') {
     const d = dist3(at, [c.p[0], c.p[1] + 0.7, c.p[2]]);
     if (d < R) damageCar(c, 900 * (1 - d / R), owner);
   }
-  heli.blast(at, R, weapon === 'rpg' || weapon === 'rpg26' ? HELI.rpg : 500, owner); // heli: an RPG's hit costs it more than half its hull
+  if (!heli.flared()) heli.blast(at, R, weapon === 'rpg' || weapon === 'rpg26' ? HELI.rpg : 500, owner); // heli: an RPG's hit costs it more than half its hull (not while its flares are out)
   chainMines(at, MINE.chain);
 }
 
@@ -3932,6 +3934,8 @@ function handle(p, m) {
       break;
     case 'heli': heli.pilot(p, m, t); break; // heli: the pilot's browser, where it is
     case 'heliHit': heli.hit(p, m); break; // heli: it hit something
+    case 'heliRocket': heli.rocket(p, m, t); break; // heli: the pilot's nose rocket
+    case 'heliFlare': heli.flare(p, t); break; // heli: the pilot's flares
     case 'heliSeat': heli.swap(p); break; // heli: Q on the ground, to a door gun and back
     case 'zip':
       if (m.off && p.zip) zipOff(p, t, 'letgo');

@@ -473,6 +473,15 @@ The CTs' helicopter waits behind the house; Terrorists can get in too (the first
 from it. **Its win was removed on 2026-11-26 at the user's request:** a Terrorist pilot keeping it 11 m up for 8 s used
 to win the round; the helicopter is for flying and shooting, never for winning.
 
+## 20. The pilot's weapons (both Mansion maps, added 2026-11-26) — **built 2026-11-26**
+
+1. **Nose rockets.** Mouse 1 flying: a rocket from under the nose toward the middle of the screen (4 a round, 1.2 s
+   apart; 300 damage, a 5 m blast).
+2. **Flares.** G flying (2 a round): for 3 s rockets fired at it fly past, and their blasts don't hurt it.
+
+**Left out (offered, not chosen):** a searchlight, a tracker scan and spotting from the air, a supply drop, the winch
+rescue, rotor wash.
+
 **Left out (offered, not chosen):** the house remembering damage between rounds, round events, a team commander, kill
 streak support, a story match.
 
