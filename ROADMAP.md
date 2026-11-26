@@ -414,6 +414,25 @@ a trail for fast-moving phones.
 
 *Bots: they don't use the tracker or react to it in version 1.*
 
+## 15. Ghosts & rigged doors (Mansion maps) — **built 2026-11-26** (045a1c6, fb2b961, 3ccfe41)
+
+1. **Ghosts.** Dead this round: G floats free through walls; once a round, near a living enemy (10 m), knock on a wall,
+   flicker a room's lights or slam a door.
+2. **Rigged doors.** A Terrorist with the HE in hand ties it to a closed door (E, 2.5 s). Opening it: a ping and the
+   blast 0.5 s later on the opener's side of the doorway. A crouched CT takes it off (3 s).
+3. **The rigged lift.** The same in the lift's cabin: it goes off 1 s after its doors open at another floor.
+
+## 16. The safe & the roof rope (Mansion maps, added 2026-11-26, not built yet)
+
+1. **The safe.** A second objective for the Terrorists: a safe in a room on the upper floor (the room picked when it's
+   built). Cracking it takes holding E for 20 s, with loud clicks heard across the floor, and pays every Terrorist
+   $1500. It pulls the Terrorists out of their corners, which also works against camping.
+2. **Rope from the roof.** A CT on the roof hooks a rope at the edge (E, 2 s) and swings in through an upstairs window,
+   smashing the glass: a SWAT-style entry. The Terrorists inside hear the hook clank on the roof first.
+
+**Left out (offered, not chosen):** fake rigs, last breath (marking your killer), the bounty, throwable junk, play of
+the round, funny awards.
+
 ---
 
 ## Missing from the map today
